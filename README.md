@@ -1,44 +1,43 @@
 # Sketch2Stitch
 
-Flutter app + Firebase backend. Mock payments, no real money.
+Flutter app with a Firebase backend. Payments are mocked; no real transactions occur.
 
 ## Setup (one-time)
 
-1. **Install Flutter:** https://docs.flutter.dev/get-started/install (pick your OS)
-2. **Install Android Studio** → open it once → SDK Manager (install Android SDK) → Device Manager (create/start an emulator), or just plug in a real Android phone with USB debugging on.
-3. **Check everything's OK:**
+1. **Install Flutter:** https://docs.flutter.dev/get-started/install
+2. **Install Android Studio** — open once, use SDK Manager to install the Android SDK, and Device Manager to create an emulator, or connect a physical Android device with USB debugging enabled.
+3. **Verify installation:**
    ```bash
    flutter doctor
    ```
-   Fix any red ✗ it shows (usually licenses — run `flutter doctor --android-licenses` and accept).
-4. **Clone the repo:**
+   Resolve any items marked with a red ✗ (license issues are usually fixed by running `flutter doctor --android-licenses` and accepting).
+4. **Clone the repository:**
    ```bash
    git clone https://github.com/meemmac/Sketch2Stitch.git
    cd Sketch2Stitch
    flutter pub get
    ```
-5. **Get Firebase config files** from whoever owns the Firebase project (ask to be added as a collaborator first):
-   - `google-services.json` → put in `android/app/`
-   - (Mac only, for iOS) `GoogleService-Info.plist` → put in `ios/Runner/`
+5. **Obtain Firebase config files** from the project owner (collaborator access on the Firebase project is required first):
+   - `google-services.json` → place in `android/app/`
+   - `GoogleService-Info.plist` (macOS/iOS only) → place in `ios/Runner/`
 
-
-## Every time you work on it
+## Development workflow
 
 ```bash
-git pull origin main        # get latest changes
-flutter pub get              # in case dependencies changed
-flutter run                  # pick your emulator/device when it asks
+git pull origin main    # fetch latest changes
+flutter pub get         # update dependencies if changed
+flutter run              # select an emulator or device
 ```
 
-When done with a change:
+To submit changes:
 ```bash
-git checkout -b feature/your-thing   # only if starting new work
+git checkout -b feature/feature-name   # for new work
 git add .
-git commit -m "what you did"
-git push origin feature/your-thing
+git commit -m "description of changes"
+git push origin feature/feature-name
 ```
-Then open a Pull Request on GitHub into `main`. Don't push straight to `main`.
+A Pull Request should then be opened into `main`. Direct pushes to `main` are not permitted.
 
 ## Platform notes
-- **Android:** everyone can build/run this, Windows or Mac.
-- **iOS:** only possible on a Mac. If you're on Windows, just build/test Android — that's expected and fine.
+- **Android:** supported on both Windows and macOS.
+- **iOS:** builds require macOS with Xcode. Windows-based development should target Android only.
