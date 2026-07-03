@@ -145,13 +145,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                       children: [
                         _buildStakeholderCard(
                           "Tailor",
-                          "Access digital measurements, manage complex orders, and showcase your craftsmanship.",
+                          "Access digital measurements, manage orders, and showcase your craftsmanship.",
                           Icons.content_cut_rounded,
                           0,
                         ),
                         _buildStakeholderCard(
                           "Customer",
-                          "Visualize designs, purchase premium fabrics, and connect with top-rated tailors.",
+                          "Customize designs, trial with AI, purchase premium fabrics, and connect with tailors.",
                           Icons.auto_awesome_rounded,
                           1,
                         ),
@@ -164,6 +164,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                       ],
                     ),
                   ),
+
+                  const SizedBox(height: 40),
+
+                  // 🖼 Bended Horizontal Image Scroll
+                  _buildBendedImageScroll(),
 
                   const SizedBox(height: 40),
 
@@ -217,6 +222,87 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const FirebaseTestScreen()),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBendedImageScroll() {
+    final List<String> images = [
+      'crochet.jpg',
+      'embroidery.jpg',
+      'fab.jpg',
+      'fab2.jpg',
+      'fabrics_rolled.jpg',
+      'gorgeous.jpg',
+      'lace.jpg',
+      'saree.jpg',
+      'silk.jpg',
+      'tassel.jpg',
+      'textile.jpg',
+    ];
+
+    return SizedBox(
+      height: 200,
+      child: Stack(
+        children: [
+          // The actual scrolling list
+          ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            itemCount: images.length,
+            physics: const BouncingScrollPhysics(),
+            itemBuilder: (context, index) {
+              return Container(
+                width: 150,
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  image: DecorationImage(
+                    image: AssetImage('assets/images/${images[index]}'),
+                    fit: BoxFit.cover,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    )
+                  ],
+                ),
+              );
+            },
+          ),
+          // Top Ellipse to create "bend"
+          Positioned(
+            top: -65,
+            left: -50,
+            right: -50,
+            child: Container(
+              height: 100,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF4F9F1), // Background color
+                borderRadius: BorderRadius.vertical(
+                  bottom: Radius.elliptical(MediaQuery.of(context).size.width + 100, 80),
+                ),
+              ),
+            ),
+          ),
+          // Bottom Ellipse to create "bend"
+          Positioned(
+            bottom: -65,
+            left: -50,
+            right: -50,
+            child: Container(
+              height: 100,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF4F9F1), // Background color
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.elliptical(MediaQuery.of(context).size.width + 100, 80),
                 ),
               ),
             ),
