@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'about_us_screen.dart';
+import 'firebase_test_screen.dart';
 
 void main() {
   runApp(const Sketch2StitchApp());
@@ -68,6 +69,16 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
     return Scaffold(
       backgroundColor: bgColor,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const FirebaseTestScreen()),
+          );
+        },
+        backgroundColor: Colors.green.shade800,
+        child: const Icon(Icons.cloud),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
