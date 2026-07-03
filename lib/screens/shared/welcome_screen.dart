@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'about_us_screen.dart';
 import 'firebase_test_screen.dart';
@@ -17,6 +19,10 @@ class Sketch2StitchApp extends StatelessWidget {
       theme: ThemeData(
         fontFamily: 'Roboto',
         useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF4CAF50),
+          primary: const Color(0xFF2E7D32),
+        ),
       ),
       home: const WelcomeScreen(),
     );
@@ -30,214 +36,446 @@ class WelcomeScreen extends StatefulWidget {
   State<WelcomeScreen> createState() => _WelcomeScreenState();
 }
 
-class _WelcomeScreenState extends State<WelcomeScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateMixin {
+  late AnimationController _particleController;
+  late AnimationController _floatController;
+  late AnimationController _glowController;
 
   @override
   void initState() {
     super.initState();
+    _particleController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 25),
+    )..repeat();
 
-    _controller =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 1200));
+    _floatController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 5),
+    )..repeat(reverse: true);
 
-    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
-    );
-
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
-
-    _controller.forward();
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _particleController.dispose();
+    _floatController.dispose();
+    _glowController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    const bgColor = Color(0xFFEEF6E9); // light green background
-
     return Scaffold(
-      backgroundColor: bgColor,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const FirebaseTestScreen()),
-          );
-        },
-        backgroundColor: Colors.green.shade800,
-        child: const Icon(Icons.cloud),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              const SizedBox(height: 20),
-
-              // 🔵 Top Title
-              FadeTransition(
-                opacity: _fadeAnimation,
-                child: const Text(
-                  "Sketch2Stitch",
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // 🖼 HERO IMAGE PLACEHOLDER (desktop image removed -> blank for now)
-              SlideTransition(
-                position: _slideAnimation,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 20),
-                  height: 180,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.6),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.black12),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      "Image Placeholder",
-                      style: TextStyle(color: Colors.black45),
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 30),
-
-              // 🔘 Login / Signup Buttons (centered)
-              FadeTransition(
-                opacity: _fadeAnimation,
-               child: Column(
-                 children: [
-                   Row(
-                     mainAxisAlignment: MainAxisAlignment.center,
-                     children: [
-                       _buildButton("Login", Colors.black87, null),
-                       const SizedBox(width: 20),
-                       _buildButton("Signup", Colors.green, null),
-                     ],
-                   ),
-                   const SizedBox(height: 15),
-                   _buildButton("About Us", Colors.green.shade700, context),
-                 ],
-               ),
-              ),
-
-              const SizedBox(height: 30),
-
-              // 📌 Simple tagline
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 25),
-                child: Text(
-                  "Design your dress, buy materials, and get it stitched in one place.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: Colors.black87),
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              // 🟩 SECOND IMAGE PLACEHOLDER (replaces horizontal scroll section)
-              SlideTransition(
-                position: _slideAnimation,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 20),
-                  height: 120,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: const Center(
-                    child: Text("Future Image Slider Placeholder"),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              // 🧭 HELP SECTION (simplified mobile version)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                margin: const EdgeInsets.symmetric(horizontal: 15),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Help getting started",
-                      style:
-                      TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    SizedBox(height: 10),
-                    Text(
-                      "Explore design ideas, choose fabrics, and connect with tailors easily.",
-                      style: TextStyle(fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 40),
-            ],
+      backgroundColor: const Color(0xFFF4F9F1), // Ultra-premium soft green
+      body: Stack(
+        children: [
+          // 🌊 Floating fabric-like particles in background
+          AnimatedBuilder(
+            animation: _particleController,
+            builder: (context, child) {
+              return CustomPaint(
+                painter: FabricParticlePainter(_particleController.value),
+                size: Size.infinite,
+              );
+            },
           ),
-        ),
+          
+          SafeArea(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 🏷 Top Left Logo
+                  Padding(
+                    padding: const EdgeInsets.only(left: 20, top: 20),
+                    child: Image.asset(
+                      'assets/images/transparent_logo.png',
+                      height: 55,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // ✍️ Main Tagline Section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 30),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Sketch2Stitch",
+                          style: TextStyle(
+                            fontSize: 42,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.green.shade900,
+                            letterSpacing: -1.5,
+                            height: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 15),
+                        Text(
+                          "Design Your Dress, Buy Materials, and Get It Stitched in One Place",
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.green.shade800.withOpacity(0.8),
+                            fontWeight: FontWeight.w500,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 40),
+
+                  // 🃏 Stakeholder Cards with Glassmorphism & Parallax
+                  SizedBox(
+                    height: 260,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      physics: const BouncingScrollPhysics(),
+                      children: [
+                        _buildStakeholderCard(
+                          "Tailor",
+                          "Access digital measurements, manage complex orders, and showcase your craftsmanship.",
+                          Icons.content_cut_rounded,
+                          0,
+                        ),
+                        _buildStakeholderCard(
+                          "Customer",
+                          "Visualize designs, purchase premium fabrics, and connect with top-rated tailors.",
+                          Icons.auto_awesome_rounded,
+                          1,
+                        ),
+                        _buildStakeholderCard(
+                          "Retailer",
+                          "Expand your reach by listing high-quality fabrics and fashion accessories.",
+                          Icons.storefront_rounded,
+                          2,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 40),
+
+                  // 🔘 Glowing Login / Signup Buttons
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 30),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildGlowButton(
+                            "Login",
+                            Colors.white,
+                            Colors.green.shade900,
+                            false,
+                            () {},
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        Expanded(
+                          child: _buildGlowButton(
+                            "Signup",
+                            Colors.green.shade800,
+                            Colors.white,
+                            true,
+                            () {},
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 50),
+
+                  // 🛠 Help Getting Started Section
+                  _buildHelpSection(),
+
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ),
+          
+          // Subtle Debug/Test Access
+          Positioned(
+            right: 10,
+            top: 10,
+            child: Opacity(
+              opacity: 0.3,
+              child: IconButton(
+                icon: const Icon(Icons.settings_input_component, size: 18),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const FirebaseTestScreen()),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildButton(String text, Color color, BuildContext? context) {
-    return GestureDetector(
-      onTap: () {
-        if (text == "About Us" && context != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AboutUsScreen()),
-          );
-        }
+  Widget _buildStakeholderCard(String title, String desc, IconData icon, int index) {
+    return AnimatedBuilder(
+      animation: _floatController,
+      builder: (context, child) {
+        // Parallax / Gentle Drifting Effect
+        double verticalOffset = math.sin(_floatController.value * 2 * math.pi + (index * 1.5)) * 12;
+        return Transform.translate(
+          offset: Offset(0, verticalOffset),
+          child: Container(
+            width: 280,
+            margin: const EdgeInsets.only(right: 20, top: 10, bottom: 10),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(30),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                child: Container(
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.45),
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.6),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.green.shade900.withOpacity(0.04),
+                        blurRadius: 25,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50.withOpacity(0.8),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(icon, color: Colors.green.shade800, size: 30),
+                      ),
+                      const Spacer(),
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green.shade900,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        desc,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black87.withOpacity(0.7),
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
       },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 12),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            )
+    );
+  }
+
+  Widget _buildGlowButton(String text, Color bgColor, Color textColor, bool hasGlow, VoidCallback onTap) {
+    return AnimatedBuilder(
+      animation: _glowController,
+      builder: (context, child) {
+        return Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: hasGlow ? [
+              BoxShadow(
+                color: Colors.green.shade500.withOpacity(0.4 * _glowController.value),
+                blurRadius: 20 * _glowController.value,
+                spreadRadius: 2 * _glowController.value,
+              )
+            ] : [],
+          ),
+          child: Material(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(18),
+            elevation: hasGlow ? 0 : 4,
+            shadowColor: Colors.black12,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(18),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  border: bgColor == Colors.white 
+                      ? Border.all(color: Colors.green.shade100, width: 1.5) 
+                      : null,
+                ),
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHelpSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 30),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "HELP GETTING STARTED",
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 2,
+              color: Colors.green.shade900.withOpacity(0.4),
+            ),
+          ),
+          const SizedBox(height: 25),
+          _buildHelpItem(
+            "Design and Measurement",
+            "The design feature provides a platform where users can sketch their ideas or upload custom reference images.",
+            Icons.brush_rounded,
+          ),
+          const SizedBox(height: 25),
+          _buildHelpItem(
+            "About Us",
+            "Discover the story behind Sketch2Stitch and our vision for the future of custom fashion.",
+            Icons.info_outline_rounded,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AboutUsScreen()),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHelpItem(String title, String desc, IconData icon, {VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(5),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 15,
+                  )
+                ],
+              ),
+              child: Icon(icon, color: Colors.green.shade700, size: 26),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    desc,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.black54,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
-        child: Text(
-          text,
-          style: const TextStyle(color: Colors.white),
-        ),
       ),
     );
   }
+}
+
+class FabricParticlePainter extends CustomPainter {
+  final double animationValue;
+
+  FabricParticlePainter(this.animationValue);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.green.shade200.withOpacity(0.15)
+      ..style = PaintingStyle.fill;
+
+    final random = math.Random(555);
+
+    for (int i = 0; i < 15; i++) {
+      // Slow, organic movement
+      double x = (random.nextDouble() * size.width + (animationValue * 40 * (random.nextDouble() + 0.5))) % size.width;
+      double y = (random.nextDouble() * size.height + (math.sin(animationValue * math.pi * 2 + i) * 20)) % size.height;
+      
+      double radius = 50 + random.nextDouble() * 80;
+      
+      final path = Path();
+      int points = 10;
+      for (int j = 0; j < points; j++) {
+        double angle = (j * 2 * math.pi) / points;
+        // Wavy edges for fabric feel
+        double wave = 0.2 * math.sin(animationValue * math.pi * 2 + j * 1.5);
+        double r = radius * (0.8 + wave);
+        double px = x + math.cos(angle) * r;
+        double py = y + math.sin(angle) * r;
+        if (j == 0) path.moveTo(px, py);
+        else path.lineTo(px, py);
+      }
+      path.close();
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
