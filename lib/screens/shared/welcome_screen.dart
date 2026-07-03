@@ -452,8 +452,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
           const SizedBox(height: 25),
           _buildHelpItem(
             "Design and Measurement",
-            "The design feature provides a platform where users can sketch their ideas or upload custom reference images.",
+            "The design feature provides a platform where users can design their ideas or upload custom reference images.Customers save and update body measurements in inches. Each field has a guide button with step-by-step measuring instructions. Saved measurements are used automatically in the Cart and Virtual Trial",
             Icons.brush_rounded,
+          ),
+          const SizedBox(height: 25),
+          _buildHelpItem(
+            "Virtual Trial",
+            "This feature lets customers upload their photo (or use a default mannequin) and preview how their chosen outfit will look before placing an order. It also displays estimated fabric requirements in gaj and inches, allows users to add style and fit notes, and provides a Go to Cart option to proceed with the purchase.",
+            Icons.checkroom_rounded,
           ),
           const SizedBox(height: 25),
           _buildHelpItem(
