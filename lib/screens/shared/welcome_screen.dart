@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'login_screen.dart';
 import 'about_us_screen.dart';
 import 'firebase_test_screen.dart';
 import 'ai_test_screen.dart';
@@ -184,7 +185,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                             Colors.white,
                             Colors.green.shade900,
                             false,
-                            () {},
+                            () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const LoginScreen(),
+                                ),
+                              );
+                            },
                           ),
                         ),
                         const SizedBox(width: 20),
