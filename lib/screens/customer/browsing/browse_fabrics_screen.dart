@@ -5,20 +5,39 @@ import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/review.dart';
 import 'package:sketch2stitch/models/portfolio.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_tailors_screen.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
 
-class BrowseFabricsScreen extends StatefulWidget {
+/// Entry point kept for backward compatibility with existing navigation
+/// calls (e.g. `Navigator.push(... BrowseFabricsScreen())`). It now opens
+/// the shared [BrowseShell] on the Fabrics tab, so the user can swipe or
+/// tap between Fabrics / Tailors / Retailers from anywhere.
+class BrowseFabricsScreen extends StatelessWidget {
   const BrowseFabricsScreen({super.key});
 
   @override
-  State<BrowseFabricsScreen> createState() => _BrowseFabricsScreenState();
+  Widget build(BuildContext context) {
+    return const BrowseShell(initialIndex: 0);
+  }
 }
 
-class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
+/// The actual fabrics tab content, rendered as one page inside the
+/// shared [BrowseShell] PageView. Header and navigation row live in the
+/// shell; this widget only owns the hero, category chips, and grid.
+class FabricsPageBody extends StatefulWidget {
+  final ValueNotifier<String> searchQuery;
+
+  const FabricsPageBody({super.key, required this.searchQuery});
+
+  @override
+  State<FabricsPageBody> createState() => _FabricsPageBodyState();
+}
+
+class _FabricsPageBodyState extends State<FabricsPageBody>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   String _selectedCategory = 'All';
-  String _searchQuery = '';
-  bool _showFilters = false;
 
   final List<Retailer> _retailers = [];
   final List<Product> _products = [];
@@ -40,7 +59,6 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
   }
 
   void _loadHardcodedData() {
-    // Sample Reviews
     final sampleReviews = [
       Review(
         id: 'r1',
@@ -53,7 +71,6 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
       ),
     ];
 
-    // Sample Portfolios
     final samplePortfolios = [
       Portfolio(
         id: 'pf1',
@@ -63,7 +80,6 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
       ),
     ];
 
-    // Retailers
     _retailers.addAll([
       Retailer(
         id: 'r1',
@@ -93,7 +109,6 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
       ),
     ]);
 
-    // Products with local images
     _products.addAll([
       Product(
         id: 'p1',
@@ -102,7 +117,8 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
         category: 'Cotton',
         materialType: '100% Cotton',
         colorOptions: ['White', 'Pink', 'Blue'],
-        description: 'High-quality cotton fabric perfect for all your tailoring needs. This premium fabric offers excellent durability, comfort, and a luxurious feel.',
+        description:
+            'High-quality cotton fabric perfect for all your tailoring needs. This premium fabric offers excellent durability, comfort, and a luxurious feel.',
         price: 230,
         rating: 4.5,
         reviewCount: 234,
@@ -116,7 +132,8 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
         category: 'Cotton',
         materialType: 'Cotton Blend',
         colorOptions: ['White', 'Beige', 'Blue'],
-        description: 'Premium cotton blend fabric with excellent durability and softness.',
+        description:
+            'Premium cotton blend fabric with excellent durability and softness.',
         price: 330,
         rating: 4.7,
         reviewCount: 234,
@@ -130,7 +147,8 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
         category: 'Cotton',
         materialType: '100% Cotton',
         colorOptions: ['White', 'Blue', 'Green'],
-        description: 'Casual cotton fabric for everyday wear. Lightweight and breathable.',
+        description:
+            'Casual cotton fabric for everyday wear. Lightweight and breathable.',
         price: 130,
         rating: 3.5,
         reviewCount: 200,
@@ -172,7 +190,8 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
         category: 'Lace',
         materialType: 'Cotton Lace',
         colorOptions: ['White', 'Blue', 'Green'],
-        description: 'Beautiful lace fabric for elegant designs and special occasions.',
+        description:
+            'Beautiful lace fabric for elegant designs and special occasions.',
         price: 450,
         rating: 3.5,
         reviewCount: 200,
@@ -186,7 +205,8 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
         category: 'Silk',
         materialType: '100% Silk',
         colorOptions: ['White', 'Gold', 'Pink'],
-        description: 'Luxurious silk fabric for special occasions and formal wear.',
+        description:
+            'Luxurious silk fabric for special occasions and formal wear.',
         price: 550,
         rating: 4.7,
         reviewCount: 156,
@@ -214,7 +234,8 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
         category: 'Embroidery',
         materialType: 'Cotton Blend',
         colorOptions: ['White', 'Gold', 'Blue'],
-        description: 'Exquisite embroidery fabric for traditional and modern designs.',
+        description:
+            'Exquisite embroidery fabric for traditional and modern designs.',
         price: 600,
         rating: 4.9,
         reviewCount: 312,
@@ -228,7 +249,8 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
         category: 'Linen',
         materialType: 'Linen Blend',
         colorOptions: ['White', 'Beige', 'Green'],
-        description: 'Breathable linen blend fabric for comfortable everyday wear.',
+        description:
+            'Breathable linen blend fabric for comfortable everyday wear.',
         price: 260,
         rating: 4.3,
         reviewCount: 167,
@@ -237,7 +259,6 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
       ),
     ]);
 
-    // Tailors
     _tailors.addAll([
       Tailor(
         id: 't1',
@@ -258,188 +279,27 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredProducts = _products.where((p) {
-      final matchesCategory = _selectedCategory == 'All' ||
-          p.category == _selectedCategory;
-      final matchesSearch = p.productName
-          .toLowerCase()
-          .contains(_searchQuery.toLowerCase());
-      return matchesCategory && matchesSearch;
-    }).toList();
+    super.build(context);
+    return ValueListenableBuilder<String>(
+      valueListenable: widget.searchQuery,
+      builder: (context, searchQuery, _) {
+        final filteredProducts = _products.where((p) {
+          final matchesCategory =
+              _selectedCategory == 'All' || p.category == _selectedCategory;
+          final matchesSearch = p.productName
+              .toLowerCase()
+              .contains(searchQuery.toLowerCase());
+          return matchesCategory && matchesSearch;
+        }).toList();
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          _buildHeader(),
-          _buildHeroSection(),
-          _buildNavigationRow(),
-          _buildCategoryChips(),
-          Expanded(
-            child: _buildProductGrid(filteredProducts),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─── Header ────────────────────────────────────────────────────────────────
-
-  Widget _buildHeader() {
-    return Container(
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 8,
-        bottom: 12,
-        left: 16,
-        right: 16,
-      ),
-      child: Row(
-        children: [
-          // Dashboard/Menu Icon
-          IconButton(
-            onPressed: () {
-              // Open drawer later
-            },
-            icon: const Icon(
-              Icons.menu,
-              color: Color(0xFF224F34),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Logo
-          Image.asset(
-            'assets/images/transparent_logo.png',
-            height: 45,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                height: 45,
-                width: 45,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF224F34),
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Text(
-                    'S2S',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(width: 16),
-
-          // Search Bar
-          Expanded(
-            child: Container(
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.grey.shade300,
-                ),
-              ),
-              child: TextField(
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
-                },
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search, size: 20),
-                  hintText: 'Search fabrics...',
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 10),
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 12),
-
-          // Cart
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(
-              Icons.shopping_cart_outlined,
-              color: Color(0xFF224F34),
-              size: 24,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─── Navigation Row ──────────────────────────────────────────────────────
-
-  Widget _buildNavigationRow() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
+        return Column(
           children: [
-            const Text(
-              'Browse Clothing and Elements',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF224F34),
-              ),
-            ),
-            const SizedBox(width: 30),
-
-            TextButton(
-              onPressed: () {
-                // Navigate to Browse Tailors Screen
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const BrowseTailorsScreen(),
-                  ),
-                );
-              },
-              child: const Text(
-                'Browse Tailors',
-                style: TextStyle(
-                  color: Color(0xFF224F34),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-
-            const SizedBox(width: 8),
-
-           TextButton(
-  onPressed: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const BrowseRetailersScreen(),
-      ),
-    );
-  },
-  child: const Text(
-    'Browse Retailers',
-    style: TextStyle(
-      color: Color(0xFF224F34),
-      fontWeight: FontWeight.w600,
-      fontSize: 13,
-    ),
-  ),
-),
-
-            const SizedBox(width: 8),
+            _buildHeroSection(),
+            _buildCategoryChips(),
+            Expanded(child: _buildProductGrid(filteredProducts)),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -471,10 +331,7 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
           const SizedBox(height: 4),
           Text(
             'Choose from our wide selection of high-quality fabrics',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white.withValues(alpha: 0.9),
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: 0.9)),
           ),
           const SizedBox(height: 12),
           Row(
@@ -528,9 +385,7 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
             child: _buildChip(
               category,
               _selectedCategory == category,
-              () {
-                setState(() => _selectedCategory = category);
-              },
+              () => setState(() => _selectedCategory = category),
             ),
           );
         }).toList(),
@@ -586,9 +441,7 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
       itemBuilder: (context, index) {
         final product = products[index];
         return GestureDetector(
-          onTap: () {
-            _showProductDetailOverlay(context, product);
-          },
+          onTap: () => _showProductDetailOverlay(context, product),
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -605,13 +458,10 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Product Image
                 Expanded(
                   flex: 3,
                   child: ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(16),
-                    ),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                     child: Image.asset(
                       product.imageUrl ?? 'assets/images/placeholder.jpg',
                       width: double.infinity,
@@ -619,17 +469,13 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
                           color: Colors.grey[200],
-                          child: const Icon(
-                            Icons.image_not_supported,
-                            size: 50,
-                            color: Colors.grey,
-                          ),
+                          child: const Icon(Icons.image_not_supported,
+                              size: 50, color: Colors.grey),
                         );
                       },
                     ),
                   ),
                 ),
-                // Product Info
                 Expanded(
                   flex: 2,
                   child: Padding(
@@ -640,28 +486,18 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
                       children: [
                         Text(
                           product.productName,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            const Icon(
-                              Icons.star,
-                              color: Color(0xFFFDE807),
-                              size: 14,
-                            ),
+                            const Icon(Icons.star, color: Color(0xFFFDE807), size: 14),
                             const SizedBox(width: 2),
                             Text(
                               '${product.rating} (${product.reviewCount})',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey,
-                              ),
+                              style: const TextStyle(fontSize: 11, color: Colors.grey),
                             ),
                           ],
                         ),
@@ -685,8 +521,6 @@ class _BrowseFabricsScreenState extends State<BrowseFabricsScreen> {
       },
     );
   }
-
-  // ─── Show Product Detail as Overlay ─────────────────────────────────────
 
   void _showProductDetailOverlay(BuildContext context, Product product) {
     showModalBottomSheet(

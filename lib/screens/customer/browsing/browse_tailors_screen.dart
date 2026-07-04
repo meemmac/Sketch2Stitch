@@ -3,96 +3,47 @@ import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/portfolio.dart';
 import 'package:sketch2stitch/models/review.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_fabrics_screen.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
 
-class BrowseTailorsScreen extends StatefulWidget {
+/// Entry point kept for backward compatibility with existing navigation
+/// calls (e.g. `Navigator.push(... BrowseTailorsScreen())`). It now opens
+/// the shared [BrowseShell] on the Tailors tab.
+class BrowseTailorsScreen extends StatelessWidget {
   const BrowseTailorsScreen({super.key});
 
   @override
-  State<BrowseTailorsScreen> createState() => _BrowseTailorsScreenState();
+  Widget build(BuildContext context) {
+    return const BrowseShell(initialIndex: 1);
+  }
 }
 
-class _BrowseTailorsScreenState extends State<BrowseTailorsScreen>
-    with SingleTickerProviderStateMixin {
+/// The actual tailors tab content, rendered as one page inside the shared
+/// [BrowseShell] PageView. Header and navigation row (including the
+/// tab-switch transition) live in the shell now; this widget only owns
+/// the hero, filter chips, and list.
+class TailorsPageBody extends StatefulWidget {
+  final ValueNotifier<String> searchQuery;
+
+  const TailorsPageBody({super.key, required this.searchQuery});
+
+  @override
+  State<TailorsPageBody> createState() => _TailorsPageBodyState();
+}
+
+class _TailorsPageBodyState extends State<TailorsPageBody>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   String _selectedFilter = 'All';
-  String _searchQuery = '';
 
   final List<Tailor> _tailors = [];
   final List<String> _filters = ['All', 'Top Rated', 'Premium', 'Fast Service'];
 
-  // ─── Nav "scroll to switch page" state ──────────────────────────────────
-  // _navDragOffset ranges from 0 (rest, "Browse Tailors" active) to
-  // -_navDragMax (fully dragged left, "Browse Clothing" active -> navigates).
-  late AnimationController _navAnimController;
-  double _navDragOffset = 0;
-  static const double _navDragMax = 140;
-
-  double get _clothingProgress => (-_navDragOffset / _navDragMax).clamp(0.0, 1.0);
-  double get _tailorsProgress => 1 - _clothingProgress;
-
-  double _lerp(double a, double b, double t) => a + (b - a) * t;
-
   @override
   void initState() {
     super.initState();
-    _navAnimController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 220),
-    );
     _loadHardcodedData();
-  }
-
-  @override
-  void dispose() {
-    _navAnimController.dispose();
-    super.dispose();
-  }
-
-  void _onNavDragUpdate(DragUpdateDetails details) {
-    setState(() {
-      _navDragOffset = (_navDragOffset + details.delta.dx).clamp(-_navDragMax, 0.0);
-    });
-  }
-
-  void _snapNav(double target, {VoidCallback? onComplete}) {
-    final tween = Tween<double>(begin: _navDragOffset, end: target);
-    _navAnimController.reset();
-    final curved = CurvedAnimation(parent: _navAnimController, curve: Curves.easeOut);
-    late final Animation<double> anim;
-    anim = tween.animate(curved)
-      ..addListener(() {
-        setState(() => _navDragOffset = anim.value);
-      });
-    _navAnimController.forward().whenComplete(() => onComplete?.call());
-  }
-
-  void _onNavDragEnd(DragEndDetails details) {
-    // Crossed far enough left -> finish the slide and navigate to Fabrics.
-    if (_clothingProgress >= 0.65) {
-      _snapNav(-_navDragMax, onComplete: () {
-        if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          PageRouteBuilder(
-            transitionDuration: const Duration(milliseconds: 280),
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                const BrowseFabricsScreen(),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(-1, 0),
-                  end: Offset.zero,
-                ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut)),
-                child: child,
-              );
-            },
-          ),
-        );
-      });
-    } else {
-      // Didn't cross the threshold -> snap back to "Browse Tailors" active.
-      _snapNav(0);
-    }
   }
 
   void _loadHardcodedData() {
@@ -145,8 +96,9 @@ class _BrowseTailorsScreenState extends State<BrowseTailorsScreen>
         licenses: ['License #12345'],
         rating: 4.5,
         reviewCount: 234,
-        profileImage: 'https://picsum.photos/seed/masterstitch/200/200',
-        description: 'Expert tailoring with 15 years experience. Specializing in wedding and formal wear.',
+       profileImage: 'assets/images/crochet.jpg',
+        description:
+            'Expert tailoring with 15 years experience. Specializing in wedding and formal wear.',
         portfolio: samplePortfolios,
         reviews: sampleReviews.where((r) => r.targetId == 't1').toList(),
       ),
@@ -159,8 +111,9 @@ class _BrowseTailorsScreenState extends State<BrowseTailorsScreen>
         licenses: [],
         rating: 3.5,
         reviewCount: 134,
-        profileImage: 'https://picsum.photos/seed/quickstitch/200/200',
-        description: 'Fast and reliable tailoring with 10 years experience. Specializing in casual and daily wear.',
+       profileImage: 'assets/images/design.jpg',
+        description:
+            'Fast and reliable tailoring with 10 years experience. Specializing in casual and daily wear.',
         portfolio: [],
         reviews: sampleReviews.where((r) => r.targetId == 't2').toList(),
       ),
@@ -173,8 +126,9 @@ class _BrowseTailorsScreenState extends State<BrowseTailorsScreen>
         licenses: ['License #22222'],
         rating: 4.0,
         reviewCount: 334,
-        profileImage: 'https://picsum.photos/seed/royalstitch/200/200',
-        description: 'Premium tailoring with 5 years experience. Specializing in traditional and ethnic wear.',
+       profileImage: 'assets/images/drawing_fabric.jpg',
+        description:
+            'Premium tailoring with 5 years experience. Specializing in traditional and ethnic wear.',
         portfolio: [],
         reviews: sampleReviews.where((r) => r.targetId == 't3').toList(),
       ),
@@ -187,8 +141,9 @@ class _BrowseTailorsScreenState extends State<BrowseTailorsScreen>
         licenses: [],
         rating: 4.5,
         reviewCount: 234,
-        profileImage: 'https://picsum.photos/seed/stitchtailors/200/200',
-        description: 'Professional tailoring with 15 years experience. Specializing in wedding and formal wear.',
+        profileImage: 'assets/images/textile.jpg',
+        description:
+            'Professional tailoring with 15 years experience. Specializing in wedding and formal wear.',
         portfolio: [],
         reviews: [],
       ),
@@ -201,8 +156,9 @@ class _BrowseTailorsScreenState extends State<BrowseTailorsScreen>
         licenses: ['License #33333'],
         rating: 4.5,
         reviewCount: 234,
-        profileImage: 'https://picsum.photos/seed/modernfit/200/200',
-        description: 'Modern tailoring with 15 years experience. Specializing in formal and informal wear.',
+        profileImage: 'assets/images/gorgeous.jpg',
+        description:
+            'Modern tailoring with 15 years experience. Specializing in formal and informal wear.',
         portfolio: [],
         reviews: [],
       ),
@@ -215,8 +171,9 @@ class _BrowseTailorsScreenState extends State<BrowseTailorsScreen>
         licenses: ['License #44444'],
         rating: 4.5,
         reviewCount: 234,
-        profileImage: 'https://picsum.photos/seed/masterstitch2/200/200',
-        description: 'Expert tailoring with 15 years experience. Specializing in wedding and formal wear.',
+        profileImage: 'assets/images/design.jpg',
+        description:
+            'Expert tailoring with 15 years experience. Specializing in wedding and formal wear.',
         portfolio: [],
         reviews: [],
       ),
@@ -225,200 +182,30 @@ class _BrowseTailorsScreenState extends State<BrowseTailorsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final filteredTailors = _tailors.where((t) {
-      final matchesFilter = _selectedFilter == 'All' ||
-          (_selectedFilter == 'Top Rated' && t.rating >= 4.5) ||
-          (_selectedFilter == 'Premium' && t.hasLicense) ||
-          (_selectedFilter == 'Fast Service' && t.reviewCount > 200);
+    super.build(context);
+    return ValueListenableBuilder<String>(
+      valueListenable: widget.searchQuery,
+      builder: (context, searchQuery, _) {
+        final filteredTailors = _tailors.where((t) {
+          final matchesFilter = _selectedFilter == 'All' ||
+              (_selectedFilter == 'Top Rated' && t.rating >= 4.5) ||
+              (_selectedFilter == 'Premium' && t.hasLicense) ||
+              (_selectedFilter == 'Fast Service' && t.reviewCount > 200);
 
-      final matchesSearch = t.name
-              .toLowerCase()
-              .contains(_searchQuery.toLowerCase()) ||
-          (t.description?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
+          final matchesSearch = t.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
+              (t.description?.toLowerCase().contains(searchQuery.toLowerCase()) ?? false);
 
-      return matchesFilter && matchesSearch;
-    }).toList();
+          return matchesFilter && matchesSearch;
+        }).toList();
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          _buildHeader(),
-          _buildHeroSection(),
-          _buildNavigationRow(),
-          _buildFilterChips(),
-          Expanded(
-            child: _buildTailorsList(filteredTailors),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─── Header ────────────────────────────────────────────────────────────────
-
-Widget _buildHeader() {
-    return Container(
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 8,
-        bottom: 12,
-        left: 16,
-        right: 16,
-      ),
-      child: Row(
-        children: [
-          // Dashboard/Menu Icon
-          IconButton(
-            onPressed: () {
-              // Open drawer later
-            },
-            icon: const Icon(
-              Icons.menu,
-              color: Color(0xFF224F34),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Logo
-          Image.asset(
-            'assets/images/transparent_logo.png',
-            height: 45,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                height: 45,
-                width: 45,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF224F34),
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Text(
-                    'S2S',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(width: 16),
-
-          // Search Bar
-          Expanded(
-            child: Container(
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.grey.shade300,
-                ),
-              ),
-              child: TextField(
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
-                },
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search, size: 20),
-                  hintText: 'Search tailors...',
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 10),
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 12),
-
-          // Cart
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(
-              Icons.shopping_cart_outlined,
-              color: Color(0xFF224F34),
-              size: 24,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-
-  // ─── Navigation Row ──────────────────────────────────────────────────────
-
-  Widget _buildNavigationRow() {
-    final clothingProgress = _clothingProgress;
-    final tailorsProgress = _tailorsProgress;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onHorizontalDragUpdate: _onNavDragUpdate,
-      onHorizontalDragEnd: _onNavDragEnd,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          physics: const NeverScrollableScrollPhysics(),
-          child: Transform.translate(
-            offset: Offset(_navDragOffset * 0.35, 0),
-            child: Row(
-              children: [
-                Text(
-                  'Browse Clothing and Elements',
-                  style: TextStyle(
-                    fontSize: _lerp(14, 19, clothingProgress),
-                    fontWeight: clothingProgress > 0.5
-                        ? FontWeight.bold
-                        : FontWeight.w500,
-                    color: Color.lerp(
-                      const Color(0xFF224F34).withValues(alpha: 0.55),
-                      const Color(0xFF224F34),
-                      clothingProgress,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 24),
-
-                Text(
-                  'Browse Tailors',
-                  style: TextStyle(
-                    fontSize: _lerp(13, 19, tailorsProgress),
-                    fontWeight: tailorsProgress > 0.5
-                        ? FontWeight.bold
-                        : FontWeight.w500,
-                    color: Color.lerp(
-                      const Color(0xFF224F34).withValues(alpha: 0.55),
-                      const Color(0xFF224F34),
-                      tailorsProgress,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(width: 20),
-
-                TextButton(
-                  onPressed: () {},
-                  child: const Text(
-                    'Browse Retailers',
-                    style: TextStyle(
-                      color: Color(0xFF224F34),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(width: 8),
-              ],
-            ),
-          ),
-        ),
-      ),
+        return Column(
+          children: [
+            _buildHeroSection(),
+            _buildFilterChips(),
+            Expanded(child: _buildTailorsList(filteredTailors)),
+          ],
+        );
+      },
     );
   }
 
@@ -441,19 +228,12 @@ Widget _buildHeader() {
         children: [
           const Text(
             'Expert Tailors at Your Service',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
           ),
           const SizedBox(height: 4),
           Text(
             'Find skilled tailors for all your stitching needs',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white.withValues(alpha: 0.9),
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: 0.9)),
           ),
           const SizedBox(height: 12),
           Row(
@@ -482,11 +262,7 @@ Widget _buildHeader() {
           const SizedBox(width: 4),
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
+            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -507,9 +283,7 @@ Widget _buildHeader() {
             child: _buildFilterChip(
               filter,
               _selectedFilter == filter,
-              () {
-                setState(() => _selectedFilter = filter);
-              },
+              () => setState(() => _selectedFilter = filter),
             ),
           );
         }).toList(),
@@ -525,9 +299,7 @@ Widget _buildHeader() {
         decoration: BoxDecoration(
           color: selected ? const Color(0xFF224F34) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? const Color(0xFF224F34) : Colors.grey[300]!,
-          ),
+          border: Border.all(color: selected ? const Color(0xFF224F34) : Colors.grey[300]!),
         ),
         child: Text(
           label,
@@ -546,25 +318,18 @@ Widget _buildHeader() {
   Widget _buildTailorsList(List<Tailor> tailors) {
     if (tailors.isEmpty) {
       return const Center(
-        child: Text(
-          'No tailors found',
-          style: TextStyle(color: Colors.grey, fontSize: 16),
-        ),
+        child: Text('No tailors found', style: TextStyle(color: Colors.grey, fontSize: 16)),
       );
     }
 
     return ListView.builder(
       padding: const EdgeInsets.all(12),
       itemCount: tailors.length,
-      itemBuilder: (context, index) {
-        final tailor = tailors[index];
-        return _buildTailorCard(tailor);
-      },
+      itemBuilder: (context, index) => _buildTailorCard(tailors[index]),
     );
   }
 
   Widget _buildTailorCard(Tailor tailor) {
-    // Extract specialty from description
     String specialty = 'Wedding & Formal Wear';
     if (tailor.description != null) {
       final desc = tailor.description!.toLowerCase();
@@ -577,7 +342,6 @@ Widget _buildHeader() {
       }
     }
 
-    // Extract experience from description
     String experience = '15 years';
     if (tailor.description != null) {
       final expMatch = RegExp(r'(\d+)\s*years?').firstMatch(tailor.description!);
@@ -593,47 +357,32 @@ Widget _buildHeader() {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
       child: Row(
         children: [
-          // Profile Image
           Container(
             width: 120,
             height: 140,
             decoration: BoxDecoration(
-              borderRadius: const BorderRadius.horizontal(
-                left: Radius.circular(16),
-              ),
+              borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
               color: Colors.grey[100],
             ),
             child: ClipRRect(
-              borderRadius: const BorderRadius.horizontal(
-                left: Radius.circular(16),
-              ),
+              borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
               child: Image.network(
-                tailor.profileImage ??
-                    'https://picsum.photos/seed/${tailor.id}/200/200',
+                tailor.profileImage ?? 'https://picsum.photos/seed/${tailor.id}/200/200',
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
                     color: Colors.grey[200],
-                    child: const Icon(
-                      Icons.person,
-                      size: 50,
-                      color: Colors.grey,
-                    ),
+                    child: const Icon(Icons.person, size: 50, color: Colors.grey),
                   );
                 },
               ),
             ),
           ),
-          // Info
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(12),
@@ -642,59 +391,32 @@ Widget _buildHeader() {
                 children: [
                   Text(
                     tailor.name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    specialty,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
-                  ),
+                  Text(specialty, style: const TextStyle(fontSize: 12, color: Colors.grey)),
                   const SizedBox(height: 4),
                   Row(
                     children: [
                       RatingStars(rating: tailor.rating, size: 14),
                       const SizedBox(width: 4),
-                      Text(
-                        '${tailor.rating} (${tailor.reviewCount})',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
+                      Text('${tailor.rating} (${tailor.reviewCount})',
+                          style: const TextStyle(fontSize: 12, color: Colors.grey)),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(
-                        Icons.location_on,
-                        size: 14,
-                        color: Colors.grey,
-                      ),
+                      const Icon(Icons.location_on, size: 14, color: Colors.grey),
                       const SizedBox(width: 4),
-                      Text(
-                        tailor.generalArea,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
+                      Text(tailor.generalArea, style: const TextStyle(fontSize: 12, color: Colors.grey)),
                     ],
                   ),
                   const SizedBox(height: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: Colors.orange[50],
                       borderRadius: BorderRadius.circular(12),
@@ -702,24 +424,16 @@ Widget _buildHeader() {
                     ),
                     child: Text(
                       experience,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: Colors.orange,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: const TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          // Arrow
           const Padding(
             padding: EdgeInsets.all(8.0),
-            child: Icon(
-              Icons.chevron_right,
-              color: Colors.grey,
-            ),
+            child: Icon(Icons.chevron_right, color: Colors.grey),
           ),
         ],
       ),

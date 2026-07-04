@@ -2,29 +2,41 @@ import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/models/review.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
 
-class BrowseRetailersScreen extends StatefulWidget {
+/// Entry point kept for backward compatibility with existing navigation
+/// calls (e.g. `Navigator.push(... BrowseRetailersScreen())`). It now
+/// opens the shared [BrowseShell] on the Retailers tab.
+class BrowseRetailersScreen extends StatelessWidget {
   const BrowseRetailersScreen({super.key});
 
   @override
-  State<BrowseRetailersScreen> createState() => _BrowseRetailersScreenState();
+  Widget build(BuildContext context) {
+    return const BrowseShell(initialIndex: 2);
+  }
 }
 
-class _BrowseRetailersScreenState extends State<BrowseRetailersScreen> {
+/// The actual retailers tab content, rendered as one page inside the
+/// shared [BrowseShell] PageView. Header and navigation row live in the
+/// shell; this widget only owns the hero, filter/category chips, and grid.
+class RetailersPageBody extends StatefulWidget {
+  final ValueNotifier<String> searchQuery;
+
+  const RetailersPageBody({super.key, required this.searchQuery});
+
+  @override
+  State<RetailersPageBody> createState() => _RetailersPageBodyState();
+}
+
+class _RetailersPageBodyState extends State<RetailersPageBody>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   String _selectedFilter = 'All';
-  String _searchQuery = '';
 
   final List<Retailer> _retailers = [];
   final List<String> _filters = ['All', 'Top Rated', 'Premium', 'Fast Service'];
-  final List<String> _categories = [
-    'All',
-    'Cotton',
-    'Silk',
-    'Wool',
-    'Linen',
-    'Lace',
-    'Embroidery'
-  ];
 
   @override
   void initState() {
@@ -151,178 +163,30 @@ class _BrowseRetailersScreenState extends State<BrowseRetailersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredRetailers = _retailers.where((r) {
-      final matchesFilter = _selectedFilter == 'All' ||
-          (_selectedFilter == 'Top Rated' && r.rating >= 4.5) ||
-          (_selectedFilter == 'Premium' && r.hasLicense) ||
-          (_selectedFilter == 'Fast Service' && r.reviewCount > 200);
-      
-      final matchesSearch = r.shopName
-          .toLowerCase()
-          .contains(_searchQuery.toLowerCase()) ||
-          (r.description?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
-      
-      return matchesFilter && matchesSearch;
-    }).toList();
+    super.build(context);
+    return ValueListenableBuilder<String>(
+      valueListenable: widget.searchQuery,
+      builder: (context, searchQuery, _) {
+        final filteredRetailers = _retailers.where((r) {
+          final matchesFilter = _selectedFilter == 'All' ||
+              (_selectedFilter == 'Top Rated' && r.rating >= 4.5) ||
+              (_selectedFilter == 'Premium' && r.hasLicense) ||
+              (_selectedFilter == 'Fast Service' && r.reviewCount > 200);
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          _buildHeader(),
-          _buildHeroSection(),
-          _buildNavigationRow(),
-          _buildFilterChips(), // Added this back
-          _buildCategoryChips(),
-          Expanded(
-            child: _buildRetailersGrid(filteredRetailers),
-          ),
-        ],
-      ),
-    );
-  }
+          final matchesSearch = r.shopName.toLowerCase().contains(searchQuery.toLowerCase()) ||
+              (r.description?.toLowerCase().contains(searchQuery.toLowerCase()) ?? false);
 
-  // ─── Header ────────────────────────────────────────────────────────────────
+          return matchesFilter && matchesSearch;
+        }).toList();
 
-  Widget _buildHeader() {
-    return Container(
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 8,
-        bottom: 12,
-        left: 16,
-        right: 16,
-      ),
-      child: Row(
-        children: [
-          // Dashboard/Menu Icon
-          IconButton(
-            onPressed: () {
-              // Open drawer later
-            },
-            icon: const Icon(
-              Icons.menu,
-              color: Color(0xFF224F34),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Logo
-          Image.asset(
-            'assets/images/transparent_logo.png',
-            height: 45,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                height: 45,
-                width: 45,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF224F34),
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Text(
-                    'S2S',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(width: 16),
-
-          // Search Bar
-          Expanded(
-            child: Container(
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.grey.shade300,
-                ),
-              ),
-              child: TextField(
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
-                },
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search, size: 20),
-                  hintText: 'Search retailers...',
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 10),
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 12),
-
-          // Cart
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(
-              Icons.shopping_cart_outlined,
-              color: Color(0xFF224F34),
-              size: 24,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─── Navigation Row ──────────────────────────────────────────────────────
-
-  Widget _buildNavigationRow() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
+        return Column(
           children: [
-            const Text(
-              'Browse Clothing and elements',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF224F34),
-              ),
-            ),
-            const SizedBox(width: 30),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text(
-                'Browse Tailors',
-                style: TextStyle(
-                  color: Color(0xFF224F34),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Text('|', style: TextStyle(color: Colors.grey)),
-            const SizedBox(width: 8),
-            TextButton(
-              onPressed: () {},
-              child: const Text(
-                'Browse Retailers',
-                style: TextStyle(
-                  color: Color(0xFF224F34),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
-              ),
-            ),
+            _buildHeroSection(),
+            _buildFilterChips(),
+            Expanded(child: _buildRetailersGrid(filteredRetailers)),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -345,19 +209,12 @@ class _BrowseRetailersScreenState extends State<BrowseRetailersScreen> {
         children: [
           const Text(
             'Trusted Fabric Retailers',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
           ),
           const SizedBox(height: 4),
           Text(
             'Shop from verified retailers with the best quality fabrics',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white.withValues(alpha: 0.9),
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: 0.9)),
           ),
           const SizedBox(height: 12),
           Row(
@@ -386,11 +243,7 @@ class _BrowseRetailersScreenState extends State<BrowseRetailersScreen> {
           const SizedBox(width: 4),
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
+            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -411,9 +264,7 @@ class _BrowseRetailersScreenState extends State<BrowseRetailersScreen> {
             child: _buildChip(
               filter,
               _selectedFilter == filter,
-              () {
-                setState(() => _selectedFilter = filter);
-              },
+              () => setState(() => _selectedFilter = filter),
             ),
           );
         }).toList(),
@@ -429,57 +280,7 @@ class _BrowseRetailersScreenState extends State<BrowseRetailersScreen> {
         decoration: BoxDecoration(
           color: selected ? const Color(0xFF224F34) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? const Color(0xFF224F34) : Colors.grey[300]!,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : Colors.black87,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ─── Category Chips ──────────────────────────────────────────────────────
-
-  Widget _buildCategoryChips() {
-    return Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: _categories.map((category) {
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: _buildCategoryChip(
-              category,
-              false,
-              () {
-                // Handle category selection
-              },
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildCategoryChip(String label, bool selected, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFF224F34) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? const Color(0xFF224F34) : Colors.grey[300]!,
-          ),
+          border: Border.all(color: selected ? const Color(0xFF224F34) : Colors.grey[300]!),
         ),
         child: Text(
           label,
@@ -498,10 +299,7 @@ class _BrowseRetailersScreenState extends State<BrowseRetailersScreen> {
   Widget _buildRetailersGrid(List<Retailer> retailers) {
     if (retailers.isEmpty) {
       return const Center(
-        child: Text(
-          'No retailers found',
-          style: TextStyle(color: Colors.grey, fontSize: 16),
-        ),
+        child: Text('No retailers found', style: TextStyle(color: Colors.grey, fontSize: 16)),
       );
     }
 
@@ -514,10 +312,7 @@ class _BrowseRetailersScreenState extends State<BrowseRetailersScreen> {
         mainAxisSpacing: 12,
       ),
       itemCount: retailers.length,
-      itemBuilder: (context, index) {
-        final retailer = retailers[index];
-        return _buildRetailerCard(retailer);
-      },
+      itemBuilder: (context, index) => _buildRetailerCard(retailers[index]),
     );
   }
 
@@ -534,38 +329,26 @@ class _BrowseRetailersScreenState extends State<BrowseRetailersScreen> {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.grey[200]!),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Logo Image
             Expanded(
               flex: 3,
               child: Stack(
                 children: [
                   ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(16),
-                    ),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                     child: Image.network(
-                      retailer.logoUrl ??
-                          'https://picsum.photos/seed/${retailer.id}/200/200',
+                      retailer.logoUrl ?? 'https://picsum.photos/seed/${retailer.id}/200/200',
                       width: double.infinity,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
                           color: Colors.grey[200],
-                          child: const Icon(
-                            Icons.store,
-                            size: 50,
-                            color: Colors.grey,
-                          ),
+                          child: const Icon(Icons.store, size: 50, color: Colors.grey),
                         );
                       },
                     ),
@@ -575,21 +358,11 @@ class _BrowseRetailersScreenState extends State<BrowseRetailersScreen> {
                       top: 8,
                       right: 8,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.orange,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(12)),
                         child: const Text(
                           'Top Rated',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w600),
                         ),
                       ),
                     ),
@@ -598,28 +371,17 @@ class _BrowseRetailersScreenState extends State<BrowseRetailersScreen> {
                       top: 8,
                       left: 8,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.green,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(12)),
                         child: const Text(
                           'Licensed',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w600),
                         ),
                       ),
                     ),
                 ],
               ),
             ),
-            // Info
             Expanded(
               flex: 2,
               child: Padding(
@@ -633,20 +395,14 @@ class _BrowseRetailersScreenState extends State<BrowseRetailersScreen> {
                       children: [
                         Text(
                           retailer.shopName,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
                         Text(
                           retailer.description?.split(' ').take(3).join(' ') ?? 'Fabric Store',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey,
-                          ),
+                          style: const TextStyle(fontSize: 10, color: Colors.grey),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -659,31 +415,18 @@ class _BrowseRetailersScreenState extends State<BrowseRetailersScreen> {
                           children: [
                             RatingStars(rating: retailer.rating, size: 12),
                             const SizedBox(width: 4),
-                            Text(
-                              '${retailer.rating}',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey,
-                              ),
-                            ),
+                            Text('${retailer.rating}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                           ],
                         ),
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            const Icon(
-                              Icons.location_on,
-                              size: 12,
-                              color: Colors.grey,
-                            ),
+                            const Icon(Icons.location_on, size: 12, color: Colors.grey),
                             const SizedBox(width: 2),
                             Expanded(
                               child: Text(
                                 retailer.generalArea,
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.grey,
-                                ),
+                                style: const TextStyle(fontSize: 10, color: Colors.grey),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
