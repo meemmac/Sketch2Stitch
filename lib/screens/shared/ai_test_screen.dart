@@ -110,7 +110,20 @@ class _AITestScreenState extends State<AITestScreen> {
       _generatedImageBytes = null;
     });
 
-    String generatedPrompt = _promptController.text;
+    // Hidden system prompt prepended before user's prompt
+    final hiddenSystemPrompt = "System Instructions:\n"
+        "- Use the uploaded personal image as the primary reference for the person's identity, body shape, pose, and proportions.\n"
+        "- Generate a realistic, full-body image whenever possible.\n"
+        "- Preserve the person's facial features, hairstyle, skin tone, and overall appearance.\n"
+        "- Use all uploaded reference images (garment, fabric, embroidery, accessories, etc.) as design references only.\n"
+        "- Incorporate the uploaded design elements and fabrics into a single coherent outfit.\n"
+        "- Respect the provided body measurements to achieve a realistic fit.\n"
+        "- Produce a clean, high-quality, photorealistic result.\n"
+        "- Keep the background simple and uncluttered unless the user explicitly requests otherwise.\n"
+        "- Follow any additional instructions provided by the user, but treat the uploaded images as the highest-priority references.\n\n"
+        "User Prompt: ${_promptController.text}";
+
+    String generatedPrompt = hiddenSystemPrompt;
 
     try {
       // 1. Prepare image bytes (prefer reference images first, then personal image, then mock assets)
@@ -131,7 +144,7 @@ class _AITestScreenState extends State<AITestScreen> {
       final geminiPrompt = "You are a professional tailor and clothing assistant.\n"
           "Analyze the body measurements and instructions provided to estimate fabric requirements and write an image prompt.\n\n"
           "Tailor Measurements:\n$measurementString\n\n"
-          "Style Prompt/Instructions:\n${_promptController.text}\n\n"
+          "Style Prompt/Instructions:\n$hiddenSystemPrompt\n\n"
           "Please output a valid JSON block containing exactly these fields:\n"
           "- 'orna': Estimated fabric required for Orna (e.g. '1 Gauge' or '2 meters')\n"
           "- 'kameez': Estimated fabric required for Kameez (e.g. '2 Gauge' or '2.5 meters')\n"
@@ -162,7 +175,7 @@ class _AITestScreenState extends State<AITestScreen> {
             'Embroidery': parsed['embroidery'] ?? '1 pcs',
           };
         });
-        generatedPrompt = parsed['image_generation_prompt'] ?? _promptController.text;
+        generatedPrompt = parsed['image_generation_prompt'] ?? hiddenSystemPrompt;
       } catch (geminiError) {
         // Log Gemini failure but proceed using fallback fabric requirements and user style instructions
         debugPrint("Gemini failed, using fallback fabric requirements: $geminiError");
@@ -636,30 +649,43 @@ class _AITestScreenState extends State<AITestScreen> {
   Widget _buildUploadCard(String label, XFile? file, VoidCallback onTap, Color themeColor) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        height: 110,
+        height: 140, // Consistent fixed height for equal dimensions
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0x07000000),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: file != null
             ? ClipRRect(
-                borderRadius: BorderRadius.circular(11),
+                borderRadius: BorderRadius.circular(14),
                 child: Image.file(
                   File(file.path),
                   fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
                 ),
               )
             : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_a_photo, color: themeColor, size: 28),
+                  Icon(Icons.add_a_photo_outlined, color: themeColor, size: 28),
                   const SizedBox(height: 8),
                   Text(
                     label,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black54),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black54,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ],

@@ -72,9 +72,9 @@ class AIService {
   static Future<Uint8List> testHuggingFace({
     required String token,
     required String prompt,
-    String model = 'stabilityai/stable-diffusion-xl-base-1.0',
+    String model = 'black-forest-labs/FLUX.1-schnell',
   }) async {
-    final url = Uri.parse('https://api-inference.huggingface.co/models/$model');
+    final url = Uri.parse('https://router.huggingface.co/hf-inference/models/$model');
 
     final response = await http.post(
       url,
