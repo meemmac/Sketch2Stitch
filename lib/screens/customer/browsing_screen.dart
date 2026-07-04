@@ -1,26 +1,6 @@
 import 'package:flutter/material.dart';
-
-void main() {
-  runApp(const Sketch2StitchApp());
-}
-
-class Sketch2StitchApp extends StatelessWidget {
-  const Sketch2StitchApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Sketch2Stitch',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        fontFamily: 'Inter',
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF224F34)),
-        useMaterial3: true,
-      ),
-      home: const BrowseClothingPage(),
-    );
-  }
-}
+import 'package:iconify_flutter/iconify_flutter.dart';
+import 'package:iconify_flutter/icons/mdi.dart';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -246,7 +226,7 @@ class _Header extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
                 children: const [
-                  Icon(Icons.search, color: Color(0xFF6A9C89), size: 20),
+                  Iconify(Mdi.magnify, color: Color(0xFF6A9C89), size: 20),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -267,8 +247,8 @@ class _Header extends StatelessWidget {
           Stack(
             children: [
               IconButton(
-                icon: const Icon(Icons.shopping_cart_outlined,
-                    color: Color(0xFF16423C), size: 26),
+               icon: const Iconify(Mdi.cart,
+    color: Color(0xFF16423C), size: 24),
                 onPressed: () {},
                 padding: EdgeInsets.zero,
                 constraints:
@@ -298,7 +278,7 @@ class _Header extends StatelessWidget {
               border: Border.all(color: const Color(0xFF224F34), width: 2),
               color: const Color(0xFFE8F4EE),
             ),
-            child: const Icon(Icons.person,
+            child: const Iconify(Mdi.account,
                 color: Color(0xFF224F34), size: 18),
           ),
         ],
@@ -480,8 +460,8 @@ class _ProductCard extends StatelessWidget {
                   // Rating
                   Row(
                     children: [
-                      const Icon(Icons.star,
-                          color: Color(0xFFFDE807), size: 13),
+                      const Iconify(Mdi.star,
+                          color: Color(0xFFFDE807), size: 14),
                       const SizedBox(width: 3),
                       Text(
                         '${item.rating} (${item.reviewCount})',
