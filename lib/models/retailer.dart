@@ -1,4 +1,3 @@
-import 'product.dart';
 import 'review.dart';
 
 class Retailer {
@@ -12,7 +11,6 @@ class Retailer {
   final int reviewCount;
   final String? logoUrl;
   final String? description;
-  final List<Product> products;
   final List<Review> reviews;
   bool isFavorite;
 
@@ -27,10 +25,19 @@ class Retailer {
     this.reviewCount = 0,
     this.logoUrl,
     this.description,
-    this.products = const [],
     this.reviews = const [],
     this.isFavorite = false,
   });
+
+  bool get hasLicense => licenses.isNotEmpty;
+
+  String get generalArea {
+    final parts = address.split(',');
+    if (parts.length > 1) {
+      return parts[parts.length - 2].trim();
+    }
+    return address;
+  }
 
   Retailer copyWith({
     String? id,
@@ -43,7 +50,6 @@ class Retailer {
     int? reviewCount,
     String? logoUrl,
     String? description,
-    List<Product>? products,
     List<Review>? reviews,
     bool? isFavorite,
   }) {
@@ -58,23 +64,8 @@ class Retailer {
       reviewCount: reviewCount ?? this.reviewCount,
       logoUrl: logoUrl ?? this.logoUrl,
       description: description ?? this.description,
-      products: products ?? this.products,
       reviews: reviews ?? this.reviews,
       isFavorite: isFavorite ?? this.isFavorite,
     );
   }
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'shopName': shopName,
-    'email': email,
-    'phone': phone,
-    'address': address,
-    'licenses': licenses,
-    'rating': rating,
-    'reviewCount': reviewCount,
-    'logoUrl': logoUrl,
-    'description': description,
-    'isFavorite': isFavorite,
-  };
 }

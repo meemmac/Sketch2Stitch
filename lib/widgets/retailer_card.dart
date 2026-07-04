@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/retailer.dart';
+import 'package:sketch2stitch/widgets/rating_stars.dart';
 
 class RetailerCard extends StatelessWidget {
   final Retailer retailer;
@@ -107,14 +108,13 @@ class RetailerCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.star,
-                          color: Color(0xFFFDE807), size: 14),
-                      const SizedBox(width: 3),
+                      RatingStars(rating: retailer.rating, size: 12),
+                      const SizedBox(width: 4),
                       Text(
-                        '${retailer.rating} (${retailer.reviewCount})',
+                        '(${retailer.reviewCount})',
                         style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.black87,
+                          fontSize: 11,
+                          color: Colors.grey,
                         ),
                       ),
                     ],

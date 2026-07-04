@@ -27,36 +27,6 @@ class Product {
     this.stock = 10,
   });
 
-  Product copyWith({
-    String? id,
-    String? retailerId,
-    String? productName,
-    String? category,
-    String? materialType,
-    List<String>? colorOptions,
-    String? description,
-    double? price,
-    double? rating,
-    int? reviewCount,
-    String? imageUrl,
-    int? stock,
-  }) {
-    return Product(
-      id: id ?? this.id,
-      retailerId: retailerId ?? this.retailerId,
-      productName: productName ?? this.productName,
-      category: category ?? this.category,
-      materialType: materialType ?? this.materialType,
-      colorOptions: colorOptions ?? this.colorOptions,
-      description: description ?? this.description,
-      price: price ?? this.price,
-      rating: rating ?? this.rating,
-      reviewCount: reviewCount ?? this.reviewCount,
-      imageUrl: imageUrl ?? this.imageUrl,
-      stock: stock ?? this.stock,
-    );
-  }
-
   Map<String, dynamic> toJson() => {
     'id': id,
     'retailerId': retailerId,

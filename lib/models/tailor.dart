@@ -32,6 +32,16 @@ class Tailor {
     this.isFavorite = false,
   });
 
+  bool get hasLicense => licenses.isNotEmpty;
+
+  String get generalArea {
+    final parts = address.split(',');
+    if (parts.length > 1) {
+      return parts[parts.length - 2].trim();
+    }
+    return address;
+  }
+
   Tailor copyWith({
     String? id,
     String? name,
@@ -63,18 +73,4 @@ class Tailor {
       isFavorite: isFavorite ?? this.isFavorite,
     );
   }
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'email': email,
-    'phone': phone,
-    'address': address,
-    'licenses': licenses,
-    'rating': rating,
-    'reviewCount': reviewCount,
-    'profileImage': profileImage,
-    'description': description,
-    'isFavorite': isFavorite,
-  };
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
+import 'package:sketch2stitch/widgets/rating_stars.dart';
 
 class ProductCard extends StatelessWidget {
   final Product product;
@@ -81,7 +82,7 @@ class ProductCard extends StatelessWidget {
                     ),
                   ),
                   // Stock Badge
-                  if (product.stock < 5)
+                  if (product.stock < 5 && product.stock > 0)
                     Positioned(
                       top: 8,
                       left: 8,
@@ -97,6 +98,29 @@ class ProductCard extends StatelessWidget {
                         child: Text(
                           'Only ${product.stock} left',
                           style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (product.stock == 0)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.88),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'Out of Stock',
+                          style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -129,14 +153,13 @@ class ProductCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.star,
-                            color: Color(0xFFFDE807), size: 14),
-                        const SizedBox(width: 3),
+                        RatingStars(rating: product.rating, size: 12),
+                        const SizedBox(width: 4),
                         Text(
-                          '${product.rating} (${product.reviewCount})',
+                          '(${product.reviewCount})',
                           style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.black87,
+                            fontSize: 10,
+                            color: Colors.grey,
                           ),
                         ),
                       ],
@@ -145,13 +168,18 @@ class ProductCard extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Tk ${product.price.toInt()}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF16423C),
-                          ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Tk ${product.price.toInt()}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF16423C),
+                              ),
+                            ),
+                          ],
                         ),
                         if (product.colorOptions.isNotEmpty)
                           Container(
@@ -167,7 +195,7 @@ class ProductCard extends StatelessWidget {
                             child: Text(
                               product.colorOptions.first,
                               style: const TextStyle(
-                                fontSize: 10,
+                                fontSize: 9,
                                 color: Colors.black87,
                               ),
                             ),
