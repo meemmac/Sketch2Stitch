@@ -37,10 +37,8 @@ class _AITestScreenState extends State<AITestScreen> {
     'Ankle': TextEditingController(text: '9"'),
   };
 
-  // Custom Prompt Instruction
-  final TextEditingController _promptController = TextEditingController(
-    text: "A premium white Kameez salwar suite with gorgeous pink and green floral embroidery details on the neck and matching white dupatta (orna) drape, worn by a South Asian female model in studio lighting.",
-  );
+  // Custom Prompt Instruction (empty by default — user fills this in)
+  final TextEditingController _promptController = TextEditingController();
 
   // Status and Results
   bool _isLoading = false;
@@ -126,24 +124,40 @@ class _AITestScreenState extends State<AITestScreen> {
     String generatedPrompt = hiddenSystemPrompt;
 
     try {
-      // 1. Prepare image bytes (prefer reference images first, then personal image, then mock assets)
-      Uint8List? refImageBytes;
-      if (_referenceImages.isNotEmpty) {
-        refImageBytes = await File(_referenceImages.first.path).readAsBytes();
-      } else if (_personalImage != null) {
-        refImageBytes = await File(_personalImage!.path).readAsBytes();
-      } else {
-        // Fallback to loaded asset bytes if no custom image is uploaded
+      // 1. Collect all image bytes: personal image + all reference images
+      Uint8List? primaryImageBytes;  // personal image for HF try-on
+      Uint8List? geminiImageBytes;   // first available image sent to Gemini for visual context
+
+      if (_personalImage != null) {
+        primaryImageBytes = await File(_personalImage!.path).readAsBytes();
+        geminiImageBytes = primaryImageBytes;
+      }
+
+      // Build list of all reference image bytes for context descriptions
+      final List<Uint8List> allRefBytes = [];
+      for (final ref in _referenceImages) {
+        allRefBytes.add(await File(ref.path).readAsBytes());
+      }
+      // Use first reference image as Gemini visual context if no personal image
+      if (geminiImageBytes == null && allRefBytes.isNotEmpty) {
+        geminiImageBytes = allRefBytes.first;
+      }
+      // Fallback to bundled asset if nothing is uploaded
+      if (geminiImageBytes == null) {
         final ByteData data = await rootBundle.load('assets/images/silk.jpg');
-        refImageBytes = data.buffer.asUint8List();
+        geminiImageBytes = data.buffer.asUint8List();
       }
 
       // 2. Prepare structured measurement prompt details
       final measurementString = _measurements.entries.map((e) => "${e.key}: ${e.value.text}").join("\n");
+      final refImageNote = allRefBytes.isNotEmpty
+          ? "${allRefBytes.length} reference image(s) of garment/fabric/embroidery have been uploaded for design context."
+          : "No reference images uploaded.";
 
       final geminiPrompt = "You are a professional tailor and clothing assistant.\n"
           "Analyze the body measurements and instructions provided to estimate fabric requirements and write an image prompt.\n\n"
           "Tailor Measurements:\n$measurementString\n\n"
+          "Reference Images Context: $refImageNote\n\n"
           "Style Prompt/Instructions:\n$hiddenSystemPrompt\n\n"
           "Please output a valid JSON block containing exactly these fields:\n"
           "- 'orna': Estimated fabric required for Orna (e.g. '1 Gauge' or '2 meters')\n"
@@ -154,11 +168,11 @@ class _AITestScreenState extends State<AITestScreen> {
           "Format your response as pure JSON like: {\"orna\": \"...\", \"kameez\": \"...\", \"salwar\": \"...\", \"embroidery\": \"...\", \"image_generation_prompt\": \"...\"}";
 
       try {
-        // Call Gemini for structured estimation and image prompt generation
+        // Call Gemini with personal/first reference image for visual context
         final geminiResponse = await AIService.testGemini(
           apiKey: geminiKey,
           prompt: geminiPrompt,
-          imageBytes: refImageBytes,
+          imageBytes: geminiImageBytes,
         );
 
         // Parse JSON response from Gemini
@@ -300,18 +314,23 @@ class _AITestScreenState extends State<AITestScreen> {
                   ),
                   const SizedBox(height: 12),
                   
-                  // Image inputs layout
+                  // Image inputs layout — fixed equal labels then equal cards
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Personal image slot
                       Expanded(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const Text(
-                              "Personal Image",
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54),
+                            const SizedBox(
+                              height: 20,
+                              child: Text(
+                                "Personal Image",
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black54),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                             const SizedBox(height: 8),
                             _buildUploadCard(
@@ -324,15 +343,20 @@ class _AITestScreenState extends State<AITestScreen> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      
+
                       // Reference images list slot
                       Expanded(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const Text(
-                              "Reference Images",
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54),
+                            const SizedBox(
+                              height: 20,
+                              child: Text(
+                                "Reference Images",
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black54),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                             const SizedBox(height: 8),
                             _buildUploadCard(
@@ -674,10 +698,12 @@ class _AITestScreenState extends State<AITestScreen> {
                   height: double.infinity,
                 ),
               )
-            : Column(
+            : Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_a_photo_outlined, color: themeColor, size: 28),
+                  Icon(Icons.add_a_photo_outlined, color: themeColor, size: 32),
                   const SizedBox(height: 8),
                   Text(
                     label,
@@ -690,6 +716,7 @@ class _AITestScreenState extends State<AITestScreen> {
                   ),
                 ],
               ),
+            ),
       ),
     );
   }
