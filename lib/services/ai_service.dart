@@ -94,7 +94,80 @@ class AIService {
     }
   }
 
-  /// Call the IDM-VTON virtual try-on model via Nymbo HF Space Gradio API.
+  /// Generate an image using Gemini's native image generation capability.
+  /// Uses the same API key as the text Gemini call.
+  /// Accepts an optional list of input images (person, garment, references).
+  static Future<Uint8List> generateImageWithGemini({
+    required String apiKey,
+    required String prompt,
+    List<Uint8List> inputImages = const [],
+    String mimeType = 'image/jpeg',
+  }) async {
+    // Image-generation capable Gemini models, newest first
+    final List<String> imageModels = [
+      'gemini-2.0-flash-preview-image-generation',
+      'gemini-3.1-flash-lite-image',
+      'gemini-3.1-flash-image',
+    ];
+
+    String lastError = '';
+
+    for (final model in imageModels) {
+      try {
+        final url = Uri.parse(
+          'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey',
+        );
+
+        // Build parts: text prompt first, then all input images
+        final List<Map<String, dynamic>> parts = [
+          {'text': prompt},
+        ];
+        for (final imgBytes in inputImages) {
+          parts.add({
+            'inlineData': {
+              'mimeType': mimeType,
+              'data': base64Encode(imgBytes),
+            }
+          });
+        }
+
+        final body = {
+          'contents': [
+            {'parts': parts}
+          ],
+          'generationConfig': {
+            'responseModalities': ['IMAGE', 'TEXT'],
+          },
+        };
+
+        final response = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(body),
+        ).timeout(const Duration(seconds: 60));
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final parts2 = data['candidates'][0]['content']['parts'] as List;
+          // Find the image part in the response
+          for (final part in parts2) {
+            if (part['inlineData'] != null) {
+              final base64Img = part['inlineData']['data'] as String;
+              return base64Decode(base64Img);
+            }
+          }
+          lastError = 'Model $model returned 200 but no image part in response';
+        } else {
+          lastError = 'Model $model returned (${response.statusCode}): ${response.body}';
+        }
+      } catch (e) {
+        lastError = 'Model $model threw: ${e.toString()}';
+      }
+    }
+
+    throw Exception('Gemini image generation failed after all models. Last error: $lastError');
+  }
+
   /// Sends person image and garment image, returns the try-on result as bytes.
   static Future<Uint8List> callVirtualTryOn({
     required Uint8List personImageBytes,

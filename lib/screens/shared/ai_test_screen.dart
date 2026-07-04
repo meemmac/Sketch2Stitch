@@ -203,29 +203,30 @@ class _AITestScreenState extends State<AITestScreen> {
         });
       }
 
-      // 3. Generate the virtual trial image
+      // 3. Generate the virtual trial image using Gemini's native image generation capability
       Uint8List resultBytes;
 
-      if (primaryImageBytes != null && allRefBytes.isNotEmpty) {
-        // --- IDM-VTON path: person image + garment image → real try-on ---
-        setState(() {
-          _statusMessage =
-              "Sending images to Virtual Try-On model (IDM-VTON)...\nThis may take 30–120 seconds if the model is waking up.";
-        });
+      final List<Uint8List> inputImages = [];
+      if (primaryImageBytes != null) {
+        inputImages.add(primaryImageBytes);
+      }
+      inputImages.addAll(allRefBytes);
 
-        resultBytes = await AIService.callVirtualTryOn(
-          personImageBytes: primaryImageBytes,
-          garmentImageBytes: allRefBytes.first,    // first reference = garment
-          garmentDescription: generatedPrompt,     // Gemini's refined description
-          hfToken: hfToken,
+      setState(() {
+        _statusMessage = "Generating try-on trial image using Google Gemini...";
+      });
+
+      try {
+        resultBytes = await AIService.generateImageWithGemini(
+          apiKey: geminiKey,
+          prompt: generatedPrompt,
+          inputImages: inputImages,
         );
-      } else {
-        // --- FLUX fallback: text-to-image only ---
+      } catch (geminiImgError) {
+        debugPrint("Gemini image generation failed, falling back to Hugging Face FLUX: $geminiImgError");
         setState(() {
-          _statusMessage =
-              "No personal image or reference uploaded — generating from text via FLUX...";
+          _statusMessage = "Gemini image generation failed. Retrying with Hugging Face FLUX...";
         });
-
         resultBytes = await AIService.testHuggingFace(
           token: hfToken,
           prompt: generatedPrompt,
