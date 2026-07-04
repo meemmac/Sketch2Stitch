@@ -74,16 +74,16 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
 
     // Initialize mock data
     _customerProfile = const DrawerProfileData(
-      name: "Jane Doe",
-      email: "jane.doe@example.com",
-      phone: "+1 (555) 019-2834",
-      address: "123 Creative Lane, New York, NY",
+      name: "Maria Doe",
+      email: "maria.doe@example.com",
+      phone: "+880 1234567890",
+      address: "123 Creative Lane, New Market Road, Dhaka",
     );
 
     _tailorProfile = const DrawerProfileData(
       name: "Master Karim",
       email: "karim.tailors@example.com",
-      phone: "+880 1712-345678",
+      phone: "+880 1234567890",
       address: "Suite 4B, Concord Tower, Dhaka",
       rating: 4.8,
     );
@@ -92,7 +92,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       name: "Alim Rahman",
       shopName: "Elegant Fabrics Ltd.",
       email: "contact@elegantfabrics.com",
-      phone: "+880 1911-876543",
+      phone: "+880 1234567890",
       address: "Shop 12, Banani Super Market, Dhaka",
       rating: 4.6,
     );
@@ -323,14 +323,6 @@ class DrawerProfileSection extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (role == AppUserRole.retailer)
-                      Text(
-                        "Owner: ${profile.name}",
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.black54,
-                        ),
-                      ),
                     const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -355,10 +347,10 @@ class DrawerProfileSection extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
-          // Rating Row if Tailor or Retailer
-          if (!isCustomer) ...[
-            Row(
-              children: [
+          // Rating & Edit Row
+          Row(
+            children: [
+              if (!isCustomer) ...[
                 const Icon(Icons.star_rounded, color: Colors.amber, size: 20),
                 const SizedBox(width: 4),
                 Text(
@@ -369,23 +361,23 @@ class DrawerProfileSection extends StatelessWidget {
                     color: Color(0xFF1E392A),
                   ),
                 ),
-                const Spacer(),
-                TextButton.icon(
-                  style: TextButton.styleFrom(
-                    foregroundColor: themeColor,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  ),
-                  onPressed: onEditPressed,
-                  icon: const Icon(Icons.edit_rounded, size: 16),
-                  label: const Text(
-                    "Edit",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                ),
               ],
-            ),
-            const SizedBox(height: 12),
-          ],
+              const Spacer(),
+              TextButton.icon(
+                style: TextButton.styleFrom(
+                  foregroundColor: themeColor,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                ),
+                onPressed: onEditPressed,
+                icon: const Icon(Icons.edit_rounded, size: 16),
+                label: const Text(
+                  "Edit",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
 
           // Detailed Fields
           _buildInfoRow(Icons.email_outlined, profile.email),
@@ -643,16 +635,17 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
                 ),
               ),
               const SizedBox(height: 12),
-            ],
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: isRetailer ? "Owner Name" : "Name",
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.person_rounded),
+            ] else ...[
+              TextField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: "Name",
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.person_rounded),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
+            ],
             TextField(
               controller: _emailController,
               decoration: const InputDecoration(
