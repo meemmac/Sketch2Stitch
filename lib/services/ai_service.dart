@@ -93,4 +93,88 @@ class AIService {
       throw Exception('Hugging Face API Error (${response.statusCode}): ${response.body}');
     }
   }
+
+  /// Call the IDM-VTON virtual try-on model via Nymbo HF Space Gradio API.
+  /// Sends person image and garment image, returns the try-on result as bytes.
+  static Future<Uint8List> callVirtualTryOn({
+    required Uint8List personImageBytes,
+    required Uint8List garmentImageBytes,
+    String garmentDescription = '',
+    String personMimeType = 'image/jpeg',
+    String garmentMimeType = 'image/jpeg',
+    String hfToken = '',
+  }) async {
+    final personBase64 = 'data:$personMimeType;base64,${base64Encode(personImageBytes)}';
+    final garmentBase64 = 'data:$garmentMimeType;base64,${base64Encode(garmentImageBytes)}';
+
+    // Nymbo/Virtual-Try-On Space uses IDM-VTON.
+    // Input order: [person_image_dict, garment_image, garment_description,
+    //               is_checked (bool), is_checked_crop (bool), denoise_steps (int),
+    //               seed (int)]
+    final body = {
+      'data': [
+        {
+          'background': {'name': 'person.jpg', 'data': personBase64},
+          'layers': [],
+          'composite': null,
+        },
+        {'name': 'garment.jpg', 'data': garmentBase64},
+        garmentDescription.isEmpty ? 'A garment to try on' : garmentDescription,
+        true,  // is_checked
+        true,  // is_checked_crop
+        30,    // denoise_steps
+        42,    // seed
+      ],
+    };
+
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+    };
+    if (hfToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $hfToken';
+    }
+
+    // Step 1: Queue the job
+    final queueUrl = Uri.parse('https://nymbo-virtual-try-on.hf.space/run/predict');
+    final response = await http.post(
+      queueUrl,
+      headers: headers,
+      body: jsonEncode(body),
+    ).timeout(const Duration(seconds: 120));
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      // Gradio returns {"data": [url_or_base64, ...]}
+      final resultData = decoded['data'];
+      if (resultData != null && resultData is List && resultData.isNotEmpty) {
+        final first = resultData[0];
+        String? imageUrl;
+
+        if (first is Map) {
+          // Newer Gradio returns {url: "..."} or {path: "..."}
+          imageUrl = first['url'] as String? ?? first['path'] as String?;
+        } else if (first is String) {
+          if (first.startsWith('data:')) {
+            // Inline base64 data URI
+            final base64Part = first.split(',').last;
+            return base64Decode(base64Part);
+          }
+          imageUrl = first;
+        }
+
+        if (imageUrl != null) {
+          // Fetch the image from the returned URL
+          final imgResponse = await http.get(Uri.parse(imageUrl))
+              .timeout(const Duration(seconds: 30));
+          if (imgResponse.statusCode == 200) {
+            return imgResponse.bodyBytes;
+          }
+          throw Exception('Failed to download result image: ${imgResponse.statusCode}');
+        }
+      }
+      throw Exception('Unexpected IDM-VTON response format: ${response.body.substring(0, 200)}');
+    } else {
+      throw Exception('IDM-VTON API Error (${response.statusCode}): ${response.body.substring(0, 300)}');
+    }
+  }
 }

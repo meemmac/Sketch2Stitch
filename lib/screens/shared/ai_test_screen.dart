@@ -203,18 +203,37 @@ class _AITestScreenState extends State<AITestScreen> {
         });
       }
 
-      // 3. Call Hugging Face to generate the virtual trial image
-      setState(() {
-        _statusMessage = "Generating try-on trial image using Stable Diffusion...";
-      });
+      // 3. Generate the virtual trial image
+      Uint8List resultBytes;
 
-      final hfBytes = await AIService.testHuggingFace(
-        token: hfToken,
-        prompt: generatedPrompt,
-      );
+      if (primaryImageBytes != null && allRefBytes.isNotEmpty) {
+        // --- IDM-VTON path: person image + garment image → real try-on ---
+        setState(() {
+          _statusMessage =
+              "Sending images to Virtual Try-On model (IDM-VTON)...\nThis may take 30–120 seconds if the model is waking up.";
+        });
+
+        resultBytes = await AIService.callVirtualTryOn(
+          personImageBytes: primaryImageBytes,
+          garmentImageBytes: allRefBytes.first,    // first reference = garment
+          garmentDescription: generatedPrompt,     // Gemini's refined description
+          hfToken: hfToken,
+        );
+      } else {
+        // --- FLUX fallback: text-to-image only ---
+        setState(() {
+          _statusMessage =
+              "No personal image or reference uploaded — generating from text via FLUX...";
+        });
+
+        resultBytes = await AIService.testHuggingFace(
+          token: hfToken,
+          prompt: generatedPrompt,
+        );
+      }
 
       setState(() {
-        _generatedImageBytes = hfBytes;
+        _generatedImageBytes = resultBytes;
         _isLoading = false;
         _statusMessage = "";
       });
