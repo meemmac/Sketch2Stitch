@@ -69,58 +69,28 @@ class AIService {
   }
 
   /// Test the Hugging Face Inference API to generate an image from a prompt.
-  static Future<Map<String, dynamic>> testHuggingFace({
+  static Future<Uint8List> testHuggingFace({
     required String token,
     required String prompt,
     String model = 'stabilityai/stable-diffusion-xl-base-1.0',
   }) async {
-    try {
-      final url = Uri.parse('https://api-inference.huggingface.co/models/$model');
+    final url = Uri.parse('https://api-inference.huggingface.co/models/$model');
 
-      final response = await http.post(
-        url,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'inputs': prompt,
-        }),
-      ).timeout(const Duration(seconds: 15));
+    final response = await http.post(
+      url,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'inputs': prompt,
+      }),
+    ).timeout(const Duration(seconds: 25));
 
-      if (response.statusCode == 200) {
-        return {
-          'bytes': response.bodyBytes,
-          'source': 'Hugging Face ($model)',
-        };
-      } else {
-        throw Exception('Hugging Face API Error (${response.statusCode}): ${response.body}');
-      }
-    } catch (e) {
-      // Fallback to Pollinations AI (free, no token needed, reliable DNS)
-      try {
-        final bytes = await generatePollinations(prompt: prompt);
-        return {
-          'bytes': bytes,
-          'source': 'Pollinations.ai (Fallback due to: ${e.toString().split('\n').first})',
-        };
-      } catch (fallbackError) {
-        throw Exception('Both Hugging Face and Pollinations failed.\nHF Error: $e\nPollinations Error: $fallbackError');
-      }
-    }
-  }
-
-  /// Generate image using Pollinations.ai (completely free, no auth key required)
-  static Future<Uint8List> generatePollinations({
-    required String prompt,
-  }) async {
-    final encodedPrompt = Uri.encodeComponent(prompt);
-    final url = Uri.parse('https://image.pollinations.ai/prompt/$encodedPrompt?nologo=true&private=true');
-    final response = await http.get(url).timeout(const Duration(seconds: 15));
     if (response.statusCode == 200) {
       return response.bodyBytes;
     } else {
-      throw Exception('Pollinations API Error (${response.statusCode})');
+      throw Exception('Hugging Face API Error (${response.statusCode}): ${response.body}');
     }
   }
 }

@@ -16,18 +16,9 @@ class AITestScreen extends StatefulWidget {
 class _AITestScreenState extends State<AITestScreen> {
   final ImagePicker _picker = ImagePicker();
 
-  // Credentials controllers
-  final TextEditingController _geminiKeyController = TextEditingController(
-    text: APIConfig.geminiApiKey == 'YOUR_GEMINI_API_KEY_HERE' ? '' : APIConfig.geminiApiKey,
-  );
-  final TextEditingController _hfTokenController = TextEditingController(
-    text: APIConfig.hfToken == 'YOUR_HF_TOKEN_HERE' ? '' : APIConfig.hfToken,
-  );
-
   // Uploaded images
-  XFile? _selfPhoto;
-  XFile? _garmentRef;
-  XFile? _fabricRef;
+  XFile? _personalImage;
+  List<XFile> _referenceImages = [];
 
   // 13 Measurement Controllers
   final Map<String, TextEditingController> _measurements = {
@@ -55,7 +46,6 @@ class _AITestScreenState extends State<AITestScreen> {
   bool _isLoading = false;
   String _statusMessage = "";
   Uint8List? _generatedImageBytes;
-  String? _imageSource;
 
   // Fabric Requirements structure
   Map<String, String> _fabricRequirements = {
@@ -65,31 +55,51 @@ class _AITestScreenState extends State<AITestScreen> {
     'Embroidery': '1 pcs',
   };
 
-  Future<void> _pickImage(int type) async {
+  Future<void> _pickPersonalImage() async {
     try {
       final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
       if (image != null) {
         setState(() {
-          if (type == 1) _selfPhoto = image;
-          if (type == 2) _garmentRef = image;
-          if (type == 3) _fabricRef = image;
+          _personalImage = image;
         });
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error picking image: $e")),
+        SnackBar(content: Text("Error picking personal image: $e")),
       );
     }
   }
 
-  Future<void> _generateVirtualTrial() async {
-    final geminiKey = _geminiKeyController.text.trim();
-    final hfToken = _hfTokenController.text.trim();
-
-    if (geminiKey.isEmpty) {
+  Future<void> _pickReferenceImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        setState(() {
+          _referenceImages.add(image);
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please make sure Gemini API Key is set in credentials / api_config.dart")),
+        SnackBar(content: Text("Error picking reference image: $e")),
+      );
+    }
+  }
+
+  void _removeReferenceImage(int index) {
+    setState(() {
+      _referenceImages.removeAt(index);
+    });
+  }
+
+  Future<void> _generateVirtualTrial() async {
+    const geminiKey = APIConfig.geminiApiKey;
+    const hfToken = APIConfig.hfToken;
+
+    if (geminiKey.isEmpty || geminiKey == 'YOUR_GEMINI_API_KEY_HERE') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please make sure Gemini API Key is set in lib/utils/api_config.dart")),
       );
       return;
     }
@@ -100,13 +110,15 @@ class _AITestScreenState extends State<AITestScreen> {
       _generatedImageBytes = null;
     });
 
+    String generatedPrompt = _promptController.text;
+
     try {
-      // 1. Prepare image bytes (prefer fabric image first, then garment reference, then mock assets)
+      // 1. Prepare image bytes (prefer reference images first, then personal image, then mock assets)
       Uint8List? refImageBytes;
-      if (_fabricRef != null) {
-        refImageBytes = await File(_fabricRef!.path).readAsBytes();
-      } else if (_garmentRef != null) {
-        refImageBytes = await File(_garmentRef!.path).readAsBytes();
+      if (_referenceImages.isNotEmpty) {
+        refImageBytes = await File(_referenceImages.first.path).readAsBytes();
+      } else if (_personalImage != null) {
+        refImageBytes = await File(_personalImage!.path).readAsBytes();
       } else {
         // Fallback to loaded asset bytes if no custom image is uploaded
         final ByteData data = await rootBundle.load('assets/images/silk.jpg');
@@ -128,16 +140,15 @@ class _AITestScreenState extends State<AITestScreen> {
           "- 'image_generation_prompt': A detailed prompt (up to 80 words) describing the finished tailored outfit on a model for the virtual trial image generator.\n\n"
           "Format your response as pure JSON like: {\"orna\": \"...\", \"kameez\": \"...\", \"salwar\": \"...\", \"embroidery\": \"...\", \"image_generation_prompt\": \"...\"}";
 
-      // Call Gemini for structured estimation and image prompt generation
-      final geminiResponse = await AIService.testGemini(
-        apiKey: geminiKey,
-        prompt: geminiPrompt,
-        imageBytes: refImageBytes,
-      );
-
-      // Parse JSON response from Gemini
-      String generatedPrompt = _promptController.text;
       try {
+        // Call Gemini for structured estimation and image prompt generation
+        final geminiResponse = await AIService.testGemini(
+          apiKey: geminiKey,
+          prompt: geminiPrompt,
+          imageBytes: refImageBytes,
+        );
+
+        // Parse JSON response from Gemini
         final rawJson = geminiResponse.substring(
           geminiResponse.indexOf('{'),
           geminiResponse.lastIndexOf('}') + 1,
@@ -145,31 +156,38 @@ class _AITestScreenState extends State<AITestScreen> {
         final parsed = jsonDecode(rawJson);
         setState(() {
           _fabricRequirements = {
-            'Orna': parsed['orna'] ?? '1.5 Gauge',
+            'Orna': parsed['orna'] ?? '1 Gauge',
             'Kameez': parsed['kameez'] ?? '2 Gauge',
             'Salwar': parsed['salwar'] ?? '2.5 Gauge',
             'Embroidery': parsed['embroidery'] ?? '1 pcs',
           };
         });
         generatedPrompt = parsed['image_generation_prompt'] ?? _promptController.text;
-      } catch (e) {
-        // Fallback: search for fabric requirements in text if JSON parsing fails
-        print("Could not parse Gemini JSON, using fallback parsing: $e");
+      } catch (geminiError) {
+        // Log Gemini failure but proceed using fallback fabric requirements and user style instructions
+        debugPrint("Gemini failed, using fallback fabric requirements: $geminiError");
+        setState(() {
+          _fabricRequirements = {
+            'Orna': '1 Gauge',
+            'Kameez': '2 Gauge',
+            'Salwar': '2.5 Gauge',
+            'Embroidery': '1 pcs',
+          };
+        });
       }
 
-      // 3. Call Hugging Face / Pollinations to generate the virtual trial image
+      // 3. Call Hugging Face to generate the virtual trial image
       setState(() {
         _statusMessage = "Generating try-on trial image using Stable Diffusion...";
       });
 
-      final hfResult = await AIService.testHuggingFace(
+      final hfBytes = await AIService.testHuggingFace(
         token: hfToken,
         prompt: generatedPrompt,
       );
 
       setState(() {
-        _generatedImageBytes = hfResult['bytes'] as Uint8List;
-        _imageSource = hfResult['source'] as String;
+        _generatedImageBytes = hfBytes;
         _isLoading = false;
         _statusMessage = "";
       });
@@ -183,86 +201,60 @@ class _AITestScreenState extends State<AITestScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Colors.green.shade800;
-    final secondaryBgColor = const Color(0xFFEEF6E9);
+    const themeColor = Color(0xFF6C9985); // Sage/Greenish-gray theme color
+    const secondaryBgColor = Color(0xFFEEF6E9);
 
     return Scaffold(
-      backgroundColor: secondaryBgColor,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Row(
-          children: [
-            const Icon(Icons.checkroom, color: Colors.white),
-            const SizedBox(width: 8),
-            Text(
-              "Sketch2Stitch",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.green.shade50,
-                fontSize: 18,
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () {
+            // Future dashboard drawer trigger
+          },
+        ),
+        automaticallyImplyLeading: false,
+        title: Image.asset(
+          'assets/images/transparent_logo.png',
+          height: 36,
+          fit: BoxFit.contain,
+        ),
+        backgroundColor: secondaryBgColor,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black87),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12.0),
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: themeColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                "Back to Home",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
               ),
             ),
-          ],
-        ),
-        backgroundColor: primaryColor,
-        actions: [
-          TextButton.icon(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.home, color: Colors.white, size: 18),
-            label: const Text(
-              "Back to Home",
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
           ),
-          const SizedBox(width: 8),
         ],
       ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // API Configuration/Credentials drawer
-            ExpansionTile(
-              title: const Text(
-                "⚙️ Credentials Configuration",
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              ),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Column(
-                    children: [
-                      TextField(
-                        controller: _geminiKeyController,
-                        decoration: const InputDecoration(
-                          labelText: "Google Gemini API Key",
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        obscureText: true,
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _hfTokenController,
-                        decoration: const InputDecoration(
-                          labelText: "Hugging Face Access Token (Optional)",
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        obscureText: true,
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                  ),
-                )
-              ],
-            ),
-
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header Banner matching the mockup
+                  // Header Banner
                   const Text(
                     "Welcome to our\nvirtual trial.",
                     style: TextStyle(
@@ -281,41 +273,141 @@ class _AITestScreenState extends State<AITestScreen> {
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
                   ),
                   const SizedBox(height: 12),
-                  _buildStepItem("Upload at least one clear image of yourself"),
-                  _buildStepItem("Upload all elements and fabric"),
-                  _buildStepItem("Upload your customized designs"),
-                  _buildStepItem("Fill up your information and insert your attachments with just one click"),
-                  _buildStepItem("Write clear instructions about the elements you have given and your preferences"),
+                  _buildStepItem("Upload at least one clear image of yourself", _personalImage != null),
+                  _buildStepItem("Upload all elements and fabric", _referenceImages.isNotEmpty),
+                  _buildStepItem("Review and edit your body measurements before generating the virtual trial", true),
+                  _buildStepItem("Write clear instructions about the elements you have given and your preferences", _promptController.text.trim().isNotEmpty),
 
                   const SizedBox(height: 32),
 
                   // Uploads Hub
                   const Text(
-                    "📤 Attachment & Reference Uploads",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    "Attachment & Reference Upload",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E392A)),
                   ),
                   const SizedBox(height: 12),
+                  
+                  // Image inputs layout
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: _buildUploadCard("Your Photo", _selfPhoto, () => _pickImage(1))),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildUploadCard("Garment Ref", _garmentRef, () => _pickImage(2))),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildUploadCard("Fabric/Emb", _fabricRef, () => _pickImage(3))),
+                      // Personal image slot
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Personal Image",
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54),
+                            ),
+                            const SizedBox(height: 8),
+                            _buildUploadCard(
+                              "Your Photo",
+                              _personalImage,
+                              _pickPersonalImage,
+                              themeColor,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      
+                      // Reference images list slot
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Reference Images",
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54),
+                            ),
+                            const SizedBox(height: 8),
+                            _buildUploadCard(
+                              "Add Reference",
+                              null,
+                              _pickReferenceImage,
+                              themeColor,
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
+                  
+                  // Render scrollable picked reference images if list is not empty
+                  if (_referenceImages.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      "Uploaded references:",
+                      style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.black54),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 90,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _referenceImages.length,
+                        itemBuilder: (context, index) {
+                          return Stack(
+                            alignment: Alignment.topRight,
+                            children: [
+                              Container(
+                                margin: const EdgeInsets.only(right: 12),
+                                width: 80,
+                                height: 80,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey.shade300),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(7),
+                                  child: Image.file(
+                                    File(_referenceImages[index].path),
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                top: 2,
+                                right: 14,
+                                child: InkWell(
+                                  onTap: () => _removeReferenceImage(index),
+                                  child: Container(
+                                    decoration: const BoxDecoration(
+                                      color: Colors.black54,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    padding: const EdgeInsets.all(2),
+                                    child: const Icon(
+                                      Icons.close,
+                                      size: 14,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ],
 
                   const SizedBox(height: 32),
 
                   // Measurements Form
                   const Text(
-                    "📏 Body Measurements (inches)",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    "Body Measurements (inches)",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E392A)),
                   ),
                   const SizedBox(height: 12),
                   Card(
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    color: const Color(0xFFFAFDF9),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.grey.shade200),
+                    ),
                     child: Padding(
                       padding: const EdgeInsets.all(12),
                       child: GridView.builder(
@@ -350,8 +442,8 @@ class _AITestScreenState extends State<AITestScreen> {
 
                   // Instructions Prompt
                   const Text(
-                    "✍️ Desired Outfit Preferences & Instructions",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    "Outfit Preferences & Instructions",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E392A)),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -370,12 +462,12 @@ class _AITestScreenState extends State<AITestScreen> {
                     Center(
                       child: Column(
                         children: [
-                          CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(primaryColor)),
+                          const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(themeColor)),
                           const SizedBox(height: 12),
                           Text(
                             _statusMessage,
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+                            style: const TextStyle(color: themeColor, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
@@ -404,7 +496,8 @@ class _AITestScreenState extends State<AITestScreen> {
                     height: 50,
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
+                        backgroundColor: themeColor,
+                        elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -423,37 +516,26 @@ class _AITestScreenState extends State<AITestScreen> {
                   // Results Block
                   if (_generatedImageBytes != null) ...[
                     const Text(
-                      "🎉 Try-On & Fabric Estimate Results",
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      "Try-On & Fabric Estimate Results",
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E392A)),
                     ),
                     const SizedBox(height: 16),
                     Card(
-                      elevation: 3,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: Colors.grey.shade200),
+                      ),
                       clipBehavior: Clip.antiAlias,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           // Stack image and overlay source
-                          Stack(
-                            alignment: Alignment.bottomRight,
-                            children: [
-                              Image.memory(
-                                _generatedImageBytes!,
-                                fit: BoxFit.cover,
-                                width: double.infinity,
-                                height: 350,
-                              ),
-                              if (_imageSource != null)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  color: Colors.black54,
-                                  child: Text(
-                                    _imageSource!,
-                                    style: const TextStyle(color: Colors.white, fontSize: 10),
-                                  ),
-                                ),
-                            ],
+                          Image.memory(
+                            _generatedImageBytes!,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: 350,
                           ),
 
                           // Fabric ledger
@@ -484,9 +566,9 @@ class _AITestScreenState extends State<AITestScreen> {
                                         ),
                                         Text(
                                           entry.value,
-                                          style: TextStyle(
+                                          style: const TextStyle(
                                             fontWeight: FontWeight.bold,
-                                            color: primaryColor,
+                                            color: Color(0xFF1E392A),
                                             fontSize: 14,
                                           ),
                                         ),
@@ -507,9 +589,9 @@ class _AITestScreenState extends State<AITestScreen> {
                   Center(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        "This bases on generative AI model, please read the terms and conditions of https://gemini.google.com/policy-guidelines",
-                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                      child: const Text(
+                        "This bases on Google Gemini and Hugging Face generative AI models, please read the terms and conditions of https://gemini.google.com/policy-guidelines",
+                        style: TextStyle(fontSize: 11, color: Colors.grey),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -524,25 +606,25 @@ class _AITestScreenState extends State<AITestScreen> {
     );
   }
 
-  Widget _buildStepItem(String text) {
+  Widget _buildStepItem(String text, bool isDone) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            Icons.check_circle,
-            color: Colors.green.shade600,
+            isDone ? Icons.check_circle : Icons.close,
+            color: isDone ? Colors.green.shade600 : Colors.black87,
             size: 20,
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: Color(0xFF333333),
-                fontWeight: FontWeight.w500,
+                color: const Color(0xFF333333),
+                fontWeight: isDone ? FontWeight.bold : FontWeight.w500,
               ),
             ),
           ),
@@ -551,7 +633,7 @@ class _AITestScreenState extends State<AITestScreen> {
     );
   }
 
-  Widget _buildUploadCard(String label, XFile? file, VoidCallback onTap) {
+  Widget _buildUploadCard(String label, XFile? file, VoidCallback onTap, Color themeColor) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -573,7 +655,7 @@ class _AITestScreenState extends State<AITestScreen> {
             : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_a_photo, color: Colors.green.shade800, size: 28),
+                  Icon(Icons.add_a_photo, color: themeColor, size: 28),
                   const SizedBox(height: 8),
                   Text(
                     label,
