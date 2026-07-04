@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/ai_service.dart';
 import '../../utils/api_config.dart';
+import '../../widgets/dashboard_drawer.dart';
 
 class AITestScreen extends StatefulWidget {
   const AITestScreen({super.key});
@@ -253,11 +254,18 @@ class _AITestScreenState extends State<AITestScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
+      drawer: const DashboardDrawer(
+        initialRole: AppUserRole.customer,
+      ),
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.menu),
-          onPressed: () {
-            // Future dashboard drawer trigger
+        leading: Builder(
+          builder: (context) {
+            return IconButton(
+              icon: const Icon(Icons.menu),
+              onPressed: () {
+                Scaffold.of(context).openDrawer();
+              },
+            );
           },
         ),
         automaticallyImplyLeading: false,
