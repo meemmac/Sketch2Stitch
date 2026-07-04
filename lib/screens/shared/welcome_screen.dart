@@ -124,7 +124,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                           "Design Your Dress, Buy Materials, and Get It Stitched in One Place",
                           style: TextStyle(
                             fontSize: 18,
-                            color: Colors.green.shade800.withOpacity(0.8),
+                            color: Colors.green.shade800.withValues(alpha: 0.8),
                             fontWeight: FontWeight.w500,
                             height: 1.4,
                           ),
@@ -268,7 +268,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 10,
                       offset: const Offset(0, 5),
                     )
@@ -330,15 +330,15 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                 child: Container(
                   padding: const EdgeInsets.all(28),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.45),
+                    color: Colors.white.withValues(alpha: 0.45),
                     borderRadius: BorderRadius.circular(30),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.6),
+                      color: Colors.white.withValues(alpha: 0.6),
                       width: 1.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.green.shade900.withOpacity(0.04),
+                        color: Colors.green.shade900.withValues(alpha: 0.04),
                         blurRadius: 25,
                         offset: const Offset(0, 10),
                       ),
@@ -350,7 +350,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: Colors.green.shade50.withOpacity(0.8),
+                          color: Colors.green.shade50.withValues(alpha: 0.8),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(icon, color: Colors.green.shade800, size: 30),
@@ -370,7 +370,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                         desc,
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.black87.withOpacity(0.7),
+                          color: Colors.black87.withValues(alpha: 0.7),
                           height: 1.5,
                         ),
                       ),
@@ -394,7 +394,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
             borderRadius: BorderRadius.circular(18),
             boxShadow: hasGlow ? [
               BoxShadow(
-                color: Colors.green.shade500.withOpacity(0.4 * _glowController.value),
+                color: Colors.green.shade500.withValues(alpha: 0.4 * _glowController.value),
                 blurRadius: 20 * _glowController.value,
                 spreadRadius: 2 * _glowController.value,
               )
@@ -446,7 +446,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
               fontSize: 13,
               fontWeight: FontWeight.w900,
               letterSpacing: 2,
-              color: Colors.green.shade900.withOpacity(0.4),
+              color: Colors.green.shade900.withValues(alpha: 0.4),
             ),
           ),
           const SizedBox(height: 25),
@@ -492,7 +492,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                 borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 15,
                   )
                 ],
@@ -539,7 +539,7 @@ class FabricParticlePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.green.shade200.withOpacity(0.15)
+      ..color = Colors.green.shade200.withValues(alpha: 0.15)
       ..style = PaintingStyle.fill;
 
     final random = math.Random(555);
@@ -560,8 +560,11 @@ class FabricParticlePainter extends CustomPainter {
         double r = radius * (0.8 + wave);
         double px = x + math.cos(angle) * r;
         double py = y + math.sin(angle) * r;
-        if (j == 0) path.moveTo(px, py);
-        else path.lineTo(px, py);
+        if (j == 0) {
+          path.moveTo(px, py);
+        } else {
+          path.lineTo(px, py);
+        }
       }
       path.close();
       canvas.drawPath(path, paint);

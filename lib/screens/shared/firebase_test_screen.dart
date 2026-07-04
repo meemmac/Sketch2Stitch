@@ -53,7 +53,7 @@ class _FirebaseTestScreenState extends State<FirebaseTestScreen> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   borderRadius: BorderRadius.circular(15),
                   border: Border.all(color: Colors.green.shade300),
                 ),
