@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -112,210 +113,221 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               Center(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCEFDD).withOpacity(0.55),
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Logo — same asset used on the Welcome screen
-                        Image.asset(
-                          'assets/images/transparent_logo.png',
-                          height: 55,
-                          fit: BoxFit.contain,
-                        ),
-                        const SizedBox(height: 24),
-
-                        const Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'Sign in with email',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                      child: Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.55),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.6),
+                            width: 1.2,
                           ),
                         ),
-                        const SizedBox(height: 20),
-
-                        // Email field
-                        const Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text('Email'),
-                        ),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: InputDecoration(
-                            hintText: 'Email',
-                            prefixIcon: const Icon(Icons.email_outlined),
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Password field
-                        const Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text('Password'),
-                        ),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: _passwordController,
-                          obscureText: _obscurePassword,
-                          decoration: InputDecoration(
-                            hintText: 'Password',
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscurePassword = !_obscurePassword;
-                                });
-                              },
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // User type dropdown
-                        const Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text('User Type'),
-                        ),
-                        const SizedBox(height: 6),
-                        DropdownButtonFormField<String>(
-                          initialValue: _selectedUserType,
-                          hint: const Text('User Type'),
-                          icon: Container(
-                            width: 22,
-                            height: 22,
-                            margin: const EdgeInsets.only(right: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFDFF2DF),
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                            child: const Icon(
-                              Icons.keyboard_arrow_down,
-                              size: 16,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: const Color(0xFFDFF2DF),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                          items: _userTypes.map((type) {
-                            return DropdownMenuItem(
-                              value: type,
-                              child: Text(type),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedUserType = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Forgot password
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () {
-                              // TODO: Navigate to forgot_password_screen.dart
-                            },
-                            style: TextButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              minimumSize: const Size(0, 0),
-                            ),
-                            child: const Text(
-                              'Forgot password ?',
-                              style: TextStyle(
-                                color: Colors.black54,
-                                fontSize: 12.5,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Get Started button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              // TODO: Handle login logic
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.black,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              elevation: 0,
-                            ),
-                            child: const Text(
-                              'Get Started',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Register link
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text('Or '),
-                            TextButton(
-                              onPressed: () {
-                                // TODO: Navigate to register_screen.dart
-                                // Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen()));
-                              },
-                              style: TextButton.styleFrom(
-                                padding: EdgeInsets.zero,
-                                minimumSize: const Size(0, 0),
-                              ),
-                              child: const Text(
-                                'Register',
+                            // Logo — same asset used on the Welcome screen
+                            Image.asset(
+                              'assets/images/transparent_logo.png',
+                              height: 55,
+                              fit: BoxFit.contain,
+                            ),
+                            const SizedBox(height: 24),
+
+                            const Align(
+                              alignment: Alignment.center,
+                              child: Text(
+                                'Sign in with email',
                                 style: TextStyle(
-                                  color: Colors.black87,
+                                  fontSize: 22,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
+                            const SizedBox(height: 20),
+
+                            // Email field
+                            const Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text('Email'),
+                            ),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              decoration: InputDecoration(
+                                hintText: 'Email',
+                                prefixIcon: const Icon(Icons.email_outlined),
+                                filled: true,
+                                fillColor: Colors.white,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Password field
+                            const Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text('Password'),
+                            ),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _passwordController,
+                              obscureText: _obscurePassword,
+                              decoration: InputDecoration(
+                                hintText: 'Password',
+                                prefixIcon: const Icon(Icons.lock_outline),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // User type dropdown
+                            const Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text('User Type'),
+                            ),
+                            const SizedBox(height: 6),
+                            DropdownButtonFormField<String>(
+                              initialValue: _selectedUserType,
+                              dropdownColor: const Color(0xFFDFF2DF),
+                              hint: const Text('User Type'),
+                              icon: Container(
+                                width: 22,
+                                height: 22,
+                                margin: const EdgeInsets.only(right: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFDFF2DF),
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                                child: const Icon(
+                                  Icons.keyboard_arrow_down,
+                                  size: 16,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              decoration: InputDecoration(
+                                filled: true,
+                                fillColor: Colors.white,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                              items: _userTypes.map((type) {
+                                return DropdownMenuItem(
+                                  value: type,
+                                  child: Text(type),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  _selectedUserType = value;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Forgot password
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: () {
+                                  // TODO: Navigate to forgot_password_screen.dart
+                                },
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: const Size(0, 0),
+                                ),
+                                child: const Text(
+                                  'Forgot password ?',
+                                  style: TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 12.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Get Started button
+                            SizedBox(
+                              width: double.infinity,
+                              height: 50,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  // TODO: Handle login logic
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.black,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                child: const Text(
+                                  'Get Started',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Register link
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text('Or '),
+                                TextButton(
+                                  onPressed: () {
+                                    // TODO: Navigate to register_screen.dart
+                                    // Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen()));
+                                  },
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    minimumSize: const Size(0, 0),
+                                  ),
+                                  child: const Text(
+                                    'Register',
+                                    style: TextStyle(
+                                      color: Colors.black87,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
