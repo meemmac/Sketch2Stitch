@@ -288,31 +288,37 @@ class AIService {
         ? 'No design references uploaded.'
         : '${referenceImageBytes.length} design reference image(s) uploaded (garments / fabrics / embroidery / accessories / sketches / patterns).';
 
-    final geminiAnalysisPrompt =
-        'You are a professional fashion designer and tailor assistant.\n'
-        'An AI fashion model is being generated with the following appearance:\n'
-        '$profileDesc\n\n'
-        'Style preferences: $styleString\n\n'
-        'Body Measurements (inches):\n$measurementString\n\n'
-        'Design References: $refNote\n\n'
-        '${customInstructions.isNotEmpty ? "Additional instructions: $customInstructions\n\n" : ""}'
-        'TASK: Based on the STYLE PREFERENCES above, determine which garment pieces '
-        'are needed for this outfit (e.g. Kameez, Salwar, Dupatta, Saree, Blouse, '
-        'Lehenga, Jacket, Trousers, Shirt, Skirt, etc.). '
-        'For each piece, estimate the fabric quantity in gauge or inches. '
-        'If the style preferences are too vague or non-specific to determine the '
-        'garment pieces and quantities, set the "insufficient" flag to true.\n\n'
-        'Output a valid JSON block with EXACTLY these fields:\n'
-        '- "insufficient": true or false\n'
-        '- "garments": an array of objects, each with "name" (garment piece) and '
-        '"quantity" (e.g. "2.5 Gauge", "3 meters", "1.5 inches"). Empty array if insufficient.\n'
-        '- "image_generation_prompt": a concise 80-word vivid prompt describing the '
-        'finished outfit on the AI fashion model. Focus on outfit design, colours, '
-        'fabric, and styling. Keep model description brief.\n\n'
-        'Format:\n'
-        '{"insufficient":false,"garments":[{"name":"Kameez","quantity":"2.5 Gauge"},{"name":"Salwar","quantity":"3 Gauge"}],"image_generation_prompt":"..."}';
+    // ── Build the analysis prompt ──────────────────────────────────────────────
+    // Priority order: custom instructions → style preferences → measurements
+    final hasCustom = customInstructions.isNotEmpty;
+    final hasStyle  = stylePreferences.isNotEmpty;
 
-    onStatus?.call('Analysing design references with Gemini...');
+    final geminiAnalysisPrompt =
+        'You are a professional tailor and fashion designer.\n\n'
+        '=== BODY MEASUREMENTS (inches) ===\n'
+        '$measurementString\n\n'
+        '=== STYLE PREFERENCES ===\n'
+        '${hasStyle ? styleString : "Not specified"}\n\n'
+        '${hasCustom ? "=== ADDITIONAL INSTRUCTIONS ===\n$customInstructions\n\n" : ""}'
+        '=== DESIGN REFERENCES ===\n'
+        '$refNote\n\n'
+        '=== AI MODEL APPEARANCE ===\n'
+        '$profileDesc\n\n'
+        'TASK:\n'
+        '1. Identify every garment piece required for this outfit. '
+        'Use the Additional Instructions and Style Preferences to determine the pieces '
+        '(e.g. Kameez, Salwar, Dupatta, Saree Blouse, Lehenga, Jacket, Trousers, Shirt, '
+        'Embroidery panel, Lining, etc.). '
+        'If neither is provided, make a reasonable assumption based on the profile.\n'
+        '2. For each piece, use the body measurements above to calculate the fabric '
+        'quantity required. Express quantity in Gauge (for local fabric rolls) or meters.\n'
+        '3. Write a vivid 80-word image-generation prompt describing the finished outfit '
+        'on the AI fashion model. Focus on the outfit colours, fabric, silhouette, and styling.\n\n'
+        'Output ONLY a JSON object — no markdown, no explanation — in this exact format:\n'
+        '{"garments":[{"name":"Piece Name","quantity":"X Gauge"},{"name":"Another Piece","quantity":"Y meters"}],'
+        '"image_generation_prompt":"..."}';
+
+    onStatus?.call('Analysing with Gemini — estimating fabric quantities...');
 
     Map<String, String> fabricEstimates = {};
     String imagePrompt =
@@ -330,43 +336,43 @@ class AIService {
         prompt: geminiAnalysisPrompt,
         imageBytes: visualContext,
       );
-      final startIdx = geminiText.indexOf('{');
-      final endIdx = geminiText.lastIndexOf('}');
-      if (startIdx != -1 && endIdx != -1) {
-        final parsed = jsonDecode(geminiText.substring(startIdx, endIdx + 1))
-            as Map<String, dynamic>;
 
-        final isInsufficient = parsed['insufficient'] as bool? ?? false;
-        if (isInsufficient) {
+      debugPrint('[VirtualTrial] Gemini raw response: $geminiText');
+
+      // Strip any markdown code fences Gemini might wrap around JSON
+      final cleaned = geminiText
+          .replaceAll(RegExp(r'```json\s*'), '')
+          .replaceAll(RegExp(r'```\s*'), '')
+          .trim();
+
+      final startIdx = cleaned.indexOf('{');
+      final endIdx   = cleaned.lastIndexOf('}');
+
+      if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
+        final jsonStr = cleaned.substring(startIdx, endIdx + 1);
+        final parsed  = jsonDecode(jsonStr) as Map<String, dynamic>;
+
+        // ── Parse garments array (type-safe: use toString on every value) ──
+        final rawGarments = parsed['garments'];
+        if (rawGarments is List && rawGarments.isNotEmpty) {
           fabricEstimates = {
-            '_note':
-                'Not enough style description to estimate fabric quantities.',
+            for (final g in rawGarments)
+              if (g is Map)
+                g['name'].toString(): g['quantity'].toString(),
           };
-        } else {
-          final garments = parsed['garments'] as List<dynamic>? ?? [];
-          if (garments.isEmpty) {
-            fabricEstimates = {
-              '_note':
-                  'Not enough style description to estimate fabric quantities.',
-            };
-          } else {
-            fabricEstimates = {
-              for (final g in garments)
-                (g['name'] as String? ?? 'Piece'):
-                    (g['quantity'] as String? ?? '—'),
-            };
-          }
         }
 
-        if (parsed['image_generation_prompt'] != null) {
-          imagePrompt = parsed['image_generation_prompt'] as String;
+        // ── Parse image prompt ─────────────────────────────────────────────
+        final rawPrompt = parsed['image_generation_prompt'];
+        if (rawPrompt != null && rawPrompt.toString().trim().isNotEmpty) {
+          imagePrompt = rawPrompt.toString().trim();
         }
+      } else {
+        debugPrint('[VirtualTrial] No JSON object found in Gemini response.');
       }
-    } catch (e) {
-      // Non-fatal: leave fabricEstimates empty and continue with image generation
-      fabricEstimates = {
-        '_note': 'Could not estimate fabric requirements at this time.',
-      };
+    } catch (e, st) {
+      // Non-fatal — image generation still proceeds
+      debugPrint('[VirtualTrial] Fabric estimation error: $e\n$st');
     }
 
     // 4. Generate image

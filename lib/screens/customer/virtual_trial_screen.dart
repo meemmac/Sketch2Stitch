@@ -502,6 +502,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
           : GestureDetector(
               onTap: _pickReferenceImages,
               child: Container(
+                width: double.infinity,
                 height: 110,
                 decoration: BoxDecoration(
                   color: _sagePale,
@@ -511,6 +512,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Icon(Icons.add_photo_alternate_outlined,
                         color: _sage, size: 32),
