@@ -22,7 +22,7 @@ class _BrowseScreenState extends State<BrowseScreen>
   late TabController _tabController;
   String _selectedCategory = 'All';
   String _searchQuery = '';
-  bool _showFilters = false;
+  final bool _showFilters = false;
 
   final List<Retailer> _retailers = [];
   final List<Product> _products = [];
@@ -531,7 +531,7 @@ class _BrowseScreenState extends State<BrowseScreen>
                         backgroundImage: NetworkImage(
                           tailor.profileImage ?? 'https://picsum.photos/seed/${tailor.id}/100/100',
                         ),
-                        onBackgroundImageError: (_, __) {},
+                        onBackgroundImageError: (_, _) {},
                       ),
                       const SizedBox(height: 4),
                       Text(

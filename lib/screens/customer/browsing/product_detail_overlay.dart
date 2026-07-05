@@ -181,7 +181,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   const SizedBox(height: 20),
 
                   // Features - With fixed height, different colors
-                  Container(
+                  SizedBox(
                     height: 145,
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
