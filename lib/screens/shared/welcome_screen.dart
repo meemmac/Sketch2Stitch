@@ -1,8 +1,10 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'login_screen.dart';
 import 'about_us_screen.dart';
 import 'firebase_test_screen.dart';
+import 'ai_test_screen.dart';
 
 void main() {
   runApp(const Sketch2StitchApp());
@@ -183,7 +185,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                             Colors.white,
                             Colors.green.shade900,
                             false,
-                            () {},
+                            () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const LoginScreen(),
+                                ),
+                              );
+                            },
                           ),
                         ),
                         const SizedBox(width: 20),
@@ -222,6 +231,20 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const FirebaseTestScreen()),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 50,
+            top: 10,
+            child: Opacity(
+              opacity: 0.3,
+              child: IconButton(
+                icon: const Icon(Icons.psychology, size: 18),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AITestScreen()),
                 ),
               ),
             ),
