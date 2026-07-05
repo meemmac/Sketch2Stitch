@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../models/appearance_profile.dart';
+
 
 class AIService {
   /// Test the Google Gemini API with a prompt and optional image bytes.
@@ -249,5 +252,140 @@ class AIService {
     } else {
       throw Exception('IDM-VTON API Error (${response.statusCode}): ${response.body.substring(0, 300)}');
     }
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Profile-Based Virtual Trial (no personal photo)
+  // ────────────────────────────────────────────────────────────────────────────
+
+
+  /// Generates an AI virtual trial image from an [AppearanceProfile] plus
+  /// design-reference images.  No personal photo required.
+  ///
+  /// Returns a record of (imageBytes, fabricEstimates).
+  static Future<(Uint8List, Map<String, String>)> generateVirtualTrialFromProfile({
+    required String geminiApiKey,
+    required String hfToken,
+    required AppearanceProfile profile,
+    required List<Uint8List> referenceImageBytes,
+    required Map<String, TextEditingController> measurements,
+    required List<String> stylePreferences,
+    required String customInstructions,
+    void Function(String status)? onStatus,
+  }) async {
+    // 1. Build measurement string
+    final measurementString =
+        measurements.entries.map((e) => '${e.key}: ${e.value.text}').join('\n');
+
+    // 2. Build style string
+    final styleString = stylePreferences.isEmpty
+        ? 'No specific style preference'
+        : stylePreferences.join(', ');
+
+    // 3. System instructions + profile description
+    final profileDesc = profile.toPromptString();
+    final refNote = referenceImageBytes.isEmpty
+        ? 'No design references uploaded.'
+        : '${referenceImageBytes.length} design reference image(s) uploaded (garments / fabrics / embroidery / accessories / sketches / patterns).';
+
+    final geminiAnalysisPrompt =
+        'You are a professional fashion designer and tailor assistant.\n'
+        'An AI fashion model is being generated with the following appearance:\n'
+        '$profileDesc\n\n'
+        'Style preferences: $styleString\n\n'
+        'Body Measurements (inches):\n$measurementString\n\n'
+        'Design References: $refNote\n\n'
+        '${customInstructions.isNotEmpty ? "Additional instructions: $customInstructions\n\n" : ""}'
+        'TASK: Based on the STYLE PREFERENCES above, determine which garment pieces '
+        'are needed for this outfit (e.g. Kameez, Salwar, Dupatta, Saree, Blouse, '
+        'Lehenga, Jacket, Trousers, Shirt, Skirt, etc.). '
+        'For each piece, estimate the fabric quantity in gauge or inches. '
+        'If the style preferences are too vague or non-specific to determine the '
+        'garment pieces and quantities, set the "insufficient" flag to true.\n\n'
+        'Output a valid JSON block with EXACTLY these fields:\n'
+        '- "insufficient": true or false\n'
+        '- "garments": an array of objects, each with "name" (garment piece) and '
+        '"quantity" (e.g. "2.5 Gauge", "3 meters", "1.5 inches"). Empty array if insufficient.\n'
+        '- "image_generation_prompt": a concise 80-word vivid prompt describing the '
+        'finished outfit on the AI fashion model. Focus on outfit design, colours, '
+        'fabric, and styling. Keep model description brief.\n\n'
+        'Format:\n'
+        '{"insufficient":false,"garments":[{"name":"Kameez","quantity":"2.5 Gauge"},{"name":"Salwar","quantity":"3 Gauge"}],"image_generation_prompt":"..."}';
+
+    onStatus?.call('Analysing design references with Gemini...');
+
+    Map<String, String> fabricEstimates = {};
+    String imagePrompt =
+        'A photorealistic full-body fashion shot. $profileDesc '
+        'Wearing a beautifully tailored outfit. Style: $styleString. '
+        'Clean, minimal background. Professional fashion photography lighting.';
+
+    // Use first reference image as Gemini visual context if available
+    final Uint8List? visualContext =
+        referenceImageBytes.isNotEmpty ? referenceImageBytes.first : null;
+
+    try {
+      final geminiText = await testGemini(
+        apiKey: geminiApiKey,
+        prompt: geminiAnalysisPrompt,
+        imageBytes: visualContext,
+      );
+      final startIdx = geminiText.indexOf('{');
+      final endIdx = geminiText.lastIndexOf('}');
+      if (startIdx != -1 && endIdx != -1) {
+        final parsed = jsonDecode(geminiText.substring(startIdx, endIdx + 1))
+            as Map<String, dynamic>;
+
+        final isInsufficient = parsed['insufficient'] as bool? ?? false;
+        if (isInsufficient) {
+          fabricEstimates = {
+            '_note':
+                'Not enough style description to estimate fabric quantities.',
+          };
+        } else {
+          final garments = parsed['garments'] as List<dynamic>? ?? [];
+          if (garments.isEmpty) {
+            fabricEstimates = {
+              '_note':
+                  'Not enough style description to estimate fabric quantities.',
+            };
+          } else {
+            fabricEstimates = {
+              for (final g in garments)
+                (g['name'] as String? ?? 'Piece'):
+                    (g['quantity'] as String? ?? '—'),
+            };
+          }
+        }
+
+        if (parsed['image_generation_prompt'] != null) {
+          imagePrompt = parsed['image_generation_prompt'] as String;
+        }
+      }
+    } catch (e) {
+      // Non-fatal: leave fabricEstimates empty and continue with image generation
+      fabricEstimates = {
+        '_note': 'Could not estimate fabric requirements at this time.',
+      };
+    }
+
+    // 4. Generate image
+    onStatus?.call('Generating try-on preview with Google Gemini...');
+    Uint8List resultBytes;
+    try {
+      resultBytes = await generateImageWithGemini(
+        apiKey: geminiApiKey,
+        prompt: imagePrompt,
+        inputImages: referenceImageBytes,
+      );
+    } catch (_) {
+      onStatus?.call('Gemini image failed. Retrying with Hugging Face FLUX...');
+      resultBytes = await testHuggingFace(
+        token: hfToken,
+        prompt: imagePrompt,
+      );
+    }
+
+    return (resultBytes, fabricEstimates);
   }
 }
