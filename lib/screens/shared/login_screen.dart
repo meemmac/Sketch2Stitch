@@ -141,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                             const Align(
                               alignment: Alignment.center,
                               child: Text(
-                                'Sign in with email',
+                                'Sign in to your account',
                                 style: TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.bold,
@@ -153,15 +153,15 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                             // Email field
                             const Align(
                               alignment: Alignment.centerLeft,
-                              child: Text('Email'),
+                              child: Text('Credential'),
                             ),
                             const SizedBox(height: 6),
                             TextField(
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
                               decoration: InputDecoration(
-                                hintText: 'Email',
-                                prefixIcon: const Icon(Icons.email_outlined),
+                                hintText: 'Email or mobile number',
+                                prefixIcon: const Icon(Icons.person_outline),
                                 filled: true,
                                 fillColor: Colors.white,
                                 border: OutlineInputBorder(
