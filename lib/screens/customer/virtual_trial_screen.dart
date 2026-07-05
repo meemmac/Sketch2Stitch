@@ -105,9 +105,25 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     'Ankle': TextEditingController(text: '9"'),
   };
 
-  // ── Style preferences ───────────────────────────────────────────────────────
   final Set<String> _selectedStyles = {};
   final _customInstructionsController = TextEditingController();
+  final _customHairColorController = TextEditingController();
+  final _customAccessoriesController = TextEditingController();
+
+  // =========================================================================
+  // FUTURE INTEGRATION PLACEHOLDER:
+  // When linking Virtual Trial to Cart / Order details, these variables
+  // will hold passed garment item parts, sketches, or measurements.
+  // Example call: VirtualTrialScreen(prefillGarments: ['Kameez', 'Salwar'], measurements: ...)
+  // =========================================================================
+  final List<String> _prefilledGarmentParts = []; 
+
+  @override
+  void initState() {
+    super.initState();
+    // In future dev, bind these passed values to selection controllers:
+    debugPrint('Autofill parts loaded: ${_prefilledGarmentParts.length}');
+  }
 
   // ── Generation state ────────────────────────────────────────────────────────
   bool _isLoading = false;
@@ -185,6 +201,8 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       pose: _profile.pose,
       expression: _profile.expression,
       accessories: Set.from(_profile.accessories),
+      customHairColor: _customHairColorController.text.trim(),
+      customAccessories: _customAccessoriesController.text.trim(),
     );
 
     try {
@@ -242,6 +260,8 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       c.dispose();
     }
     _customInstructionsController.dispose();
+    _customHairColorController.dispose();
+    _customAccessoriesController.dispose();
     _resultAnim.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -663,35 +683,108 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
             ),
           ),
 
-          // Hair Style
+          // Hair Style (Disabled if Bald is selected)
           _profileRow(
             label: 'Hair Style',
-            child: _chipRow(
-              values: HairStyle.values,
-              labels: (v) => v.label,
-              selected: (v) => _profile.hairStyle == v,
-              onTap: (v) => setState(() {
-                _profile.hairStyle = v;
-                _profileConfigured = true;
-              }),
+            child: IgnorePointer(
+              ignoring: _profile.hairLength == HairLength.bald,
+              child: Opacity(
+                opacity: _profile.hairLength == HairLength.bald ? 0.4 : 1.0,
+                child: _chipRow(
+                  values: HairStyle.values,
+                  labels: (v) => v.label,
+                  selected: (v) => _profile.hairLength != HairLength.bald && _profile.hairStyle == v,
+                  onTap: (v) => setState(() {
+                    _profile.hairStyle = v;
+                    _profileConfigured = true;
+                  }),
+                ),
+              ),
             ),
           ),
 
-          // Hair Color
+          // Hair Color (Only first 3 options as color swatches, otherwise text input)
           _profileRow(
             label: 'Hair Color',
-            child: _swatchRow(
-              items: _hairSwatches
-                  .map((s) => (s.$1, s.$2 == _profile.hairColor,
-                      () => setState(() {
-                            _profile.hairColor = s.$2;
-                            _profileConfigured = true;
-                          })))
-                  .toList(),
-              tooltip: (i) => _hairSwatches[i].$2.label,
-              bordered: (i) =>
-                  _hairSwatches[i].$2 == HairColor.white ||
-                  _hairSwatches[i].$2 == HairColor.blonde,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _swatchRow(
+                  items: _hairSwatches.take(3).map((s) => (
+                    s.$1,
+                    _profile.hairColor == s.$2,
+                    () => setState(() {
+                      _profile.hairColor = s.$2;
+                      _profileConfigured = true;
+                    })
+                  )).toList(),
+                  tooltip: (i) => _hairSwatches[i].$2.label,
+                  bordered: (i) => false,
+                ),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _profile.hairColor = HairColor.colorful;
+                      _profileConfigured = true;
+                    });
+                  },
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: _profile.hairColor == HairColor.colorful ? _sage : _border,
+                            width: _profile.hairColor == HairColor.colorful ? 2 : 1,
+                          ),
+                          gradient: const SweepGradient(
+                            colors: [Colors.red, Colors.yellow, Colors.blue, Colors.red],
+                          ),
+                        ),
+                        child: _profile.hairColor == HairColor.colorful
+                            ? const Icon(Icons.check, size: 12, color: Colors.white)
+                            : null,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Other Custom Color',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black54),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_profile.hairColor == HairColor.colorful) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 40,
+                    child: TextField(
+                      controller: _customHairColorController,
+                      decoration: InputDecoration(
+                        hintText: 'Enter hair color (e.g. Auburn, Silver, Pink)...',
+                        hintStyle: const TextStyle(fontSize: 12, color: Colors.black38),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: _border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: _sage),
+                        ),
+                      ),
+                      style: const TextStyle(fontSize: 12),
+                      onChanged: (val) {
+                        setState(() {
+                          _profileConfigured = true;
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
 
@@ -733,12 +826,11 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                             Text(
                               pi.$2.displayName,
                               style: TextStyle(
-                                fontSize: 8,
-                                color: selected
-                                    ? Colors.white
-                                    : Colors.black54,
-                                fontWeight: FontWeight.w600,
-                              ),
+                                  fontSize: 8,
+                                  color: selected
+                                      ? Colors.white
+                                      : Colors.black54,
+                                  fontWeight: FontWeight.w600),
                             ),
                           ],
                         ),
@@ -766,47 +858,78 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
             ),
           ),
 
-          // Accessories (multi-select)
+          // Accessories (multi-select + custom accessory text input)
           _profileRow(
             label: 'Accessories',
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: ModelAccessory.values.map((acc) {
-                final selected =
-                    _profile.accessories.contains(acc);
-                return GestureDetector(
-                  onTap: () => setState(() {
-                    if (selected) {
-                      _profile.accessories.remove(acc);
-                    } else {
-                      _profile.accessories.add(acc);
-                    }
-                    _profileConfigured = true;
-                  }),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: selected ? _sage : _sagePale,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: selected ? _sage : _border),
-                    ),
-                    child: Text(
-                      acc.label,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: selected
-                            ? Colors.white
-                            : Colors.black54,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: ModelAccessory.values.map((acc) {
+                    final selected =
+                        _profile.accessories.contains(acc);
+                    return GestureDetector(
+                      onTap: () => setState(() {
+                        if (selected) {
+                          _profile.accessories.remove(acc);
+                        } else {
+                          _profile.accessories.add(acc);
+                        }
+                        _profileConfigured = true;
+                      }),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: selected ? _sage : _sagePale,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: selected ? _sage : _border),
+                        ),
+                        child: Text(
+                          acc.label,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: selected
+                                ? Colors.white
+                                : Colors.black54,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 40,
+                  child: TextField(
+                    controller: _customAccessoriesController,
+                    decoration: InputDecoration(
+                      hintText: 'Other custom accessories (e.g. Earrings, Bracelet, Tiara)...',
+                      hintStyle: const TextStyle(fontSize: 12, color: Colors.black38),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: _border),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: _sage),
                       ),
                     ),
+                    style: const TextStyle(fontSize: 12),
+                    onChanged: (val) {
+                      setState(() {
+                        _profileConfigured = true;
+                      });
+                    },
                   ),
-                );
-              }).toList(),
+                ),
+              ],
             ),
           ),
         ],
@@ -907,6 +1030,34 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Notice banner explaining order page / dress parts for fabric calculation
+          Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.amber.shade200),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline, color: Colors.amber.shade800, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'If you did not come from an order page, please mention the specific dress parts you want to buy (e.g., "Dupatta, Kameez, Salwar") in the box below so the AI can estimate the correct quantities.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.black.withAlpha(180),
+                      fontWeight: FontWeight.w500,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -1199,49 +1350,82 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
           ),
           const SizedBox(height: 12),
           ...fabric.entries.map((e) {
-                // Special: Gemini returned a note instead of garment rows
-                if (e.key == '_note') {
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      e.value,
-                      style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.black45,
-                          fontStyle: FontStyle.italic),
-                    ),
-                  );
-                }
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: [
-                      Flexible(
-                        flex: 5,
-                        child: Text(
-                          e.key,
-                          style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500),
+            // Special: a note row (no garment, just informational text)
+            if (e.key == '_note') {
+              return Padding(
+                padding: const EdgeInsets.only(top: 4, bottom: 2),
+                child: Text(
+                  e.value,
+                  style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.black45,
+                      fontStyle: FontStyle.italic),
+                ),
+              );
+            }
+            // Normal garment row: name + quantity chips
+            final parts = e.value
+                .split('/')
+                .map((p) => p.trim())
+                .where((p) => p.isNotEmpty)
+                .toList();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    e.key,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _ink),
+                  ),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: parts.map((part) {
+                      final isInch  = part.toLowerCase().contains('inch');
+                      final isMeter = part.toLowerCase().contains('meter');
+                      Color bg, border, fg;
+                      if (isInch) {
+                        bg = const Color(0xFFE8F0FE);
+                        border = const Color(0xFFADC8F5);
+                        fg = const Color(0xFF2558C1);
+                      } else if (isMeter) {
+                        bg = const Color(0xFFFFF8E1);
+                        border = const Color(0xFFFFCC80);
+                        fg = const Color(0xFFBF7800);
+                      } else {
+                        // Gauge
+                        bg = _sagePale;
+                        border = _border;
+                        fg = _sageDark;
+                      }
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: bg,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: border),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        flex: 4,
                         child: Text(
-                          e.value,
-                          textAlign: TextAlign.end,
-                          style: const TextStyle(
-                            fontSize: 13,
+                          part,
+                          style: TextStyle(
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: _sageDark,
+                            color: fg,
                           ),
                         ),
-                      ),
-                    ],
+                      );
+                    }).toList(),
                   ),
-                );
-              }),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );

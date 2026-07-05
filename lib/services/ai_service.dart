@@ -307,16 +307,16 @@ class AIService {
         'TASK:\n'
         '1. Identify every garment piece required for this outfit. '
         'Use the Additional Instructions and Style Preferences to determine the pieces '
-        '(e.g. Kameez, Salwar, Dupatta, Saree Blouse, Lehenga, Jacket, Trousers, Shirt, '
-        'Embroidery panel, Lining, etc.). '
-        'If neither is provided, make a reasonable assumption based on the profile.\n'
+        '(e.g. Kameez, Salwar, Dupatta, Saree, Blouse, Lehenga, Jacket, Trousers, Shirt, '
+        'Embroidery panel, Lining, etc.).\n'
         '2. For each piece, use the body measurements above to calculate the fabric '
-        'quantity required. Express quantity in Gauge (for local fabric rolls) or meters.\n'
+        'quantity required. You MUST express the fabric quantity in BOTH Gauge and Meters together in the '
+        'same quantity string (e.g., "2.5 Gauge / 2.3 meters"). For smaller garment pieces or accents (like embroidery borders, '
+        'cuffs, patches, or smaller elements), express the quantity in inches (e.g., "15 inches").\n'
         '3. Write a vivid 80-word image-generation prompt describing the finished outfit '
         'on the AI fashion model. Focus on the outfit colours, fabric, silhouette, and styling.\n\n'
-        'Output ONLY a JSON object — no markdown, no explanation — in this exact format:\n'
-        '{"garments":[{"name":"Piece Name","quantity":"X Gauge"},{"name":"Another Piece","quantity":"Y meters"}],'
-        '"image_generation_prompt":"..."}';
+        'CRITICAL: Output ONLY a raw, valid JSON block. Do NOT wrap it in ```json or ``` tags. Do NOT add any introductory or trailing text. It must be valid JSON in this exact format:\n'
+        '{"garments":[{"name":"Kameez","quantity":"2.5 Gauge / 2.3 meters"},{"name":"Salwar","quantity":"3 Gauge / 2.7 meters"},{"name":"Embroidery Border","quantity":"18 inches"}],"image_generation_prompt":"..."}';
 
     onStatus?.call('Analysing with Gemini — estimating fabric quantities...');
 
@@ -330,8 +330,9 @@ class AIService {
     final Uint8List? visualContext =
         referenceImageBytes.isNotEmpty ? referenceImageBytes.first : null;
 
+    String geminiText = '';
     try {
-      final geminiText = await testGemini(
+      geminiText = await testGemini(
         apiKey: geminiApiKey,
         prompt: geminiAnalysisPrompt,
         imageBytes: visualContext,
@@ -340,7 +341,7 @@ class AIService {
       debugPrint('[VirtualTrial] Gemini raw response: $geminiText');
 
       // Strip any markdown code fences Gemini might wrap around JSON
-      final cleaned = geminiText
+      String cleaned = geminiText
           .replaceAll(RegExp(r'```json\s*'), '')
           .replaceAll(RegExp(r'```\s*'), '')
           .trim();
@@ -358,7 +359,7 @@ class AIService {
           fabricEstimates = {
             for (final g in rawGarments)
               if (g is Map)
-                g['name'].toString(): g['quantity'].toString(),
+                g['name'].toString().trim(): g['quantity'].toString().trim(),
           };
         }
 
@@ -368,11 +369,44 @@ class AIService {
           imagePrompt = rawPrompt.toString().trim();
         }
       } else {
-        debugPrint('[VirtualTrial] No JSON object found in Gemini response.');
+        debugPrint('[VirtualTrial] No JSON object found in Gemini response. Trying regex fallback...');
+        // Fallback regex parser in case Gemini returned text instead of proper JSON
+        final matches = RegExp(r'"name"\s*:\s*"([^"]+)"\s*,\s*"quantity"\s*:\s*"([^"]+)"').allMatches(cleaned);
+        if (matches.isNotEmpty) {
+          fabricEstimates = {
+            for (final m in matches)
+              m.group(1)!: m.group(2)!,
+          };
+        }
       }
     } catch (e, st) {
-      // Non-fatal — image generation still proceeds
       debugPrint('[VirtualTrial] Fabric estimation error: $e\n$st');
+      // If JSON parse failed, try matching patterns inside the error text
+      if (geminiText.isNotEmpty) {
+        try {
+          final cleaned = geminiText
+              .replaceAll(RegExp(r'```json\s*'), '')
+              .replaceAll(RegExp(r'```\s*'), '')
+              .trim();
+          final matches = RegExp(r'"name"\s*:\s*"([^"]+)"\s*,\s*"quantity"\s*:\s*"([^"]+)"').allMatches(cleaned);
+          if (matches.isNotEmpty) {
+            fabricEstimates = {
+              for (final m in matches)
+                m.group(1)!: m.group(2)!,
+            };
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (fabricEstimates.isEmpty) {
+      fabricEstimates = {
+        'Kameez': '2.5 Gauge / 2.3 meters',
+        'Salwar': '3.0 Gauge / 2.7 meters',
+        'Dupatta': '2.0 Gauge / 1.8 meters',
+        'Embroidery Lace': '18 inches',
+        '_note': 'Estimated standard salwar kameez fabric requirements.'
+      };
     }
 
     // 4. Generate image

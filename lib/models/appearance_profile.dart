@@ -34,18 +34,36 @@ class AppearanceProfile {
     this.pose = ModelPose.standingFront,
     this.expression = FacialExpression.neutral,
     Set<ModelAccessory>? accessories,
+    this.customHairColor = '',
+    this.customAccessories = '',
   }) : accessories = accessories ?? {};
+
+  // Custom visual values
+  String customHairColor;
+  String customAccessories;
 
   /// Builds a descriptive English prompt fragment for the AI model.
   String toPromptString() {
-    final accText = accessories.isEmpty
-        ? 'no accessories'
-        : accessories.map((a) => a.label).join(', ');
+    String hairText = '';
+    if (hairLength == HairLength.bald) {
+      hairText = 'bald head';
+    } else {
+      final colorStr = (hairColor == HairColor.colorful && customHairColor.trim().isNotEmpty)
+          ? customHairColor.trim()
+          : hairColor.label;
+      hairText = '${hairLength.label} ${hairStyle.label} $colorStr hair';
+    }
+
+    final List<String> accList = [];
+    accList.addAll(accessories.map((a) => a.label));
+    if (customAccessories.trim().isNotEmpty) {
+      accList.add(customAccessories.trim());
+    }
+    final accText = accList.isEmpty ? 'no accessories' : accList.join(', ');
 
     return 'A ${ageGroup.label} ${gender.label} fashion model '
         'with a ${bodyShape.label} body shape, ${height.label} height, '
-        '${skinTone.label} skin tone, ${hairLength.label} ${hairStyle.label} '
-        '${hairColor.label} hair. '
+        '${skinTone.label} skin tone, $hairText. '
         'The model is ${pose.label} with a ${expression.label} expression. '
         'The model is wearing $accText as pre-existing accessories.';
   }
