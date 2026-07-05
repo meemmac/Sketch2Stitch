@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../models/appearance_profile.dart';
+
 
 class AIService {
   /// Test the Google Gemini API with a prompt and optional image bytes.
@@ -249,5 +252,180 @@ class AIService {
     } else {
       throw Exception('IDM-VTON API Error (${response.statusCode}): ${response.body.substring(0, 300)}');
     }
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Profile-Based Virtual Trial (no personal photo)
+  // ────────────────────────────────────────────────────────────────────────────
+
+
+  /// Generates an AI virtual trial image from an [AppearanceProfile] plus
+  /// design-reference images.  No personal photo required.
+  ///
+  /// Returns a record of (imageBytes, fabricEstimates).
+  static Future<(Uint8List, Map<String, String>)> generateVirtualTrialFromProfile({
+    required String geminiApiKey,
+    required String hfToken,
+    required AppearanceProfile profile,
+    required List<Uint8List> referenceImageBytes,
+    required Map<String, TextEditingController> measurements,
+    required List<String> stylePreferences,
+    required String customInstructions,
+    void Function(String status)? onStatus,
+  }) async {
+    // 1. Build measurement string
+    final measurementString =
+        measurements.entries.map((e) => '${e.key}: ${e.value.text}').join('\n');
+
+    // 2. Build style string
+    final styleString = stylePreferences.isEmpty
+        ? 'No specific style preference'
+        : stylePreferences.join(', ');
+
+    // 3. System instructions + profile description
+    final profileDesc = profile.toPromptString();
+    final refNote = referenceImageBytes.isEmpty
+        ? 'No design references uploaded.'
+        : '${referenceImageBytes.length} design reference image(s) uploaded (garments / fabrics / embroidery / accessories / sketches / patterns).';
+
+    // ── Build the analysis prompt ──────────────────────────────────────────────
+    // Priority order: custom instructions → style preferences → measurements
+    final hasCustom = customInstructions.isNotEmpty;
+    final hasStyle  = stylePreferences.isNotEmpty;
+
+    final geminiAnalysisPrompt =
+        'You are a professional tailor and fashion designer.\n\n'
+        '=== BODY MEASUREMENTS (inches) ===\n'
+        '$measurementString\n\n'
+        '=== STYLE PREFERENCES ===\n'
+        '${hasStyle ? styleString : "Not specified"}\n\n'
+        '${hasCustom ? "=== ADDITIONAL INSTRUCTIONS ===\n$customInstructions\n\n" : ""}'
+        '=== DESIGN REFERENCES ===\n'
+        '$refNote\n\n'
+        '=== AI MODEL APPEARANCE ===\n'
+        '$profileDesc\n\n'
+        'TASK:\n'
+        '1. Identify every garment piece required for this outfit. '
+        'Use the Additional Instructions and Style Preferences to determine the pieces '
+        '(e.g. Kameez, Salwar, Dupatta, Saree, Blouse, Lehenga, Jacket, Trousers, Shirt, '
+        'Embroidery panel, Lining, etc.).\n'
+        '2. For each piece, use the body measurements above to calculate the fabric '
+        'quantity required. You MUST express the fabric quantity in BOTH Gauge and Meters together in the '
+        'same quantity string (e.g., "2.5 Gauge / 2.3 meters"). For smaller garment pieces or accents (like embroidery borders, '
+        'cuffs, patches, or smaller elements), express the quantity in inches (e.g., "15 inches").\n'
+        '3. Write a vivid 80-word image-generation prompt describing the finished outfit '
+        'on the AI fashion model. Focus on the outfit colours, fabric, silhouette, and styling.\n\n'
+        'CRITICAL: Output ONLY a raw, valid JSON block. Do NOT wrap it in ```json or ``` tags. Do NOT add any introductory or trailing text. It must be valid JSON in this exact format:\n'
+        '{"garments":[{"name":"Kameez","quantity":"2.5 Gauge / 2.3 meters"},{"name":"Salwar","quantity":"3 Gauge / 2.7 meters"},{"name":"Embroidery Border","quantity":"18 inches"}],"image_generation_prompt":"..."}';
+
+    onStatus?.call('Analysing with Gemini — estimating fabric quantities...');
+
+    Map<String, String> fabricEstimates = {};
+    String imagePrompt =
+        'A photorealistic full-body fashion shot. $profileDesc '
+        'Wearing a beautifully tailored outfit. Style: $styleString. '
+        'Clean, minimal background. Professional fashion photography lighting.';
+
+    // Use first reference image as Gemini visual context if available
+    final Uint8List? visualContext =
+        referenceImageBytes.isNotEmpty ? referenceImageBytes.first : null;
+
+    String geminiText = '';
+    try {
+      geminiText = await testGemini(
+        apiKey: geminiApiKey,
+        prompt: geminiAnalysisPrompt,
+        imageBytes: visualContext,
+      );
+
+      debugPrint('[VirtualTrial] Gemini raw response: $geminiText');
+
+      // Strip any markdown code fences Gemini might wrap around JSON
+      String cleaned = geminiText
+          .replaceAll(RegExp(r'```json\s*'), '')
+          .replaceAll(RegExp(r'```\s*'), '')
+          .trim();
+
+      final startIdx = cleaned.indexOf('{');
+      final endIdx   = cleaned.lastIndexOf('}');
+
+      if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
+        final jsonStr = cleaned.substring(startIdx, endIdx + 1);
+        final parsed  = jsonDecode(jsonStr) as Map<String, dynamic>;
+
+        // ── Parse garments array (type-safe: use toString on every value) ──
+        final rawGarments = parsed['garments'];
+        if (rawGarments is List && rawGarments.isNotEmpty) {
+          fabricEstimates = {
+            for (final g in rawGarments)
+              if (g is Map)
+                g['name'].toString().trim(): g['quantity'].toString().trim(),
+          };
+        }
+
+        // ── Parse image prompt ─────────────────────────────────────────────
+        final rawPrompt = parsed['image_generation_prompt'];
+        if (rawPrompt != null && rawPrompt.toString().trim().isNotEmpty) {
+          imagePrompt = rawPrompt.toString().trim();
+        }
+      } else {
+        debugPrint('[VirtualTrial] No JSON object found in Gemini response. Trying regex fallback...');
+        // Fallback regex parser in case Gemini returned text instead of proper JSON
+        final matches = RegExp(r'"name"\s*:\s*"([^"]+)"\s*,\s*"quantity"\s*:\s*"([^"]+)"').allMatches(cleaned);
+        if (matches.isNotEmpty) {
+          fabricEstimates = {
+            for (final m in matches)
+              m.group(1)!: m.group(2)!,
+          };
+        }
+      }
+    } catch (e, st) {
+      debugPrint('[VirtualTrial] Fabric estimation error: $e\n$st');
+      // If JSON parse failed, try matching patterns inside the error text
+      if (geminiText.isNotEmpty) {
+        try {
+          final cleaned = geminiText
+              .replaceAll(RegExp(r'```json\s*'), '')
+              .replaceAll(RegExp(r'```\s*'), '')
+              .trim();
+          final matches = RegExp(r'"name"\s*:\s*"([^"]+)"\s*,\s*"quantity"\s*:\s*"([^"]+)"').allMatches(cleaned);
+          if (matches.isNotEmpty) {
+            fabricEstimates = {
+              for (final m in matches)
+                m.group(1)!: m.group(2)!,
+            };
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (fabricEstimates.isEmpty) {
+      fabricEstimates = {
+        'Kameez': '2.5 Gauge / 2.3 meters',
+        'Salwar': '3.0 Gauge / 2.7 meters',
+        'Dupatta': '2.0 Gauge / 1.8 meters',
+        'Embroidery Lace': '18 inches',
+        '_note': 'Estimated standard salwar kameez fabric requirements.'
+      };
+    }
+
+    // 4. Generate image
+    onStatus?.call('Generating try-on preview with Google Gemini...');
+    Uint8List resultBytes;
+    try {
+      resultBytes = await generateImageWithGemini(
+        apiKey: geminiApiKey,
+        prompt: imagePrompt,
+        inputImages: referenceImageBytes,
+      );
+    } catch (_) {
+      onStatus?.call('Gemini image failed. Retrying with Hugging Face FLUX...');
+      resultBytes = await testHuggingFace(
+        token: hfToken,
+        prompt: imagePrompt,
+      );
+    }
+
+    return (resultBytes, fabricEstimates);
   }
 }
