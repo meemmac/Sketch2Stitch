@@ -1,3 +1,5 @@
+import 'order_item.dart';
+
 class Product {
   final String id;
   final String retailerId;
@@ -6,11 +8,9 @@ class Product {
   final String materialType;
   final List<String> colorOptions;
   final String description;
-  final double price;
-  final double rating;
-  final int reviewCount;
-  final String? imageUrl;
-  final int stock;
+  
+  // Relationships
+  List<OrderItem>? orderItems;
 
   Product({
     required this.id,
@@ -20,12 +20,30 @@ class Product {
     required this.materialType,
     required this.colorOptions,
     required this.description,
-    required this.price,
-    this.rating = 0.0,
-    this.reviewCount = 0,
-    this.imageUrl,
-    this.stock = 10,
+    this.orderItems = const [],
   });
+
+  Product copyWith({
+    String? id,
+    String? retailerId,
+    String? productName,
+    String? category,
+    String? materialType,
+    List<String>? colorOptions,
+    String? description,
+    List<OrderItem>? orderItems,
+  }) {
+    return Product(
+      id: id ?? this.id,
+      retailerId: retailerId ?? this.retailerId,
+      productName: productName ?? this.productName,
+      category: category ?? this.category,
+      materialType: materialType ?? this.materialType,
+      colorOptions: colorOptions ?? this.colorOptions,
+      description: description ?? this.description,
+      orderItems: orderItems ?? this.orderItems,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -35,10 +53,17 @@ class Product {
     'materialType': materialType,
     'colorOptions': colorOptions,
     'description': description,
-    'price': price,
-    'rating': rating,
-    'reviewCount': reviewCount,
-    'imageUrl': imageUrl,
-    'stock': stock,
   };
+
+  factory Product.fromJson(Map<String, dynamic> json) {
+    return Product(
+      id: json['id'] ?? '',
+      retailerId: json['retailerId'] ?? '',
+      productName: json['productName'] ?? '',
+      category: json['category'] ?? '',
+      materialType: json['materialType'] ?? '',
+      colorOptions: List<String>.from(json['colorOptions'] ?? []),
+      description: json['description'] ?? '',
+    );
+  }
 }

@@ -1,3 +1,4 @@
+
 class Measurement {
   final String id;
   final String customerId;
@@ -14,8 +15,8 @@ class Measurement {
   final double thigh;
   final double knee;
   final double ankle;
-  final DateTime? createdAt;
 
+  
   Measurement({
     required this.id,
     required this.customerId,
@@ -32,8 +33,43 @@ class Measurement {
     required this.thigh,
     required this.knee,
     required this.ankle,
-    this.createdAt,
   });
+
+  Measurement copyWith({
+    String? id,
+    String? customerId,
+    double? upperBustCircumference,
+    double? roundShoulderCircumference,
+    double? hipsCircumference,
+    double? underBustCircumference,
+    double? bustCircumference,
+    double? bustSpan,
+    double? shoulderToHips,
+    double? shoulderToKnee,
+    double? shoulderToUnderBust,
+    double? shoulderToBust,
+    double? thigh,
+    double? knee,
+    double? ankle,
+  }) {
+    return Measurement(
+      id: id ?? this.id,
+      customerId: customerId ?? this.customerId,
+      upperBustCircumference: upperBustCircumference ?? this.upperBustCircumference,
+      roundShoulderCircumference: roundShoulderCircumference ?? this.roundShoulderCircumference,
+      hipsCircumference: hipsCircumference ?? this.hipsCircumference,
+      underBustCircumference: underBustCircumference ?? this.underBustCircumference,
+      bustCircumference: bustCircumference ?? this.bustCircumference,
+      bustSpan: bustSpan ?? this.bustSpan,
+      shoulderToHips: shoulderToHips ?? this.shoulderToHips,
+      shoulderToKnee: shoulderToKnee ?? this.shoulderToKnee,
+      shoulderToUnderBust: shoulderToUnderBust ?? this.shoulderToUnderBust,
+      shoulderToBust: shoulderToBust ?? this.shoulderToBust,
+      thigh: thigh ?? this.thigh,
+      knee: knee ?? this.knee,
+      ankle: ankle ?? this.ankle,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -51,6 +87,25 @@ class Measurement {
     'thigh': thigh,
     'knee': knee,
     'ankle': ankle,
-    'createdAt': createdAt?.toIso8601String(),
   };
+
+  factory Measurement.fromJson(Map<String, dynamic> json) {
+    return Measurement(
+      id: json['id'] ?? '',
+      customerId: json['customerId'] ?? '',
+      upperBustCircumference: (json['upperBustCircumference'] ?? 0).toDouble(),
+      roundShoulderCircumference: (json['roundShoulderCircumference'] ?? 0).toDouble(),
+      hipsCircumference: (json['hipsCircumference'] ?? 0).toDouble(),
+      underBustCircumference: (json['underBustCircumference'] ?? 0).toDouble(),
+      bustCircumference: (json['bustCircumference'] ?? 0).toDouble(),
+      bustSpan: (json['bustSpan'] ?? 0).toDouble(),
+      shoulderToHips: (json['shoulderToHips'] ?? 0).toDouble(),
+      shoulderToKnee: (json['shoulderToKnee'] ?? 0).toDouble(),
+      shoulderToUnderBust: (json['shoulderToUnderBust'] ?? 0).toDouble(),
+      shoulderToBust: (json['shoulderToBust'] ?? 0).toDouble(),
+      thigh: (json['thigh'] ?? 0).toDouble(),
+      knee: (json['knee'] ?? 0).toDouble(),
+      ankle: (json['ankle'] ?? 0).toDouble(),
+    );
+  }
 }

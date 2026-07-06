@@ -1,5 +1,6 @@
 import 'portfolio.dart';
-import 'review.dart';
+import 'tailor_job.dart';
+import 'notification.dart';
 
 class Tailor {
   final String id;
@@ -12,9 +13,11 @@ class Tailor {
   final int reviewCount;
   final String? profileImage;
   final String? description;
-  final List<Portfolio> portfolio;
-  final List<Review> reviews;
-  bool isFavorite;
+  
+  // Relationships
+  List<Portfolio>? portfolio;
+  List<Notifications>? notifications;  // Notifications for this tailor
+  List<TailorJob>? jobs;
 
   Tailor({
     required this.id,
@@ -28,8 +31,8 @@ class Tailor {
     this.profileImage,
     this.description,
     this.portfolio = const [],
-    this.reviews = const [],
-    this.isFavorite = false,
+    this.notifications = const [],
+    this.jobs = const [],
   });
 
   bool get hasLicense => licenses.isNotEmpty;
@@ -54,8 +57,8 @@ class Tailor {
     String? profileImage,
     String? description,
     List<Portfolio>? portfolio,
-    List<Review>? reviews,
-    bool? isFavorite,
+    List<Notifications>? notifications,
+    List<TailorJob>? jobs,
   }) {
     return Tailor(
       id: id ?? this.id,
@@ -69,8 +72,36 @@ class Tailor {
       profileImage: profileImage ?? this.profileImage,
       description: description ?? this.description,
       portfolio: portfolio ?? this.portfolio,
-      reviews: reviews ?? this.reviews,
-      isFavorite: isFavorite ?? this.isFavorite,
+      notifications: notifications ?? this.notifications,
+      jobs: jobs ?? this.jobs,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'email': email,
+    'phone': phone,
+    'address': address,
+    'licenses': licenses,
+    'rating': rating,
+    'reviewCount': reviewCount,
+    'profileImage': profileImage,
+    'description': description,
+  };
+
+  factory Tailor.fromJson(Map<String, dynamic> json) {
+    return Tailor(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      email: json['email'] ?? '',
+      phone: json['phone'] ?? '',
+      address: json['address'] ?? '',
+      licenses: List<String>.from(json['licenses'] ?? []),
+      rating: (json['rating'] ?? 0).toDouble(),
+      reviewCount: json['reviewCount'] ?? 0,
+      profileImage: json['profileImage'],
+      description: json['description'],
     );
   }
 }

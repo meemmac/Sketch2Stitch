@@ -68,7 +68,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         targetRole: ReviewTargetRole.retailer,
         rating: 5.0,
         comment: 'Excellent quality fabrics!',
-        createdAt: DateTime.now(),
       ),
     ];
 
@@ -90,10 +89,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         address: 'Gulshan, Dhaka',
         licenses: ['License #123'],
         rating: 4.8,
-        reviewCount: 214,
-        logoUrl: 'assets/images/retailer1.png',
-        description: 'Premium quality fabrics for your style',
-        reviews: sampleReviews,
       ),
       Retailer(
         id: 'r2',
@@ -103,10 +98,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         address: 'Banani, Dhaka',
         licenses: [],
         rating: 4.5,
-        reviewCount: 104,
-        logoUrl: 'assets/images/retailer2.png',
-        description: 'Best cotton blend fabrics',
-        reviews: [],
+        
       ),
     ]);
 
@@ -120,11 +112,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         colorOptions: ['White', 'Pink', 'Blue'],
         description:
             'High-quality cotton fabric perfect for all your tailoring needs. This premium fabric offers excellent durability, comfort, and a luxurious feel.',
-        price: 230,
-        rating: 4.5,
-        reviewCount: 234,
-        imageUrl: 'assets/images/fab.jpg',
-        stock: 50,
+        
       ),
       Product(
         id: 'p2',
@@ -135,11 +123,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         colorOptions: ['White', 'Beige', 'Blue'],
         description:
             'Premium cotton blend fabric with excellent durability and softness.',
-        price: 330,
-        rating: 4.7,
-        reviewCount: 234,
-        imageUrl: 'assets/images/fab2.jpg',
-        stock: 30,
+       
       ),
       Product(
         id: 'p3',
@@ -150,11 +134,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         colorOptions: ['White', 'Blue', 'Green'],
         description:
             'Casual cotton fabric for everyday wear. Lightweight and breathable.',
-        price: 130,
-        rating: 3.5,
-        reviewCount: 200,
-        imageUrl: 'assets/images/fabric_waves.jpg',
-        stock: 40,
+      
       ),
       Product(
         id: 'p4',
@@ -164,11 +144,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         materialType: '100% Linen',
         colorOptions: ['White', 'Pink', 'Blue'],
         description: 'High-quality linen fabric perfect for summer wear.',
-        price: 280,
-        rating: 4.5,
-        reviewCount: 234,
-        imageUrl: 'assets/images/fabrics_rolled.jpg',
-        stock: 50,
+        
       ),
       Product(
         id: 'p5',
@@ -178,11 +154,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         materialType: 'Silk Blend',
         colorOptions: ['White', 'Beige', 'Blue'],
         description: 'Luxurious silk blend fabric with beautiful drape and sheen.',
-        price: 380,
-        rating: 4.7,
-        reviewCount: 234,
-        imageUrl: 'assets/images/silk.jpg',
-        stock: 30,
+       
       ),
       Product(
         id: 'p6',
@@ -193,11 +165,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         colorOptions: ['White', 'Blue', 'Green'],
         description:
             'Beautiful lace fabric for elegant designs and special occasions.',
-        price: 450,
-        rating: 3.5,
-        reviewCount: 200,
-        imageUrl: 'assets/images/lace.jpg',
-        stock: 40,
+        
       ),
       Product(
         id: 'p7',
@@ -208,11 +176,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         colorOptions: ['White', 'Gold', 'Pink'],
         description:
             'Luxurious silk fabric for special occasions and formal wear.',
-        price: 550,
-        rating: 4.7,
-        reviewCount: 156,
-        imageUrl: 'assets/images/lace2.jpg',
-        stock: 20,
+       
       ),
       Product(
         id: 'p8',
@@ -222,11 +186,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         materialType: 'Wool Blend',
         colorOptions: ['White', 'Brown', 'Blue'],
         description: 'Warm wool blend fabric perfect for winter wear.',
-        price: 420,
-        rating: 4.8,
-        reviewCount: 189,
-        imageUrl: 'assets/images/gorgeous.jpg',
-        stock: 25,
+       
       ),
       Product(
         id: 'p9',
@@ -237,11 +197,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         colorOptions: ['White', 'Gold', 'Blue'],
         description:
             'Exquisite embroidery fabric for traditional and modern designs.',
-        price: 600,
-        rating: 4.9,
-        reviewCount: 312,
-        imageUrl: 'assets/images/embroidery.jpg',
-        stock: 15,
+        
       ),
       Product(
         id: 'p10',
@@ -252,11 +208,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         colorOptions: ['White', 'Beige', 'Green'],
         description:
             'Breathable linen blend fabric for comfortable everyday wear.',
-        price: 260,
-        rating: 4.3,
-        reviewCount: 167,
-        imageUrl: 'assets/images/tassel.jpg',
-        stock: 35,
+       
       ),
     ]);
 
@@ -273,7 +225,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         profileImage: 'assets/images/tailor1.jpg',
         description: 'Expert tailoring services with 10+ years experience.',
         portfolio: samplePortfolios,
-        reviews: sampleReviews,
+        
       ),
     ]);
   }

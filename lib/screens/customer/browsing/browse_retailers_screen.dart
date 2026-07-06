@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:sketch2stitch/models/retailer.dart';
+import 'package:sketch2stitch/models/models.dart';
 import 'package:sketch2stitch/models/review.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
@@ -54,7 +54,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
         targetRole: ReviewTargetRole.retailer,
         rating: 4.5,
         comment: 'Great quality fabrics!',
-        createdAt: DateTime.now(),
       ),
       Review(
         id: 'r2',
@@ -63,7 +62,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
         targetRole: ReviewTargetRole.retailer,
         rating: 4.5,
         comment: 'Excellent service!',
-        createdAt: DateTime.now(),
       ),
     ];
 
@@ -76,10 +74,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
         address: 'Gulshan, Dhaka',
         licenses: ['License #123'],
         rating: 4.5,
-        reviewCount: 234,
-        logoUrl: 'assets/images/fabric_waves.jpg',
-        description: 'Multi-brand Fabric Store with premium quality fabrics',
-        reviews: sampleReviews.where((r) => r.targetId == 'r1').toList(),
+        
       ),
       Retailer(
         id: 'r2',
@@ -89,10 +84,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
         address: 'Banani, Dhaka',
         licenses: ['License #456'],
         rating: 4.5,
-        reviewCount: 234,
-        logoUrl: 'https://picsum.photos/seed/cottoncorner/200/200',
-        description: 'Cotton Specialist with 100% pure cotton fabrics',
-        reviews: sampleReviews.where((r) => r.targetId == 'r2').toList(),
+        
       ),
       Retailer(
         id: 'r3',
@@ -102,10 +94,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
         address: 'Dhanmondi, Dhaka',
         licenses: ['License #789'],
         rating: 4.8,
-        reviewCount: 312,
-        logoUrl: 'https://picsum.photos/seed/silkemporium/200/200',
-        description: 'Luxury silk fabrics for special occasions',
-        reviews: [],
       ),
       Retailer(
         id: 'r4',
@@ -115,10 +103,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
         address: 'Uttara, Dhaka',
         licenses: [],
         rating: 4.2,
-        reviewCount: 167,
-        logoUrl: 'https://picsum.photos/seed/linenworld/200/200',
-        description: 'Premium linen fabrics for all seasons',
-        reviews: [],
       ),
       Retailer(
         id: 'r5',
@@ -128,10 +112,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
         address: 'Mirpur, Dhaka',
         licenses: ['License #101'],
         rating: 4.6,
-        reviewCount: 198,
-        logoUrl: 'https://picsum.photos/seed/woolhouse/200/200',
-        description: 'Specialist in wool and winter fabrics',
-        reviews: [],
       ),
       Retailer(
         id: 'r6',
@@ -141,10 +121,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
         address: 'Gulshan, Dhaka',
         licenses: ['License #123'],
         rating: 4.5,
-        reviewCount: 234,
-        logoUrl: 'https://picsum.photos/seed/fabricparadise2/200/200',
-        description: 'Multi-brand Fabric Store with premium quality fabrics',
-        reviews: [],
+       
       ),
       Retailer(
         id: 'r7',
@@ -154,10 +131,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
         address: 'Banani, Dhaka',
         licenses: ['License #456'],
         rating: 4.5,
-        reviewCount: 234,
-        logoUrl: 'https://picsum.photos/seed/cottoncorner2/200/200',
-        description: 'Cotton Specialist with 100% pure cotton fabrics',
-        reviews: [],
+        
       ),
     ]);
   }

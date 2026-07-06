@@ -12,7 +12,6 @@ class Review {
   final String? orderId;
   final double rating;
   final String comment;
-  final DateTime createdAt;
 
   Review({
     required this.id,
@@ -22,8 +21,27 @@ class Review {
     this.orderId,
     required this.rating,
     required this.comment,
-    required this.createdAt,
   });
+
+  Review copyWith({
+    String? id,
+    String? customerId,
+    String? targetId,
+    ReviewTargetRole? targetRole,
+    String? orderId,
+    double? rating,
+    String? comment,
+  }) {
+    return Review(
+      id: id ?? this.id,
+      customerId: customerId ?? this.customerId,
+      targetId: targetId ?? this.targetId,
+      targetRole: targetRole ?? this.targetRole,
+      orderId: orderId ?? this.orderId,
+      rating: rating ?? this.rating,
+      comment: comment ?? this.comment,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -33,6 +51,17 @@ class Review {
     'orderId': orderId,
     'rating': rating,
     'comment': comment,
-    'createdAt': createdAt.toIso8601String(),
   };
+
+  factory Review.fromJson(Map<String, dynamic> json) {
+    return Review(
+      id: json['id'] ?? '',
+      customerId: json['customerId'] ?? '',
+      targetId: json['targetId'] ?? '',
+      targetRole: ReviewTargetRole.values[json['targetRole'] ?? 0],
+      orderId: json['orderId'],
+      rating: (json['rating'] ?? 0).toDouble(),
+      comment: json['comment'] ?? '',
+    );
+  }
 }

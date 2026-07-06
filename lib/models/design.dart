@@ -3,14 +3,12 @@ class Design {
   final String customerId;
   final String? designFile;
   final String description;
-  final DateTime createdAt;
 
   Design({
     required this.id,
     required this.customerId,
     this.designFile,
     required this.description,
-    required this.createdAt,
   });
 
   Map<String, dynamic> toJson() => {
@@ -18,6 +16,14 @@ class Design {
     'customerId': customerId,
     'designFile': designFile,
     'description': description,
-    'createdAt': createdAt.toIso8601String(),
   };
+
+  factory Design.fromJson(Map<String, dynamic> json) {
+    return Design(
+      id: json['id'] ?? '',
+      customerId: json['customerId'] ?? '',
+      designFile: json['designFile'],
+      description: json['description'] ?? '',
+    );
+  }
 }

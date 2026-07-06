@@ -1,10 +1,27 @@
+import 'measurement.dart';
+import 'design.dart';
+import 'order.dart';
+import 'review.dart';
+import 'conversation.dart';
+import 'favorite.dart';
+import 'notification.dart';
+
 class Customer {
   final String id;
   final String name;
   final String email;
   final String phone;
   final String address;
-  final String? profileImage;
+  
+  // Relationships
+  List<Measurement>? measurements;
+  List<Order>? orders;
+  List<Review>? reviews;
+  List<Conversation>? conversations;
+  List<Favorite>? favorites;
+  List<Design>? designs;
+  List<Notifications>? notifications;
+
 
   Customer({
     required this.id,
@@ -12,7 +29,13 @@ class Customer {
     required this.email,
     required this.phone,
     required this.address,
-    this.profileImage,
+    this.measurements,
+    this.designs,
+    this.orders,
+    this.reviews,
+    this.conversations,
+    this.favorites,
+    this.notifications,
   });
 
   Map<String, dynamic> toJson() => {
@@ -21,6 +44,15 @@ class Customer {
     'email': email,
     'phone': phone,
     'address': address,
-    'profileImage': profileImage,
   };
+
+  factory Customer.fromJson(Map<String, dynamic> json) {
+    return Customer(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      email: json['email'] ?? '',
+      phone: json['phone'] ?? '',
+      address: json['address'] ?? '',
+    );
+  }
 }

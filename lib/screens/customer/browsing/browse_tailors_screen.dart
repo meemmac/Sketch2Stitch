@@ -56,7 +56,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
         targetRole: ReviewTargetRole.tailor,
         rating: 4.5,
         comment: 'Excellent work!',
-        createdAt: DateTime.now(),
+       
       ),
       Review(
         id: 'r2',
@@ -65,7 +65,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
         targetRole: ReviewTargetRole.tailor,
         rating: 3.5,
         comment: 'Good service',
-        createdAt: DateTime.now(),
+        
       ),
       Review(
         id: 'r3',
@@ -74,7 +74,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
         targetRole: ReviewTargetRole.tailor,
         rating: 4.0,
         comment: 'Very professional',
-        createdAt: DateTime.now(),
+        
       ),
     ];
 
@@ -101,7 +101,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
         description:
             'Expert tailoring with 15 years experience. Specializing in wedding and formal wear.',
         portfolio: samplePortfolios,
-        reviews: sampleReviews.where((r) => r.targetId == 't1').toList(),
+        
       ),
       Tailor(
         id: 't2',
@@ -116,7 +116,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
         description:
             'Fast and reliable tailoring with 10 years experience. Specializing in casual and daily wear.',
         portfolio: [],
-        reviews: sampleReviews.where((r) => r.targetId == 't2').toList(),
+        
       ),
       Tailor(
         id: 't3',
@@ -131,7 +131,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
         description:
             'Premium tailoring with 5 years experience. Specializing in traditional and ethnic wear.',
         portfolio: [],
-        reviews: sampleReviews.where((r) => r.targetId == 't3').toList(),
+        
       ),
       Tailor(
         id: 't4',
@@ -146,7 +146,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
         description:
             'Professional tailoring with 15 years experience. Specializing in wedding and formal wear.',
         portfolio: [],
-        reviews: [],
+        
       ),
       Tailor(
         id: 't5',
@@ -161,7 +161,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
         description:
             'Modern tailoring with 15 years experience. Specializing in formal and informal wear.',
         portfolio: [],
-        reviews: [],
+        
       ),
       Tailor(
         id: 't6',
@@ -176,7 +176,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
         description:
             'Expert tailoring with 15 years experience. Specializing in wedding and formal wear.',
         portfolio: [],
-        reviews: [],
+       
       ),
     ]);
   }
