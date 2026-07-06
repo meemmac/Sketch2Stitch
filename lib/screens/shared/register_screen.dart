@@ -256,7 +256,66 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ],
     );
   }
-  
+
+  // ---------------- Step 3: Retailer Form ----------------
+  Widget _buildRetailerForm() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildLogo(),
+        const SizedBox(height: 12),
+        const Text(
+          'Registration Form',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 20),
+ 
+        _buildFieldLabel('Shop name'),
+        const SizedBox(height: 6),
+        _buildTextField(
+          controller: _shopNameController,
+          hint: 'Shop name',
+        ),
+        const SizedBox(height: 16),
+ 
+        _buildFieldLabel('Organizational email'),
+        const SizedBox(height: 6),
+        _buildTextField(
+          controller: _orgEmailController,
+          hint: 'Organizational email',
+          icon: Icons.mail_outline,
+          keyboardType: TextInputType.emailAddress,
+        ),
+        const SizedBox(height: 16),
+ 
+        _buildFieldLabel('Phone number'),
+        const SizedBox(height: 6),
+        _buildTextField(
+          controller: _retailerPhoneController,
+          hint: 'Phone number',
+          icon: Icons.phone_outlined,
+          keyboardType: TextInputType.phone,
+        ),
+        const SizedBox(height: 16),
+ 
+        _buildFieldLabel('Shop address'),
+        const SizedBox(height: 6),
+        _buildTextField(
+          controller: _shopAddressController,
+          hint: 'Shop address',
+          icon: Icons.storefront_outlined,
+        ),
+        const SizedBox(height: 24),
+ 
+        _buildNextButton(onPressed: () {
+          // TODO: validate fields and move to the next registration step
+        }),
+        const SizedBox(height: 16),
+        _buildSignInRow(),
+      ],
+    );
+  }
+
   // ---------------- Shared reusable widgets ----------------
   Widget _buildFieldLabel(String text) {
     return Align(
