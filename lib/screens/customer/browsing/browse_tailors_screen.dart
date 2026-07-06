@@ -4,6 +4,7 @@ import 'package:sketch2stitch/models/portfolio.dart';
 import 'package:sketch2stitch/models/review.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 
 /// Entry point kept for backward compatibility with existing navigation
 /// calls (e.g. `Navigator.push(... BrowseTailorsScreen())`). It now opens
@@ -96,7 +97,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
         licenses: ['License #12345'],
         rating: 4.5,
         reviewCount: 234,
-       profileImage: 'assets/images/crochet.jpg',
+        profileImage: 'https://picsum.photos/seed/masterstitch/200/200',
         description:
             'Expert tailoring with 15 years experience. Specializing in wedding and formal wear.',
         portfolio: samplePortfolios,
@@ -111,7 +112,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
         licenses: [],
         rating: 3.5,
         reviewCount: 134,
-       profileImage: 'assets/images/design.jpg',
+        profileImage: 'https://picsum.photos/seed/quickstitch/200/200',
         description:
             'Fast and reliable tailoring with 10 years experience. Specializing in casual and daily wear.',
         portfolio: [],
@@ -126,7 +127,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
         licenses: ['License #22222'],
         rating: 4.0,
         reviewCount: 334,
-       profileImage: 'assets/images/drawing_fabric.jpg',
+        profileImage: 'https://picsum.photos/seed/royalstitch/200/200',
         description:
             'Premium tailoring with 5 years experience. Specializing in traditional and ethnic wear.',
         portfolio: [],
@@ -141,7 +142,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
         licenses: [],
         rating: 4.5,
         reviewCount: 234,
-        profileImage: 'assets/images/textile.jpg',
+        profileImage: 'https://picsum.photos/seed/stitchtailors/200/200',
         description:
             'Professional tailoring with 15 years experience. Specializing in wedding and formal wear.',
         portfolio: [],
@@ -156,7 +157,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
         licenses: ['License #33333'],
         rating: 4.5,
         reviewCount: 234,
-        profileImage: 'assets/images/gorgeous.jpg',
+        profileImage: 'https://picsum.photos/seed/modernfit/200/200',
         description:
             'Modern tailoring with 15 years experience. Specializing in formal and informal wear.',
         portfolio: [],
@@ -171,7 +172,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
         licenses: ['License #44444'],
         rating: 4.5,
         reviewCount: 234,
-        profileImage: 'assets/images/design.jpg',
+        profileImage: 'https://picsum.photos/seed/masterstitch2/200/200',
         description:
             'Expert tailoring with 15 years experience. Specializing in wedding and formal wear.',
         portfolio: [],
@@ -217,7 +218,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF64CD57), Color(0xFF224F34)],
+          colors: [kSageDark, kSage],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -297,9 +298,9 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF224F34) : Colors.white,
+          color: selected ? kSage : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? const Color(0xFF224F34) : Colors.grey[300]!),
+          border: Border.all(color: selected ? kSage : kBorder),
         ),
         child: Text(
           label,
@@ -353,9 +354,9 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: kCardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: kBorder),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
         ],

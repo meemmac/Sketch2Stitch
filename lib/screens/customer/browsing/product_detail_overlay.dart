@@ -126,7 +126,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF224F34),
+                      color: Color(0xFF2C5C44),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -251,12 +251,12 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                           ),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? const Color(0xFF224F34)
+                                ? const Color(0xFF2C5C44)
                                 : Colors.white,
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
                               color: isSelected
-                                  ? const Color(0xFF224F34)
+                                  ? const Color(0xFF2C5C44)
                                   : Colors.grey[300]!,
                             ),
                           ),
@@ -304,15 +304,15 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Added to cart!'),
-                                backgroundColor: Color(0xFF64CD57),
+                                backgroundColor: Color(0xFF4E8B6F),
                                 duration: Duration(seconds: 2),
                               ),
                             );
                           },
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF224F34),
+                            foregroundColor: const Color(0xFF2C5C44),
                             padding: const EdgeInsets.symmetric(vertical: 16),
-                            side: const BorderSide(color: Color(0xFF224F34)),
+                            side: const BorderSide(color: Color(0xFF2C5C44)),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -322,7 +322,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF224F34),
+                              color: Color(0xFF2C5C44),
                             ),
                           ),
                         ),
@@ -335,13 +335,13 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Order placed successfully!'),
-                                backgroundColor: Color(0xFF64CD57),
+                                backgroundColor: Color(0xFF4E8B6F),
                                 duration: Duration(seconds: 2),
                               ),
                             );
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF224F34),
+                            backgroundColor: const Color(0xFF2C5C44),
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -430,7 +430,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                     ? loadingProgress.cumulativeBytesLoaded /
                         loadingProgress.expectedTotalBytes!
                     : null,
-                color: const Color(0xFF224F34),
+                color: const Color(0xFF2C5C44),
               ),
             ),
           );

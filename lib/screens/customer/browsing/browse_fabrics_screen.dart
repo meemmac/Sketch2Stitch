@@ -6,6 +6,7 @@ import 'package:sketch2stitch/models/review.dart';
 import 'package:sketch2stitch/models/portfolio.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 
 /// Entry point kept for backward compatibility with existing navigation
 /// calls (e.g. `Navigator.push(... BrowseFabricsScreen())`). It now opens
@@ -311,7 +312,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF64CD57), Color(0xFF224F34)],
+          colors: [kSageDark, kSage],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -399,10 +400,10 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF224F34) : Colors.white,
+          color: selected ? kSage : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? const Color(0xFF224F34) : Colors.grey[300]!,
+            color: selected ? kSage : kBorder,
           ),
         ),
         child: Text(
@@ -444,9 +445,9 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
           onTap: () => _showProductDetailOverlay(context, product),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: kCardBg,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey[200]!),
+              border: Border.all(color: kBorder),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.04),
@@ -507,7 +508,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF16423C),
+                            color: kSageDark,
                           ),
                         ),
                       ],

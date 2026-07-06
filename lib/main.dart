@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_fabrics_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'screens/shared/welcome_screen.dart';
+import 'firebase_options.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const Sketch2StitchApp());
 }
-
 class Sketch2StitchApp extends StatelessWidget {
   const Sketch2StitchApp({super.key});
 

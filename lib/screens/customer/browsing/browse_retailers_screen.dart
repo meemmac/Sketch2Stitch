@@ -3,6 +3,7 @@ import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/models/review.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 
 /// Entry point kept for backward compatibility with existing navigation
 /// calls (e.g. `Navigator.push(... BrowseRetailersScreen())`). It now
@@ -198,7 +199,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF64CD57), Color(0xFF224F34)],
+          colors: [kSageDark, kSage],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -278,9 +279,9 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF224F34) : Colors.white,
+          color: selected ? kSage : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? const Color(0xFF224F34) : Colors.grey[300]!),
+          border: Border.all(color: selected ? kSage : kBorder),
         ),
         child: Text(
           label,
@@ -325,9 +326,9 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
       },
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: kCardBg,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey[200]!),
+          border: Border.all(color: kBorder),
           boxShadow: [
             BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
           ],

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_fabrics_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_tailors_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 
 /// Shared shell for the three "Browse" tabs (Fabrics/Clothing, Tailors,
 /// Retailers). Provides one header, one animated navigation row, and a
@@ -109,7 +110,7 @@ class _BrowseShellState extends State<BrowseShell> {
             onPressed: () {
               // Open drawer later
             },
-            icon: const Icon(Icons.menu, color: Color(0xFF224F34)),
+            icon: const Icon(Icons.menu, color: kSage),
           ),
           const SizedBox(width: 8),
           Image.asset(
@@ -120,7 +121,7 @@ class _BrowseShellState extends State<BrowseShell> {
                 height: 45,
                 width: 45,
                 decoration: const BoxDecoration(
-                  color: Color(0xFF224F34),
+                  color: kSage,
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
@@ -141,9 +142,9 @@ class _BrowseShellState extends State<BrowseShell> {
             child: Container(
               height: 40,
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
+                color: kSagePale,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
+                border: Border.all(color: kBorder),
               ),
               child: TextField(
                 onChanged: (value) => _searchNotifier.value = value,
@@ -161,7 +162,7 @@ class _BrowseShellState extends State<BrowseShell> {
             onPressed: () {},
             icon: const Icon(
               Icons.shopping_cart_outlined,
-              color: Color(0xFF224F34),
+              color: kSage,
               size: 24,
             ),
           ),
@@ -189,8 +190,8 @@ class _BrowseShellState extends State<BrowseShell> {
             final t = (1 - (_page - index).abs()).clamp(0.0, 1.0);
             final fontSize = lerpDouble(14, 18, t)!;
             final color = Color.lerp(
-              const Color(0xFF224F34).withValues(alpha: 0.5),
-              const Color(0xFF224F34),
+              kSage.withValues(alpha: 0.5),
+              kSage,
               t,
             );
             final weight = t > 0.5 ? FontWeight.bold : FontWeight.w600;
@@ -219,7 +220,7 @@ class _BrowseShellState extends State<BrowseShell> {
                       height: 2.5,
                       width: lerpDouble(0, 28, t),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF224F34).withValues(alpha: t),
+                        color: kSage.withValues(alpha: t),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
