@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'login_screen.dart';
 import 'about_us_screen.dart';
 import 'firebase_test_screen.dart';
-import 'ai_test_screen.dart';
+import '../customer/virtual_trial_screen.dart';
 
 void main() {
   runApp(const Sketch2StitchApp());
@@ -244,7 +244,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                 icon: const Icon(Icons.psychology, size: 18),
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const AITestScreen()),
+                  MaterialPageRoute(builder: (context) => const VirtualTrialScreen()),
                 ),
               ),
             ),

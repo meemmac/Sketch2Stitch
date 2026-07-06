@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../screens/customer/virtual_trial_screen.dart';
 
 /// Enum representing the three user roles.
 enum AppUserRole {
@@ -435,13 +436,23 @@ class DrawerNavigationSection extends StatelessWidget {
             label: item['title'] as String,
             themeColor: themeColor,
             onTap: () {
-              debugPrint("Navigation clicked: ${item['title']}");
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text("Navigation trigger: ${item['title']}"),
-                  duration: const Duration(seconds: 1),
-                ),
-              );
+              Navigator.pop(context); // close drawer first
+              if (item['title'] == 'Virtual Trial') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const VirtualTrialScreen(),
+                  ),
+                );
+              } else {
+                debugPrint("Navigation clicked: ${item['title']}");
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text("Navigation trigger: ${item['title']}"),
+                    duration: const Duration(seconds: 1),
+                  ),
+                );
+              }
             },
           );
         }).toList(),
@@ -468,7 +479,6 @@ class DrawerNavigationSection extends StatelessWidget {
         return [
           {'title': 'Orders', 'icon': Icons.receipt_long_rounded},
           {'title': 'Inventory', 'icon': Icons.inventory_2_outlined},
-          {'title': 'Messages', 'icon': Icons.chat_bubble_outline_rounded},
         ];
     }
   }
