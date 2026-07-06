@@ -13,27 +13,52 @@ class _RegisterScreenState extends State<RegisterScreen> {
   RegisterStep _step = RegisterStep.roleSelect;
   String? _selectedRole;
 
+    // Customer form controllers
+  final _customerFullNameController = TextEditingController();
+  final _customerEmailController = TextEditingController();
+  final _customerPhoneController = TextEditingController();
+ 
+  // Tailor form controllers
+  final _tailorFullNameController = TextEditingController();
+  final _tailorEmailController = TextEditingController();
+  final _tailorPhoneController = TextEditingController();
+ 
+  // Retailer form controllers
+  final _shopNameController = TextEditingController();
+  final _orgEmailController = TextEditingController();
+  final _retailerPhoneController = TextEditingController();
+  final _shopAddressController = TextEditingController();
+ 
+  @override
+  void dispose() {
+    _customerFullNameController.dispose();
+    _customerEmailController.dispose();
+    _customerPhoneController.dispose();
+    _tailorFullNameController.dispose();
+    _tailorEmailController.dispose();
+    _tailorPhoneController.dispose();
+    _shopNameController.dispose();
+    _orgEmailController.dispose();
+    _retailerPhoneController.dispose();
+    _shopAddressController.dispose();
+    super.dispose();
+  }
+
   void _selectRole(String role) {
     setState(() {
       _selectedRole = role;
-      if (role == 'Retailer') {
-        _step = RegisterStep.retailerForm;
-      } else {
-        _step = RegisterStep.customerTailorForm;
-      }
+      _step = role == 'Retailer' ? RegisterStep.retailerForm : RegisterStep.customerTailorForm;
     });
   }
-
+ 
   void _goBack() {
     if (_step == RegisterStep.roleSelect) {
       Navigator.pop(context);
     } else {
-      setState(() {
-        _step = RegisterStep.roleSelect;
-      });
+      setState(() => _step = RegisterStep.roleSelect);
     }
   }
-
+ 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -81,23 +106,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
-
+ 
   Widget _buildStepContent() {
     switch (_step) {
       case RegisterStep.roleSelect:
         return _buildRoleSelect();
       case RegisterStep.customerTailorForm:
-        return Text('${_selectedRole ?? ''} form goes here'); // placeholder, built in a later step
+        return Text('${_selectedRole ?? ''} form goes here'); // built in a later step
       case RegisterStep.retailerForm:
-        return const Text('Retailer form goes here'); // placeholder, built in a later step
+        return const Text('Retailer form goes here'); // built in a later step
     }
   }
-
+ 
+  Widget _buildLogo() {
+    return Image.asset('assets/images/transparent_logo.png', height: 55, fit: BoxFit.contain);
+  }
+ 
   Widget _buildRoleSelect() {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Image.asset('assets/images/transparent_logo.png', height: 55, fit: BoxFit.contain),
+        _buildLogo(),
         const SizedBox(height: 16),
         const Text('Register As', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
         const SizedBox(height: 24),
@@ -107,21 +136,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         const SizedBox(height: 16),
         _buildRoleButton('Retailer'),
         const SizedBox(height: 20),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('Or '),
-            TextButton(
-              onPressed: () {},
-              style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0)),
-              child: const Text('Sign in', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
+        _buildSignInRow(),
       ],
     );
   }
-
+ 
   Widget _buildRoleButton(String role) {
     return SizedBox(
       width: double.infinity,
@@ -137,8 +156,77 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
+ 
+  // ---------------- Shared reusable widgets ----------------
+  Widget _buildFieldLabel(String text) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+    );
+  }
+ 
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hint,
+    IconData? icon,
+    TextInputType? keyboardType,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        hintText: hint,
+        suffixIcon: icon == null ? null : Icon(icon, size: 18, color: Colors.black54),
+        filled: true,
+        fillColor: const Color(0xFFBFE4C4),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+ 
+  Widget _buildNextButton({required VoidCallback onPressed}) {
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF6FAE73),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+          elevation: 0,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Text('Next', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+            SizedBox(width: 8),
+            Icon(Icons.arrow_forward, color: Colors.white, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+ 
+  Widget _buildSignInRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Text('Or '),
+        TextButton(
+          onPressed: () {
+            // TODO: Navigate to login_screen.dart
+          },
+          style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0)),
+          child: const Text('Sign in', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+        ),
+      ],
+    );
+  }
 }
-
+ 
 
 
 
