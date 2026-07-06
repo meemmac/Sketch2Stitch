@@ -206,6 +206,57 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ],
     );
   }
+
+  // ---------------- Step 2b: Tailor Form ----------------
+  Widget _buildTailorForm() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildLogo(),
+        const SizedBox(height: 12),
+        const Text(
+          'Registration Form',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 20),
+ 
+        _buildFieldLabel('Full Name'),
+        const SizedBox(height: 6),
+        _buildTextField(
+          controller: _tailorFullNameController,
+          hint: 'Full Name',
+        ),
+        const SizedBox(height: 16),
+ 
+        _buildFieldLabel('Email address'),
+        const SizedBox(height: 6),
+        _buildTextField(
+          controller: _tailorEmailController,
+          hint: 'Email address',
+          icon: Icons.mail_outline,
+          keyboardType: TextInputType.emailAddress,
+        ),
+        const SizedBox(height: 16),
+ 
+        _buildFieldLabel('Phone number'),
+        const SizedBox(height: 6),
+        _buildTextField(
+          controller: _tailorPhoneController,
+          hint: 'Phone number',
+          icon: Icons.phone_outlined,
+          keyboardType: TextInputType.phone,
+        ),
+        const SizedBox(height: 24),
+ 
+        _buildNextButton(onPressed: () {
+          // TODO: validate fields and save tailor registration data
+        }),
+        const SizedBox(height: 16),
+        _buildSignInRow(),
+      ],
+    );
+  }
+  
   // ---------------- Shared reusable widgets ----------------
   Widget _buildFieldLabel(String text) {
     return Align(
