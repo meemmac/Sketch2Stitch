@@ -1,34 +1,35 @@
 import 'package:flutter/material.dart';
- 
+import 'login_screen.dart';
+
 enum RegisterStep { roleSelect, customerForm, tailorForm, retailerForm }
- 
+
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
- 
+
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
- 
+
 class _RegisterScreenState extends State<RegisterScreen> {
   RegisterStep _step = RegisterStep.roleSelect;
   String? _selectedRole;
- 
+
   // Customer form controllers
   final _customerFullNameController = TextEditingController();
   final _customerEmailController = TextEditingController();
   final _customerPhoneController = TextEditingController();
- 
+
   // Tailor form controllers
   final _tailorFullNameController = TextEditingController();
   final _tailorEmailController = TextEditingController();
   final _tailorPhoneController = TextEditingController();
- 
+
   // Retailer form controllers
   final _shopNameController = TextEditingController();
   final _orgEmailController = TextEditingController();
   final _retailerPhoneController = TextEditingController();
   final _shopAddressController = TextEditingController();
- 
+
   @override
   void dispose() {
     _customerFullNameController.dispose();
@@ -43,7 +44,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _shopAddressController.dispose();
     super.dispose();
   }
- 
+
   void _selectRole(String role) {
     setState(() {
       _selectedRole = role;
@@ -56,7 +57,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     });
   }
- 
+
   void _goBack() {
     if (_step == RegisterStep.roleSelect) {
       Navigator.pop(context);
@@ -66,7 +67,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       });
     }
   }
- 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -110,7 +111,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
               ),
- 
+
               // Main content
               Center(
                 child: SingleChildScrollView(
@@ -132,7 +133,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
- 
+
   Widget _buildStepContent() {
     switch (_step) {
       case RegisterStep.roleSelect:
@@ -145,7 +146,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return _buildRetailerForm();
     }
   }
- 
+
   Widget _buildLogo() {
     return Image.asset(
       'assets/images/transparent_logo.png',
@@ -153,7 +154,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       fit: BoxFit.contain,
     );
   }
- 
+
   // ---------------- Step 1: Register As ----------------
   Widget _buildRoleSelect() {
     return Column(
@@ -176,7 +177,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ],
     );
   }
- 
+
   Widget _buildRoleButton(String role) {
     return SizedBox(
       width: double.infinity,
@@ -201,9 +202,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
- 
- 
- // ---------------- Step 2a: Customer Form ----------------
+
+  // ---------------- Step 2a: Customer Form ----------------
   Widget _buildCustomerForm() {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -215,7 +215,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 20),
- 
+
         _buildFieldLabel('Full Name'),
         const SizedBox(height: 6),
         _buildTextField(
@@ -223,7 +223,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           hint: 'Full Name',
         ),
         const SizedBox(height: 16),
- 
+
         _buildFieldLabel('Email address'),
         const SizedBox(height: 6),
         _buildTextField(
@@ -233,7 +233,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: 16),
- 
+
         _buildFieldLabel('Phone number'),
         const SizedBox(height: 6),
         _buildTextField(
@@ -243,7 +243,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           keyboardType: TextInputType.phone,
         ),
         const SizedBox(height: 24),
- 
+
         _buildNextButton(onPressed: () {
           // TODO: validate fields and save customer registration data
         }),
@@ -265,7 +265,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 20),
- 
+
         _buildFieldLabel('Full Name'),
         const SizedBox(height: 6),
         _buildTextField(
@@ -273,7 +273,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           hint: 'Full Name',
         ),
         const SizedBox(height: 16),
- 
+
         _buildFieldLabel('Email address'),
         const SizedBox(height: 6),
         _buildTextField(
@@ -283,7 +283,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: 16),
- 
+
         _buildFieldLabel('Phone number'),
         const SizedBox(height: 6),
         _buildTextField(
@@ -293,7 +293,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           keyboardType: TextInputType.phone,
         ),
         const SizedBox(height: 24),
- 
+
         _buildNextButton(onPressed: () {
           // TODO: validate fields and save tailor registration data
         }),
@@ -315,7 +315,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 20),
- 
+
         _buildFieldLabel('Shop name'),
         const SizedBox(height: 6),
         _buildTextField(
@@ -323,7 +323,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           hint: 'Shop name',
         ),
         const SizedBox(height: 16),
- 
+
         _buildFieldLabel('Organizational email'),
         const SizedBox(height: 6),
         _buildTextField(
@@ -333,7 +333,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: 16),
- 
+
         _buildFieldLabel('Phone number'),
         const SizedBox(height: 6),
         _buildTextField(
@@ -343,7 +343,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           keyboardType: TextInputType.phone,
         ),
         const SizedBox(height: 16),
- 
+
         _buildFieldLabel('Shop address'),
         const SizedBox(height: 6),
         _buildTextField(
@@ -352,7 +352,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           icon: Icons.storefront_outlined,
         ),
         const SizedBox(height: 24),
- 
+
         _buildNextButton(onPressed: () {
           // TODO: validate fields and move to the next registration step
         }),
@@ -362,14 +362,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // ---------------- Shared reusable widgets ----------------
+  // ---------------- Shared small widgets ----------------
   Widget _buildFieldLabel(String text) {
     return Align(
       alignment: Alignment.centerLeft,
-      child: Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      ),
     );
   }
- 
+
   Widget _buildTextField({
     required TextEditingController controller,
     required String hint,
@@ -381,7 +384,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       keyboardType: keyboardType,
       decoration: InputDecoration(
         hintText: hint,
-        suffixIcon: icon == null ? null : Icon(icon, size: 18, color: Colors.black54),
+        suffixIcon: icon == null
+            ? null
+            : Container(
+                margin: const EdgeInsets.all(8),
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2F6B3A),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 16, color: Colors.white),
+              ),
         filled: true,
         fillColor: const Color(0xFFBFE4C4),
         border: OutlineInputBorder(
@@ -391,7 +405,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
- 
+
   Widget _buildNextButton({required VoidCallback onPressed}) {
     return SizedBox(
       width: double.infinity,
@@ -400,13 +414,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF6FAE73),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(25),
+          ),
           elevation: 0,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: const [
-            Text('Next', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+            Text(
+              'Next',
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+            ),
             SizedBox(width: 8),
             Icon(Icons.arrow_forward, color: Colors.white, size: 18),
           ],
@@ -414,7 +433,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
- 
   Widget _buildSignInRow() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -422,7 +440,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         const Text('Or '),
         TextButton(
           onPressed: () {
-            // TODO: Navigate to login_screen.dart
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+            );
           },
           style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0)),
           child: const Text('Sign in', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
@@ -432,7 +453,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 }
  
-
 
 
 
