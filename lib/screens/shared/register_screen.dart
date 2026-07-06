@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
-
-enum RegisterStep { roleSelect, customerTailorForm, retailerForm }
-
+ 
+enum RegisterStep { roleSelect, customerForm, tailorForm, retailerForm }
+ 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
-
+ 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
-
+ 
 class _RegisterScreenState extends State<RegisterScreen> {
   RegisterStep _step = RegisterStep.roleSelect;
   String? _selectedRole;
-
-    // Customer form controllers
+ 
+  // Customer form controllers
   final _customerFullNameController = TextEditingController();
   final _customerEmailController = TextEditingController();
   final _customerPhoneController = TextEditingController();
@@ -43,11 +43,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _shopAddressController.dispose();
     super.dispose();
   }
-
+ 
   void _selectRole(String role) {
     setState(() {
       _selectedRole = role;
-      _step = role == 'Retailer' ? RegisterStep.retailerForm : RegisterStep.customerTailorForm;
+      if (role == 'Retailer') {
+        _step = RegisterStep.retailerForm;
+      } else if (role == 'Tailor') {
+        _step = RegisterStep.tailorForm;
+      } else {
+        _step = RegisterStep.customerForm;
+      }
     });
   }
  
@@ -55,7 +61,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (_step == RegisterStep.roleSelect) {
       Navigator.pop(context);
     } else {
-      setState(() => _step = RegisterStep.roleSelect);
+      setState(() {
+        _step = RegisterStep.roleSelect;
+      });
     }
   }
  
@@ -63,8 +71,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
+        decoration: BoxDecoration(
+          image: const DecorationImage(
+            image: AssetImage('assets/images/register_background.png'),
+            fit: BoxFit.cover,
+          ),
+          gradient: const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [Color(0xFFCDECCB), Color(0xFFEFF9EE)],
@@ -73,6 +85,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         child: SafeArea(
           child: Stack(
             children: [
+              // Back button
               Positioned(
                 top: 10,
                 right: 10,
@@ -80,12 +93,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   onPressed: _goBack,
                   style: TextButton.styleFrom(
                     backgroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 8,
+                    ),
                   ),
-                  child: const Text('Back', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600)),
+                  child: const Text(
+                    'Back',
+                    style: TextStyle(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
+ 
+              // Main content
               Center(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
@@ -111,30 +137,40 @@ class _RegisterScreenState extends State<RegisterScreen> {
     switch (_step) {
       case RegisterStep.roleSelect:
         return _buildRoleSelect();
-      case RegisterStep.customerTailorForm:
-        return Text('${_selectedRole ?? ''} form goes here'); // built in a later step
+      case RegisterStep.customerForm:
+        return _buildCustomerForm();
+      case RegisterStep.tailorForm:
+        return _buildTailorForm();
       case RegisterStep.retailerForm:
-        return const Text('Retailer form goes here'); // built in a later step
+        return _buildRetailerForm();
     }
   }
  
   Widget _buildLogo() {
-    return Image.asset('assets/images/transparent_logo.png', height: 55, fit: BoxFit.contain);
+    return Image.asset(
+      'assets/images/transparent_logo.png',
+      height: 55,
+      fit: BoxFit.contain,
+    );
   }
  
+  // ---------------- Step 1: Register As ----------------
   Widget _buildRoleSelect() {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         _buildLogo(),
         const SizedBox(height: 16),
-        const Text('Register As', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+        const Text(
+          'Register As',
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 24),
         _buildRoleButton('Customer'),
         const SizedBox(height: 16),
-        _buildRoleButton('Tailor'),
-        const SizedBox(height: 16),
         _buildRoleButton('Retailer'),
+        const SizedBox(height: 16),
+        _buildRoleButton('Tailor'),
         const SizedBox(height: 20),
         _buildSignInRow(),
       ],
@@ -149,13 +185,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
         onPressed: () => _selectRole(role),
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF7CB77F),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
           elevation: 0,
         ),
-        child: Text(role, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+        child: Text(
+          role,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }
+ 
  
  // ---------------- Step 2a: Customer Form ----------------
   Widget _buildCustomerForm() {
