@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'login_screen.dart';
 
 enum RegisterStep { roleSelect, customerForm, tailorForm, retailerForm }
 
@@ -71,6 +70,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Container(
         decoration: BoxDecoration(
           image: const DecorationImage(
@@ -86,7 +86,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
         child: SafeArea(
           child: Stack(
             children: [
-              // Back button
+              // Main content — reserved top space keeps it from ever
+              // reaching the Back button, and AnimatedPadding smoothly
+              // lifts it above the keyboard when typing.
+              Padding(
+                padding: const EdgeInsets.only(top: 80),
+                child: AnimatedPadding(
+                  duration: const Duration(milliseconds: 150),
+                  curve: Curves.easeOut,
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom,
+                  ),
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+                      child: Container(
+                        padding: const EdgeInsets.all(24),
+                        constraints: const BoxConstraints(maxWidth: 340),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.85),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: _buildStepContent(),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Back button — last child so it always renders on top,
+              // and the reserved top padding above keeps the card from
+              // ever reaching it.
               Positioned(
                 top: 10,
                 right: 10,
@@ -108,22 +138,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       color: Colors.black87,
                       fontWeight: FontWeight.w600,
                     ),
-                  ),
-                ),
-              ),
-
-              // Main content
-              Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-                  child: Container(
-                    padding: const EdgeInsets.all(24),
-                    constraints: const BoxConstraints(maxWidth: 340),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.85),
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: _buildStepContent(),
                   ),
                 ),
               ),
@@ -266,18 +280,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         const SizedBox(height: 20),
 
-        _buildFieldLabel('Full Name'),
+        _buildFieldLabel('Shop name'),
         const SizedBox(height: 6),
         _buildTextField(
-          controller: _tailorFullNameController,
-          hint: 'Full Name',
+          controller: _shopNameController,
+          hint: 'Shop name',
         ),
         const SizedBox(height: 16),
 
         _buildFieldLabel('Email address'),
         const SizedBox(height: 6),
         _buildTextField(
-          controller: _tailorEmailController,
+          controller: _orgEmailController,
           hint: 'Email address',
           icon: Icons.mail_outline,
           keyboardType: TextInputType.emailAddress,
@@ -287,12 +301,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _buildFieldLabel('Phone number'),
         const SizedBox(height: 6),
         _buildTextField(
-          controller: _tailorPhoneController,
+          controller: _retailerPhoneController,
           hint: 'Phone number',
           icon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
         ),
+        const SizedBox(height: 16),
+
+        _buildFieldLabel('Shop address'),
+        const SizedBox(height: 6),
+        _buildTextField(
+          controller: _shopAddressController,
+          hint: 'Shop address',
+          icon: Icons.storefront_outlined,
+        ),
         const SizedBox(height: 24),
+
 
         _buildNextButton(onPressed: () {
           // TODO: validate fields and save tailor registration data
@@ -433,6 +457,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
+
   Widget _buildSignInRow() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -440,20 +465,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
         const Text('Or '),
         TextButton(
           onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const LoginScreen()),
-            );
+            // TODO: Navigate to login_screen.dart
           },
-          style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0)),
-          child: const Text('Sign in', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+          style: TextButton.styleFrom(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(0, 0),
+          ),
+          child: const Text(
+            'Sign in',
+            style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+          ),
         ),
       ],
     );
   }
 }
- 
-
 
 
 
