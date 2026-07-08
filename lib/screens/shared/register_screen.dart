@@ -563,17 +563,3 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
     );
   }
 }
-
-
-// class Sketch2StitchApp extends StatelessWidget {
-//   const Sketch2StitchApp({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       title: 'Sketch2Stitch',
-//       debugShowCheckedModeBanner: false,
-//       home: const RegisterScreen(), // <-- এটা পরিবর্তন করুন
-//     );
-//   }
-// }
