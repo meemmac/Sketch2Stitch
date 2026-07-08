@@ -1,4 +1,6 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'login_screen.dart';
 
 enum RegisterStep { roleSelect, customerForm, tailorForm, retailerForm }
 
@@ -9,9 +11,11 @@ class RegisterScreen extends StatefulWidget {
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProviderStateMixin {
   RegisterStep _step = RegisterStep.roleSelect;
   String? _selectedRole;
+
+  late AnimationController _floatController;
 
   // Customer form controllers
   final _customerFullNameController = TextEditingController();
@@ -30,6 +34,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _shopAddressController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _floatController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 6),
+    )..repeat(reverse: true);
+  }
+
+  @override
   void dispose() {
     _customerFullNameController.dispose();
     _customerEmailController.dispose();
@@ -41,6 +54,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _orgEmailController.dispose();
     _retailerPhoneController.dispose();
     _shopAddressController.dispose();
+    _floatController.dispose();
     super.dispose();
   }
 
@@ -73,10 +87,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       resizeToAvoidBottomInset: false,
       body: Container(
         decoration: BoxDecoration(
-          image: const DecorationImage(
-            image: AssetImage('assets/images/register_background.png'),
-            fit: BoxFit.cover,
-          ),
           gradient: const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -86,6 +96,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
         child: SafeArea(
           child: Stack(
             children: [
+              // Floating decorative circles
+              AnimatedBuilder(
+                animation: _floatController,
+                builder: (context, child) {
+                  double offset = _floatController.value * 20;
+                  return Stack(
+                    children: [
+                      Positioned(
+                        top: 60 - offset,
+                        left: -30,
+                        child: _floatingCircle(120, Colors.white.withOpacity(0.25)),
+                      ),
+                      Positioned(
+                        top: 180 + offset,
+                        right: -40,
+                        child: _floatingCircle(90, Colors.green.shade100.withOpacity(0.35)),
+                      ),
+                      Positioned(
+                        bottom: 100 - offset,
+                        left: 20,
+                        child: _floatingCircle(70, Colors.white.withOpacity(0.3)),
+                      ),
+                      Positioned(
+                        bottom: 40 + offset,
+                        right: 30,
+                        child: _floatingCircle(50, Colors.green.shade200.withOpacity(0.3)),
+                      ),
+                    ],
+                  );
+                },
+              ),
+
               // Main content — reserved top space keeps it from ever
               // reaching the Back button, and AnimatedPadding smoothly
               // lifts it above the keyboard when typing.
@@ -97,19 +139,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   padding: EdgeInsets.only(
                     bottom: MediaQuery.of(context).viewInsets.bottom,
                   ),
-                  child: Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-                      child: Container(
-                        padding: const EdgeInsets.all(24),
-                        constraints: const BoxConstraints(maxWidth: 340),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.85),
-                          borderRadius: BorderRadius.circular(24),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight - 48,
+                          ),
+                          child: Center(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(24),
+                                  constraints: const BoxConstraints(maxWidth: 340),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.55),
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.6),
+                                      width: 1.2,
+                                    ),
+                                  ),
+                                  child: _buildStepContent(),
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                        child: _buildStepContent(),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -199,9 +260,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: ElevatedButton(
         onPressed: () => _selectRole(role),
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF7CB77F),
+          backgroundColor: const Color.fromARGB(255, 130, 189, 149),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(14),
           ),
           elevation: 0,
         ),
@@ -223,45 +284,54 @@ class _RegisterScreenState extends State<RegisterScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         _buildLogo(),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         const Text(
           'Registration Form',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
 
-        _buildFieldLabel('Full Name'),
-        const SizedBox(height: 6),
+        _buildFieldLabel('Full name'),
+        const SizedBox(height: 4),
         _buildTextField(
           controller: _customerFullNameController,
-          hint: 'Full Name',
+          hint: 'Full name',
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
 
         _buildFieldLabel('Email address'),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         _buildTextField(
-          controller: _customerEmailController,
+          controller: _orgEmailController,
           hint: 'Email address',
           icon: Icons.mail_outline,
           keyboardType: TextInputType.emailAddress,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
 
         _buildFieldLabel('Phone number'),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         _buildTextField(
-          controller: _customerPhoneController,
+          controller: _retailerPhoneController,
           hint: 'Phone number',
           icon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 10),
+
+        _buildFieldLabel('Address'),
+        const SizedBox(height: 4),
+        _buildTextField(
+          controller: _shopAddressController,
+          hint: 'Address',
+          icon: Icons.storefront_outlined,
+        ),
+        const SizedBox(height: 16),
 
         _buildNextButton(onPressed: () {
-          // TODO: validate fields and save customer registration data
+          // TODO: validate fields and move to the next registration step
         }),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
         _buildSignInRow(),
       ],
     );
@@ -270,58 +340,57 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ---------------- Step 2b: Tailor Form ----------------
   Widget _buildTailorForm() {
     return Column(
-      mainAxisSize: MainAxisSize.min,
+       mainAxisSize: MainAxisSize.min,
       children: [
         _buildLogo(),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         const Text(
           'Registration Form',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
 
         _buildFieldLabel('Shop name'),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         _buildTextField(
           controller: _shopNameController,
           hint: 'Shop name',
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
 
         _buildFieldLabel('Email address'),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         _buildTextField(
           controller: _orgEmailController,
           hint: 'Email address',
           icon: Icons.mail_outline,
           keyboardType: TextInputType.emailAddress,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
 
         _buildFieldLabel('Phone number'),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         _buildTextField(
           controller: _retailerPhoneController,
           hint: 'Phone number',
           icon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
 
         _buildFieldLabel('Shop address'),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         _buildTextField(
           controller: _shopAddressController,
           hint: 'Shop address',
           icon: Icons.storefront_outlined,
         ),
-        const SizedBox(height: 24),
-
+        const SizedBox(height: 16),
 
         _buildNextButton(onPressed: () {
           // TODO: validate fields and save tailor registration data
         }),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
         _buildSignInRow(),
       ],
     );
@@ -333,54 +402,54 @@ class _RegisterScreenState extends State<RegisterScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         _buildLogo(),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         const Text(
           'Registration Form',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
 
         _buildFieldLabel('Shop name'),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         _buildTextField(
           controller: _shopNameController,
           hint: 'Shop name',
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
 
         _buildFieldLabel('Organizational email'),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         _buildTextField(
           controller: _orgEmailController,
           hint: 'Organizational email',
           icon: Icons.mail_outline,
           keyboardType: TextInputType.emailAddress,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
 
         _buildFieldLabel('Phone number'),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         _buildTextField(
           controller: _retailerPhoneController,
           hint: 'Phone number',
           icon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
 
         _buildFieldLabel('Shop address'),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         _buildTextField(
           controller: _shopAddressController,
           hint: 'Shop address',
           icon: Icons.storefront_outlined,
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
 
         _buildNextButton(onPressed: () {
           // TODO: validate fields and move to the next registration step
         }),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
         _buildSignInRow(),
       ],
     );
@@ -415,13 +484,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 width: 30,
                 height: 30,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2F6B3A),
+                  color: const Color(0xFFDFF2DF),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, size: 16, color: Colors.white),
+                child: Icon(icon, size: 16, color: Colors.black87),
               ),
         filled: true,
-        fillColor: const Color(0xFFBFE4C4),
+        fillColor: Colors.white,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide.none,
@@ -437,9 +506,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF6FAE73),
+          backgroundColor: Colors.black,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(25),
+            borderRadius: BorderRadius.circular(14),
           ),
           elevation: 0,
         ),
@@ -461,11 +530,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget _buildSignInRow() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: [
+            children: [
         const Text('Or '),
         TextButton(
           onPressed: () {
-            // TODO: Navigate to login_screen.dart
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+            );
           },
           style: TextButton.styleFrom(
             padding: EdgeInsets.zero,
@@ -479,14 +551,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ],
     );
   }
+
+  Widget _floatingCircle(double size, Color color) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+      ),
+    );
+  }
 }
-
-
-
-
-
-
-
 
 
 // class Sketch2StitchApp extends StatelessWidget {

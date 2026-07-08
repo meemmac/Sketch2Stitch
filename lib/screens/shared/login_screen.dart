@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:sketch2stitch/screens/shared/register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -8,7 +9,8 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
@@ -60,22 +62,34 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       Positioned(
                         top: 60 - offset,
                         left: -30,
-                        child: _floatingCircle(120, Colors.white.withOpacity(0.25)),
+                        child: _floatingCircle(
+                          120,
+                          Colors.white.withOpacity(0.25),
+                        ),
                       ),
                       Positioned(
                         top: 180 + offset,
                         right: -40,
-                        child: _floatingCircle(90, Colors.green.shade100.withOpacity(0.35)),
+                        child: _floatingCircle(
+                          90,
+                          Colors.green.shade100.withOpacity(0.35),
+                        ),
                       ),
                       Positioned(
                         bottom: 100 - offset,
                         left: 20,
-                        child: _floatingCircle(70, Colors.white.withOpacity(0.3)),
+                        child: _floatingCircle(
+                          70,
+                          Colors.white.withOpacity(0.3),
+                        ),
                       ),
                       Positioned(
                         bottom: 40 + offset,
                         right: 30,
-                        child: _floatingCircle(50, Colors.green.shade200.withOpacity(0.3)),
+                        child: _floatingCircle(
+                          50,
+                          Colors.green.shade200.withOpacity(0.3),
+                        ),
                       ),
                     ],
                   );
@@ -144,7 +158,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                   keyboardType: TextInputType.emailAddress,
                                   decoration: InputDecoration(
                                     hintText: 'Email or mobile number',
-                                    prefixIcon: const Icon(Icons.person_outline),
+                                    prefixIcon: const Icon(
+                                      Icons.person_outline,
+                                    ),
                                     filled: true,
                                     fillColor: Colors.white,
                                     border: OutlineInputBorder(
@@ -291,8 +307,13 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                     const Text('Or '),
                                     TextButton(
                                       onPressed: () {
-                                        // TODO: Navigate to register_screen.dart
-                                        // Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen()));
+                                        Navigator.pushReplacement(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const RegisterScreen(),
+                                          ),
+                                        );
                                       },
                                       style: TextButton.styleFrom(
                                         padding: EdgeInsets.zero,
@@ -358,10 +379,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
   }
 }
