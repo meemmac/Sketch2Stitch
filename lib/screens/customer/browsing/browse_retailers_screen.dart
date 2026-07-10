@@ -1,12 +1,10 @@
-// lib/screens/customer/browsing/browse_retailers_screen.dart
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
 
-/// Hardcoded sample retailers. Firestore has been removed for now — swap
-/// this list back out for a service call whenever the backend is ready.
+/// Hardcoded sample retailers.
 final List<Retailer> kHardcodedRetailers = [
   Retailer(
     id: 'r1',
@@ -51,11 +49,10 @@ final List<Retailer> kHardcodedRetailers = [
 ];
 
 /// The actual retailers tab content, rendered as one page inside the
-/// shared [BrowseShell] PageView. Header and navigation row live in the
-/// shell; this widget only owns the hero, filter/category chips, and grid.
+/// shared [BrowseShell] PageView.
 class RetailersPageBody extends StatefulWidget {
   final ValueNotifier<String> searchQuery;
-  final RetailersFilterData filterData; // Rating + Location
+  final RetailersFilterData filterData;
 
   const RetailersPageBody({
     super.key,
@@ -72,10 +69,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
   @override
   bool get wantKeepAlive => true;
 
-  String _selectedFilter = 'All';
-
   final List<Retailer> _retailers = kHardcodedRetailers;
-  final List<String> _filters = ['All', 'Top Rated'];
 
   @override
   Widget build(BuildContext context) {
@@ -84,8 +78,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
       valueListenable: widget.searchQuery,
       builder: (context, searchQuery, _) {
         final filteredRetailers = _retailers.where((r) {
-          final matchesFilter = _selectedFilter == 'All' ||
-              (_selectedFilter == 'Top Rated' && r.rating >= 4.5);
           final matchesSearch = r.shopName.toLowerCase().contains(searchQuery.toLowerCase());
           
           // Rating filter from shell
@@ -95,14 +87,12 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
           final matchesLocation = widget.filterData.location == 'All' ||
               r.generalArea.toLowerCase().contains(widget.filterData.location.toLowerCase());
           
-          return matchesFilter && matchesSearch && matchesRating && 
-                 matchesLocation;
+          return matchesSearch && matchesRating && matchesLocation;
         }).toList();
 
         return Column(
           children: [
             _buildHeroSection(),
-            _buildFilterChips(),
             Expanded(child: _buildRetailersGrid(filteredRetailers)),
           ],
         );
@@ -117,7 +107,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
     final isSmallScreen = screenWidth < 400;
     
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: isSmallScreen ? 12 : 16),
+      margin: EdgeInsets.symmetric(horizontal: isSmallScreen ? 12 : 16, vertical: 8),
       padding: EdgeInsets.all(isSmallScreen ? 14 : 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -180,60 +170,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // ─── Filter Chips ──────────────────────────────────────────────────────
-
-  Widget _buildFilterChips() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenWidth < 400;
-    
-    return Container(
-      height: 44,
-      padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 8 : 12, vertical: 4),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: _filters.map((filter) {
-          return Padding(
-            padding: EdgeInsets.only(right: isSmallScreen ? 4 : 6),
-            child: _buildChip(
-              filter,
-              _selectedFilter == filter,
-              () => setState(() => _selectedFilter = filter),
-              isSmallScreen,
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildChip(String label, bool selected, VoidCallback onTap, bool isSmall) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: isSmall ? 14 : 16, 
-          vertical: isSmall ? 6 : 7
-        ),
-        decoration: BoxDecoration(
-          color: selected ? kSage : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? kSage : kBorder,
-            width: 0.8,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: isSmall ? 12 : 14,
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : Colors.black87,
-          ),
-        ),
       ),
     );
   }
@@ -425,7 +361,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                     Text(
                       retailer.shopName,
                       style: TextStyle(
-                        fontSize: isSmall ? 14 : 16,
+                        fontSize: isSmall ? 15 : 17,
                         fontWeight: FontWeight.w600,
                         height: 1.2,
                       ),

@@ -94,7 +94,7 @@ final List<Tailor> kHardcodedTailors = [
 /// [BrowseShell] PageView.
 class TailorsPageBody extends StatefulWidget {
   final ValueNotifier<String> searchQuery;
-  final TailorsFilterData filterData; // Rating + Location
+  final TailorsFilterData filterData;
 
   const TailorsPageBody({
     super.key,
@@ -111,10 +111,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
   @override
   bool get wantKeepAlive => true;
 
-  String _selectedFilter = 'All';
-
   final List<Tailor> _tailors = kHardcodedTailors;
-  final List<String> _filters = ['All', 'Top Rated'];
 
   @override
   Widget build(BuildContext context) {
@@ -123,8 +120,6 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
       valueListenable: widget.searchQuery,
       builder: (context, searchQuery, _) {
         final filteredTailors = _tailors.where((t) {
-          final matchesFilter = _selectedFilter == 'All' ||
-              (_selectedFilter == 'Top Rated' && t.rating >= 4.5);
           final matchesSearch = t.name.toLowerCase().contains(searchQuery.toLowerCase());
           
           // Rating filter from shell
@@ -134,14 +129,12 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
           final matchesLocation = widget.filterData.location == 'All' ||
               t.generalArea.toLowerCase().contains(widget.filterData.location.toLowerCase());
           
-          return matchesFilter && matchesSearch && matchesRating && 
-                 matchesLocation;
+          return matchesSearch && matchesRating && matchesLocation;
         }).toList();
 
         return Column(
           children: [
             _buildHeroSection(),
-            _buildFilterChips(),
             Expanded(child: _buildTailorsGrid(filteredTailors)),
           ],
         );
@@ -156,7 +149,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
     final isSmallScreen = screenWidth < 400;
     
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: isSmallScreen ? 12 : 16),
+      margin: EdgeInsets.symmetric(horizontal: isSmallScreen ? 12 : 16, vertical: 8),
       padding: EdgeInsets.all(isSmallScreen ? 14 : 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -219,60 +212,6 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // ─── Filter Chips ──────────────────────────────────────────────────────
-
-  Widget _buildFilterChips() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenWidth < 400;
-    
-    return Container(
-      height: 44,
-      padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 8 : 12, vertical: 4),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: _filters.map((filter) {
-          return Padding(
-            padding: EdgeInsets.only(right: isSmallScreen ? 4 : 6),
-            child: _buildFilterChip(
-              filter,
-              _selectedFilter == filter,
-              () => setState(() => _selectedFilter = filter),
-              isSmallScreen,
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(String label, bool selected, VoidCallback onTap, bool isSmall) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: isSmall ? 14 : 16, 
-          vertical: isSmall ? 6 : 7
-        ),
-        decoration: BoxDecoration(
-          color: selected ? kSage : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? kSage : kBorder,
-            width: 0.8,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: isSmall ? 12 : 14,
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : Colors.black87,
-          ),
-        ),
       ),
     );
   }
@@ -482,14 +421,14 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                     Text(
                       tailor.name,
                       style: TextStyle(
-                        fontSize: isSmall ? 14 : 16,
+                        fontSize: isSmall ? 15 : 17,
                         fontWeight: FontWeight.w600,
                         height: 1.2,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    SizedBox(height: isSmall ? 2 : 4),
+                    SizedBox(height: isSmall ? 4 : 6),
                     Text(
                       specialty,
                       style: TextStyle(
