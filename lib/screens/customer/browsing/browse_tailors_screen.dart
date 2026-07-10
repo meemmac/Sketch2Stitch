@@ -2,19 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/portfolio.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
-
-/// Entry point kept for backward compatibility with existing navigation
-/// calls (e.g. `Navigator.push(... BrowseTailorsScreen())`). It now opens
-/// the shared [BrowseShell] on the Tailors tab.
-class BrowseTailorsScreen extends StatelessWidget {
-  const BrowseTailorsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const BrowseShell(initialIndex: 1);
-  }
-}
+import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
+import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
 
 /// Hardcoded sample tailors with asset images.
 final List<Tailor> kHardcodedTailors = [
@@ -101,13 +91,16 @@ final List<Tailor> kHardcodedTailors = [
 ];
 
 /// The actual tailors tab content, rendered as one page inside the shared
-/// [BrowseShell] PageView. Header and navigation row (including the
-/// tab-switch transition) live in the shell now; this widget only owns
-/// the hero, filter chips, and grid.
+/// [BrowseShell] PageView.
 class TailorsPageBody extends StatefulWidget {
   final ValueNotifier<String> searchQuery;
+  final TailorsFilterData filterData; // Rating + Location
 
-  const TailorsPageBody({super.key, required this.searchQuery});
+  const TailorsPageBody({
+    super.key,
+    required this.searchQuery,
+    required this.filterData,
+  });
 
   @override
   State<TailorsPageBody> createState() => _TailorsPageBodyState();
@@ -120,9 +113,8 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
 
   String _selectedFilter = 'All';
 
-  // Hardcoded data — no Firestore for now.
   final List<Tailor> _tailors = kHardcodedTailors;
-  final List<String> _filters = ['All', 'Top Rated', 'Premium', 'Fast Service'];
+  final List<String> _filters = ['All', 'Top Rated'];
 
   @override
   Widget build(BuildContext context) {
@@ -132,13 +124,18 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
       builder: (context, searchQuery, _) {
         final filteredTailors = _tailors.where((t) {
           final matchesFilter = _selectedFilter == 'All' ||
-              (_selectedFilter == 'Top Rated' && t.rating >= 4.8) ||
-              (_selectedFilter == 'Premium' && t.rating >= 4.7) ||
-              (_selectedFilter == 'Fast Service' && t.rating >= 4.5);
-
+              (_selectedFilter == 'Top Rated' && t.rating >= 4.5);
           final matchesSearch = t.name.toLowerCase().contains(searchQuery.toLowerCase());
-
-          return matchesFilter && matchesSearch;
+          
+          // Rating filter from shell
+          final matchesRating = t.rating >= widget.filterData.minRating;
+          
+          // Location filter from shell
+          final matchesLocation = widget.filterData.location == 'All' ||
+              t.generalArea.toLowerCase().contains(widget.filterData.location.toLowerCase());
+          
+          return matchesFilter && matchesSearch && matchesRating && 
+                 matchesLocation;
         }).toList();
 
         return Column(
@@ -155,35 +152,45 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
   // ─── Hero Section ─────────────────────────────────────────────────────────
 
   Widget _buildHeroSection() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 400;
+    
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(20),
+      margin: EdgeInsets.symmetric(horizontal: isSmallScreen ? 12 : 16),
+      padding: EdgeInsets.all(isSmallScreen ? 14 : 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF2C5C44), Color(0xFF4E8B6F)],
+          colors: [kSageDark, kSage],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Expert Tailors at Your Service',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+          Text(
+            'Expert Tailors',
+            style: TextStyle(
+              fontSize: isSmallScreen ? 18 : 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
-            'Find skilled tailors for all your stitching needs',
-            style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: 0.9)),
+            'Skilled tailors for all your stitching needs',
+            style: TextStyle(
+              fontSize: isSmallScreen ? 13 : 14,
+              color: Colors.white.withValues(alpha: 0.9),
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Row(
             children: [
-              _buildHeroChip(Icons.verified, 'Verified Professionals'),
+              _buildHeroChip(Icons.verified, 'Verified', isSmallScreen),
               const SizedBox(width: 8),
-              _buildHeroChip(Icons.star, 'Quality Guaranteed'),
+              _buildHeroChip(Icons.star, 'Quality', isSmallScreen),
             ],
           ),
         ],
@@ -191,21 +198,25 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
     );
   }
 
-  Widget _buildHeroChip(IconData icon, String label) {
+  Widget _buildHeroChip(IconData icon, String label, bool isSmall) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: isSmall ? 10 : 12, vertical: isSmall ? 4 : 5),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: Colors.white, size: 14),
+          Icon(icon, color: Colors.white, size: isSmall ? 12 : 14),
           const SizedBox(width: 4),
           Text(
             label,
-            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: isSmall ? 11 : 12,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -215,18 +226,22 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
   // ─── Filter Chips ──────────────────────────────────────────────────────
 
   Widget _buildFilterChips() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 400;
+    
     return Container(
       height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 8 : 12, vertical: 4),
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: _filters.map((filter) {
           return Padding(
-            padding: const EdgeInsets.only(right: 8),
+            padding: EdgeInsets.only(right: isSmallScreen ? 4 : 6),
             child: _buildFilterChip(
               filter,
               _selectedFilter == filter,
               () => setState(() => _selectedFilter = filter),
+              isSmallScreen,
             ),
           );
         }).toList(),
@@ -234,20 +249,26 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
     );
   }
 
-  Widget _buildFilterChip(String label, bool selected, VoidCallback onTap) {
+  Widget _buildFilterChip(String label, bool selected, VoidCallback onTap, bool isSmall) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding: EdgeInsets.symmetric(
+          horizontal: isSmall ? 14 : 16, 
+          vertical: isSmall ? 6 : 7
+        ),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF2C5C44) : Colors.white,
+          color: selected ? kSage : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? const Color(0xFF2C5C44) : Colors.grey[300]!),
+          border: Border.all(
+            color: selected ? kSage : kBorder,
+            width: 0.8,
+          ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 13,
+            fontSize: isSmall ? 12 : 14,
             fontWeight: FontWeight.w600,
             color: selected ? Colors.white : Colors.black87,
           ),
@@ -260,54 +281,70 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
 
   Widget _buildTailorsGrid(List<Tailor> tailors) {
     if (tailors.isEmpty) {
-      return const Center(
-        child: Text('No tailors found', style: TextStyle(color: Colors.grey, fontSize: 16)),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off_rounded,
+              size: 64,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No tailors found',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try adjusting your filters or search terms',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[500],
+              ),
+            ),
+          ],
+        ),
       );
     }
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    
+    final isSmallScreen = screenWidth < 400;
+    final spacing = isSmallScreen ? 10.0 : 12.0;
+    final cardAspectRatio = screenHeight < 700 ? 0.72 : 0.78;
+
     return GridView.builder(
-      padding: const EdgeInsets.all(12),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      padding: EdgeInsets.all(spacing),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.75,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        childAspectRatio: cardAspectRatio,
+        crossAxisSpacing: spacing,
+        mainAxisSpacing: spacing,
       ),
       itemCount: tailors.length,
-      itemBuilder: (context, index) => _buildTailorCard(tailors[index]),
+      itemBuilder: (context, index) => _buildTailorCard(tailors[index], isSmallScreen),
     );
   }
 
-  Widget _buildTailorCard(Tailor tailor) {
-    final bool showTopRated = tailor.rating >= 4.8;
-    final bool isPremium = tailor.rating >= 4.7;
-    final bool isFastService = tailor.rating >= 4.5;
+  Widget _buildTailorCard(Tailor tailor, bool isSmall) {
+    final bool isTopRated = tailor.rating >= 4.8;
 
-    // Determine which badge to show (priority: Top Rated > Premium > Fast Service)
-    String? badgeText;
-    Color? badgeColor;
-    if (showTopRated) {
-      badgeText = 'Top Rated';
-      badgeColor = Colors.orange;
-    } else if (isPremium) {
-      badgeText = 'Premium';
-      badgeColor = Colors.purple;
-    } else if (isFastService) {
-      badgeText = 'Fast Service';
-      badgeColor = Colors.blue;
-    }
-
+    // Get specialty from portfolio description
     String specialty = 'Professional Tailoring';
     if (tailor.portfolio != null && tailor.portfolio!.isNotEmpty) {
-      final desc = tailor.portfolio!.first.description?.toLowerCase() ?? '';
-      if (desc.contains('casual')) {
-        specialty = 'Casual & Daily Wear';
-      } else if (desc.contains('traditional') || desc.contains('ethnic')) {
-        specialty = 'Traditional & Ethnic';
-      } else if (desc.contains('formal') || desc.contains('informal')) {
-        specialty = 'Formal & Informal Wear';
-      } else if (desc.isNotEmpty) {
-        specialty = desc;
+      final desc = tailor.portfolio!.first.description ?? '';
+      if (desc.isNotEmpty) {
+        if (desc.length <= 30) {
+          specialty = desc;
+        } else {
+          specialty = desc.substring(0, 30) + '...';
+        }
       }
     }
 
@@ -319,26 +356,37 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
 
     return GestureDetector(
       onTap: () {
-        // Navigate to tailor detail
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TailorDetailScreen(tailor: tailor),
+          ),
+        );
       },
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey[200]!),
+          color: kCardBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: kBorder, width: 0.5),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              flex: 3,
+            // Image section with badges
+            Flexible(
+              flex: 5,
               child: Stack(
                 children: [
                   ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
                     child: SizedBox(
                       width: double.infinity,
                       height: double.infinity,
@@ -346,81 +394,130 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                         imageUrl,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
-                          color: Colors.grey[200],
-                          child: const Icon(Icons.person, size: 50, color: Colors.grey),
+                          color: kSage.withValues(alpha: 0.12),
+                          child: Icon(Icons.person, size: isSmall ? 36 : 40, color: kSageDark),
                         ),
                       ),
                     ),
                   ),
-                  if (badgeText != null)
+                  // Top Rated Badge
+                  if (isTopRated)
                     Positioned(
                       top: 8,
                       right: 8,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isSmall ? 8 : 10,
+                          vertical: isSmall ? 4 : 5,
+                        ),
                         decoration: BoxDecoration(
-                          color: badgeColor,
+                          color: Colors.orange,
                           borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            width: 0.3,
+                          ),
                         ),
                         child: Text(
-                          badgeText,
-                          style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w600),
+                          '⭐ Top Rated',
+                          style: TextStyle(
+                            fontSize: isSmall ? 9 : 11,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
+                  // Rating Badge - Bottom Right
+                  Positioned(
+                    bottom: 8,
+                    right: 8,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isSmall ? 6 : 8,
+                        vertical: isSmall ? 3 : 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.star,
+                            color: Colors.amber,
+                            size: isSmall ? 10 : 12,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            tailor.rating.toStringAsFixed(1),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: isSmall ? 10 : 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
-            Expanded(
-              flex: 2,
+            // Content section
+            Flexible(
+              flex: 4,
               child: Padding(
-                padding: const EdgeInsets.all(10),
+                padding: EdgeInsets.fromLTRB(
+                  isSmall ? 10 : 12,
+                  isSmall ? 8 : 10,
+                  isSmall ? 10 : 12,
+                  isSmall ? 10 : 12,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          tailor.name,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          specialty,
-                          style: const TextStyle(fontSize: 10, color: Colors.grey),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+                    Text(
+                      tailor.name,
+                      style: TextStyle(
+                        fontSize: isSmall ? 14 : 16,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    SizedBox(height: isSmall ? 2 : 4),
+                    Text(
+                      specialty,
+                      style: TextStyle(
+                        fontSize: isSmall ? 11 : 12,
+                        color: Colors.grey[600],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: isSmall ? 4 : 6),
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            RatingStars(rating: tailor.rating, size: 12),
-                            const SizedBox(width: 4),
-                            Text('${tailor.rating}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                          ],
+                        Icon(
+                          Icons.location_on,
+                          size: isSmall ? 12 : 14,
+                          color: Colors.grey[600],
                         ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.location_on, size: 12, color: Colors.grey),
-                            const SizedBox(width: 2),
-                            Expanded(
-                              child: Text(
-                                tailor.generalArea,
-                                style: const TextStyle(fontSize: 10, color: Colors.grey),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            tailor.generalArea,
+                            style: TextStyle(
+                              fontSize: isSmall ? 11 : 12,
+                              color: Colors.grey[600],
                             ),
-                          ],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),

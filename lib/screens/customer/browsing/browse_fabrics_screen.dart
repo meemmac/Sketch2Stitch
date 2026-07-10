@@ -1,30 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
+import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
 
-/// Entry point kept for backward compatibility with existing navigation
-/// calls (e.g. `Navigator.push(... BrowseFabricsScreen())`). It now opens
-/// the shared [BrowseShell] on the Fabrics tab, so the user can swipe or
-/// tap between Fabrics / Tailors / Retailers from anywhere.
-class BrowseFabricsScreen extends StatelessWidget {
-  const BrowseFabricsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const BrowseShell(initialIndex: 0);
-  }
-}
-
-/// Hardcoded sample fabrics with assets images
+/// Hardcoded sample fabrics with assets images (NO RATING)
 final List<Product> kHardcodedProducts = [
   Product(
     id: 'p1',
     retailerId: 'r1',
     productName: 'Premium Egyptian Cotton',
     category: 'Cotton',
-    materialType: '100% Cotton',
+    materialType: 'Cotton',
     colorOptions: [
       ColorOption(optionId: 1, color: 'White', image: 'assets/images/fab.jpg', price: 650, stock: 40),
       ColorOption(optionId: 2, color: 'Beige', image: 'assets/images/fab2.jpg', price: 650, stock: 25),
@@ -41,7 +28,7 @@ final List<Product> kHardcodedProducts = [
     retailerId: 'r1',
     productName: 'Pure Mulberry Silk',
     category: 'Silk',
-    materialType: '100% Silk',
+    materialType: 'Silk',
     colorOptions: [
       ColorOption(optionId: 1, color: 'Gold', image: 'assets/images/silk.jpg', price: 1800, stock: 10),
       ColorOption(optionId: 2, color: 'Pink', image: 'assets/images/saree.jpg', price: 1750, stock: 8),
@@ -58,7 +45,7 @@ final List<Product> kHardcodedProducts = [
     retailerId: 'r2',
     productName: 'Merino Wool Blend',
     category: 'Wool',
-    materialType: 'Wool Blend',
+    materialType: 'Wool',
     colorOptions: [
       ColorOption(optionId: 1, color: 'Brown', image: 'assets/images/drawing_fabric.jpg', price: 950, stock: 18),
       ColorOption(optionId: 2, color: 'Black', image: 'assets/images/textile.jpg', price: 950, stock: 20),
@@ -74,7 +61,7 @@ final List<Product> kHardcodedProducts = [
     retailerId: 'r2',
     productName: 'Irish Linen Weave',
     category: 'Linen',
-    materialType: '100% Linen',
+    materialType: 'Linen',
     colorOptions: [
       ColorOption(optionId: 1, color: 'White', image: 'assets/images/fabrics_rolled.jpg', price: 780, stock: 30),
       ColorOption(optionId: 2, color: 'Beige', image: 'assets/images/fab.jpg', price: 780, stock: 22),
@@ -90,7 +77,7 @@ final List<Product> kHardcodedProducts = [
     retailerId: 'r3',
     productName: 'French Chantilly Lace',
     category: 'Lace',
-    materialType: 'Nylon-Cotton Lace',
+    materialType: 'Lace',
     colorOptions: [
       ColorOption(optionId: 1, color: 'White', image: 'assets/images/lace.jpg', price: 1200, stock: 6),
       ColorOption(optionId: 2, color: 'Black', image: 'assets/images/lace2.jpg', price: 1200, stock: 4),
@@ -106,7 +93,7 @@ final List<Product> kHardcodedProducts = [
     retailerId: 'r3',
     productName: 'Zardozi Embroidered Panel',
     category: 'Embroidery',
-    materialType: 'Silk with Metallic Thread',
+    materialType: 'Embroidery',
     colorOptions: [
       ColorOption(optionId: 1, color: 'Gold', image: 'assets/images/embroidery.jpg', price: 3200, stock: 3),
       ColorOption(optionId: 2, color: 'Green', image: 'assets/images/design.jpg', price: 3200, stock: 2),
@@ -122,7 +109,7 @@ final List<Product> kHardcodedProducts = [
     retailerId: 'r1',
     productName: 'Premium Tassel Fabric',
     category: 'Cotton',
-    materialType: 'Cotton Blend',
+    materialType: 'Cotton',
     colorOptions: [
       ColorOption(optionId: 1, color: 'White', image: 'assets/images/tassel.jpg', price: 550, stock: 35),
       ColorOption(optionId: 2, color: 'Blue', image: 'assets/images/drawing_fabric.jpg', price: 600, stock: 20),
@@ -137,7 +124,7 @@ final List<Product> kHardcodedProducts = [
     retailerId: 'r2',
     productName: 'Handwoven Textile',
     category: 'Cotton',
-    materialType: '100% Cotton',
+    materialType: 'Cotton',
     colorOptions: [
       ColorOption(optionId: 1, color: 'White', image: 'assets/images/textile.jpg', price: 850, stock: 15),
       ColorOption(optionId: 2, color: 'Beige', image: 'assets/images/fabric_waves.jpg', price: 850, stock: 10),
@@ -152,7 +139,7 @@ final List<Product> kHardcodedProducts = [
     retailerId: 'r3',
     productName: 'Designer Silk Blend',
     category: 'Silk',
-    materialType: 'Silk Blend',
+    materialType: 'Silk',
     colorOptions: [
       ColorOption(optionId: 1, color: 'Gold', image: 'assets/images/gorgeous.jpg', price: 2500, stock: 5),
       ColorOption(optionId: 2, color: 'Blue', image: 'assets/images/design.jpg', price: 2800, stock: 3),
@@ -167,7 +154,7 @@ final List<Product> kHardcodedProducts = [
     retailerId: 'r1',
     productName: 'Classic Cotton Weave',
     category: 'Cotton',
-    materialType: '100% Cotton',
+    materialType: 'Cotton',
     colorOptions: [
       ColorOption(optionId: 1, color: 'White', image: 'assets/images/fab.jpg', price: 450, stock: 50),
       ColorOption(optionId: 2, color: 'Blue', image: 'assets/images/fab2.jpg', price: 500, stock: 30),
@@ -181,12 +168,16 @@ final List<Product> kHardcodedProducts = [
 ];
 
 /// The actual fabrics tab content, rendered as one page inside the
-/// shared [BrowseShell] PageView. Header and navigation row live in the
-/// shell; this widget only owns the hero, category chips, and grid.
+/// shared [BrowseShell] PageView.
 class FabricsPageBody extends StatefulWidget {
   final ValueNotifier<String> searchQuery;
+  final FabricsFilterData filterData;
 
-  const FabricsPageBody({super.key, required this.searchQuery});
+  const FabricsPageBody({
+    super.key,
+    required this.searchQuery,
+    required this.filterData,
+  });
 
   @override
   State<FabricsPageBody> createState() => _FabricsPageBodyState();
@@ -197,19 +188,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
   @override
   bool get wantKeepAlive => true;
 
-  String _selectedCategory = 'All';
-
-  // Hardcoded data — no Firestore for now.
   final List<Product> _products = kHardcodedProducts;
-  final List<String> _categories = [
-    'All',
-    'Cotton',
-    'Silk',
-    'Wool',
-    'Linen',
-    'Lace',
-    'Embroidery'
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -218,18 +197,34 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       valueListenable: widget.searchQuery,
       builder: (context, searchQuery, _) {
         final filteredProducts = _products.where((p) {
-          final matchesCategory =
-              _selectedCategory == 'All' || p.category == _selectedCategory;
+          // Search filter
           final matchesSearch = p.productName
               .toLowerCase()
               .contains(searchQuery.toLowerCase());
-          return matchesCategory && matchesSearch;
+          
+          // Price filter
+          final productMinPrice = p.minPrice;
+          final matchesPrice = productMinPrice >= widget.filterData.minPrice &&
+              productMinPrice <= widget.filterData.maxPrice;
+          
+          // Color filter
+          final matchesColor = widget.filterData.color == 'All' || 
+              p.colorOptions.any((c) => c.color == widget.filterData.color);
+          
+          // Material Type filter - check BOTH category and materialType
+          final matchesMaterial = widget.filterData.materialType == 'All' || 
+              p.category == widget.filterData.materialType ||
+              p.materialType == widget.filterData.materialType;
+          
+          // NO RATING FILTER FOR FABRICS
+          
+          return matchesSearch && matchesPrice && 
+                 matchesColor && matchesMaterial;
         }).toList();
 
         return Column(
           children: [
             _buildHeroSection(),
-            _buildCategoryChips(),
             Expanded(child: _buildProductGrid(filteredProducts)),
           ],
         );
@@ -240,39 +235,45 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
   // ─── Hero Section ─────────────────────────────────────────────────────────
 
   Widget _buildHeroSection() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 400;
+    
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(20),
+      margin: EdgeInsets.symmetric(horizontal: isSmallScreen ? 12 : 16, vertical: 8),
+      padding: EdgeInsets.all(isSmallScreen ? 14 : 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [kSageDark, kSage],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Premium Fabrics for Your Style',
+          Text(
+            'Premium Fabrics',
             style: TextStyle(
-              fontSize: 20,
+              fontSize: isSmallScreen ? 18 : 20,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            'Choose from our wide selection of high-quality fabrics',
-            style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: 0.9)),
+            'High-quality fabrics for your style',
+            style: TextStyle(
+              fontSize: isSmallScreen ? 13 : 14,
+              color: Colors.white.withValues(alpha: 0.9),
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Row(
             children: [
-              _buildHeroChip(Icons.local_shipping, 'Free Delivery on Tk 500+'),
+              _buildHeroChip(Icons.local_shipping, 'Free Delivery', isSmallScreen),
               const SizedBox(width: 8),
-              _buildHeroChip(Icons.verified, 'Quality Assured'),
+              _buildHeroChip(Icons.verified, 'Quality Assured', isSmallScreen),
             ],
           ),
         ],
@@ -280,23 +281,23 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
     );
   }
 
-  Widget _buildHeroChip(IconData icon, String label) {
+  Widget _buildHeroChip(IconData icon, String label, bool isSmall) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: isSmall ? 10 : 12, vertical: isSmall ? 4 : 5),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: Colors.white, size: 14),
+          Icon(icon, color: Colors.white, size: isSmall ? 12 : 14),
           const SizedBox(width: 4),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
-              fontSize: 11,
+              fontSize: isSmall ? 11 : 12,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -305,71 +306,55 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
     );
   }
 
-  // ─── Category Chips ──────────────────────────────────────────────────────
-
-  Widget _buildCategoryChips() {
-    return Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: _categories.map((category) {
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: _buildChip(
-              category,
-              _selectedCategory == category,
-              () => setState(() => _selectedCategory = category),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildChip(String label, bool selected, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected ? kSage : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? kSage : kBorder,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : Colors.black87,
-          ),
-        ),
-      ),
-    );
-  }
-
   // ─── Product Grid ──────────────────────────────────────────────────────
 
   Widget _buildProductGrid(List<Product> products) {
     if (products.isEmpty) {
-      return const Center(
-        child: Text(
-          'No products found',
-          style: TextStyle(color: Colors.grey, fontSize: 16),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off_rounded,
+              size: 64,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No products found',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try adjusting your filters or search terms',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[500],
+              ),
+            ),
+          ],
         ),
       );
     }
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    
+    final isSmallScreen = screenWidth < 400;
+    final spacing = isSmallScreen ? 10.0 : 12.0;
+    final cardAspectRatio = screenHeight < 700 ? 0.72 : 0.78;
+
     return GridView.builder(
-      padding: const EdgeInsets.all(12),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      padding: EdgeInsets.all(spacing),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.72,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        childAspectRatio: cardAspectRatio,
+        crossAxisSpacing: spacing,
+        mainAxisSpacing: spacing,
       ),
       itemCount: products.length,
       itemBuilder: (context, index) {
@@ -385,11 +370,11 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
           child: Container(
             decoration: BoxDecoration(
               color: kCardBg,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: kBorder),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: kBorder, width: 0.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -397,14 +382,15 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // Image section
-                Expanded(
-                  flex: 4,
+                // Image section with category badge
+                Flexible(
+                  flex: 5,
                   child: Stack(
                     children: [
                       ClipRRect(
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
                         child: SizedBox(
                           width: double.infinity,
                           height: double.infinity,
@@ -414,77 +400,122 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) => Container(
                                     color: kSage.withValues(alpha: 0.12),
-                                    child: const Icon(Icons.texture, size: 36, color: kSageDark),
+                                    child: Icon(Icons.texture, size: isSmallScreen ? 36 : 40, color: kSageDark),
                                   ),
                                 )
                               : Container(
                                   color: kSage.withValues(alpha: 0.12),
-                                  child: const Icon(Icons.texture, size: 36, color: kSageDark),
+                                  child: Icon(Icons.texture, size: isSmallScreen ? 36 : 40, color: kSageDark),
                                 ),
                         ),
                       ),
-                      if (outOfStock)
-                        Positioned(
-                          top: 6,
-                          left: 6,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.6),
-                              borderRadius: BorderRadius.circular(10),
+                      // Category Badge - Top Right
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isSmallScreen ? 8 : 10, 
+                            vertical: isSmallScreen ? 4 : 5
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              width: 0.3,
                             ),
-                            child: const Text(
-                              'Out of Stock',
-                              style: TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.w600),
+                          ),
+                          child: Text(
+                            product.category,
+                            style: TextStyle(
+                              fontSize: isSmallScreen ? 10 : 12,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.3,
                             ),
                           ),
                         ),
+                      ),
+                      // Out of Stock Badge - Top Left
+                      if (outOfStock)
+                        Positioned(
+                          top: 8,
+                          left: 8,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isSmallScreen ? 8 : 10, 
+                              vertical: isSmallScreen ? 4 : 5
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withValues(alpha: 0.85),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                width: 0.3,
+                              ),
+                            ),
+                            child: Text(
+                              'Out of Stock',
+                              style: TextStyle(
+                                fontSize: isSmallScreen ? 9 : 11,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      // NO RATING BADGE FOR FABRICS
                     ],
                   ),
                 ),
-                // Content section
-                Expanded(
+                // Content section - LARGER TEXT
+                Flexible(
                   flex: 4,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+                    padding: EdgeInsets.fromLTRB(
+                      isSmallScreen ? 10 : 12,
+                      isSmallScreen ? 8 : 10,
+                      isSmallScreen ? 10 : 12,
+                      isSmallScreen ? 10 : 12,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           product.productName,
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 15 : 17,
+                            fontWeight: FontWeight.w600,
+                            height: 1.2,
+                          ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 1),
-                        Text(
-                          product.materialType,
-                          style: const TextStyle(fontSize: 10, color: Colors.grey),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
+                        SizedBox(height: isSmallScreen ? 4 : 6),
                         Text(
                           product.priceRange,
-                          style: const TextStyle(
-                            fontSize: 12,
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 15 : 17,
                             fontWeight: FontWeight.w700,
                             color: kSageDark,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 3),
-                        Row(
-                          children: product.colorOptions
-                              .take(4)
-                              .map((option) => Padding(
-                                    padding: const EdgeInsets.only(right: 3),
-                                    child: _colorDot(option),
-                                  ))
-                              .toList(),
-                        ),
+                        SizedBox(height: isSmallScreen ? 6 : 8),
+                        if (!outOfStock) ...[
+                          Row(
+                            children: product.colorOptions
+                                .take(4)
+                                .map((option) => Padding(
+                                      padding: EdgeInsets.only(right: isSmallScreen ? 3 : 4),
+                                      child: _colorDot(option, isSmallScreen),
+                                    ))
+                                .toList(),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -497,14 +528,15 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
     );
   }
 
-  Widget _colorDot(ColorOption option) {
+  Widget _colorDot(ColorOption option, bool isSmall) {
     final color = _resolveColor(option.color);
     final bool outOfStock = option.stock <= 0;
+    final double size = isSmall ? 14 : 16;
     return Opacity(
       opacity: outOfStock ? 0.35 : 1.0,
       child: Container(
-        width: 12,
-        height: 12,
+        width: size,
+        height: size,
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,

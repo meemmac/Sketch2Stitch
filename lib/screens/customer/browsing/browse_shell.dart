@@ -4,7 +4,8 @@ import 'package:sketch2stitch/screens/customer/browsing/browse_fabrics_screen.da
 import 'package:sketch2stitch/screens/customer/browsing/browse_tailors_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
-import 'package:sketch2stitch/screens/test_cloudinary_screen.dart'; // Add this import
+import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
+import '../../../widgets/dashboard_drawer.dart';
 
 /// Shared shell for the three "Browse" tabs (Fabrics/Clothing, Tailors,
 /// Retailers). Provides one header, one animated navigation row, and a
@@ -33,9 +34,70 @@ class _BrowseShellState extends State<BrowseShell> {
     'Search retailers...',
   ];
 
+  static const List<String> _locations = [
+    'All',
+    'Dhaka',
+    'Chittagong',
+    'Rajshahi',
+    'Khulna',
+    'Sylhet',
+    'Barishal',
+    'Rangpur',
+  ];
+
+  static const List<String> _materialTypes = [
+    'All',
+    'Cotton',
+    'Silk',
+    'Wool',
+    'Linen',
+    'Lace',
+    'Embroidery',
+    'Polyester',
+    'Nylon',
+    'Rayon',
+    'Denim',
+    'Leather',
+    'Velvet',
+    'Satin',
+  ];
+
+  static const List<String> _colorOptions = [
+    'All',
+    'White',
+    'Black',
+    'Red',
+    'Blue',
+    'Green',
+    'Gold',
+    'Silver',
+    'Pink',
+    'Beige',
+    'Brown',
+    'Purple',
+  ];
+
   late final PageController _pageController;
   final ValueNotifier<String> _searchNotifier = ValueNotifier('');
   double _page = 0;
+
+  // ─── Tab-Specific Filter Values ──────────────────────────────────────
+  
+  // Fabrics Filters (Price, Color, Material Type) - NO RATING
+  double _fabricsMinPrice = 0;
+  double _fabricsMaxPrice = 5000;
+  String _fabricsSelectedColor = 'All';
+  String _fabricsSelectedMaterial = 'All';
+  
+  // Tailors Filters (Rating, Location)
+  double _tailorsMinRating = 0;
+  String _tailorsSelectedLocation = 'All';
+  
+  // Retailers Filters (Rating, Location)
+  double _retailersMinRating = 0;
+  String _retailersSelectedLocation = 'All';
+
+  bool _showFilterOverlay = false;
 
   @override
   void initState() {
@@ -46,7 +108,6 @@ class _BrowseShellState extends State<BrowseShell> {
   }
 
   void _onPageScroll() {
-    // .page is null on the very first frame before the PageView lays out.
     final value = _pageController.page;
     if (value != null && value != _page) {
       setState(() => _page = value);
@@ -69,15 +130,87 @@ class _BrowseShellState extends State<BrowseShell> {
     );
   }
 
+  void _toggleFilterOverlay() {
+    setState(() {
+      _showFilterOverlay = !_showFilterOverlay;
+    });
+  }
+
+  void _applyFilters() {
+    setState(() {
+      _showFilterOverlay = false;
+    });
+    _searchNotifier.value = _searchNotifier.value;
+  }
+
+  void _resetFilters() {
+    setState(() {
+      // Reset Fabrics filters
+      _fabricsMinPrice = 0;
+      _fabricsMaxPrice = 5000;
+      _fabricsSelectedColor = 'All';
+      _fabricsSelectedMaterial = 'All';
+      
+      // Reset Tailors filters
+      _tailorsMinRating = 0;
+      _tailorsSelectedLocation = 'All';
+      
+      // Reset Retailers filters
+      _retailersMinRating = 0;
+      _retailersSelectedLocation = 'All';
+      
+      _showFilterOverlay = false;
+    });
+    _searchNotifier.value = _searchNotifier.value;
+  }
+
+  bool get _hasActiveFilters {
+    final currentIndex = _page.round().clamp(0, _tabLabels.length - 1);
+    
+    if (currentIndex == 0) {
+      // Fabrics tab - NO RATING
+      return _fabricsMinPrice > 0 || 
+             _fabricsMaxPrice < 5000 || 
+             _fabricsSelectedColor != 'All' || 
+             _fabricsSelectedMaterial != 'All';
+    } else if (currentIndex == 1) {
+      // Tailors tab - Rating + Location
+      return _tailorsMinRating > 0 || 
+             _tailorsSelectedLocation != 'All';
+    } else {
+      // Retailers tab - Rating + Location
+      return _retailersMinRating > 0 || 
+             _retailersSelectedLocation != 'All';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentIndex = _page.round().clamp(0, _tabLabels.length - 1);
 
+    // Create tab-specific filter data
+    final fabricsFilterData = FabricsFilterData(
+      minPrice: _fabricsMinPrice,
+      maxPrice: _fabricsMaxPrice,
+      color: _fabricsSelectedColor,
+      materialType: _fabricsSelectedMaterial,
+    );
+
+    final tailorsFilterData = TailorsFilterData(
+      minRating: _tailorsMinRating,
+      location: _tailorsSelectedLocation,
+    );
+
+    final retailersFilterData = RetailersFilterData(
+      minRating: _retailersMinRating,
+      location: _retailersSelectedLocation,
+    );
+
     return Scaffold(
       backgroundColor: Colors.white,
+      drawer: const DashboardDrawer(initialRole: AppUserRole.customer),
       body: Stack(
         children: [
-          // Main content
           Column(
             children: [
               _buildHeader(currentIndex),
@@ -87,34 +220,53 @@ class _BrowseShellState extends State<BrowseShell> {
                   controller: _pageController,
                   physics: const BouncingScrollPhysics(),
                   children: [
-                    FabricsPageBody(searchQuery: _searchNotifier),
-                    TailorsPageBody(searchQuery: _searchNotifier),
-                    RetailersPageBody(searchQuery: _searchNotifier),
+                    FabricsPageBody(
+                      searchQuery: _searchNotifier,
+                      filterData: fabricsFilterData,
+                    ),
+                    TailorsPageBody(
+                      searchQuery: _searchNotifier,
+                      filterData: tailorsFilterData,
+                    ),
+                    RetailersPageBody(
+                      searchQuery: _searchNotifier,
+                      filterData: retailersFilterData,
+                    ),
                   ],
                 ),
               ),
             ],
           ),
           
-          // Cloudinary Test Floating Action Button
-          Positioned(
-            bottom: 20,
-            right: 20,
-            child: FloatingActionButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const TestCloudinaryScreen(),
+          // Filter Overlay
+          if (_showFilterOverlay)
+            GestureDetector(
+              onTap: _toggleFilterOverlay,
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.3),
+                child: GestureDetector(
+                  onTap: () {},
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.15),
+                            blurRadius: 20,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: _buildFilterPanel(currentIndex),
+                    ),
                   ),
-                );
-              },
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-              tooltip: 'Test Cloudinary Upload',
-              child: const Icon(Icons.cloud_upload),
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -125,27 +277,29 @@ class _BrowseShellState extends State<BrowseShell> {
   Widget _buildHeader(int currentIndex) {
     return Container(
       padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 8,
-        bottom: 12,
-        left: 16,
-        right: 16,
+        top: MediaQuery.of(context).padding.top + 6,
+        bottom: 6,
+        left: 12,
+        right: 12,
       ),
       child: Row(
         children: [
-          IconButton(
-            onPressed: () {
-              // Open drawer later
-            },
-            icon: const Icon(Icons.menu, color: kSage),
+          Builder(
+            builder: (ctx) => IconButton(
+              icon: const Icon(Icons.menu, color: kSage, size: 24),
+              onPressed: () => Scaffold.of(ctx).openDrawer(),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
           ),
           const SizedBox(width: 8),
           Image.asset(
             'assets/images/transparent_logo.png',
-            height: 45,
+            height: 32,
             errorBuilder: (context, error, stackTrace) {
               return Container(
-                height: 45,
-                width: 45,
+                height: 32,
+                width: 32,
                 decoration: const BoxDecoration(
                   color: kSage,
                   shape: BoxShape.circle,
@@ -156,65 +310,657 @@ class _BrowseShellState extends State<BrowseShell> {
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                      fontSize: 10,
                     ),
                   ),
                 ),
               );
             },
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 10),
           Expanded(
             child: Container(
-              height: 40,
+              height: 34,
               decoration: BoxDecoration(
                 color: kSagePale,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: kBorder),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: kBorder, width: 0.5),
               ),
               child: TextField(
                 onChanged: (value) => _searchNotifier.value = value,
                 decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search, size: 20),
+                  prefixIcon: const Icon(Icons.search, size: 16),
                   hintText: _searchHints[currentIndex],
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 6),
+                  hintStyle: const TextStyle(fontSize: 12),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 6),
+          Stack(
+            children: [
+              IconButton(
+                onPressed: _toggleFilterOverlay,
+                icon: Icon(
+                  Icons.filter_list,
+                  color: _showFilterOverlay || _hasActiveFilters ? kSage : Colors.grey,
+                  size: 20,
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+              if (_hasActiveFilters)
+                Positioned(
+                  top: 2,
+                  right: 2,
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 4),
           IconButton(
             onPressed: () {},
             icon: const Icon(
               Icons.shopping_cart_outlined,
               color: kSage,
-              size: 24,
+              size: 20,
             ),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
         ],
       ),
     );
   }
 
+  // ─── Filter Panel ──────────────────────────────────────────────────────
+
+  Widget _buildFilterPanel(int currentTab) {
+    if (currentTab == 0) {
+      return _buildFabricsFilterPanel();
+    } else if (currentTab == 1) {
+      return _buildTailorsFilterPanel();
+    } else {
+      return _buildRetailersFilterPanel();
+    }
+  }
+
+  // ─── Fabrics Filter Panel (NO RATING) ─────────────────────────────
+  
+  Widget _buildFabricsFilterPanel() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      constraints: const BoxConstraints(maxHeight: 480),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Filter Fabrics',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                TextButton(
+                  onPressed: _resetFilters,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    'Reset All',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Price Range
+            const Text(
+              'Price Range',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Tk ${_fabricsMinPrice.toStringAsFixed(0)}',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    'Tk ${_fabricsMaxPrice.toStringAsFixed(0)}',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                    textAlign: TextAlign.end,
+                  ),
+                ),
+              ],
+            ),
+            RangeSlider(
+              values: RangeValues(_fabricsMinPrice, _fabricsMaxPrice),
+              min: 0,
+              max: 5000,
+              divisions: 50,
+              activeColor: kSage,
+              inactiveColor: Colors.grey.shade300,
+              onChanged: (values) {
+                setState(() {
+                  _fabricsMinPrice = values.start;
+                  _fabricsMaxPrice = values.end;
+                });
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // Color Filter
+            const Text(
+              'Color',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: _colorOptions.map((color) {
+                final isSelected = _fabricsSelectedColor == color;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _fabricsSelectedColor = color;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isSelected ? kSage : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? kSage : Colors.grey.shade300,
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (color != 'All')
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: _resolveColor(color),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.grey.shade300, width: 0.5),
+                            ),
+                          ),
+                        if (color != 'All') const SizedBox(width: 4),
+                        Text(
+                          color,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isSelected ? Colors.white : Colors.grey.shade700,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
+
+            // Material Type Filter
+            const Text(
+              'Material Type',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: _materialTypes.map((material) {
+                final isSelected = _fabricsSelectedMaterial == material;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _fabricsSelectedMaterial = material;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isSelected ? kSage : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? kSage : Colors.grey.shade300,
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Text(
+                      material,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isSelected ? Colors.white : Colors.grey.shade700,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 14),
+
+            // Apply Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _applyFilters,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kSage,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  minimumSize: const Size(double.infinity, 40),
+                ),
+                child: const Text(
+                  'Apply Filters',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Tailors Filter Panel (Rating + Location) ──────────────────────
+  
+  Widget _buildTailorsFilterPanel() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      constraints: const BoxConstraints(maxHeight: 480),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Filter Tailors',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                TextButton(
+                  onPressed: _resetFilters,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    'Reset All',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Rating Filter
+            const Text(
+              'Minimum Rating',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                Expanded(
+                  child: Slider(
+                    value: _tailorsMinRating,
+                    min: 0,
+                    max: 5,
+                    divisions: 10,
+                    activeColor: Colors.amber,
+                    inactiveColor: Colors.grey.shade300,
+                    label: '${_tailorsMinRating.toStringAsFixed(1)} ★',
+                    onChanged: (value) {
+                      setState(() {
+                        _tailorsMinRating = value;
+                      });
+                    },
+                  ),
+                ),
+                Container(
+                  width: 45,
+                  alignment: Alignment.center,
+                  child: Text(
+                    '${_tailorsMinRating.toStringAsFixed(1)} ★',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Location Filter
+            const Text(
+              'Location',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: _locations.map((location) {
+                final isSelected = _tailorsSelectedLocation == location;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _tailorsSelectedLocation = location;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isSelected ? kSage : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? kSage : Colors.grey.shade300,
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Text(
+                      location,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isSelected ? Colors.white : Colors.grey.shade700,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 14),
+
+            // Apply Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _applyFilters,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kSage,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  minimumSize: const Size(double.infinity, 40),
+                ),
+                child: const Text(
+                  'Apply Filters',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Retailers Filter Panel (Rating + Location) ────────────────────
+  
+  Widget _buildRetailersFilterPanel() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      constraints: const BoxConstraints(maxHeight: 480),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Filter Retailers',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                TextButton(
+                  onPressed: _resetFilters,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    'Reset All',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Rating Filter
+            const Text(
+              'Minimum Rating',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                Expanded(
+                  child: Slider(
+                    value: _retailersMinRating,
+                    min: 0,
+                    max: 5,
+                    divisions: 10,
+                    activeColor: Colors.amber,
+                    inactiveColor: Colors.grey.shade300,
+                    label: '${_retailersMinRating.toStringAsFixed(1)} ★',
+                    onChanged: (value) {
+                      setState(() {
+                        _retailersMinRating = value;
+                      });
+                    },
+                  ),
+                ),
+                Container(
+                  width: 45,
+                  alignment: Alignment.center,
+                  child: Text(
+                    '${_retailersMinRating.toStringAsFixed(1)} ★',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Location Filter
+            const Text(
+              'Location',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: _locations.map((location) {
+                final isSelected = _retailersSelectedLocation == location;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _retailersSelectedLocation = location;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isSelected ? kSage : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? kSage : Colors.grey.shade300,
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Text(
+                      location,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isSelected ? Colors.white : Colors.grey.shade700,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 14),
+
+            // Apply Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _applyFilters,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kSage,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  minimumSize: const Size(double.infinity, 40),
+                ),
+                child: const Text(
+                  'Apply Filters',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _resolveColor(String name) {
+    switch (name.toLowerCase()) {
+      case 'white':
+        return Colors.white;
+      case 'black':
+        return Colors.black;
+      case 'red':
+        return Colors.red;
+      case 'pink':
+        return Colors.pink[200]!;
+      case 'blue':
+        return Colors.blue[300]!;
+      case 'green':
+        return Colors.green[300]!;
+      case 'beige':
+        return const Color(0xFFE8DCC8);
+      case 'brown':
+        return Colors.brown[300]!;
+      case 'gold':
+        return const Color(0xFFD4AF37);
+      case 'silver':
+        return Colors.grey[400]!;
+      case 'purple':
+        return Colors.purple[300]!;
+      default:
+        return Colors.grey[300]!;
+    }
+  }
+
   // ─── Navigation Row ──────────────────────────────────────────────────────
-  // Tapping a label animates the PageView; swiping the PageView animates
-  // the labels — both routes drive the same `_page` value so the row and
-  // the content always stay perfectly in sync.
 
   Widget _buildNavigationRow() {
     return SizedBox(
-      height: 50,
+      height: 40,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: List.generate(_tabLabels.length, (index) {
-            // 1.0 when this tab is fully active, fading to 0.0 as the
-            // page scrolls a full page away.
             final t = (1 - (_page - index).abs()).clamp(0.0, 1.0);
-            final fontSize = lerpDouble(14, 18, t)!;
+            final fontSize = lerpDouble(12, 15, t)!;
             final color = Color.lerp(
               kSage.withValues(alpha: 0.5),
               kSage,
@@ -223,7 +969,7 @@ class _BrowseShellState extends State<BrowseShell> {
             final weight = t > 0.5 ? FontWeight.bold : FontWeight.w600;
 
             return Padding(
-              padding: const EdgeInsets.only(right: 22),
+              padding: const EdgeInsets.only(right: 14),
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => _goToPage(index),
@@ -239,12 +985,11 @@ class _BrowseShellState extends State<BrowseShell> {
                       ),
                       child: Text(_tabLabels[index]),
                     ),
-                    const SizedBox(height: 4),
-                    // Sliding underline that fades in/out with activity.
+                    const SizedBox(height: 3),
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 120),
-                      height: 2.5,
-                      width: lerpDouble(0, 28, t),
+                      height: 2,
+                      width: lerpDouble(0, 20, t),
                       decoration: BoxDecoration(
                         color: kSage.withValues(alpha: t),
                         borderRadius: BorderRadius.circular(2),

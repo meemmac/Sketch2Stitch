@@ -174,26 +174,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 4),
 
-                  // Category (from database)
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.label,
-                        color: Color(0xFF2C5C44),
-                        size: 18,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        widget.product.category,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
                   // Quantity
                   const Text(
                     'Quantity (gauge)',
