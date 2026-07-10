@@ -255,8 +255,9 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
           Text(
             'Premium Fabrics',
             style: TextStyle(
-              fontSize: isSmallScreen ? 18 : 20,
-              fontWeight: FontWeight.bold,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
               color: Colors.white,
             ),
           ),
@@ -264,7 +265,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
           Text(
             'High-quality fabrics for your style',
             style: TextStyle(
-              fontSize: isSmallScreen ? 13 : 14,
+              fontSize: 13,
               color: Colors.white.withValues(alpha: 0.9),
             ),
           ),
@@ -297,7 +298,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
             label,
             style: TextStyle(
               color: Colors.white,
-              fontSize: isSmall ? 11 : 12,
+              fontSize: 13,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -323,16 +324,17 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
             Text(
               'No products found',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
                 color: Colors.grey[600],
-                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Try adjusting your filters or search terms',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 color: Colors.grey[500],
               ),
             ),
@@ -429,7 +431,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                           child: Text(
                             product.category,
                             style: TextStyle(
-                              fontSize: isSmallScreen ? 10 : 12,
+                              fontSize: 13,
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 0.3,
@@ -458,7 +460,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                             child: Text(
                               'Out of Stock',
                               style: TextStyle(
-                                fontSize: isSmallScreen ? 9 : 11,
+                                fontSize: 13,
                                 color: Colors.white,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -486,7 +488,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                         Text(
                           product.productName,
                           style: TextStyle(
-                            fontSize: isSmallScreen ? 15 : 17,
+                            fontSize: 13,
                             fontWeight: FontWeight.w600,
                             height: 1.2,
                           ),
@@ -497,7 +499,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                         Text(
                           product.priceRange,
                           style: TextStyle(
-                            fontSize: isSmallScreen ? 15 : 17,
+                            fontSize: 13,
                             fontWeight: FontWeight.w700,
                             color: kSageDark,
                           ),

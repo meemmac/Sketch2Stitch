@@ -123,8 +123,9 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
           Text(
             'Trusted Retailers',
             style: TextStyle(
-              fontSize: isSmallScreen ? 18 : 20,
-              fontWeight: FontWeight.bold,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
               color: Colors.white,
             ),
           ),
@@ -132,7 +133,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
           Text(
             'Verified retailers with quality fabrics',
             style: TextStyle(
-              fontSize: isSmallScreen ? 13 : 14,
+              fontSize: 13,
               color: Colors.white.withValues(alpha: 0.9),
             ),
           ),
@@ -165,7 +166,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
             label,
             style: TextStyle(
               color: Colors.white,
-              fontSize: isSmall ? 11 : 12,
+              fontSize: 13,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -191,16 +192,17 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
             Text(
               'No retailers found',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
                 color: Colors.grey[600],
-                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Try adjusting your filters or search terms',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 color: Colors.grey[500],
               ),
             ),
@@ -300,7 +302,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                         child: Text(
                           '⭐ Top Rated',
                           style: TextStyle(
-                            fontSize: isSmall ? 9 : 11,
+                            fontSize: 13,
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
                           ),
@@ -333,7 +335,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                             retailer.rating.toStringAsFixed(1),
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: isSmall ? 10 : 12,
+                              fontSize: 13,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -361,7 +363,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                     Text(
                       retailer.shopName,
                       style: TextStyle(
-                        fontSize: isSmall ? 15 : 17,
+                        fontSize: 13,
                         fontWeight: FontWeight.w600,
                         height: 1.2,
                       ),
@@ -381,7 +383,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                           child: Text(
                             retailer.generalArea,
                             style: TextStyle(
-                              fontSize: isSmall ? 11 : 12,
+                              fontSize: 13,
                               color: Colors.grey[600],
                             ),
                             maxLines: 1,

@@ -333,7 +333,7 @@ class _BrowseShellState extends State<BrowseShell> {
                   hintText: _searchHints[currentIndex],
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 6),
-                  hintStyle: const TextStyle(fontSize: 12),
+                  hintStyle: const TextStyle(fontSize: 13),
                 ),
               ),
             ),
@@ -411,8 +411,9 @@ class _BrowseShellState extends State<BrowseShell> {
                 const Text(
                   'Filter Fabrics',
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
                   ),
                 ),
                 TextButton(
@@ -425,7 +426,7 @@ class _BrowseShellState extends State<BrowseShell> {
                   child: const Text(
                     'Reset All',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -448,13 +449,13 @@ class _BrowseShellState extends State<BrowseShell> {
                 Expanded(
                   child: Text(
                     'Tk ${_fabricsMinPrice.toStringAsFixed(0)}',
-                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                    style: const TextStyle(fontSize: 13, color: Colors.grey),
                   ),
                 ),
                 Expanded(
                   child: Text(
                     'Tk ${_fabricsMaxPrice.toStringAsFixed(0)}',
-                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                    style: const TextStyle(fontSize: 13, color: Colors.grey),
                     textAlign: TextAlign.end,
                   ),
                 ),
@@ -523,7 +524,7 @@ class _BrowseShellState extends State<BrowseShell> {
                         Text(
                           color,
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 13,
                             color: isSelected ? Colors.white : Colors.grey.shade700,
                             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                           ),
@@ -569,7 +570,7 @@ class _BrowseShellState extends State<BrowseShell> {
                     child: Text(
                       material,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 13,
                         color: isSelected ? Colors.white : Colors.grey.shade700,
                         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                       ),
@@ -597,7 +598,7 @@ class _BrowseShellState extends State<BrowseShell> {
                 child: const Text(
                   'Apply Filters',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -626,8 +627,9 @@ class _BrowseShellState extends State<BrowseShell> {
                 const Text(
                   'Filter Tailors',
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
                   ),
                 ),
                 TextButton(
@@ -640,7 +642,7 @@ class _BrowseShellState extends State<BrowseShell> {
                   child: const Text(
                     'Reset All',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -752,7 +754,7 @@ class _BrowseShellState extends State<BrowseShell> {
                 child: const Text(
                   'Apply Filters',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -781,8 +783,9 @@ class _BrowseShellState extends State<BrowseShell> {
                 const Text(
                   'Filter Retailers',
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
                   ),
                 ),
                 TextButton(
@@ -795,7 +798,7 @@ class _BrowseShellState extends State<BrowseShell> {
                   child: const Text(
                     'Reset All',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -907,7 +910,7 @@ class _BrowseShellState extends State<BrowseShell> {
                 child: const Text(
                   'Apply Filters',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
