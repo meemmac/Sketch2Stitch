@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+ import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/models/tailor.dart';
@@ -6,7 +6,7 @@ import 'package:sketch2stitch/models/review.dart';
 import 'package:sketch2stitch/models/portfolio.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
-import 'package:sketch2stitch/services/firestore_service.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 
 /// Entry point kept for backward compatibility with existing navigation
 /// calls (e.g. `Navigator.push(... BrowseFabricsScreen())`). It now opens
@@ -40,7 +40,9 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
 
   String _selectedCategory = 'All';
 
+  final List<Retailer> _retailers = [];
   final List<Product> _products = [];
+  final List<Tailor> _tailors = [];
   final List<String> _categories = [
     'All',
     'Cotton',
@@ -51,28 +53,181 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
     'Embroidery'
   ];
 
-  final FirestoreService _firestoreService = FirestoreService();
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
-    _loadProducts();
+    _loadHardcodedData();
   }
 
-  Future<void> _loadProducts() async {
-    setState(() => _isLoading = true);
-    try {
-      final products = await _firestoreService.getProducts();
-      setState(() {
-        _products.clear();
-        _products.addAll(products);
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Error loading products: $e');
-      setState(() => _isLoading = false);
-    }
+  void _loadHardcodedData() {
+    final sampleReviews = [
+      Review(
+        id: 'r1',
+        customerId: 'c1',
+        targetId: 'r1',
+        targetRole: ReviewTargetRole.retailer,
+        rating: 5.0,
+        comment: 'Excellent quality fabrics!',
+      ),
+    ];
+
+    final samplePortfolios = [
+      Portfolio(
+        id: 'pf1',
+        tailorId: 't1',
+        image: 'assets/images/portfolio1.jpg',
+        description: 'Bridal gown',
+      ),
+    ];
+
+    _retailers.addAll([
+      Retailer(
+        id: 'r1',
+        shopName: 'Premium Fabrics',
+        email: 'premium@shop.com',
+        phone: '+8801712345681',
+        address: 'Gulshan, Dhaka',
+        licenses: ['License #123'],
+        rating: 4.8,
+      ),
+      Retailer(
+        id: 'r2',
+        shopName: 'Cotton Blend',
+        email: 'cotton@shop.com',
+        phone: '+8801712345682',
+        address: 'Banani, Dhaka',
+        licenses: [],
+        rating: 4.5,
+        
+      ),
+    ]);
+
+    _products.addAll([
+      Product(
+        id: 'p1',
+        retailerId: 'r1',
+        productName: 'Premium Cotton Fabric',
+        category: 'Cotton',
+        materialType: '100% Cotton',
+        colorOptions: ['White', 'Pink', 'Blue'],
+        description:
+            'High-quality cotton fabric perfect for all your tailoring needs. This premium fabric offers excellent durability, comfort, and a luxurious feel.',
+        
+      ),
+      Product(
+        id: 'p2',
+        retailerId: 'r1',
+        productName: 'Cotton Blend Fabric',
+        category: 'Cotton',
+        materialType: 'Cotton Blend',
+        colorOptions: ['White', 'Beige', 'Blue'],
+        description:
+            'Premium cotton blend fabric with excellent durability and softness.',
+       
+      ),
+      Product(
+        id: 'p3',
+        retailerId: 'r1',
+        productName: 'Cotton Casual Fabric',
+        category: 'Cotton',
+        materialType: '100% Cotton',
+        colorOptions: ['White', 'Blue', 'Green'],
+        description:
+            'Casual cotton fabric for everyday wear. Lightweight and breathable.',
+      
+      ),
+      Product(
+        id: 'p4',
+        retailerId: 'r1',
+        productName: 'Premium Linen Fabric',
+        category: 'Linen',
+        materialType: '100% Linen',
+        colorOptions: ['White', 'Pink', 'Blue'],
+        description: 'High-quality linen fabric perfect for summer wear.',
+        
+      ),
+      Product(
+        id: 'p5',
+        retailerId: 'r2',
+        productName: 'Silk Blend Fabric',
+        category: 'Silk',
+        materialType: 'Silk Blend',
+        colorOptions: ['White', 'Beige', 'Blue'],
+        description: 'Luxurious silk blend fabric with beautiful drape and sheen.',
+       
+      ),
+      Product(
+        id: 'p6',
+        retailerId: 'r2',
+        productName: 'Lace Fabric',
+        category: 'Lace',
+        materialType: 'Cotton Lace',
+        colorOptions: ['White', 'Blue', 'Green'],
+        description:
+            'Beautiful lace fabric for elegant designs and special occasions.',
+        
+      ),
+      Product(
+        id: 'p7',
+        retailerId: 'r2',
+        productName: 'Premium Silk Fabric',
+        category: 'Silk',
+        materialType: '100% Silk',
+        colorOptions: ['White', 'Gold', 'Pink'],
+        description:
+            'Luxurious silk fabric for special occasions and formal wear.',
+       
+      ),
+      Product(
+        id: 'p8',
+        retailerId: 'r1',
+        productName: 'Wool Blend Fabric',
+        category: 'Wool',
+        materialType: 'Wool Blend',
+        colorOptions: ['White', 'Brown', 'Blue'],
+        description: 'Warm wool blend fabric perfect for winter wear.',
+       
+      ),
+      Product(
+        id: 'p9',
+        retailerId: 'r2',
+        productName: 'Embroidery Fabric',
+        category: 'Embroidery',
+        materialType: 'Cotton Blend',
+        colorOptions: ['White', 'Gold', 'Blue'],
+        description:
+            'Exquisite embroidery fabric for traditional and modern designs.',
+        
+      ),
+      Product(
+        id: 'p10',
+        retailerId: 'r1',
+        productName: 'Linen Blend Fabric',
+        category: 'Linen',
+        materialType: 'Linen Blend',
+        colorOptions: ['White', 'Beige', 'Green'],
+        description:
+            'Breathable linen blend fabric for comfortable everyday wear.',
+       
+      ),
+    ]);
+
+    _tailors.addAll([
+      Tailor(
+        id: 't1',
+        name: 'Master Stitch Tailors',
+        email: 'master@tailor.com',
+        phone: '+8801712345679',
+        address: 'Dhanmondi, Dhaka',
+        licenses: ['License #12345'],
+        rating: 4.5,
+        reviewCount: 214,
+        profileImage: 'assets/images/tailor1.jpg',
+        description: 'Expert tailoring services with 10+ years experience.',
+        portfolio: samplePortfolios,
+        
+      ),
+    ]);
   }
 
   @override
@@ -89,12 +244,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
               .contains(searchQuery.toLowerCase());
           return matchesCategory && matchesSearch;
         }).toList();
-
-        if (_isLoading) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
-        }
 
         return Column(
           children: [
@@ -115,7 +264,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF2C5C44), Color(0xFF4E8B6F)],
+          colors: [kSageDark, kSage],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -203,10 +352,10 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF2C5C44) : Colors.white,
+          color: selected ? kSage : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? const Color(0xFF2C5C44) : Colors.grey[300]!,
+            color: selected ? kSage : kBorder,
           ),
         ),
         child: Text(
@@ -248,9 +397,9 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
           onTap: () => _showProductDetailOverlay(context, product),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: kCardBg,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey[200]!),
+              border: Border.all(color: kBorder),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.04),
@@ -266,9 +415,17 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                   flex: 3,
                   child: ClipRRect(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                    child: Container(
-                      color: Colors.grey[200],
-                      child: const Icon(Icons.image, size: 50, color: Colors.grey),
+                    child: Image.asset(
+                      product.imageUrl ?? 'assets/images/placeholder.jpg',
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.image_not_supported,
+                              size: 50, color: Colors.grey),
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -287,17 +444,23 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          product.materialType,
-                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        Row(
+                          children: [
+                            const Icon(Icons.star, color: Color(0xFFFDE807), size: 14),
+                            const SizedBox(width: 2),
+                            Text(
+                              '${product.rating} (${product.reviewCount})',
+                              style: const TextStyle(fontSize: 11, color: Colors.grey),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          product.category,
+                          'Tk ${product.price}',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF2C5C44),
+                            color: kSageDark,
                           ),
                         ),
                       ],
