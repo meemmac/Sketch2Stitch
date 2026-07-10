@@ -4,6 +4,7 @@ import 'package:sketch2stitch/screens/customer/browsing/browse_fabrics_screen.da
 import 'package:sketch2stitch/screens/customer/browsing/browse_tailors_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
+import 'package:sketch2stitch/screens/test_cloudinary_screen.dart'; // Add this import
 
 /// Shared shell for the three "Browse" tabs (Fabrics/Clothing, Tailors,
 /// Retailers). Provides one header, one animated navigation row, and a
@@ -74,19 +75,44 @@ class _BrowseShellState extends State<BrowseShell> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Column(
+      body: Stack(
         children: [
-          _buildHeader(currentIndex),
-          _buildNavigationRow(),
-          Expanded(
-            child: PageView(
-              controller: _pageController,
-              physics: const BouncingScrollPhysics(),
-              children: [
-                FabricsPageBody(searchQuery: _searchNotifier),
-                TailorsPageBody(searchQuery: _searchNotifier),
-                RetailersPageBody(searchQuery: _searchNotifier),
-              ],
+          // Main content
+          Column(
+            children: [
+              _buildHeader(currentIndex),
+              _buildNavigationRow(),
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  physics: const BouncingScrollPhysics(),
+                  children: [
+                    FabricsPageBody(searchQuery: _searchNotifier),
+                    TailorsPageBody(searchQuery: _searchNotifier),
+                    RetailersPageBody(searchQuery: _searchNotifier),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          
+          // Cloudinary Test Floating Action Button
+          Positioned(
+            bottom: 20,
+            right: 20,
+            child: FloatingActionButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TestCloudinaryScreen(),
+                  ),
+                );
+              },
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              child: const Icon(Icons.cloud_upload),
+              tooltip: 'Test Cloudinary Upload',
             ),
           ),
         ],

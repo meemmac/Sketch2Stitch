@@ -7,7 +7,7 @@ import '../models/review.dart';
 
 class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   // Collection names
   static const String productsCollection = 'products';
   static const String tailorsCollection = 'tailors';
@@ -17,22 +17,25 @@ class FirestoreService {
 
   // ─── Products ─────────────────────────────────────────────────────────────
 
+  Product _productFromDoc(String id, Map<String, dynamic> data) {
+    return Product(
+      id: id,
+      retailerId: data['retailerId'] ?? '',
+      productName: data['productName'] ?? '',
+      category: data['category'] ?? '',
+      materialType: data['materialType'] ?? '',
+      colorOptions: List<String>.from(data['colorOptions'] ?? []),
+      description: data['description'] ?? '',
+      careSymbol: List<String>.from(data['careSymbol'] ?? []),
+    );
+  }
+
   Future<List<Product>> getProducts() async {
     try {
       final snapshot = await _firestore.collection(productsCollection).get();
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return Product(
-          id: doc.id,
-          retailerId: data['retailerId'] ?? '',
-          productName: data['productName'] ?? '',
-          category: data['category'] ?? '',
-          materialType: data['materialType'] ?? '',
-          colorOptions: List<String>.from(data['colorOptions'] ?? []),
-          description: data['description'] ?? '',
-          careLevel: List<String>.from(data['careLevel'] ?? []),
-        );
-      }).toList();
+      return snapshot.docs
+          .map((doc) => _productFromDoc(doc.id, doc.data()))
+          .toList();
     } catch (e) {
       print('Error fetching products: $e');
       return [];
@@ -45,19 +48,9 @@ class FirestoreService {
           .collection(productsCollection)
           .where('category', isEqualTo: category)
           .get();
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return Product(
-          id: doc.id,
-          retailerId: data['retailerId'] ?? '',
-          productName: data['productName'] ?? '',
-          category: data['category'] ?? '',
-          materialType: data['materialType'] ?? '',
-          colorOptions: List<String>.from(data['colorOptions'] ?? []),
-          description: data['description'] ?? '',
-          careLevel: List<String>.from(data['careLevel'] ?? []),
-        );
-      }).toList();
+      return snapshot.docs
+          .map((doc) => _productFromDoc(doc.id, doc.data()))
+          .toList();
     } catch (e) {
       print('Error fetching products by category: $e');
       return [];
@@ -66,20 +59,10 @@ class FirestoreService {
 
   Future<Product?> getProductById(String productId) async {
     try {
-      final doc = await _firestore.collection(productsCollection).doc(productId).get();
+      final doc =
+          await _firestore.collection(productsCollection).doc(productId).get();
       if (!doc.exists) return null;
-      
-      final data = doc.data()!;
-      return Product(
-        id: doc.id,
-        retailerId: data['retailerId'] ?? '',
-        productName: data['productName'] ?? '',
-        category: data['category'] ?? '',
-        materialType: data['materialType'] ?? '',
-        colorOptions: List<String>.from(data['colorOptions'] ?? []),
-        description: data['description'] ?? '',
-        careLevel: List<String>.from(data['careLevel'] ?? []),
-      );
+      return _productFromDoc(doc.id, doc.data()!);
     } catch (e) {
       print('Error fetching product: $e');
       return null;
@@ -88,19 +71,9 @@ class FirestoreService {
 
   Stream<List<Product>> streamProducts() {
     return _firestore.collection(productsCollection).snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return Product(
-          id: doc.id,
-          retailerId: data['retailerId'] ?? '',
-          productName: data['productName'] ?? '',
-          category: data['category'] ?? '',
-          materialType: data['materialType'] ?? '',
-          colorOptions: List<String>.from(data['colorOptions'] ?? []),
-          description: data['description'] ?? '',
-          careLevel: List<String>.from(data['careLevel'] ?? []),
-        );
-      }).toList();
+      return snapshot.docs
+          .map((doc) => _productFromDoc(doc.id, doc.data()))
+          .toList();
     });
   }
 
@@ -109,7 +82,7 @@ class FirestoreService {
   Future<List<Tailor>> getTailors() async {
     try {
       final snapshot = await _firestore.collection(tailorsCollection).get();
-      
+
       List<Tailor> tailors = [];
       for (var doc in snapshot.docs) {
         final data = doc.data();
@@ -121,12 +94,11 @@ class FirestoreService {
           address: data['address'] ?? '',
           rating: (data['rating'] ?? 0).toDouble(),
         );
-        
-        // Fetch portfolio for this tailor
+
         final portfolio = await getPortfolioByTailorId(doc.id);
         tailors.add(tailor.copyWith(portfolio: portfolio));
       }
-      
+
       return tailors;
     } catch (e) {
       print('Error fetching tailors: $e');
@@ -136,9 +108,10 @@ class FirestoreService {
 
   Future<Tailor?> getTailorById(String tailorId) async {
     try {
-      final doc = await _firestore.collection(tailorsCollection).doc(tailorId).get();
+      final doc =
+          await _firestore.collection(tailorsCollection).doc(tailorId).get();
       if (!doc.exists) return null;
-      
+
       final data = doc.data()!;
       final tailor = Tailor(
         id: doc.id,
@@ -148,8 +121,7 @@ class FirestoreService {
         address: data['address'] ?? '',
         rating: (data['rating'] ?? 0).toDouble(),
       );
-      
-      // Fetch portfolio for this tailor
+
       final portfolio = await getPortfolioByTailorId(doc.id);
       return tailor.copyWith(portfolio: portfolio);
     } catch (e) {
@@ -171,8 +143,7 @@ class FirestoreService {
           address: data['address'] ?? '',
           rating: (data['rating'] ?? 0).toDouble(),
         );
-        
-        // Fetch portfolio for this tailor
+
         final portfolio = await getPortfolioByTailorId(doc.id);
         tailors.add(tailor.copyWith(portfolio: portfolio));
       }
@@ -204,9 +175,12 @@ class FirestoreService {
 
   Future<Retailer?> getRetailerById(String retailerId) async {
     try {
-      final doc = await _firestore.collection(retailersCollection).doc(retailerId).get();
+      final doc = await _firestore
+          .collection(retailersCollection)
+          .doc(retailerId)
+          .get();
       if (!doc.exists) return null;
-      
+
       final data = doc.data()!;
       return Retailer(
         id: doc.id,
@@ -263,7 +237,8 @@ class FirestoreService {
 
   // ─── Reviews ─────────────────────────────────────────────────────────────
 
-  Future<List<Review>> getReviewsByTargetId(String targetId, ReviewTargetRole targetRole) async {
+  Future<List<Review>> getReviewsByTargetId(
+      String targetId, ReviewTargetRole targetRole) async {
     try {
       final snapshot = await _firestore
           .collection(reviewsCollection)

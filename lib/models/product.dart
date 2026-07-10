@@ -8,7 +8,7 @@ class Product {
   final String materialType;
   final List<String> colorOptions;
   final String description;
-  final List<String> careLevel;
+  final List<String> careSymbol;
   
   // Relationships
   List<OrderItem>? orderItems;
@@ -21,7 +21,7 @@ class Product {
     required this.materialType,
     required this.colorOptions,
     required this.description,
-    required this.careLevel,
+    required this.careSymbol,
     this.orderItems = const [],
   });
 
@@ -33,7 +33,7 @@ class Product {
     String? materialType,
     List<String>? colorOptions,
     String? description,
-    List<String>? careLevel,
+    List<String>? careSymbol,
     List<OrderItem>? orderItems,
   }) {
     return Product(
@@ -44,7 +44,7 @@ class Product {
       materialType: materialType ?? this.materialType,
       colorOptions: colorOptions ?? this.colorOptions,
       description: description ?? this.description,
-      careLevel: careLevel ?? this.careLevel,
+      careSymbol: careSymbol ?? this.careSymbol,
       orderItems: orderItems ?? this.orderItems,
     );
   }
@@ -57,7 +57,7 @@ class Product {
     'materialType': materialType,
     'colorOptions': colorOptions,
     'description': description,
-    'careLevel': careLevel,
+    'careSymbol': careSymbol,
   };
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -69,7 +69,7 @@ class Product {
       materialType: json['materialType'] ?? '',
       colorOptions: List<String>.from(json['colorOptions'] ?? []),
       description: json['description'] ?? '',
-      careLevel: List<String>.from(json['careLevel'] ?? []),
+      careSymbol: List<String>.from(json['careSymbol'] ?? []),
     );
   }
 }

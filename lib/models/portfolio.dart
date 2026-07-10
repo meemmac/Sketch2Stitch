@@ -25,6 +25,7 @@ class Portfolio {
     );
   }
 
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'tailorId': tailorId,

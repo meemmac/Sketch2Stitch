@@ -284,8 +284,8 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Care Level
-                  if (widget.product.careLevel.isNotEmpty) ...[
+                  // Care Instructions
+                  if (widget.product.careSymbol.isNotEmpty) ...[
                     const Text(
                       'Care Instructions',
                       style: TextStyle(
@@ -297,7 +297,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: widget.product.careLevel.map((care) {
+                      children: widget.product.careSymbol.map((care) {
                         return Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
