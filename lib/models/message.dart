@@ -51,6 +51,7 @@ class Message {
       msgText: msgText ?? this.msgText,
       attachment: attachment ?? this.attachment,
       sentAt: sentAt ?? this.sentAt,
+    );
   }
 
   Map<String, dynamic> toJson() => {

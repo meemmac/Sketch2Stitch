@@ -100,17 +100,17 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 8),
 
-                  // Rating
+                  // Material Type
                   Row(
                     children: [
                       const Icon(
-                        Icons.star,
-                        color: Color(0xFFFDE807),
+                        Icons.category,
+                        color: Color(0xFF2C5C44),
                         size: 18,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '${widget.product.rating} (${widget.product.reviewCount} reviews)',
+                        widget.product.materialType,
                         style: const TextStyle(
                           fontSize: 14,
                           color: Colors.grey,
@@ -120,14 +120,23 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 4),
 
-                  // Price
-                  Text(
-                    'Tk ${widget.product.price} per gauge',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2C5C44),
-                    ),
+                  // Category
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.label,
+                        color: Color(0xFF2C5C44),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        widget.product.category,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 20),
 
@@ -275,6 +284,42 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 24),
 
+                  // Care Level
+                  if (widget.product.careLevel.isNotEmpty) ...[
+                    const Text(
+                      'Care Instructions',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: widget.product.careLevel.map((care) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEEF6F0),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            care,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF2C5C44),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+
                   // Product Description
                   const Text(
                     'Product Description',
@@ -370,96 +415,30 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
   }
 
   Widget _buildProductImage() {
-    final imageUrl = widget.product.imageUrl ?? '';
-
-    // Check if it's a local asset (starts with 'assets/')
-    if (imageUrl.startsWith('assets/')) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Image.asset(
-          imageUrl,
-          height: 250,
-          width: double.infinity,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              height: 250,
-              width: double.infinity,
-              color: Colors.grey[200],
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.image_not_supported,
-                    size: 60,
-                    color: Colors.grey,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Image not available',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      );
-    }
-
-    // Otherwise use network image
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
-      child: Image.network(
-        imageUrl.isNotEmpty ? imageUrl : 'https://images.unsplash.com/photo-1598532163253-6d69d0f7c5c6?w=400&h=400&fit=crop',
+      child: Container(
         height: 250,
         width: double.infinity,
-        fit: BoxFit.cover,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return Container(
-            height: 250,
-            width: double.infinity,
-            color: Colors.grey[200],
-            child: Center(
-              child: CircularProgressIndicator(
-                value: loadingProgress.expectedTotalBytes != null
-                    ? loadingProgress.cumulativeBytesLoaded /
-                        loadingProgress.expectedTotalBytes!
-                    : null,
-                color: const Color(0xFF2C5C44),
+        color: Colors.grey[200],
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.image_not_supported,
+              size: 60,
+              color: Colors.grey,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Image not available',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
               ),
             ),
-          );
-        },
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            height: 250,
-            width: double.infinity,
-            color: Colors.grey[200],
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.image_not_supported,
-                  size: 60,
-                  color: Colors.grey,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Image not available',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }

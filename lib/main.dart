@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_fabrics_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const Sketch2StitchApp());
 }
 
@@ -14,11 +17,11 @@ class Sketch2StitchApp extends StatelessWidget {
       title: 'Sketch2Stitch',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primaryColor: const Color(0xFF224F34),
+        primaryColor: const Color(0xFF2C5C44),
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF224F34),
-          primary: const Color(0xFF224F34),
-          secondary: const Color(0xFF64CD57),
+          seedColor: const Color(0xFF2C5C44),
+          primary: const Color(0xFF2C5C44),
+          secondary: const Color(0xFF4E8B6F),
         ),
         useMaterial3: true,
         appBarTheme: const AppBarTheme(

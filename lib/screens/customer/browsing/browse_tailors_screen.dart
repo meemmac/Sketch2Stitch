@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/tailor.dart';
-import 'package:sketch2stitch/models/portfolio.dart';
-import 'package:sketch2stitch/models/review.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
+import 'package:sketch2stitch/services/firestore_service.dart';
 
 /// Entry point kept for backward compatibility with existing navigation
 /// calls (e.g. `Navigator.push(... BrowseTailorsScreen())`). It now opens
@@ -39,146 +37,30 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
   String _selectedFilter = 'All';
 
   final List<Tailor> _tailors = [];
-  final List<String> _filters = ['All', 'Top Rated', 'Premium', 'Fast Service'];
+  final List<String> _filters = ['All', 'Top Rated'];
+
+  final FirestoreService _firestoreService = FirestoreService();
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadHardcodedData();
+    _loadTailors();
   }
 
-  void _loadHardcodedData() {
-    final sampleReviews = [
-      Review(
-        id: 'r1',
-        customerId: 'c1',
-        targetId: 't1',
-        targetRole: ReviewTargetRole.tailor,
-        rating: 4.5,
-        comment: 'Excellent work!',
-       
-      ),
-      Review(
-        id: 'r2',
-        customerId: 'c2',
-        targetId: 't2',
-        targetRole: ReviewTargetRole.tailor,
-        rating: 3.5,
-        comment: 'Good service',
-        
-      ),
-      Review(
-        id: 'r3',
-        customerId: 'c3',
-        targetId: 't3',
-        targetRole: ReviewTargetRole.tailor,
-        rating: 4.0,
-        comment: 'Very professional',
-        
-      ),
-    ];
-
-    final samplePortfolios = [
-      Portfolio(
-        id: 'pf1',
-        tailorId: 't1',
-        image: 'https://picsum.photos/seed/portfolio1/400/500',
-        description: 'Wedding dress',
-      ),
-    ];
-
-    _tailors.addAll([
-      Tailor(
-        id: 't1',
-        name: 'Master Stitch Tailors',
-        email: 'master@tailor.com',
-        phone: '+8801712345679',
-        address: 'Farragate, Dhaka',
-        licenses: ['License #12345'],
-        rating: 4.5,
-        reviewCount: 234,
-        profileImage: 'https://picsum.photos/seed/masterstitch/200/200',
-        description:
-            'Expert tailoring with 15 years experience. Specializing in wedding and formal wear.',
-        portfolio: samplePortfolios,
-        
-      ),
-      Tailor(
-        id: 't2',
-        name: 'Quick Stitch Express',
-        email: 'quick@tailor.com',
-        phone: '+8801712345680',
-        address: 'Chateaugues, Dhaka',
-        licenses: [],
-        rating: 3.5,
-        reviewCount: 134,
-        profileImage: 'https://picsum.photos/seed/quickstitch/200/200',
-        description:
-            'Fast and reliable tailoring with 10 years experience. Specializing in casual and daily wear.',
-        portfolio: [],
-        
-      ),
-      Tailor(
-        id: 't3',
-        name: 'Royal Stitch Express',
-        email: 'royal@tailor.com',
-        phone: '+8801712345684',
-        address: 'Magars, Dhaka',
-        licenses: ['License #22222'],
-        rating: 4.0,
-        reviewCount: 334,
-        profileImage: 'https://picsum.photos/seed/royalstitch/200/200',
-        description:
-            'Premium tailoring with 5 years experience. Specializing in traditional and ethnic wear.',
-        portfolio: [],
-        
-      ),
-      Tailor(
-        id: 't4',
-        name: 'Stitch Tailors',
-        email: 'stitch@tailor.com',
-        phone: '+8801712345685',
-        address: 'Farragate, Dhaka',
-        licenses: [],
-        rating: 4.5,
-        reviewCount: 234,
-        profileImage: 'https://picsum.photos/seed/stitchtailors/200/200',
-        description:
-            'Professional tailoring with 15 years experience. Specializing in wedding and formal wear.',
-        portfolio: [],
-        
-      ),
-      Tailor(
-        id: 't5',
-        name: 'Modern Fit Tailors',
-        email: 'modern@tailor.com',
-        phone: '+8801712345686',
-        address: 'Farragate, Dhaka',
-        licenses: ['License #33333'],
-        rating: 4.5,
-        reviewCount: 234,
-        profileImage: 'https://picsum.photos/seed/modernfit/200/200',
-        description:
-            'Modern tailoring with 15 years experience. Specializing in formal and informal wear.',
-        portfolio: [],
-        
-      ),
-      Tailor(
-        id: 't6',
-        name: 'Master Stitch Tailors',
-        email: 'master2@tailor.com',
-        phone: '+8801712345687',
-        address: 'Farragate, Dhaka',
-        licenses: ['License #44444'],
-        rating: 4.5,
-        reviewCount: 234,
-        profileImage: 'https://picsum.photos/seed/masterstitch2/200/200',
-        description:
-            'Expert tailoring with 15 years experience. Specializing in wedding and formal wear.',
-        portfolio: [],
-       
-      ),
-    ]);
+  Future<void> _loadTailors() async {
+    setState(() => _isLoading = true);
+    try {
+      final tailors = await _firestoreService.getTailors();
+      setState(() {
+        _tailors.clear();
+        _tailors.addAll(tailors);
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading tailors: $e');
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -189,15 +71,18 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
       builder: (context, searchQuery, _) {
         final filteredTailors = _tailors.where((t) {
           final matchesFilter = _selectedFilter == 'All' ||
-              (_selectedFilter == 'Top Rated' && t.rating >= 4.5) ||
-              (_selectedFilter == 'Premium' && t.hasLicense) ||
-              (_selectedFilter == 'Fast Service' && t.reviewCount > 200);
+              (_selectedFilter == 'Top Rated' && t.rating >= 4.5);
 
-          final matchesSearch = t.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
-              (t.description?.toLowerCase().contains(searchQuery.toLowerCase()) ?? false);
+          final matchesSearch = t.name.toLowerCase().contains(searchQuery.toLowerCase());
 
           return matchesFilter && matchesSearch;
         }).toList();
+
+        if (_isLoading) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
 
         return Column(
           children: [
@@ -218,7 +103,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [kSageDark, kSage],
+          colors: [Color(0xFF2C5C44), Color(0xFF4E8B6F)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -298,9 +183,9 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? kSage : Colors.white,
+          color: selected ? const Color(0xFF2C5C44) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? kSage : kBorder),
+          border: Border.all(color: selected ? const Color(0xFF2C5C44) : Colors.grey[300]!),
         ),
         child: Text(
           label,
@@ -331,32 +216,26 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
   }
 
   Widget _buildTailorCard(Tailor tailor) {
-    String specialty = 'Wedding & Formal Wear';
-    if (tailor.description != null) {
-      final desc = tailor.description!.toLowerCase();
+    String specialty = 'Professional Tailoring';
+    if (tailor.portfolio != null && tailor.portfolio!.isNotEmpty) {
+      final desc = tailor.portfolio!.first.description?.toLowerCase() ?? '';
       if (desc.contains('casual')) {
         specialty = 'Casual & Daily Wear';
       } else if (desc.contains('traditional') || desc.contains('ethnic')) {
         specialty = 'Traditional & Ethnic';
       } else if (desc.contains('formal') || desc.contains('informal')) {
         specialty = 'Formal & Informal Wear';
-      }
-    }
-
-    String experience = '15 years';
-    if (tailor.description != null) {
-      final expMatch = RegExp(r'(\d+)\s*years?').firstMatch(tailor.description!);
-      if (expMatch != null) {
-        experience = '${expMatch.group(1)} years';
+      } else if (desc.isNotEmpty) {
+        specialty = desc;
       }
     }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: kCardBg,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kBorder),
+        border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
         ],
@@ -372,16 +251,21 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
             ),
             child: ClipRRect(
               borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
-              child: Image.network(
-                tailor.profileImage ?? 'https://picsum.photos/seed/${tailor.id}/200/200',
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.person, size: 50, color: Colors.grey),
-                  );
-                },
-              ),
+              child: tailor.portfolio != null && tailor.portfolio!.isNotEmpty
+                  ? Image.network(
+                      tailor.portfolio!.first.image ?? 'https://picsum.photos/seed/${tailor.id}/200/200',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.person, size: 50, color: Colors.grey),
+                        );
+                      },
+                    )
+                  : Container(
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.person, size: 50, color: Colors.grey),
+                    ),
             ),
           ),
           Expanded(
@@ -403,7 +287,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                     children: [
                       RatingStars(rating: tailor.rating, size: 14),
                       const SizedBox(width: 4),
-                      Text('${tailor.rating} (${tailor.reviewCount})',
+                      Text('${tailor.rating}',
                           style: const TextStyle(fontSize: 12, color: Colors.grey)),
                     ],
                   ),
@@ -414,19 +298,6 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                       const SizedBox(width: 4),
                       Text(tailor.generalArea, style: const TextStyle(fontSize: 12, color: Colors.grey)),
                     ],
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.orange[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.orange[200]!),
-                    ),
-                    child: Text(
-                      experience,
-                      style: const TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.w600),
-                    ),
                   ),
                 ],
               ),

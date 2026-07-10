@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:sketch2stitch/models/models.dart';
-import 'package:sketch2stitch/models/review.dart';
+import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
+import 'package:sketch2stitch/services/firestore_service.dart';
 
 /// Entry point kept for backward compatibility with existing navigation
 /// calls (e.g. `Navigator.push(... BrowseRetailersScreen())`). It now
@@ -37,103 +36,30 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
   String _selectedFilter = 'All';
 
   final List<Retailer> _retailers = [];
-  final List<String> _filters = ['All', 'Top Rated', 'Premium', 'Fast Service'];
+  final List<String> _filters = ['All', 'Top Rated'];
+
+  final FirestoreService _firestoreService = FirestoreService();
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadHardcodedData();
+    _loadRetailers();
   }
 
-  void _loadHardcodedData() {
-    final sampleReviews = [
-      Review(
-        id: 'r1',
-        customerId: 'c1',
-        targetId: 'r1',
-        targetRole: ReviewTargetRole.retailer,
-        rating: 4.5,
-        comment: 'Great quality fabrics!',
-      ),
-      Review(
-        id: 'r2',
-        customerId: 'c2',
-        targetId: 'r2',
-        targetRole: ReviewTargetRole.retailer,
-        rating: 4.5,
-        comment: 'Excellent service!',
-      ),
-    ];
-
-    _retailers.addAll([
-      Retailer(
-        id: 'r1',
-        shopName: 'Fabric Paradise',
-        email: 'paradise@shop.com',
-        phone: '+8801712345681',
-        address: 'Gulshan, Dhaka',
-        licenses: ['License #123'],
-        rating: 4.5,
-        
-      ),
-      Retailer(
-        id: 'r2',
-        shopName: 'Cotton Corner',
-        email: 'cotton@corner.com',
-        phone: '+8801712345682',
-        address: 'Banani, Dhaka',
-        licenses: ['License #456'],
-        rating: 4.5,
-        
-      ),
-      Retailer(
-        id: 'r3',
-        shopName: 'Silk Emporium',
-        email: 'silk@emporium.com',
-        phone: '+8801712345683',
-        address: 'Dhanmondi, Dhaka',
-        licenses: ['License #789'],
-        rating: 4.8,
-      ),
-      Retailer(
-        id: 'r4',
-        shopName: 'Linen World',
-        email: 'linen@world.com',
-        phone: '+8801712345684',
-        address: 'Uttara, Dhaka',
-        licenses: [],
-        rating: 4.2,
-      ),
-      Retailer(
-        id: 'r5',
-        shopName: 'Wool House',
-        email: 'wool@house.com',
-        phone: '+8801712345685',
-        address: 'Mirpur, Dhaka',
-        licenses: ['License #101'],
-        rating: 4.6,
-      ),
-      Retailer(
-        id: 'r6',
-        shopName: 'Fabric Paradise',
-        email: 'paradise2@shop.com',
-        phone: '+8801712345686',
-        address: 'Gulshan, Dhaka',
-        licenses: ['License #123'],
-        rating: 4.5,
-       
-      ),
-      Retailer(
-        id: 'r7',
-        shopName: 'Cotton Corner',
-        email: 'cotton2@corner.com',
-        phone: '+8801712345687',
-        address: 'Banani, Dhaka',
-        licenses: ['License #456'],
-        rating: 4.5,
-        
-      ),
-    ]);
+  Future<void> _loadRetailers() async {
+    setState(() => _isLoading = true);
+    try {
+      final retailers = await _firestoreService.getRetailers();
+      setState(() {
+        _retailers.clear();
+        _retailers.addAll(retailers);
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading retailers: $e');
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -144,15 +70,18 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
       builder: (context, searchQuery, _) {
         final filteredRetailers = _retailers.where((r) {
           final matchesFilter = _selectedFilter == 'All' ||
-              (_selectedFilter == 'Top Rated' && r.rating >= 4.5) ||
-              (_selectedFilter == 'Premium' && r.hasLicense) ||
-              (_selectedFilter == 'Fast Service' && r.reviewCount > 200);
+              (_selectedFilter == 'Top Rated' && r.rating >= 4.5);
 
-          final matchesSearch = r.shopName.toLowerCase().contains(searchQuery.toLowerCase()) ||
-              (r.description?.toLowerCase().contains(searchQuery.toLowerCase()) ?? false);
+          final matchesSearch = r.shopName.toLowerCase().contains(searchQuery.toLowerCase());
 
           return matchesFilter && matchesSearch;
         }).toList();
+
+        if (_isLoading) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
 
         return Column(
           children: [
@@ -173,7 +102,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [kSageDark, kSage],
+          colors: [Color(0xFF2C5C44), Color(0xFF4E8B6F)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -253,9 +182,9 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? kSage : Colors.white,
+          color: selected ? const Color(0xFF2C5C44) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? kSage : kBorder),
+          border: Border.all(color: selected ? const Color(0xFF2C5C44) : Colors.grey[300]!),
         ),
         child: Text(
           label,
@@ -300,9 +229,9 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
       },
       child: Container(
         decoration: BoxDecoration(
-          color: kCardBg,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: kBorder),
+          border: Border.all(color: Colors.grey[200]!),
           boxShadow: [
             BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
           ],
@@ -316,16 +245,9 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                 children: [
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                    child: Image.network(
-                      retailer.logoUrl ?? 'https://picsum.photos/seed/${retailer.id}/200/200',
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey[200],
-                          child: const Icon(Icons.store, size: 50, color: Colors.grey),
-                        );
-                      },
+                    child: Container(
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.store, size: 50, color: Colors.grey),
                     ),
                   ),
                   if (showTopRated)
@@ -337,19 +259,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                         decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(12)),
                         child: const Text(
                           'Top Rated',
-                          style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ),
-                  if (retailer.hasLicense)
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(12)),
-                        child: const Text(
-                          'Licensed',
                           style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w600),
                         ),
                       ),
@@ -376,7 +285,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          retailer.description?.split(' ').take(3).join(' ') ?? 'Fabric Store',
+                          'Fabric Store',
                           style: const TextStyle(fontSize: 10, color: Colors.grey),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
