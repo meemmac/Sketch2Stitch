@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
-import 'package:sketch2stitch/services/firestore_service.dart';
 
 /// Entry point kept for backward compatibility with existing navigation
 /// calls (e.g. `Navigator.push(... BrowseRetailersScreen())`). It now
@@ -15,6 +14,51 @@ class BrowseRetailersScreen extends StatelessWidget {
     return const BrowseShell(initialIndex: 2);
   }
 }
+
+/// Hardcoded sample retailers. Firestore has been removed for now — swap
+/// this list back out for a service call whenever the backend is ready.
+final List<Retailer> kHardcodedRetailers = [
+  Retailer(
+    id: 'r1',
+    shopName: 'Dhaka Fabric House',
+    email: 'contact@dhakafabric.com',
+    phone: '01711000001',
+    address: '12 New Market Road, Dhanmondi, Dhaka',
+    rating: 4.8,
+  ),
+  Retailer(
+    id: 'r2',
+    shopName: 'Chowdhury Textiles',
+    email: 'info@chowdhurytextiles.com',
+    phone: '01711000002',
+    address: '45 Islampur Road, Islampur, Dhaka',
+    rating: 4.6,
+  ),
+  Retailer(
+    id: 'r3',
+    shopName: 'Silk & Lace Emporium',
+    email: 'hello@silklace.com',
+    phone: '01711000003',
+    address: '7 Gausia Market, Elephant Road, Dhaka',
+    rating: 4.9,
+  ),
+  Retailer(
+    id: 'r4',
+    shopName: 'Bengal Cotton Co.',
+    email: 'sales@bengalcotton.com',
+    phone: '01711000004',
+    address: '89 Karwan Bazar, Tejgaon, Dhaka',
+    rating: 4.3,
+  ),
+  Retailer(
+    id: 'r5',
+    shopName: 'Heritage Weaves',
+    email: 'support@heritageweaves.com',
+    phone: '01711000005',
+    address: '3 Mirpur Road, Mohammadpur, Dhaka',
+    rating: 4.7,
+  ),
+];
 
 /// The actual retailers tab content, rendered as one page inside the
 /// shared [BrowseShell] PageView. Header and navigation row live in the
@@ -35,32 +79,9 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
 
   String _selectedFilter = 'All';
 
-  final List<Retailer> _retailers = [];
-  final List<String> _filters = ['All', 'Top Rated'];
-
-  final FirestoreService _firestoreService = FirestoreService();
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadRetailers();
-  }
-
-  Future<void> _loadRetailers() async {
-    setState(() => _isLoading = true);
-    try {
-      final retailers = await _firestoreService.getRetailers();
-      setState(() {
-        _retailers.clear();
-        _retailers.addAll(retailers);
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Error loading retailers: $e');
-      setState(() => _isLoading = false);
-    }
-  }
+  // Hardcoded data — no Firestore for now.
+  final List<Retailer> _retailers = kHardcodedRetailers;
+  final List<String> _filters = ['All', 'Top Rated', 'Premium', 'Fast Service'];
 
   @override
   Widget build(BuildContext context) {
@@ -70,18 +91,14 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
       builder: (context, searchQuery, _) {
         final filteredRetailers = _retailers.where((r) {
           final matchesFilter = _selectedFilter == 'All' ||
-              (_selectedFilter == 'Top Rated' && r.rating >= 4.5);
+              (_selectedFilter == 'Top Rated' && r.rating >= 4.8) ||
+              (_selectedFilter == 'Premium' && r.rating >= 4.7) ||
+              (_selectedFilter == 'Fast Service' && r.rating >= 4.5);
 
           final matchesSearch = r.shopName.toLowerCase().contains(searchQuery.toLowerCase());
 
           return matchesFilter && matchesSearch;
         }).toList();
-
-        if (_isLoading) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
-        }
 
         return Column(
           children: [
@@ -222,6 +239,22 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
 
   Widget _buildRetailerCard(Retailer retailer) {
     final bool showTopRated = retailer.rating >= 4.8;
+    final bool isPremium = retailer.rating >= 4.7;
+    final bool isFastService = retailer.rating >= 4.5;
+
+    // Determine which badge to show (priority: Top Rated > Premium > Fast Service)
+    String? badgeText;
+    Color? badgeColor;
+    if (showTopRated) {
+      badgeText = 'Top Rated';
+      badgeColor = Colors.orange;
+    } else if (isPremium) {
+      badgeText = 'Premium';
+      badgeColor = Colors.purple;
+    } else if (isFastService) {
+      badgeText = 'Fast Service';
+      badgeColor = Colors.blue;
+    }
 
     return GestureDetector(
       onTap: () {
@@ -246,20 +279,32 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                     child: Container(
+                      width: double.infinity,
+                      height: double.infinity,
                       color: Colors.grey[200],
-                      child: const Icon(Icons.store, size: 50, color: Colors.grey),
+                      child: Image.asset(
+                        'assets/images/fab.jpg',
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.store, size: 50, color: Colors.grey),
+                        ),
+                      ),
                     ),
                   ),
-                  if (showTopRated)
+                  if (badgeText != null)
                     Positioned(
                       top: 8,
                       right: 8,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(12)),
-                        child: const Text(
-                          'Top Rated',
-                          style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w600),
+                        decoration: BoxDecoration(
+                          color: badgeColor,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          badgeText,
+                          style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w600),
                         ),
                       ),
                     ),

@@ -15,15 +15,27 @@ class ProductDetailOverlay extends StatefulWidget {
 
 class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
   int _quantity = 1;
-  String _selectedColor = '';
+  late ColorOption? _selectedOption;
   bool _isFavorite = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.product.colorOptions.isNotEmpty) {
-      _selectedColor = widget.product.colorOptions.first;
-    }
+    // Prefer the first in-stock color option; fall back to the first
+    // option at all (even if out of stock) so something is always shown.
+    final options = widget.product.colorOptions;
+    _selectedOption = options.isEmpty
+        ? null
+        : options.firstWhere((o) => o.stock > 0, orElse: () => options.first);
+  }
+
+  bool get _inStock => (_selectedOption?.stock ?? 0) > 0;
+
+  void _selectOption(ColorOption option) {
+    setState(() {
+      _selectedOption = option;
+      _quantity = 1;
+    });
   }
 
   @override
@@ -64,7 +76,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Product Image
+                  // Product Image (follows the selected color option)
                   _buildProductImage(),
                   const SizedBox(height: 16),
 
@@ -98,9 +110,51 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
 
-                  // Material Type
+                  // Price for the currently selected color option
+                  Row(
+                    children: [
+                      Text(
+                        _selectedOption != null
+                            ? 'Tk ${_selectedOption!.price.toStringAsFixed(0)}'
+                            : widget.product.priceRange,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF2C5C44),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      if (!_inStock)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.red[50],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Out of stock',
+                            style: TextStyle(fontSize: 11, color: Colors.red[700], fontWeight: FontWeight.w600),
+                          ),
+                        )
+                      else if (_selectedOption != null && _selectedOption!.stock <= 5)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.orange[50],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Only ${_selectedOption!.stock} left',
+                            style: TextStyle(fontSize: 11, color: Colors.orange[800], fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Material Type (from database)
                   Row(
                     children: [
                       const Icon(
@@ -120,7 +174,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 4),
 
-                  // Category
+                  // Category (from database)
                   Row(
                     children: [
                       const Icon(
@@ -159,11 +213,13 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                       children: [
                         IconButton(
                           icon: const Icon(Icons.remove, size: 20),
-                          onPressed: () {
-                            setState(() {
-                              if (_quantity > 1) _quantity--;
-                            });
-                          },
+                          onPressed: !_inStock
+                              ? null
+                              : () {
+                                  setState(() {
+                                    if (_quantity > 1) _quantity--;
+                                  });
+                                },
                         ),
                         Container(
                           width: 40,
@@ -178,62 +234,22 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                         ),
                         IconButton(
                           icon: const Icon(Icons.add, size: 20),
-                          onPressed: () {
-                            setState(() {
-                              _quantity++;
-                            });
-                          },
+                          onPressed: !_inStock
+                              ? null
+                              : () {
+                                  setState(() {
+                                    final maxStock = _selectedOption?.stock ?? 1;
+                                    if (_quantity < maxStock) _quantity++;
+                                  });
+                                },
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-
-                  // Features - With fixed height, different colors
-                  SizedBox(
-                    height: 145,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          SizedBox(
-                            width: MediaQuery.of(context).size.width * 0.28,
-                            child: _buildFeatureCard(
-                              Icons.local_shipping,
-                              'Free Delivery',
-                              '30-90 min',
-                              Colors.blue,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          SizedBox(
-                            width: MediaQuery.of(context).size.width * 0.28,
-                            child: _buildFeatureCard(
-                              Icons.verified,
-                              'Quality Assured',
-                              '100% Authentic',
-                              Colors.green,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          SizedBox(
-                            width: MediaQuery.of(context).size.width * 0.28,
-                            child: _buildFeatureCard(
-                              Icons.cut,
-                              'Custom Cutting',
-                              'Your measurements',
-                              Colors.orange,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                   const SizedBox(height: 24),
 
-                  // Available Colors
+                  // Available Colors — each chip is a full ColorOption with
+                  // its own price/stock, not just a color name anymore.
                   const Text(
                     'Available Colors',
                     style: TextStyle(
@@ -245,37 +261,53 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: widget.product.colorOptions.map((color) {
-                      final isSelected = _selectedColor == color;
+                    children: widget.product.colorOptions.map((option) {
+                      final isSelected = _selectedOption?.optionId == option.optionId;
+                      final isOutOfStock = option.stock <= 0;
                       return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedColor = color;
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? const Color(0xFF2C5C44)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
+                        onTap: () => _selectOption(option),
+                        child: Opacity(
+                          opacity: isOutOfStock ? 0.5 : 1.0,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
                               color: isSelected
                                   ? const Color(0xFF2C5C44)
-                                  : Colors.grey[300]!,
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: isSelected
+                                    ? const Color(0xFF2C5C44)
+                                    : Colors.grey[300]!,
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            color,
-                            style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.black87,
-                              fontWeight: isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  option.color,
+                                  style: TextStyle(
+                                    color: isSelected ? Colors.white : Colors.black87,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                                Text(
+                                  isOutOfStock
+                                      ? 'Out of stock'
+                                      : 'Tk ${option.price.toStringAsFixed(0)}',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: isSelected
+                                        ? Colors.white.withValues(alpha: 0.85)
+                                        : Colors.grey[600],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -284,7 +316,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Care Instructions
+                  // Care Instructions (from database)
                   if (widget.product.careSymbol.isNotEmpty) ...[
                     const Text(
                       'Care Instructions',
@@ -320,7 +352,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                     const SizedBox(height: 24),
                   ],
 
-                  // Product Description
+                  // Product Description (from database)
                   const Text(
                     'Product Description',
                     style: TextStyle(
@@ -344,16 +376,18 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Added to cart!'),
-                                backgroundColor: Color(0xFF4E8B6F),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          },
+                          onPressed: !_inStock
+                              ? null
+                              : () {
+                                  Navigator.pop(context);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Added to cart!'),
+                                      backgroundColor: Color(0xFF4E8B6F),
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFF2C5C44),
                             padding: const EdgeInsets.symmetric(vertical: 16),
@@ -375,18 +409,21 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Order placed successfully!'),
-                                backgroundColor: Color(0xFF4E8B6F),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          },
+                          onPressed: !_inStock
+                              ? null
+                              : () {
+                                  Navigator.pop(context);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Order placed successfully!'),
+                                      backgroundColor: Color(0xFF4E8B6F),
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF2C5C44),
+                            disabledBackgroundColor: Colors.grey[300],
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -414,73 +451,50 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
     );
   }
 
-  Widget _buildProductImage() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        height: 250,
-        width: double.infinity,
-        color: Colors.grey[200],
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.image_not_supported,
-              size: 60,
-              color: Colors.grey,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Image not available',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // In product_detail_overlay.dart, update _buildProductImage method:
 
-  Widget _buildFeatureCard(IconData icon, String title, String subtitle, Color color) {
-    return Container(
-      height: double.infinity,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(height: 6),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+Widget _buildProductImage() {
+  final imageUrl = _selectedOption?.image;
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(16),
+    child: Container(
+      height: 250,
+      width: double.infinity,
+      color: Colors.grey[200],
+      child: imageUrl != null && imageUrl.isNotEmpty
+          ? imageUrl.startsWith('http')
+              ? Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => _imageFallback(),
+                )
+              : Image.asset(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => _imageFallback(),
+                )
+          : _imageFallback(),
+    ),
+  );
+}
+      Widget _imageFallback() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(
+          Icons.image_not_supported,
+          size: 60,
+          color: Colors.grey,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Image not available',
+          style: TextStyle(
+            color: Colors.grey[600],
+            fontSize: 14,
           ),
-          const SizedBox(height: 3),
-          Text(
-            subtitle,
-            style: const TextStyle(
-              fontSize: 10,
-              color: Colors.grey,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

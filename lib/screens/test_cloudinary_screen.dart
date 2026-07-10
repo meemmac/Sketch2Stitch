@@ -14,7 +14,7 @@ class TestCloudinaryScreen extends StatefulWidget {
 class _TestCloudinaryScreenState extends State<TestCloudinaryScreen> {
   String? _uploadedImageUrl;
   final List<String> _uploadedImages = [];
-  bool _isLoading = false;
+  final bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {

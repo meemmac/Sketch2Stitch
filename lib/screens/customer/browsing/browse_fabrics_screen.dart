@@ -3,7 +3,6 @@ import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
-import 'package:sketch2stitch/services/firestore_service.dart';
 
 /// Entry point kept for backward compatibility with existing navigation
 /// calls (e.g. `Navigator.push(... BrowseFabricsScreen())`). It now opens
@@ -17,6 +16,169 @@ class BrowseFabricsScreen extends StatelessWidget {
     return const BrowseShell(initialIndex: 0);
   }
 }
+
+/// Hardcoded sample fabrics with assets images
+final List<Product> kHardcodedProducts = [
+  Product(
+    id: 'p1',
+    retailerId: 'r1',
+    productName: 'Premium Egyptian Cotton',
+    category: 'Cotton',
+    materialType: '100% Cotton',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/fab.jpg', price: 650, stock: 40),
+      ColorOption(optionId: 2, color: 'Beige', image: 'assets/images/fab2.jpg', price: 650, stock: 25),
+      ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/fabric_waves.jpg', price: 700, stock: 15),
+      ColorOption(optionId: 4, color: 'Black', image: 'assets/images/textile.jpg', price: 700, stock: 0),
+    ],
+    description:
+        'Soft, breathable Egyptian cotton perfect for shirts and casual wear. '
+        'Pre-shrunk and colorfast, holds its shape wash after wash.',
+    careSymbol: ['Machine wash cold', 'Do not bleach', 'Tumble dry low'],
+  ),
+  Product(
+    id: 'p2',
+    retailerId: 'r1',
+    productName: 'Pure Mulberry Silk',
+    category: 'Silk',
+    materialType: '100% Silk',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'Gold', image: 'assets/images/silk.jpg', price: 1800, stock: 10),
+      ColorOption(optionId: 2, color: 'Pink', image: 'assets/images/saree.jpg', price: 1750, stock: 8),
+      ColorOption(optionId: 3, color: 'Green', image: 'assets/images/gorgeous.jpg', price: 1750, stock: 5),
+      ColorOption(optionId: 4, color: 'White', image: 'assets/images/gorgette.jpg', price: 1700, stock: 12),
+    ],
+    description:
+        'Luxurious mulberry silk with a natural sheen, ideal for formal wear '
+        'and sarees. Lightweight with a smooth, cool feel against the skin.',
+    careSymbol: ['Dry clean only', 'Iron on low heat'],
+  ),
+  Product(
+    id: 'p3',
+    retailerId: 'r2',
+    productName: 'Merino Wool Blend',
+    category: 'Wool',
+    materialType: 'Wool Blend',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'Brown', image: 'assets/images/drawing_fabric.jpg', price: 950, stock: 18),
+      ColorOption(optionId: 2, color: 'Black', image: 'assets/images/textile.jpg', price: 950, stock: 20),
+      ColorOption(optionId: 3, color: 'Beige', image: 'assets/images/fabric_waves.jpg', price: 900, stock: 0),
+    ],
+    description:
+        'Warm merino wool blend suited for winter jackets and blazers. '
+        'Resists wrinkles and retains heat without feeling heavy.',
+    careSymbol: ['Hand wash cold', 'Dry flat'],
+  ),
+  Product(
+    id: 'p4',
+    retailerId: 'r2',
+    productName: 'Irish Linen Weave',
+    category: 'Linen',
+    materialType: '100% Linen',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/fabrics_rolled.jpg', price: 780, stock: 30),
+      ColorOption(optionId: 2, color: 'Beige', image: 'assets/images/fab.jpg', price: 780, stock: 22),
+      ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/fabric_waves.jpg', price: 820, stock: 14),
+    ],
+    description:
+        'Classic Irish linen with a crisp hand-feel, great for summer shirts '
+        'and trousers. Naturally breathable and gets softer with every wash.',
+    careSymbol: ['Machine wash cold', 'Iron while damp'],
+  ),
+  Product(
+    id: 'p5',
+    retailerId: 'r3',
+    productName: 'French Chantilly Lace',
+    category: 'Lace',
+    materialType: 'Nylon-Cotton Lace',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/lace.jpg', price: 1200, stock: 6),
+      ColorOption(optionId: 2, color: 'Black', image: 'assets/images/lace2.jpg', price: 1200, stock: 4),
+      ColorOption(optionId: 3, color: 'Pink', image: 'assets/images/embroidery.jpg', price: 1250, stock: 0),
+    ],
+    description:
+        'Delicate floral Chantilly lace, hand-finished scalloped edges. '
+        'Popular for bridal wear and formal blouses.',
+    careSymbol: ['Dry clean only', 'Do not bleach'],
+  ),
+  Product(
+    id: 'p6',
+    retailerId: 'r3',
+    productName: 'Zardozi Embroidered Panel',
+    category: 'Embroidery',
+    materialType: 'Silk with Metallic Thread',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'Gold', image: 'assets/images/embroidery.jpg', price: 3200, stock: 3),
+      ColorOption(optionId: 2, color: 'Green', image: 'assets/images/design.jpg', price: 3200, stock: 2),
+      ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/crochet.jpg', price: 3400, stock: 0),
+    ],
+    description:
+        'Hand-embroidered zardozi work with metallic thread and sequins, '
+        'crafted for statement pieces like lehengas and formal jackets.',
+    careSymbol: ['Dry clean only'],
+  ),
+  Product(
+    id: 'p7',
+    retailerId: 'r1',
+    productName: 'Premium Tassel Fabric',
+    category: 'Cotton',
+    materialType: 'Cotton Blend',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/tassel.jpg', price: 550, stock: 35),
+      ColorOption(optionId: 2, color: 'Blue', image: 'assets/images/drawing_fabric.jpg', price: 600, stock: 20),
+    ],
+    description:
+        'Beautiful tassel fabric with intricate detailing. Perfect for '
+        'curtains, upholstery, and decorative items.',
+    careSymbol: ['Dry clean only', 'Do not iron directly'],
+  ),
+  Product(
+    id: 'p8',
+    retailerId: 'r2',
+    productName: 'Handwoven Textile',
+    category: 'Cotton',
+    materialType: '100% Cotton',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/textile.jpg', price: 850, stock: 15),
+      ColorOption(optionId: 2, color: 'Beige', image: 'assets/images/fabric_waves.jpg', price: 850, stock: 10),
+    ],
+    description:
+        'Handwoven textile with traditional patterns. Each piece is unique '
+        'with slight variations that add to its charm.',
+    careSymbol: ['Hand wash', 'Do not bleach', 'Air dry'],
+  ),
+  Product(
+    id: 'p9',
+    retailerId: 'r3',
+    productName: 'Designer Silk Blend',
+    category: 'Silk',
+    materialType: 'Silk Blend',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'Gold', image: 'assets/images/gorgeous.jpg', price: 2500, stock: 5),
+      ColorOption(optionId: 2, color: 'Blue', image: 'assets/images/design.jpg', price: 2800, stock: 3),
+    ],
+    description:
+        'Luxurious designer silk blend with a unique texture and finish. '
+        'Perfect for high-end fashion and special occasions.',
+    careSymbol: ['Dry clean only', 'Store in a cool place'],
+  ),
+  Product(
+    id: 'p10',
+    retailerId: 'r1',
+    productName: 'Classic Cotton Weave',
+    category: 'Cotton',
+    materialType: '100% Cotton',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/fab.jpg', price: 450, stock: 50),
+      ColorOption(optionId: 2, color: 'Blue', image: 'assets/images/fab2.jpg', price: 500, stock: 30),
+      ColorOption(optionId: 3, color: 'Green', image: 'assets/images/fabric_waves.jpg', price: 550, stock: 20),
+    ],
+    description:
+        'Classic cotton weave fabric with a soft, comfortable feel. '
+        'Ideal for everyday wear and casual outfits.',
+    careSymbol: ['Machine wash warm', 'Tumble dry', 'Iron medium'],
+  ),
+];
 
 /// The actual fabrics tab content, rendered as one page inside the
 /// shared [BrowseShell] PageView. Header and navigation row live in the
@@ -37,7 +199,8 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
 
   String _selectedCategory = 'All';
 
-  final List<Product> _products = [];
+  // Hardcoded data — no Firestore for now.
+  final List<Product> _products = kHardcodedProducts;
   final List<String> _categories = [
     'All',
     'Cotton',
@@ -47,30 +210,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
     'Lace',
     'Embroidery'
   ];
-
-  final FirestoreService _firestoreService = FirestoreService();
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadProducts();
-  }
-
-  Future<void> _loadProducts() async {
-    setState(() => _isLoading = true);
-    try {
-      final products = await _firestoreService.getProducts();
-      setState(() {
-        _products.clear();
-        _products.addAll(products);
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Error loading products: $e');
-      setState(() => _isLoading = false);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -86,12 +225,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
               .contains(searchQuery.toLowerCase());
           return matchesCategory && matchesSearch;
         }).toList();
-
-        if (_isLoading) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
-        }
 
         return Column(
           children: [
@@ -219,8 +352,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
   }
 
   // ─── Product Grid ──────────────────────────────────────────────────────
-  // Note: the Product model has no imageUrl/rating/reviewCount/price fields,
-  // so the card shows materialType, category, and color swatches instead.
 
   Widget _buildProductGrid(List<Product> products) {
     if (products.isEmpty) {
@@ -236,13 +367,19 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       padding: const EdgeInsets.all(12),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.7,
+        childAspectRatio: 0.72,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
       itemCount: products.length,
       itemBuilder: (context, index) {
         final product = products[index];
+        final coverImage = product.colorOptions.isNotEmpty
+            ? product.colorOptions.first.image
+            : null;
+        final bool outOfStock =
+            product.colorOptions.every((c) => c.stock <= 0);
+
         return GestureDetector(
           onTap: () => _showProductDetailOverlay(context, product),
           child: Container(
@@ -261,46 +398,90 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Placeholder art area (model has no image field to load).
+                // Image section
                 Expanded(
-                  flex: 3,
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                    child: Container(
-                      width: double.infinity,
-                      color: kSage.withValues(alpha: 0.12),
-                      child: const Icon(Icons.texture, size: 44, color: kSageDark),
-                    ),
+                  flex: 4,
+                  child: Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: double.infinity,
+                          child: coverImage != null
+                              ? Image.asset(
+                                  coverImage,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Container(
+                                    color: kSage.withValues(alpha: 0.12),
+                                    child: const Icon(Icons.texture, size: 36, color: kSageDark),
+                                  ),
+                                )
+                              : Container(
+                                  color: kSage.withValues(alpha: 0.12),
+                                  child: const Icon(Icons.texture, size: 36, color: kSageDark),
+                                ),
+                        ),
+                      ),
+                      if (outOfStock)
+                        Positioned(
+                          top: 6,
+                          left: 6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Text(
+                              'Out of Stock',
+                              style: TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
+                // Content section
                 Expanded(
-                  flex: 2,
+                  flex: 4,
                   child: Padding(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           product.productName,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 1),
                         Text(
                           product.materialType,
-                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                          style: const TextStyle(fontSize: 10, color: Colors.grey),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 2),
+                        Text(
+                          product.priceRange,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: kSageDark,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 3),
                         Row(
                           children: product.colorOptions
                               .take(4)
-                              .map((color) => Padding(
-                                    padding: const EdgeInsets.only(right: 4),
-                                    child: _colorDot(color),
+                              .map((option) => Padding(
+                                    padding: const EdgeInsets.only(right: 3),
+                                    child: _colorDot(option),
                                   ))
                               .toList(),
                         ),
@@ -316,15 +497,19 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
     );
   }
 
-  Widget _colorDot(String colorName) {
-    final color = _resolveColor(colorName);
-    return Container(
-      width: 14,
-      height: 14,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: Border.all(color: kBorder),
+  Widget _colorDot(ColorOption option) {
+    final color = _resolveColor(option.color);
+    final bool outOfStock = option.stock <= 0;
+    return Opacity(
+      opacity: outOfStock ? 0.35 : 1.0,
+      child: Container(
+        width: 12,
+        height: 12,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(color: kBorder, width: 0.5),
+        ),
       ),
     );
   }
