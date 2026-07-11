@@ -1,25 +1,25 @@
-// lib/screens/customer/browsing/tailor_detail_screen.dart
+// lib/screens/customer/browsing/retailer_detail_screen.dart
 import 'package:flutter/material.dart';
-import 'package:sketch2stitch/models/tailor.dart';
-import 'package:sketch2stitch/models/portfolio.dart';
+import 'package:sketch2stitch/models/retailer.dart';
+import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 
-class TailorDetailScreen extends StatefulWidget {
-  final Tailor tailor;
+class RetailerDetailScreen extends StatefulWidget {
+  final Retailer retailer;
 
-  const TailorDetailScreen({
+  const RetailerDetailScreen({
     super.key,
-    required this.tailor,
+    required this.retailer,
   });
 
   @override
-  State<TailorDetailScreen> createState() => _TailorDetailScreenState();
+  State<RetailerDetailScreen> createState() => _RetailerDetailScreenState();
 }
 
-class _TailorDetailScreenState extends State<TailorDetailScreen> {
+class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   bool _isFavorite = false;
   bool _showAllReviews = false;
-  bool _showAllPortfolio = false;
+  bool _showAllProducts = false;
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +52,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Cover Image (from database - portfolio)
+                  // Cover Image (from database - products)
                   _buildCoverImage(),
                   // Gradient overlay
                   Container(
@@ -67,7 +67,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                       ),
                     ),
                   ),
-                  // Tailor info on image
+                  // Retailer info on image
                   Positioned(
                     bottom: 20,
                     left: 20,
@@ -76,7 +76,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          widget.tailor.name,
+                          widget.retailer.shopName,
                           style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -86,10 +86,10 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            RatingStars(rating: widget.tailor.rating, size: 16),
+                            RatingStars(rating: widget.retailer.rating, size: 16),
                             const SizedBox(width: 8),
                             Text(
-                              '${widget.tailor.rating}',
+                              '${widget.retailer.rating}',
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: Colors.white70,
@@ -108,7 +108,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                widget.tailor.address,
+                                widget.retailer.address,
                                 style: const TextStyle(
                                   fontSize: 13,
                                   color: Colors.white70,
@@ -127,7 +127,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              widget.tailor.phone,
+                              widget.retailer.phone,
                               style: const TextStyle(
                                 fontSize: 13,
                                 color: Colors.white70,
@@ -167,13 +167,13 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // About Section (from database - portfolio description)
+                  // About Section (from database - products description)
                   _buildAboutSection(),
                   
                   const SizedBox(height: 24),
                   
-                  // Portfolio (from database)
-                  _buildPortfolioSection(),
+                  // Products (from database)
+                  _buildProductsSection(),
                   
                   const SizedBox(height: 24),
                   
@@ -195,8 +195,17 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
 
   Widget _buildCoverImage() {
     String imageUrl = 'assets/images/fab.jpg';
-    if (widget.tailor.portfolio != null && widget.tailor.portfolio!.isNotEmpty) {
-      imageUrl = widget.tailor.portfolio!.first.image ?? 'assets/images/fab.jpg';
+    
+    // Try to get image from first product's first color option
+    if (widget.retailer.products != null && widget.retailer.products!.isNotEmpty) {
+      final firstProduct = widget.retailer.products!.first;
+      if (firstProduct.colorOptions.isNotEmpty) {
+        // Get the first color option's image
+        final firstColor = firstProduct.colorOptions.first;
+        if (firstColor.image != null && firstColor.image!.isNotEmpty) {
+          imageUrl = firstColor.image!;
+        }
+      }
     }
     
     return Image.asset(
@@ -204,7 +213,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       fit: BoxFit.cover,
       errorBuilder: (context, error, stackTrace) => Container(
         color: Colors.grey[300],
-        child: const Icon(Icons.person, size: 80, color: Colors.grey),
+        child: const Icon(Icons.store, size: 80, color: Colors.grey),
       ),
     );
   }
@@ -212,11 +221,11 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   // ─── About Section ──────────────────────────────────────────────────────
 
   Widget _buildAboutSection() {
-    // Get description from portfolio (database)
-    String description = 'Professional tailoring services with years of experience.';
-    if (widget.tailor.portfolio != null && widget.tailor.portfolio!.isNotEmpty) {
-      final desc = widget.tailor.portfolio!.first.description;
-      if (desc != null && desc.isNotEmpty) {
+    // Get description from products (database)
+    String description = 'Quality products with excellent customer service.';
+    if (widget.retailer.products != null && widget.retailer.products!.isNotEmpty) {
+      final desc = widget.retailer.products!.first.description;
+      if (desc.isNotEmpty) {
         description = desc;
       }
     }
@@ -225,7 +234,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'About',
+          'About Shop',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -244,18 +253,16 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     );
   }
 
-  // ─── Portfolio Section ─────────────────────────────────────────────────
+  // ─── Products Section ─────────────────────────────────────────────────
 
-  Widget _buildPortfolioSection() {
-    final portfolioImages = widget.tailor.portfolio ?? [];
+  Widget _buildProductsSection() {
+    final products = widget.retailer.products ?? [];
     
-    if (portfolioImages.isEmpty) {
+    if (products.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final displayItems = _showAllPortfolio 
-        ? portfolioImages 
-        : (portfolioImages.length > 3 ? portfolioImages.take(3).toList() : portfolioImages);
+    final displayProducts = _showAllProducts ? products : (products.length > 3 ? products.take(3).toList() : products);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -264,56 +271,100 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'Portfolio',
+              'Products',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            if (portfolioImages.length > 3)
+            if (products.length > 3)
               TextButton(
                 onPressed: () {
                   setState(() {
-                    _showAllPortfolio = !_showAllPortfolio;
+                    _showAllProducts = !_showAllProducts;
                   });
                 },
-                child: Text(_showAllPortfolio ? 'Show Less' : 'See All'),
+                child: Text(_showAllProducts ? 'Show Less' : 'See All'),
               ),
           ],
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: _showAllPortfolio ? 260 : 120,
+          height: _showAllProducts ? 350 : 160,
           child: GridView.builder(
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: _showAllPortfolio ? 3 : 1,
-              childAspectRatio: 1,
+              crossAxisCount: _showAllProducts ? 2 : 1,
+              childAspectRatio: _showAllProducts ? 0.8 : 1.2,
               crossAxisSpacing: 8,
               mainAxisSpacing: 8,
             ),
-            scrollDirection: _showAllPortfolio ? Axis.vertical : Axis.horizontal,
-            itemCount: displayItems.length,
-            physics: _showAllPortfolio ? const NeverScrollableScrollPhysics() : const BouncingScrollPhysics(),
+            scrollDirection: _showAllProducts ? Axis.vertical : Axis.horizontal,
+            itemCount: displayProducts.length,
+            physics: _showAllProducts ? const NeverScrollableScrollPhysics() : const BouncingScrollPhysics(),
             itemBuilder: (context, index) {
+              final product = displayProducts[index];
+              final String imageUrl = product.colorOptions.isNotEmpty && 
+                  product.colorOptions.first.image != null
+                  ? product.colorOptions.first.image!
+                  : 'assets/images/fab.jpg';
+              
               return GestureDetector(
                 onTap: () {
-                  _navigateToPortfolioDetail(displayItems[index]);
+                  _navigateToProductDetail(product);
                 },
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.grey[200]!),
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.asset(
-                      displayItems[index].image ?? 'assets/images/fab.jpg',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: Colors.grey[200],
-                        child: const Icon(Icons.image, color: Colors.grey),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Product Image
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(12),
+                        ),
+                        child: Image.asset(
+                          imageUrl,
+                          height: _showAllProducts ? 100 : 100,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            height: _showAllProducts ? 100 : 100,
+                            color: Colors.grey[200],
+                            child: const Icon(Icons.image, color: Colors.grey),
+                          ),
+                        ),
                       ),
-                    ),
+                      // Product Info
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              product.productName,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              product.priceRange,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF2C5C44),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               );
@@ -328,24 +379,24 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
 
   Widget _buildReviewsSection() {
     // Sample reviews - in production, these would come from the Reviews collection
-    // where targetId == tailor.id and targetRole == 'tailor'
+    // where targetId == retailer.id and targetRole == 'retailer'
     final List<Map<String, dynamic>> sampleReviews = [
       {
-        'name': 'Rahul Ahmed',
+        'name': 'Priya Sharma',
         'rating': 5.0,
-        'comment': 'Excellent work! The suit fit perfectly and the quality was outstanding.',
-        'time': '2 days ago',
+        'comment': 'Great quality fabrics! The products matched the description perfectly.',
+        'time': '3 days ago',
       },
       {
-        'name': 'Sadia Rahman',
+        'name': 'Amit Kumar',
         'rating': 4.5,
-        'comment': 'Very professional and timely delivery. Would recommend to friends.',
+        'comment': 'Quick delivery and excellent packaging. Will order again.',
         'time': '1 week ago',
       },
       {
-        'name': 'Kamal Hossain',
+        'name': 'Sneha Patel',
         'rating': 4.0,
-        'comment': 'Good quality work but delivery was a bit delayed.',
+        'comment': 'Good products but shipping was a bit delayed.',
         'time': '2 weeks ago',
       },
     ];
@@ -499,7 +550,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
           Expanded(
             child: ElevatedButton(
               onPressed: () {
-                _navigateToBooking();
+                _navigateToAllProducts();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2C5C44),
@@ -509,7 +560,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                 ),
               ),
               child: const Text(
-                'Book Now',
+                'Browse Products',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
@@ -525,10 +576,19 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
 
   // ─── Navigation Methods ──────────────────────────────────────────────
 
-  void _navigateToPortfolioDetail(Portfolio portfolio) {
+  void _navigateToAllProducts() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('View portfolio item details'),
+        content: Text('View all products from ${widget.retailer.shopName}'),
+        backgroundColor: const Color(0xFF2C5C44),
+      ),
+    );
+  }
+
+  void _navigateToProductDetail(Product product) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('View details of ${product.productName}'),
         backgroundColor: const Color(0xFF2C5C44),
       ),
     );
@@ -537,16 +597,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   void _startConversation() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Start conversation with ${widget.tailor.name}'),
-        backgroundColor: const Color(0xFF2C5C44),
-      ),
-    );
-  }
-
-  void _navigateToBooking() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Book appointment with ${widget.tailor.name}'),
+        content: Text('Start conversation with ${widget.retailer.shopName}'),
         backgroundColor: const Color(0xFF2C5C44),
       ),
     );

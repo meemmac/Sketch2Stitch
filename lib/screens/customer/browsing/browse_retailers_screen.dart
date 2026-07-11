@@ -3,6 +3,7 @@ import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
+import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
 
 /// Hardcoded sample retailers.
 final List<Retailer> kHardcodedRetailers = [
@@ -14,6 +15,7 @@ final List<Retailer> kHardcodedRetailers = [
     address: '12 New Market Road, Dhanmondi, Dhaka',
     rating: 4.8,
     profilePicture: 'assets/images/fab.jpg',
+    products: [],
   ),
   Retailer(
     id: 'r2',
@@ -23,6 +25,7 @@ final List<Retailer> kHardcodedRetailers = [
     address: '45 Islampur Road, Islampur, Dhaka',
     rating: 4.6,
     profilePicture: 'assets/images/textile.jpg',
+    products: [],
   ),
   Retailer(
     id: 'r3',
@@ -32,6 +35,7 @@ final List<Retailer> kHardcodedRetailers = [
     address: '7 Gausia Market, Elephant Road, Dhaka',
     rating: 4.9,
     profilePicture: 'assets/images/silk.jpg',
+    products: [],
   ),
   Retailer(
     id: 'r4',
@@ -41,6 +45,7 @@ final List<Retailer> kHardcodedRetailers = [
     address: '89 Karwan Bazar, Tejgaon, Dhaka',
     rating: 4.3,
     profilePicture: 'assets/images/fab2.jpg',
+    products: [],
   ),
   Retailer(
     id: 'r5',
@@ -50,6 +55,7 @@ final List<Retailer> kHardcodedRetailers = [
     address: '3 Mirpur Road, Mohammadpur, Dhaka',
     rating: 4.7,
     profilePicture: 'assets/images/lace.jpg',
+    products: [],
   ),
 ];
 
@@ -245,6 +251,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
     return GestureDetector(
       onTap: () {
         // Navigate to retailer detail
+        _navigateToRetailerDetail(retailer);
       },
       child: Container(
         decoration: BoxDecoration(
@@ -399,6 +406,19 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Navigation Method ──────────────────────────────────────────────────
+
+  void _navigateToRetailerDetail(Retailer retailer) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RetailerDetailScreen(
+          retailer: retailer,
         ),
       ),
     );

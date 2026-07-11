@@ -137,6 +137,13 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
           return matchesSearch && matchesRating && matchesLocation;
         }).toList();
 
+        // Sort by rating based on filterData.sortBy
+        if (widget.filterData.sortBy == 'ratingHighToLow') {
+          filteredTailors.sort((a, b) => b.rating.compareTo(a.rating));
+        } else if (widget.filterData.sortBy == 'ratingLowToHigh') {
+          filteredTailors.sort((a, b) => a.rating.compareTo(b.rating));
+        }
+
         return Column(
           children: [
             _buildHeroSection(),

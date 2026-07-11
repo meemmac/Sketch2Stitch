@@ -222,6 +222,13 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                  matchesColor && matchesMaterial;
         }).toList();
 
+        // Sort by price based on filterData.sortBy
+        if (widget.filterData.sortBy == 'lowToHigh') {
+          filteredProducts.sort((a, b) => a.minPrice.compareTo(b.minPrice));
+        } else if (widget.filterData.sortBy == 'highToLow') {
+          filteredProducts.sort((a, b) => b.minPrice.compareTo(a.minPrice));
+        }
+
         return Column(
           children: [
             _buildHeroSection(),

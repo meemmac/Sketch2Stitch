@@ -88,14 +88,17 @@ class _BrowseShellState extends State<BrowseShell> {
   double _fabricsMaxPrice = 5000;
   String _fabricsSelectedColor = 'All';
   String _fabricsSelectedMaterial = 'All';
+  String _fabricsSortBy = 'default'; // 'default', 'lowToHigh', 'highToLow'
   
   // Tailors Filters (Rating, Location)
   double _tailorsMinRating = 0;
   String _tailorsSelectedLocation = 'All';
+  String _tailorsSortBy = 'default'; // 'default', 'ratingHighToLow', 'ratingLowToHigh'
   
   // Retailers Filters (Rating, Location)
   double _retailersMinRating = 0;
   String _retailersSelectedLocation = 'All';
+  String _retailersSortBy = 'default'; // 'default', 'ratingHighToLow', 'ratingLowToHigh'
 
   bool _showFilterOverlay = false;
   bool _showSearchOverlay = false;
@@ -157,14 +160,17 @@ class _BrowseShellState extends State<BrowseShell> {
       _fabricsMaxPrice = 5000;
       _fabricsSelectedColor = 'All';
       _fabricsSelectedMaterial = 'All';
+      _fabricsSortBy = 'default';
       
       // Reset Tailors filters
       _tailorsMinRating = 0;
       _tailorsSelectedLocation = 'All';
+      _tailorsSortBy = 'default';
       
       // Reset Retailers filters
       _retailersMinRating = 0;
       _retailersSelectedLocation = 'All';
+      _retailersSortBy = 'default';
       
       _showFilterOverlay = false;
     });
@@ -179,15 +185,18 @@ class _BrowseShellState extends State<BrowseShell> {
       return _fabricsMinPrice > 0 || 
              _fabricsMaxPrice < 5000 || 
              _fabricsSelectedColor != 'All' || 
-             _fabricsSelectedMaterial != 'All';
+             _fabricsSelectedMaterial != 'All' ||
+             _fabricsSortBy != 'default';
     } else if (currentIndex == 1) {
       // Tailors tab - Rating + Location
       return _tailorsMinRating > 0 || 
-             _tailorsSelectedLocation != 'All';
+             _tailorsSelectedLocation != 'All' ||
+             _tailorsSortBy != 'default';
     } else {
       // Retailers tab - Rating + Location
       return _retailersMinRating > 0 || 
-             _retailersSelectedLocation != 'All';
+             _retailersSelectedLocation != 'All' ||
+             _retailersSortBy != 'default';
     }
   }
 
@@ -201,16 +210,19 @@ class _BrowseShellState extends State<BrowseShell> {
       maxPrice: _fabricsMaxPrice,
       color: _fabricsSelectedColor,
       materialType: _fabricsSelectedMaterial,
+      sortBy: _fabricsSortBy,
     );
 
     final tailorsFilterData = TailorsFilterData(
       minRating: _tailorsMinRating,
       location: _tailorsSelectedLocation,
+      sortBy: _tailorsSortBy,
     );
 
     final retailersFilterData = RetailersFilterData(
       minRating: _retailersMinRating,
       location: _retailersSelectedLocation,
+      sortBy: _retailersSortBy,
     );
 
     return Scaffold(
@@ -565,6 +577,32 @@ class _BrowseShellState extends State<BrowseShell> {
                 });
               },
             ),
+            const SizedBox(height: 6),
+
+            // Sort by Price (small toggle buttons)
+            const Text(
+              'Sort by Price',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                _buildSortChip(
+                  label: 'Low to High',
+                  icon: Icons.arrow_upward,
+                  value: 'lowToHigh',
+                ),
+                const SizedBox(width: 8),
+                _buildSortChip(
+                  label: 'High to Low',
+                  icon: Icons.arrow_downward,
+                  value: 'highToLow',
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
 
             // Color Filter
@@ -700,6 +738,145 @@ class _BrowseShellState extends State<BrowseShell> {
     );
   }
 
+  // Small pill-style sort toggle button used under the Price Range slider.
+  // Tapping the already-selected chip clears the sort back to 'default'.
+  Widget _buildSortChip({
+    required String label,
+    required IconData icon,
+    required String value,
+  }) {
+    final isSelected = _fabricsSortBy == value;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _fabricsSortBy = isSelected ? 'default' : value;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? kSage : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? kSage : Colors.grey.shade300,
+            width: 0.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: isSelected ? Colors.white : Colors.grey.shade700,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: isSelected ? Colors.white : Colors.grey.shade700,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Small pill-style rating sort chip for the Tailors filter panel.
+  Widget _buildTailorsSortChip({
+    required String label,
+    required IconData icon,
+    required String value,
+  }) {
+    final isSelected = _tailorsSortBy == value;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _tailorsSortBy = isSelected ? 'default' : value;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? kSage : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? kSage : Colors.grey.shade300,
+            width: 0.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: isSelected ? Colors.white : Colors.grey.shade700,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: isSelected ? Colors.white : Colors.grey.shade700,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Small pill-style rating sort chip for the Retailers filter panel.
+  Widget _buildRetailersSortChip({
+    required String label,
+    required IconData icon,
+    required String value,
+  }) {
+    final isSelected = _retailersSortBy == value;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _retailersSortBy = isSelected ? 'default' : value;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? kSage : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? kSage : Colors.grey.shade300,
+            width: 0.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: isSelected ? Colors.white : Colors.grey.shade700,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: isSelected ? Colors.white : Colors.grey.shade700,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ─── Tailors Filter Panel (Rating + Location) ──────────────────────
   
   Widget _buildTailorsFilterPanel() {
@@ -778,6 +955,32 @@ class _BrowseShellState extends State<BrowseShell> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+
+            // Sort by Rating (small toggle buttons)
+            const Text(
+              'Sort by Rating',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                _buildTailorsSortChip(
+                  label: 'High to Low',
+                  icon: Icons.arrow_downward,
+                  value: 'ratingHighToLow',
+                ),
+                const SizedBox(width: 8),
+                _buildTailorsSortChip(
+                  label: 'Low to High',
+                  icon: Icons.arrow_upward,
+                  value: 'ratingLowToHigh',
                 ),
               ],
             ),
@@ -934,6 +1137,32 @@ class _BrowseShellState extends State<BrowseShell> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+
+            // Sort by Rating (small toggle buttons)
+            const Text(
+              'Sort by Rating',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                _buildRetailersSortChip(
+                  label: 'High to Low',
+                  icon: Icons.arrow_downward,
+                  value: 'ratingHighToLow',
+                ),
+                const SizedBox(width: 8),
+                _buildRetailersSortChip(
+                  label: 'Low to High',
+                  icon: Icons.arrow_upward,
+                  value: 'ratingLowToHigh',
                 ),
               ],
             ),
