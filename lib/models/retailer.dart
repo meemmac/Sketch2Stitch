@@ -8,11 +8,11 @@ class Retailer {
   final String phone;
   final String address;
   final double rating;
+  final String? profilePicture;  // Added profilePicture field
   
   // Relationships
   List<Product>? products;
   List<SubOrder>? suborders;
-
 
   Retailer({
     required this.id,
@@ -21,6 +21,7 @@ class Retailer {
     required this.phone,
     required this.address,
     required this.rating,
+    this.profilePicture,  // Added to constructor
     this.products = const [],
     this.suborders = const [],
   });
@@ -40,6 +41,7 @@ class Retailer {
     String? phone,
     String? address,
     double? rating,
+    String? profilePicture,  // Added to copyWith
     String? logoUrl,
     String? description,
     List<Product>? products,
@@ -52,6 +54,7 @@ class Retailer {
       phone: phone ?? this.phone,
       address: address ?? this.address,
       rating: rating ?? this.rating,
+      profilePicture: profilePicture ?? this.profilePicture,  // Added to copyWith
       products: products ?? this.products,
       suborders: suborders ?? this.suborders,
     );
@@ -64,6 +67,7 @@ class Retailer {
     'phone': phone,
     'address': address,
     'rating': rating,
+    'profilePicture': profilePicture,  // Added to JSON
   };
 
   factory Retailer.fromJson(Map<String, dynamic> json) {
@@ -74,6 +78,7 @@ class Retailer {
       phone: json['phone'] ?? '',
       address: json['address'] ?? '',
       rating: (json['rating'] ?? 0).toDouble(),
+      profilePicture: json['profilePicture'],  // Added from JSON
     );
   }
 }

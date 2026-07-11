@@ -9,6 +9,7 @@ class Tailor {
   final String phone;
   final String address;
   final double rating;
+  final String? profilePicture;  // Added profilePicture field
   
   // Relationships
   List<Portfolio>? portfolio;
@@ -22,6 +23,7 @@ class Tailor {
     required this.phone,
     required this.address,
     required this.rating,
+    this.profilePicture,  // Added to constructor
     this.portfolio = const [],
     this.notifications = const [],
     this.jobs = const [],
@@ -42,6 +44,7 @@ class Tailor {
     String? phone,
     String? address,
     double? rating,
+    String? profilePicture,  // Added to copyWith
     List<Portfolio>? portfolio,
     List<Notifications>? notifications,
     List<TailorJob>? jobs,
@@ -53,6 +56,7 @@ class Tailor {
       phone: phone ?? this.phone,
       address: address ?? this.address,
       rating: rating ?? this.rating,
+      profilePicture: profilePicture ?? this.profilePicture,  // Added to copyWith
       portfolio: portfolio ?? this.portfolio,
       notifications: notifications ?? this.notifications,
       jobs: jobs ?? this.jobs,
@@ -66,6 +70,7 @@ class Tailor {
     'phone': phone,
     'address': address,
     'rating': rating,
+    'profilePicture': profilePicture,  // Added to JSON
   };
 
   factory Tailor.fromJson(Map<String, dynamic> json) {
@@ -76,6 +81,7 @@ class Tailor {
       phone: json['phone'] ?? '',
       address: json['address'] ?? '',
       rating: (json['rating'] ?? 0).toDouble(),
+      profilePicture: json['profilePicture'],  // Added from JSON
     );
   }
 }
