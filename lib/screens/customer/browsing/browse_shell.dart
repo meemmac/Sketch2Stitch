@@ -277,29 +277,29 @@ class _BrowseShellState extends State<BrowseShell> {
   Widget _buildHeader(int currentIndex) {
     return Container(
       padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 6,
-        bottom: 6,
-        left: 12,
-        right: 12,
+        top: MediaQuery.of(context).padding.top + 8,
+        bottom: 8,
+        left: 16,
+        right: 16,
       ),
       child: Row(
         children: [
           Builder(
             builder: (ctx) => IconButton(
-              icon: const Icon(Icons.menu, color: kSage, size: 24),
+              icon: const Icon(Icons.menu, color: kSage, size: 28),
               onPressed: () => Scaffold.of(ctx).openDrawer(),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           Image.asset(
             'assets/images/transparent_logo.png',
-            height: 32,
+            height: 40,
             errorBuilder: (context, error, stackTrace) {
               return Container(
-                height: 32,
-                width: 32,
+                height: 40,
+                width: 40,
                 decoration: const BoxDecoration(
                   color: kSage,
                   shape: BoxShape.circle,
@@ -310,35 +310,35 @@ class _BrowseShellState extends State<BrowseShell> {
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 10,
+                      fontSize: 12,
                     ),
                   ),
                 ),
               );
             },
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Container(
-              height: 34,
+              height: 42,
               decoration: BoxDecoration(
                 color: kSagePale,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: kBorder, width: 0.5),
               ),
               child: TextField(
                 onChanged: (value) => _searchNotifier.value = value,
                 decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search, size: 16),
+                  prefixIcon: const Icon(Icons.search, size: 20),
                   hintText: _searchHints[currentIndex],
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 6),
-                  hintStyle: const TextStyle(fontSize: 13),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                  hintStyle: const TextStyle(fontSize: 15),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Stack(
             children: [
               IconButton(
@@ -346,7 +346,7 @@ class _BrowseShellState extends State<BrowseShell> {
                 icon: Icon(
                   Icons.filter_list,
                   color: _showFilterOverlay || _hasActiveFilters ? kSage : Colors.grey,
-                  size: 20,
+                  size: 24,
                 ),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -356,8 +356,8 @@ class _BrowseShellState extends State<BrowseShell> {
                   top: 2,
                   right: 2,
                   child: Container(
-                    width: 6,
-                    height: 6,
+                    width: 8,
+                    height: 8,
                     decoration: const BoxDecoration(
                       color: Colors.red,
                       shape: BoxShape.circle,
@@ -366,13 +366,13 @@ class _BrowseShellState extends State<BrowseShell> {
                 ),
             ],
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 6),
           IconButton(
             onPressed: () {},
             icon: const Icon(
               Icons.shopping_cart_outlined,
               color: kSage,
-              size: 20,
+              size: 24,
             ),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
@@ -955,15 +955,15 @@ class _BrowseShellState extends State<BrowseShell> {
 
   Widget _buildNavigationRow() {
     return SizedBox(
-      height: 40,
+      height: 48,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: List.generate(_tabLabels.length, (index) {
             final t = (1 - (_page - index).abs()).clamp(0.0, 1.0);
-            final fontSize = lerpDouble(12, 15, t)!;
+            final fontSize = lerpDouble(14, 17, t)!;
             final color = Color.lerp(
               kSage.withValues(alpha: 0.5),
               kSage,
@@ -972,7 +972,7 @@ class _BrowseShellState extends State<BrowseShell> {
             final weight = t > 0.5 ? FontWeight.bold : FontWeight.w600;
 
             return Padding(
-              padding: const EdgeInsets.only(right: 14),
+              padding: const EdgeInsets.only(right: 18),
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => _goToPage(index),
@@ -988,11 +988,11 @@ class _BrowseShellState extends State<BrowseShell> {
                       ),
                       child: Text(_tabLabels[index]),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 4),
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 120),
-                      height: 2,
-                      width: lerpDouble(0, 20, t),
+                      height: 3,
+                      width: lerpDouble(0, 24, t),
                       decoration: BoxDecoration(
                         color: kSage.withValues(alpha: t),
                         borderRadius: BorderRadius.circular(2),

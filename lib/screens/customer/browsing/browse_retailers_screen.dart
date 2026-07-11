@@ -13,6 +13,7 @@ final List<Retailer> kHardcodedRetailers = [
     phone: '01711000001',
     address: '12 New Market Road, Dhanmondi, Dhaka',
     rating: 4.8,
+    profilePicture: 'assets/images/fab.jpg',
   ),
   Retailer(
     id: 'r2',
@@ -21,6 +22,7 @@ final List<Retailer> kHardcodedRetailers = [
     phone: '01711000002',
     address: '45 Islampur Road, Islampur, Dhaka',
     rating: 4.6,
+    profilePicture: 'assets/images/textile.jpg',
   ),
   Retailer(
     id: 'r3',
@@ -29,6 +31,7 @@ final List<Retailer> kHardcodedRetailers = [
     phone: '01711000003',
     address: '7 Gausia Market, Elephant Road, Dhaka',
     rating: 4.9,
+    profilePicture: 'assets/images/silk.jpg',
   ),
   Retailer(
     id: 'r4',
@@ -37,6 +40,7 @@ final List<Retailer> kHardcodedRetailers = [
     phone: '01711000004',
     address: '89 Karwan Bazar, Tejgaon, Dhaka',
     rating: 4.3,
+    profilePicture: 'assets/images/fab2.jpg',
   ),
   Retailer(
     id: 'r5',
@@ -45,6 +49,7 @@ final List<Retailer> kHardcodedRetailers = [
     phone: '01711000005',
     address: '3 Mirpur Road, Mohammadpur, Dhaka',
     rating: 4.7,
+    profilePicture: 'assets/images/lace.jpg',
   ),
 ];
 
@@ -85,7 +90,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
           
           // Location filter from shell
           final matchesLocation = widget.filterData.location == 'All' ||
-              r.generalArea.toLowerCase().contains(widget.filterData.location.toLowerCase());
+              r.address.toLowerCase().contains(widget.filterData.location.toLowerCase());
           
           return matchesSearch && matchesRating && matchesLocation;
         }).toList();
@@ -234,8 +239,8 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
   Widget _buildRetailerCard(Retailer retailer, bool isSmall) {
     final bool isTopRated = retailer.rating >= 4.8;
 
-    // Use the first letter of shop name as fallback image
-    final String initial = retailer.shopName.isNotEmpty ? retailer.shopName[0] : 'R';
+    // Get image from profilePicture or use fallback
+    String imageUrl = retailer.profilePicture ?? 'assets/images/fab.jpg';
 
     return GestureDetector(
       onTap: () {
@@ -265,18 +270,15 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                 children: [
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-                    child: Container(
+                    child: SizedBox(
                       width: double.infinity,
                       height: double.infinity,
-                      color: kSage.withValues(alpha: 0.12),
-                      child: Center(
-                        child: Text(
-                          initial,
-                          style: TextStyle(
-                            fontSize: isSmall ? 32 : 40,
-                            fontWeight: FontWeight.bold,
-                            color: kSageDark,
-                          ),
+                      child: Image.asset(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: kSage.withValues(alpha: 0.12),
+                          child: Icon(Icons.store, size: isSmall ? 36 : 40, color: kSageDark),
                         ),
                       ),
                     ),

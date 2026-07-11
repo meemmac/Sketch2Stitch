@@ -15,6 +15,7 @@ final List<Tailor> kHardcodedTailors = [
     phone: '01811000001',
     address: '5 Banani Road, Banani, Dhaka',
     rating: 4.9,
+    profilePicture: 'assets/images/fab.jpg',
     portfolio: [
       Portfolio(
         id: 'pf1',
@@ -31,6 +32,7 @@ final List<Tailor> kHardcodedTailors = [
     phone: '01811000002',
     address: '22 Gulshan Avenue, Gulshan, Dhaka',
     rating: 4.7,
+    profilePicture: 'assets/images/silk.jpg',
     portfolio: [
       Portfolio(
         id: 'pf2',
@@ -45,8 +47,9 @@ final List<Tailor> kHardcodedTailors = [
     name: 'Mohammed Rafiq',
     email: 'rafiq.tailors@example.com',
     phone: '01811000003',
-    address: '10 Uttara Sector 7, Uttara, Dhaka',
+    address: ' Kotwali, Chittagong ',
     rating: 4.4,
+    profilePicture: 'assets/images/textile.jpg',
     portfolio: [
       Portfolio(
         id: 'pf3',
@@ -63,6 +66,7 @@ final List<Tailor> kHardcodedTailors = [
     phone: '01811000004',
     address: '3 Dhanmondi 27, Dhanmondi, Dhaka',
     rating: 4.8,
+    profilePicture: 'assets/images/lace.jpg',
     portfolio: [
       Portfolio(
         id: 'pf4',
@@ -79,6 +83,7 @@ final List<Tailor> kHardcodedTailors = [
     phone: '01811000005',
     address: '15 Mirpur Road, Mirpur, Dhaka',
     rating: 4.6,
+    profilePicture: 'assets/images/fab2.jpg',
     portfolio: [
       Portfolio(
         id: 'pf5',
@@ -127,7 +132,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
           
           // Location filter from shell
           final matchesLocation = widget.filterData.location == 'All' ||
-              t.generalArea.toLowerCase().contains(widget.filterData.location.toLowerCase());
+              t.address.toLowerCase().contains(widget.filterData.location.toLowerCase());
           
           return matchesSearch && matchesRating && matchesLocation;
         }).toList();
@@ -289,11 +294,8 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
       }
     }
 
-    // Get image from portfolio or use fallback
-    String imageUrl = 'assets/images/fab.jpg';
-    if (tailor.portfolio != null && tailor.portfolio!.isNotEmpty) {
-      imageUrl = tailor.portfolio!.first.image ?? 'assets/images/fab.jpg';
-    }
+    // Get image from profilePicture or use fallback
+    String imageUrl = tailor.profilePicture ?? 'assets/images/fab.jpg';
 
     return GestureDetector(
       onTap: () {
