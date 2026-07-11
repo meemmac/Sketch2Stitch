@@ -272,7 +272,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
           const SizedBox(height: 10),
           Row(
             children: [
-              _buildHeroChip(Icons.local_shipping, 'Free Delivery', isSmallScreen),
+              _buildHeroChip(Icons.local_shipping, 'Delivery Available', isSmallScreen),
               const SizedBox(width: 8),
               _buildHeroChip(Icons.verified, 'Quality Assured', isSmallScreen),
             ],
@@ -431,7 +431,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                           child: Text(
                             product.category,
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 11,
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 0.3,
@@ -460,7 +460,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                             child: Text(
                               'Out of Stock',
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: 11,
                                 color: Colors.white,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -488,7 +488,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                         Text(
                           product.productName,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                             height: 1.2,
                           ),
@@ -499,7 +499,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                         Text(
                           product.priceRange,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
                             color: kSageDark,
                           ),

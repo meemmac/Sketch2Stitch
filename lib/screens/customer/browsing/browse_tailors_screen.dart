@@ -354,7 +354,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                           vertical: isSmall ? 4 : 5,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.orange,
+                          color: kSage,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: Colors.white.withValues(alpha: 0.2),
@@ -364,7 +364,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                         child: Text(
                           '⭐ Top Rated',
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 11,
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
                           ),
@@ -397,7 +397,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                             tailor.rating.toStringAsFixed(1),
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 13,
+                              fontSize: 11,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -425,19 +425,9 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                     Text(
                       tailor.name,
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                         height: 1.2,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    SizedBox(height: isSmall ? 4 : 6),
-                    Text(
-                      specialty,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[600],
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -455,7 +445,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                           child: Text(
                             tailor.generalArea,
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 11,
                               color: Colors.grey[600],
                             ),
                             maxLines: 1,

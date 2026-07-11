@@ -98,6 +98,7 @@ class _BrowseShellState extends State<BrowseShell> {
   String _retailersSelectedLocation = 'All';
 
   bool _showFilterOverlay = false;
+  bool _showSearchOverlay = false;
 
   @override
   void initState() {
@@ -133,6 +134,12 @@ class _BrowseShellState extends State<BrowseShell> {
   void _toggleFilterOverlay() {
     setState(() {
       _showFilterOverlay = !_showFilterOverlay;
+    });
+  }
+
+  void _toggleSearchOverlay() {
+    setState(() {
+      _showSearchOverlay = !_showSearchOverlay;
     });
   }
 
@@ -267,6 +274,36 @@ class _BrowseShellState extends State<BrowseShell> {
                 ),
               ),
             ),
+          
+          // Search Overlay
+          if (_showSearchOverlay)
+            GestureDetector(
+              onTap: _toggleSearchOverlay,
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.3),
+                child: GestureDetector(
+                  onTap: () {},
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.15),
+                            blurRadius: 20,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: _buildSearchPanel(currentIndex),
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -292,7 +329,7 @@ class _BrowseShellState extends State<BrowseShell> {
               constraints: const BoxConstraints(),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           Image.asset(
             'assets/images/transparent_logo.png',
             height: 40,
@@ -317,26 +354,16 @@ class _BrowseShellState extends State<BrowseShell> {
               );
             },
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Container(
-              height: 42,
-              decoration: BoxDecoration(
-                color: kSagePale,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kBorder, width: 0.5),
-              ),
-              child: TextField(
-                onChanged: (value) => _searchNotifier.value = value,
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  hintText: _searchHints[currentIndex],
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                  hintStyle: const TextStyle(fontSize: 15),
-                ),
-              ),
+          const Spacer(),
+          IconButton(
+            onPressed: _toggleSearchOverlay,
+            icon: Icon(
+              Icons.search,
+              color: _showSearchOverlay ? kSage : kSageDark,
+              size: 24,
             ),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
           const SizedBox(width: 8),
           Stack(
@@ -345,7 +372,7 @@ class _BrowseShellState extends State<BrowseShell> {
                 onPressed: _toggleFilterOverlay,
                 icon: Icon(
                   Icons.filter_list,
-                  color: _showFilterOverlay || _hasActiveFilters ? kSage : Colors.grey,
+                  color: _showFilterOverlay || _hasActiveFilters ? kSage : Colors.black87,
                   size: 24,
                 ),
                 padding: EdgeInsets.zero,
@@ -366,17 +393,18 @@ class _BrowseShellState extends State<BrowseShell> {
                 ),
             ],
           ),
-          const SizedBox(width: 6),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(
-              Icons.shopping_cart_outlined,
-              color: kSage,
-              size: 24,
+          const SizedBox(width: 8),
+          if (currentIndex == 0)
+            IconButton(
+              onPressed: () {},
+              icon: const Icon(
+                Icons.shopping_cart_outlined,
+                color: kSage,
+                size: 24,
+              ),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
             ),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
         ],
       ),
     );
@@ -392,6 +420,68 @@ class _BrowseShellState extends State<BrowseShell> {
     } else {
       return _buildRetailersFilterPanel();
     }
+  }
+
+  // ─── Search Panel ────────────────────────────────────────────────────────
+  
+  Widget _buildSearchPanel(int currentIndex) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Search',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              TextButton(
+                onPressed: _toggleSearchOverlay,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text(
+                  'Close',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: kSage,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: kSagePale,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kBorder, width: 0.5),
+            ),
+            child: TextField(
+              onChanged: (value) => _searchNotifier.value = value,
+              autofocus: true,
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search, size: 20),
+                hintText: _searchHints[currentIndex],
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                hintStyle: const TextStyle(fontSize: 15, color: Colors.grey),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ─── Fabrics Filter Panel (NO RATING) ─────────────────────────────
