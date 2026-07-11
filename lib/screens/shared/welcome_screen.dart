@@ -6,6 +6,8 @@ import 'register_screen.dart';
 import 'about_us_screen.dart';
 import 'firebase_test_screen.dart';
 import '../customer/virtual_trial_screen.dart';
+import '../customer/browsing/browse_shell.dart'; // Changed from browse_fabrics_screen
+import '../test_cloudinary_screen.dart';
 
 void main() {
   runApp(const Sketch2StitchApp());
@@ -74,7 +76,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F9F1), // Ultra-premium soft green
+      backgroundColor: const Color(0xFFF4F9F1),
       body: Stack(
         children: [
           // 🌊 Floating fabric-like particles in background
@@ -94,17 +96,55 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 🏷 Top Left Logo
+                  // 🏷 Top Left Logo & Top Right Buttons
                   Padding(
-                    padding: const EdgeInsets.only(left: 20, top: 20),
-                    child: Image.asset(
-                      'assets/images/transparent_logo.png',
-                      height: 55,
-                      fit: BoxFit.contain,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Logo
+                        Image.asset(
+                          'assets/images/transparent_logo.png',
+                          height: 55,
+                          fit: BoxFit.contain,
+                        ),
+                        // Top Right Buttons
+                        Row(
+                          children: [
+                            // Browse Fabrics Button - Using BrowseShell directly
+                            _buildTopRightButton(
+                              icon: Icons.shopping_bag_outlined,
+                              tooltip: 'Browse Fabrics',
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const BrowseShell(initialIndex: 0), // Use BrowseShell directly
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(width: 8),
+                            // Cloudinary Test Button
+                            _buildTopRightButton(
+                              icon: Icons.cloud_upload,
+                              tooltip: 'Test Cloudinary Upload',
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const TestCloudinaryScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 10),
 
                   // ✍️ Main Tagline Section
                   Padding(
@@ -127,7 +167,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                           "Design Your Dress, Buy Materials, and Get It Stitched in One Place",
                           style: TextStyle(
                             fontSize: 18,
-                            color: Colors.green.shade800.withOpacity(0.8),
+                            color: Colors.green.shade800.withValues(alpha: 0.8),
                             fontWeight: FontWeight.w500,
                             height: 1.4,
                           ),
@@ -210,7 +250,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                                   builder: (context) => const RegisterScreen(),
                                 ),
                               );
-
                             },
                           ),
                         ),
@@ -229,36 +268,70 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
             ),
           ),
           
-          // Subtle Debug/Test Access
+          // 🔧 Debug/Test Access (Now moved to bottom-left corner)
           Positioned(
-            right: 10,
-            top: 10,
+            bottom: 10,
+            left: 10,
             child: Opacity(
               opacity: 0.3,
-              child: IconButton(
-                icon: const Icon(Icons.settings_input_component, size: 18),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const FirebaseTestScreen()),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            right: 50,
-            top: 10,
-            child: Opacity(
-              opacity: 0.3,
-              child: IconButton(
-                icon: const Icon(Icons.psychology, size: 18),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const VirtualTrialScreen()),
-                ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.settings_input_component, size: 16),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const FirebaseTestScreen()),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.psychology, size: 16),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const VirtualTrialScreen()),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ─── Top Right Button ─────────────────────────────────────────────────
+
+  Widget _buildTopRightButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          customBorder: const CircleBorder(),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            child: Icon(
+              icon,
+              size: 22,
+              color: Colors.green.shade800,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -300,7 +373,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 10,
                       offset: const Offset(0, 5),
                     )
@@ -317,7 +390,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
             child: Container(
               height: 100,
               decoration: BoxDecoration(
-                color: const Color(0xFFF4F9F1), // Background color
+                color: const Color(0xFFF4F9F1),
                 borderRadius: BorderRadius.vertical(
                   bottom: Radius.elliptical(MediaQuery.of(context).size.width + 100, 80),
                 ),
@@ -332,7 +405,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
             child: Container(
               height: 100,
               decoration: BoxDecoration(
-                color: const Color(0xFFF4F9F1), // Background color
+                color: const Color(0xFFF4F9F1),
                 borderRadius: BorderRadius.vertical(
                   top: Radius.elliptical(MediaQuery.of(context).size.width + 100, 80),
                 ),
@@ -348,7 +421,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
     return AnimatedBuilder(
       animation: _floatController,
       builder: (context, child) {
-        // Parallax / Gentle Drifting Effect
         double verticalOffset = math.sin(_floatController.value * 2 * math.pi + (index * 1.5)) * 12;
         return Transform.translate(
           offset: Offset(0, verticalOffset),
@@ -362,15 +434,15 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                 child: Container(
                   padding: const EdgeInsets.all(28),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.45),
+                    color: Colors.white.withValues(alpha: 0.45),
                     borderRadius: BorderRadius.circular(30),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.6),
+                      color: Colors.white.withValues(alpha: 0.6),
                       width: 1.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.green.shade900.withOpacity(0.04),
+                        color: Colors.green.shade900.withValues(alpha: 0.04),
                         blurRadius: 25,
                         offset: const Offset(0, 10),
                       ),
@@ -382,7 +454,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: Colors.green.shade50.withOpacity(0.8),
+                          color: Colors.green.shade50.withValues(alpha: 0.8),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(icon, color: Colors.green.shade800, size: 30),
@@ -402,7 +474,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                         desc,
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.black87.withOpacity(0.7),
+                          color: Colors.black87.withValues(alpha: 0.7),
                           height: 1.5,
                         ),
                       ),
@@ -426,7 +498,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
             borderRadius: BorderRadius.circular(18),
             boxShadow: hasGlow ? [
               BoxShadow(
-                color: Colors.green.shade500.withOpacity(0.4 * _glowController.value),
+                color: Colors.green.shade500.withValues(alpha: 0.4 * _glowController.value),
                 blurRadius: 20 * _glowController.value,
                 spreadRadius: 2 * _glowController.value,
               )
@@ -478,7 +550,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
               fontSize: 13,
               fontWeight: FontWeight.w900,
               letterSpacing: 2,
-              color: Colors.green.shade900.withOpacity(0.4),
+              color: Colors.green.shade900.withValues(alpha: 0.4),
             ),
           ),
           const SizedBox(height: 25),
@@ -524,7 +596,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                 borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 15,
                   )
                 ],
@@ -571,13 +643,12 @@ class FabricParticlePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.green.shade200.withOpacity(0.15)
+      ..color = Colors.green.shade200.withValues(alpha: 0.15)
       ..style = PaintingStyle.fill;
 
     final random = math.Random(555);
 
     for (int i = 0; i < 15; i++) {
-      // Slow, organic movement
       double x = (random.nextDouble() * size.width + (animationValue * 40 * (random.nextDouble() + 0.5))) % size.width;
       double y = (random.nextDouble() * size.height + (math.sin(animationValue * math.pi * 2 + i) * 20)) % size.height;
       
@@ -587,13 +658,15 @@ class FabricParticlePainter extends CustomPainter {
       int points = 10;
       for (int j = 0; j < points; j++) {
         double angle = (j * 2 * math.pi) / points;
-        // Wavy edges for fabric feel
         double wave = 0.2 * math.sin(animationValue * math.pi * 2 + j * 1.5);
         double r = radius * (0.8 + wave);
         double px = x + math.cos(angle) * r;
         double py = y + math.sin(angle) * r;
-        if (j == 0) path.moveTo(px, py);
-        else path.lineTo(px, py);
+        if (j == 0) {
+          path.moveTo(px, py);
+        } else {
+          path.lineTo(px, py);
+        }
       }
       path.close();
       canvas.drawPath(path, paint);

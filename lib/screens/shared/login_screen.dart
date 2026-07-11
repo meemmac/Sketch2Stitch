@@ -64,7 +64,7 @@ class _LoginScreenState extends State<LoginScreen>
                         left: -30,
                         child: _floatingCircle(
                           120,
-                          Colors.white.withOpacity(0.25),
+                          Colors.white.withValues(alpha: 0.25),
                         ),
                       ),
                       Positioned(
@@ -72,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen>
                         right: -40,
                         child: _floatingCircle(
                           90,
-                          Colors.green.shade100.withOpacity(0.35),
+                          Colors.green.shade100.withValues(alpha: 0.35),
                         ),
                       ),
                       Positioned(
@@ -80,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen>
                         left: 20,
                         child: _floatingCircle(
                           70,
-                          Colors.white.withOpacity(0.3),
+                          Colors.white.withValues(alpha: 0.3),
                         ),
                       ),
                       Positioned(
@@ -88,7 +88,7 @@ class _LoginScreenState extends State<LoginScreen>
                         right: 30,
                         child: _floatingCircle(
                           50,
-                          Colors.green.shade200.withOpacity(0.3),
+                          Colors.green.shade200.withValues(alpha: 0.3),
                         ),
                       ),
                     ],
@@ -117,10 +117,10 @@ class _LoginScreenState extends State<LoginScreen>
                           child: Container(
                             padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.55),
+                              color: Colors.white.withValues(alpha: 0.55),
                               borderRadius: BorderRadius.circular(24),
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.6),
+                                color: Colors.white.withValues(alpha: 0.6),
                                 width: 1.2,
                               ),
                             ),

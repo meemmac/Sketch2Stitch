@@ -298,7 +298,7 @@ class DrawerProfileSection extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 28,
-                backgroundColor: themeColor.withOpacity(0.15),
+                backgroundColor: themeColor.withValues(alpha: 0.15),
                 child: Icon(
                   isCustomer
                       ? Icons.person_rounded
@@ -328,7 +328,7 @@ class DrawerProfileSection extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: themeColor.withOpacity(0.1),
+                        color: themeColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(

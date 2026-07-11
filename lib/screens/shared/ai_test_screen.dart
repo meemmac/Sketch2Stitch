@@ -19,7 +19,7 @@ class _AITestScreenState extends State<AITestScreen> {
 
   // Uploaded images
   XFile? _personalImage;
-  List<XFile> _referenceImages = [];
+  final List<XFile> _referenceImages = [];
 
   // 13 Measurement Controllers
   final Map<String, TextEditingController> _measurements = {
