@@ -143,10 +143,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
             ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.share_outlined),
-                onPressed: () {},
-              ),
-              IconButton(
                 icon: Icon(
                   _isFavorite ? Icons.favorite : Icons.favorite_border,
                   color: _isFavorite ? Colors.red : Colors.white,
@@ -180,14 +176,13 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                   // Reviews (from database)
                   _buildReviewsSection(),
                   
-                  const SizedBox(height: 80), // Space for bottom button
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
           ),
         ],
       ),
-      bottomNavigationBar: _buildBottomBar(),
     );
   }
 
@@ -262,6 +257,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
       return const SizedBox.shrink();
     }
 
+    // Show only 3 products when not showing all
     final displayProducts = _showAllProducts ? products : (products.length > 3 ? products.take(3).toList() : products);
 
     return Column(
@@ -289,72 +285,89 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: _showAllProducts ? 350 : 160,
-          child: GridView.builder(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: _showAllProducts ? 2 : 1,
-              childAspectRatio: _showAllProducts ? 0.8 : 1.2,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            scrollDirection: _showAllProducts ? Axis.vertical : Axis.horizontal,
-            itemCount: displayProducts.length,
-            physics: _showAllProducts ? const NeverScrollableScrollPhysics() : const BouncingScrollPhysics(),
-            itemBuilder: (context, index) {
-              final product = displayProducts[index];
-              final String imageUrl = product.colorOptions.isNotEmpty && 
-                  product.colorOptions.first.image != null
-                  ? product.colorOptions.first.image!
-                  : 'assets/images/fab.jpg';
-              
-              return GestureDetector(
-                onTap: () {
-                  _navigateToProductDetail(product);
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[200]!),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Product Image
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(12),
-                        ),
-                        child: Image.asset(
-                          imageUrl,
-                          height: _showAllProducts ? 100 : 100,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            height: _showAllProducts ? 100 : 100,
-                            color: Colors.grey[200],
-                            child: const Icon(Icons.image, color: Colors.grey),
-                          ),
-                        ),
+        // Use different layouts based on show all state
+        _showAllProducts 
+            ? _buildAllProductsGrid(products)
+            : _buildHorizontalProductList(displayProducts),
+      ],
+    );
+  }
+
+  // ─── Horizontal Product List (Preview Mode) ────────────────────────────
+
+  Widget _buildHorizontalProductList(List<Product> products) {
+    return SizedBox(
+      height: 160,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: products.length,
+        physics: const BouncingScrollPhysics(),
+        itemBuilder: (context, index) {
+          final product = products[index];
+          final String imageUrl = product.colorOptions.isNotEmpty && 
+              product.colorOptions.first.image != null
+              ? product.colorOptions.first.image!
+              : 'assets/images/fab.jpg';
+          
+          return GestureDetector(
+            onTap: () {
+              _navigateToProductDetail(product);
+            },
+            child: Container(
+              width: 140,
+              margin: const EdgeInsets.only(right: 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Product Image
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(12),
+                    ),
+                    child: Image.asset(
+                      imageUrl,
+                      height: 100,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        height: 100,
+                        color: Colors.grey[200],
+                        child: const Icon(Icons.image, color: Colors.grey),
                       ),
-                      // Product Info
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                    ),
+                  ),
+                  // Product Info
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product.productName,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
                           children: [
                             Text(
-                              product.productName,
+                              '${product.colorOptions.length} colors',
                               style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
+                                fontSize: 10,
+                                color: Colors.grey,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 2),
+                            const Spacer(),
                             Text(
-                              product.priceRange,
+                              'Tk ${product.minPrice.toStringAsFixed(0)}',
                               style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
@@ -363,15 +376,125 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                             ),
                           ],
                         ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ─── All Products Grid (Show All Mode) ─────────────────────────────────
+
+  Widget _buildAllProductsGrid(List<Product> products) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.7,
+      ),
+      itemCount: products.length,
+      itemBuilder: (context, index) {
+        final product = products[index];
+        final String imageUrl = product.colorOptions.isNotEmpty && 
+            product.colorOptions.first.image != null
+            ? product.colorOptions.first.image!
+            : 'assets/images/fab.jpg';
+        
+        return GestureDetector(
+          onTap: () {
+            _navigateToProductDetail(product);
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[200]!),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Product Image
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(12),
+                  ),
+                  child: Image.asset(
+                    imageUrl,
+                    height: 130,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 130,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.image, color: Colors.grey),
+                    ),
+                  ),
+                ),
+                // Product Info
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product.productName,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        product.category,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.palette,
+                            size: 12,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${product.colorOptions.length} colors',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Tk ${product.minPrice.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF2C5C44),
+                        ),
                       ),
                     ],
                   ),
                 ),
-              );
-            },
+              ],
+            ),
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -507,97 +630,12 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     );
   }
 
-  // ─── Bottom Bar ────────────────────────────────────────────────────────
-
-  Widget _buildBottomBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: OutlinedButton(
-              onPressed: () {
-                _startConversation();
-              },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF2C5C44),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                side: const BorderSide(color: Color(0xFF2C5C44)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Message',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: () {
-                _navigateToAllProducts();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2C5C44),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Browse Products',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ─── Navigation Methods ──────────────────────────────────────────────
-
-  void _navigateToAllProducts() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('View all products from ${widget.retailer.shopName}'),
-        backgroundColor: const Color(0xFF2C5C44),
-      ),
-    );
-  }
 
   void _navigateToProductDetail(Product product) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('View details of ${product.productName}'),
-        backgroundColor: const Color(0xFF2C5C44),
-      ),
-    );
-  }
-
-  void _startConversation() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Start conversation with ${widget.retailer.shopName}'),
         backgroundColor: const Color(0xFF2C5C44),
       ),
     );

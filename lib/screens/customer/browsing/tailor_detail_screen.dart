@@ -143,10 +143,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
             ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.share_outlined),
-                onPressed: () {},
-              ),
-              IconButton(
                 icon: Icon(
                   _isFavorite ? Icons.favorite : Icons.favorite_border,
                   color: _isFavorite ? Colors.red : Colors.white,

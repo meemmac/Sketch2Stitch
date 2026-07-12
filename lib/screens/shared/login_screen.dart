@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/screens/shared/register_screen.dart';
-
+import 'package:sketch2stitch/screens/shared/forgot_password_screen.dart';
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -256,7 +256,12 @@ class _LoginScreenState extends State<LoginScreen>
                                   alignment: Alignment.centerRight,
                                   child: TextButton(
                                     onPressed: () {
-                                      // TODO: Navigate to forgot_password_screen.dart
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => const ForgotPasswordScreen(),
+                                        ),
+                                      );
                                     },
                                     style: TextButton.styleFrom(
                                       padding: EdgeInsets.zero,
