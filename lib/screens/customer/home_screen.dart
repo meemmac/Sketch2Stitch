@@ -1,4 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:sketch2stitch/models/product.dart';
+import 'package:sketch2stitch/models/tailor.dart';
+import 'package:sketch2stitch/models/retailer.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_fabrics_screen.dart' show kHardcodedProducts;
+import 'package:sketch2stitch/screens/customer/browsing/browse_tailors_screen.dart' show kHardcodedTailors;
+import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.dart' show kHardcodedRetailers;
+import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
+import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dart';
+import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key});
@@ -9,12 +20,82 @@ class CustomerHomeScreen extends StatefulWidget {
 
 class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   final ScrollController _scrollController = ScrollController();
+  final GlobalKey _heroKey = GlobalKey();
+  final GlobalKey _lastViewedKey = GlobalKey();
+  final GlobalKey _favoritesKey = GlobalKey();
+  final GlobalKey _exploreTailorsKey = GlobalKey();
+  final GlobalKey _exploreFabricsKey = GlobalKey();
+  final GlobalKey _exploreElementsKey = GlobalKey();
+  final GlobalKey _exploreRetailersKey = GlobalKey();
+
+  String _favoritesFilter = 'Fabric and elements';
+
+
+  // TODO: replace with the signed-in user's real "last viewed" history
+  List<Product> get _lastViewedProducts => kHardcodedProducts.take(3).toList();
+
+  // TODO: replace with the signed-in user's real saved favorites
+  List<Product> get _favoriteFabricProducts => kHardcodedProducts.skip(2).take(3).toList();
+  List<Tailor> get _favoriteTailors => kHardcodedTailors.take(3).toList();
+  List<Retailer> get _favoriteRetailers => kHardcodedRetailers.take(3).toList();
+
+  List<Product> get _fabricSectionProducts => kHardcodedProducts
+      .where((p) => ['Cotton', 'Silk', 'Wool', 'Linen'].contains(p.category))
+      .take(6)
+      .toList();
+
+  List<Product> get _elementSectionProducts => kHardcodedProducts
+      .where((p) => ['Lace', 'Embroidery'].contains(p.category))
+      .take(6)
+      .toList();
 
   @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
   }
+  void _scrollToSection(GlobalKey key) {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      final ctx = key.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+  void _openBrowseTab(int index) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => BrowseShell(initialIndex: index)),
+    );
+  }
+
+  void _showProductOverlay(Product product) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ProductDetailOverlay(product: product),
+    );
+  }
+
+  void _openTailorDetail(Tailor tailor) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => TailorDetailScreen(tailor: tailor)),
+    );
+  }
+
+  void _openRetailerDetail(Retailer retailer) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => RetailerDetailScreen(retailer: retailer)),
+    );
+  }
+  
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +106,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         child: Column(
           children: [
             _buildTopBar(),
+            _buildSectionNavBar(),
             Expanded(
               child: SingleChildScrollView(
                 controller: _scrollController,
@@ -85,7 +167,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       onTap: onTap,
     );
   }
-
   // ---------------- Top bar ----------------
   Widget _buildTopBar() {
     return Padding(
@@ -119,6 +200,63 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  // ---------------- Section nav bar ----------------
+  Widget _buildSectionNavBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F9F1),
+        border: Border(bottom: BorderSide(color: Colors.black.withOpacity(0.06))),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            _navPill('Home', Icons.home_rounded, () => _scrollToSection(_heroKey)),
+            const SizedBox(width: 10),
+            _navPill('Last Viewed', Icons.history_rounded, () => _scrollToSection(_lastViewedKey)),
+            const SizedBox(width: 10),
+            _navPill('Favorites', Icons.favorite_border_rounded, () => _scrollToSection(_favoritesKey)),
+            const SizedBox(width: 10),
+            _navPill('Tailors', Icons.storefront_rounded, () => _scrollToSection(_exploreTailorsKey)),
+            const SizedBox(width: 10),
+            _navPill('Fabrics', Icons.texture_rounded, () => _scrollToSection(_exploreFabricsKey)),
+            const SizedBox(width: 10),
+            _navPill('Elements', Icons.category_outlined, () => _scrollToSection(_exploreElementsKey)),
+            const SizedBox(width: 10),
+            _navPill('Retailers', Icons.storefront_outlined, () => _scrollToSection(_exploreRetailersKey)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _navPill(String label, IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.black.withOpacity(0.08)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: Colors.green.shade800),
+            const SizedBox(width: 6),
+            Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.green.shade900)),
+          ],
+        ),
       ),
     );
   }
