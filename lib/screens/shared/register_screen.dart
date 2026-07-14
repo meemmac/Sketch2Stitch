@@ -21,11 +21,15 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
   final _customerFullNameController = TextEditingController();
   final _customerEmailController = TextEditingController();
   final _customerPhoneController = TextEditingController();
+  final _cusomerAddressController = TextEditingController();
+
 
   // Tailor form controllers
   final _tailorFullNameController = TextEditingController();
   final _tailorEmailController = TextEditingController();
   final _tailorPhoneController = TextEditingController();
+  final _tailorAddressController = TextEditingController();
+
 
   // Retailer form controllers
   final _shopNameController = TextEditingController();
@@ -47,10 +51,11 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
     _customerFullNameController.dispose();
     _customerEmailController.dispose();
     _customerPhoneController.dispose();
+    _cusomerAddressController.dispose();
     _tailorFullNameController.dispose();
     _tailorEmailController.dispose();
     _tailorPhoneController.dispose();
-    _shopNameController.dispose();
+    _tailorAddressController.dispose();
     _orgEmailController.dispose();
     _retailerPhoneController.dispose();
     _shopAddressController.dispose();
@@ -80,7 +85,6 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
       });
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -302,7 +306,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         _buildFieldLabel('Email address'),
         const SizedBox(height: 4),
         _buildTextField(
-          controller: _orgEmailController,
+          controller: _customerEmailController,
           hint: 'Email address',
           icon: Icons.mail_outline,
           keyboardType: TextInputType.emailAddress,
@@ -312,7 +316,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         _buildFieldLabel('Phone number'),
         const SizedBox(height: 4),
         _buildTextField(
-          controller: _retailerPhoneController,
+          controller: _customerPhoneController,
           hint: 'Phone number',
           icon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
@@ -322,14 +326,18 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         _buildFieldLabel('Address'),
         const SizedBox(height: 4),
         _buildTextField(
-          controller: _shopAddressController,
+          controller: _cusomerAddressController,
           hint: 'Address',
           icon: Icons.storefront_outlined,
         ),
         const SizedBox(height: 16),
 
         _buildNextButton(onPressed: () {
-          // TODO: validate fields and move to the next registration step
+          // Navigate to Login Screen after "submitting"
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+          );
         }),
         const SizedBox(height: 10),
         _buildSignInRow(),
@@ -353,7 +361,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         _buildFieldLabel('Shop name'),
         const SizedBox(height: 4),
         _buildTextField(
-          controller: _shopNameController,
+          controller: _tailorFullNameController,
           hint: 'Shop name',
         ),
         const SizedBox(height: 10),
@@ -361,7 +369,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         _buildFieldLabel('Email address'),
         const SizedBox(height: 4),
         _buildTextField(
-          controller: _orgEmailController,
+          controller: _tailorEmailController,
           hint: 'Email address',
           icon: Icons.mail_outline,
           keyboardType: TextInputType.emailAddress,
@@ -371,7 +379,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         _buildFieldLabel('Phone number'),
         const SizedBox(height: 4),
         _buildTextField(
-          controller: _retailerPhoneController,
+          controller: _tailorPhoneController,
           hint: 'Phone number',
           icon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
@@ -381,14 +389,17 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         _buildFieldLabel('Shop address'),
         const SizedBox(height: 4),
         _buildTextField(
-          controller: _shopAddressController,
+          controller: _tailorAddressController,
           hint: 'Shop address',
           icon: Icons.storefront_outlined,
         ),
         const SizedBox(height: 16),
-
         _buildNextButton(onPressed: () {
-          // TODO: validate fields and save tailor registration data
+          // Navigate to Login Screen after "submitting"
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+          );
         }),
         const SizedBox(height: 10),
         _buildSignInRow(),
@@ -447,7 +458,11 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         const SizedBox(height: 16),
 
         _buildNextButton(onPressed: () {
-          // TODO: validate fields and move to the next registration step
+          // Navigate to Login Screen after "submitting"
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+          );
         }),
         const SizedBox(height: 10),
         _buildSignInRow(),
@@ -516,7 +531,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
           mainAxisAlignment: MainAxisAlignment.center,
           children: const [
             Text(
-              'Next',
+              'Submit',
               style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
             ),
             SizedBox(width: 8),

@@ -10,6 +10,7 @@ import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
+import '../../widgets/dashboard_drawer.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key});
@@ -141,7 +142,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F9F1),
-      drawer: _buildDrawer(),
+      drawer: const DashboardDrawer(initialRole: AppUserRole.customer),
       body: SafeArea(
         child: Column(
           children: [
@@ -180,43 +181,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  // ---------------- Drawer (account) ----------------
-  Widget _buildDrawer() {
-    return Drawer(
-      backgroundColor: const Color(0xFFF4F9F1),
-      child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Image.asset(
-                'assets/images/transparent_logo.png',
-                height: 45,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) =>
-                const Icon(Icons.checkroom_rounded, size: 40, color: Color(0xFF2E7D32)),
-              ),
-            ),
-            const Divider(),
-            _drawerItem(Icons.person_outline_rounded, 'My Profile', () => Navigator.pop(context)),
-            _drawerItem(Icons.shopping_cart_outlined, 'My Cart', () => Navigator.pop(context)),
-            _drawerItem(Icons.local_shipping_outlined, 'Track Order', () => Navigator.pop(context)),
-            _drawerItem(Icons.logout_rounded, 'Log Out', () => Navigator.pop(context)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _drawerItem(IconData icon, String label, VoidCallback onTap) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.green.shade800),
-      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-      onTap: onTap,
     );
   }
 
