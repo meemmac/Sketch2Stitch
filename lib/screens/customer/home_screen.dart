@@ -79,6 +79,45 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     );
   }
 
+  void _openSeeAllProducts(String title, List<Product> products) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _SeeAllGridScreen<Product>(
+          title: title,
+          items: products,
+          cardBuilder: (context, p) => _buildFabricCard(p),
+        ),
+      ),
+    );
+  }
+
+  void _openSeeAllTailors(String title, List<Tailor> tailors) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _SeeAllGridScreen<Tailor>(
+          title: title,
+          items: tailors,
+          cardBuilder: (context, t) => _buildTailorCard(t),
+        ),
+      ),
+    );
+  }
+
+  void _openSeeAllRetailers(String title, List<Retailer> retailers) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _SeeAllGridScreen<Retailer>(
+          title: title,
+          items: retailers,
+          cardBuilder: (context, r) => _buildRetailerCard(r),
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -126,10 +165,13 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     const SizedBox(height: 30),
                     _buildTrustedBanner(),
                     const SizedBox(height: 30),
-                    Container(key: _exploreTailorsKey),
-                    Container(key: _exploreFabricsKey),
-                    Container(key: _exploreElementsKey),
-                    Container(key: _exploreRetailersKey),
+                    Container(key: _exploreTailorsKey, child: _buildExploreTailorsSection()),
+                    const SizedBox(height: 30),
+                    Container(key: _exploreFabricsKey, child: _buildExploreFabricsSection()),
+                    const SizedBox(height: 30),
+                    Container(key: _exploreElementsKey, child: _buildExploreElementsSection()),
+                    const SizedBox(height: 30),
+                    Container(key: _exploreRetailersKey, child: _buildExploreRetailersSection()),
                     const SizedBox(height: 30),
                   ],
                 ),
@@ -425,9 +467,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         _buildSectionHeader('Your last viewed'),
         const SizedBox(height: 12),
         _buildFabricRow(items),
-        _buildSeeAllButton(() {
-          // TODO: navigate to full "last viewed" grid (wired in a later commit)
-        }),
+        _buildSeeAllButton(() => _openSeeAllProducts('Your Last Viewed', items)),
       ],
     );
   }
@@ -453,9 +493,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         return Column(
           children: [
             _buildRetailerRow(items),
-            _buildSeeAllButton(() {
-              // TODO: navigate to full favorites grid (wired in a later commit)
-            }),
+            _buildSeeAllButton(() => _openSeeAllRetailers('Favorite Retailers', items)),
           ],
         );
       case 'Tailors':
@@ -463,9 +501,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         return Column(
           children: [
             _buildTailorRow(items),
-            _buildSeeAllButton(() {
-              // TODO: navigate to full favorites grid (wired in a later commit)
-            }),
+            _buildSeeAllButton(() => _openSeeAllTailors('Favorite Tailors', items)),
           ],
         );
       default:
@@ -473,9 +509,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         return Column(
           children: [
             _buildFabricRow(items),
-            _buildSeeAllButton(() {
-              // TODO: navigate to full favorites grid (wired in a later commit)
-            }),
+            _buildSeeAllButton(() => _openSeeAllProducts('Favorite Fabrics & Elements', items)),
           ],
         );
     }
@@ -921,6 +955,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       ),
     );
   }
+
   // ---------------- Explore Tailors ----------------
   Widget _buildExploreTailorsSection() {
     final items = kHardcodedTailors;
@@ -982,6 +1017,47 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         _buildRetailerRow(items),
         _buildSeeAllButton(() => _openBrowseTab(2)),
       ],
+    );
+  }
+}
+
+// ---------------- Generic "See all" grid screen ----------------
+// Reused for Last Viewed / Favorites so tapping "See all" always opens a
+// full grid of that exact list, using the same card widget shown on Home.
+class _SeeAllGridScreen<T> extends StatelessWidget {
+  final String title;
+  final List<T> items;
+  final Widget Function(BuildContext, T) cardBuilder;
+
+  const _SeeAllGridScreen({
+    required this.title,
+    required this.items,
+    required this.cardBuilder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        elevation: 0,
+      ),
+      body: items.isEmpty
+          ? const Center(child: Text('Nothing here yet.'))
+          : GridView.builder(
+        padding: const EdgeInsets.all(16),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 0.72,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+        ),
+        itemCount: items.length,
+        itemBuilder: (context, index) => cardBuilder(context, items[index]),
+      ),
     );
   }
 }
