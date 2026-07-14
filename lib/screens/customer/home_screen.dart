@@ -20,6 +20,7 @@ class CustomerHomeScreen extends StatefulWidget {
 
 class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   final ScrollController _scrollController = ScrollController();
+
   final GlobalKey _heroKey = GlobalKey();
   final GlobalKey _lastViewedKey = GlobalKey();
   final GlobalKey _favoritesKey = GlobalKey();
@@ -29,7 +30,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   final GlobalKey _exploreRetailersKey = GlobalKey();
 
   String _favoritesFilter = 'Fabric and elements';
-
 
   // TODO: replace with the signed-in user's real "last viewed" history
   List<Product> get _lastViewedProducts => kHardcodedProducts.take(3).toList();
@@ -49,23 +49,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       .take(6)
       .toList();
 
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-  void _scrollToSection(GlobalKey key) {
-    Future.delayed(const Duration(milliseconds: 100), () {
-      final ctx = key.currentContext;
-      if (ctx != null) {
-        Scrollable.ensureVisible(
-          ctx,
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeInOut,
-        );
-      }
-    });
-  }
   void _openBrowseTab(int index) {
     Navigator.push(
       context,
@@ -95,7 +78,25 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       MaterialPageRoute(builder: (context) => RetailerDetailScreen(retailer: retailer)),
     );
   }
-  
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToSection(GlobalKey key) {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      final ctx = key.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -115,11 +116,20 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 16),
-                    _buildHeroSection(),
+                    Container(key: _heroKey, child: _buildHeroSection()),
                     const SizedBox(height: 20),
                     _buildVirtualTrialBanner(),
                     const SizedBox(height: 30),
+                    Container(key: _lastViewedKey, child: _buildLastViewedSection()),
+                    const SizedBox(height: 30),
+                    Container(key: _favoritesKey, child: _buildFavoritesSection()),
+                    const SizedBox(height: 30),
                     _buildTrustedBanner(),
+                    const SizedBox(height: 30),
+                    Container(key: _exploreTailorsKey),
+                    Container(key: _exploreFabricsKey),
+                    Container(key: _exploreElementsKey),
+                    Container(key: _exploreRetailersKey),
                     const SizedBox(height: 30),
                   ],
                 ),
@@ -167,6 +177,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       onTap: onTap,
     );
   }
+
   // ---------------- Top bar ----------------
   Widget _buildTopBar() {
     return Padding(
@@ -281,7 +292,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 const SizedBox(height: 18),
                 ElevatedButton(
                   onPressed: () {
-                    // TODO: navigate to browse screen
+                    // TODO: navigate to Browse Fabrics tab
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black,
@@ -401,6 +412,512 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ---------------- Your last viewed ----------------
+  Widget _buildLastViewedSection() {
+    final items = _lastViewedProducts;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader('Your last viewed'),
+        const SizedBox(height: 12),
+        _buildFabricRow(items),
+        _buildSeeAllButton(() {
+          // TODO: navigate to full "last viewed" grid (wired in a later commit)
+        }),
+      ],
+    );
+  }
+
+  // ---------------- Favorites ----------------
+  Widget _buildFavoritesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader('Favorites'),
+        const SizedBox(height: 12),
+        _buildFavoritesTabBar(),
+        const SizedBox(height: 14),
+        _buildFavoritesContent(),
+      ],
+    );
+  }
+
+  Widget _buildFavoritesContent() {
+    switch (_favoritesFilter) {
+      case 'Retailers':
+        final items = _favoriteRetailers;
+        return Column(
+          children: [
+            _buildRetailerRow(items),
+            _buildSeeAllButton(() {
+              // TODO: navigate to full favorites grid (wired in a later commit)
+            }),
+          ],
+        );
+      case 'Tailors':
+        final items = _favoriteTailors;
+        return Column(
+          children: [
+            _buildTailorRow(items),
+            _buildSeeAllButton(() {
+              // TODO: navigate to full favorites grid (wired in a later commit)
+            }),
+          ],
+        );
+      default:
+        final items = _favoriteFabricProducts;
+        return Column(
+          children: [
+            _buildFabricRow(items),
+            _buildSeeAllButton(() {
+              // TODO: navigate to full favorites grid (wired in a later commit)
+            }),
+          ],
+        );
+    }
+  }
+
+  Widget _buildFavoritesTabBar() {
+    final tabs = ['Fabric and elements', 'Retailers', 'Tailors'];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: tabs.map((t) {
+              final bool active = _favoritesFilter == t;
+              return Padding(
+                padding: const EdgeInsets.only(right: 22),
+                child: GestureDetector(
+                  onTap: () => setState(() => _favoritesFilter = t),
+                  child: Container(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: active ? Colors.green.shade600 : Colors.transparent, width: 2),
+                      ),
+                    ),
+                    child: Text(
+                      t,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                        color: active ? Colors.green.shade800 : Colors.black45,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          Container(height: 1, color: Colors.black12),
+        ],
+      ),
+    );
+  }
+
+  // ---------------- Shared headers & buttons ----------------
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCenteredHeading(String title) {
+    return Center(
+      child: Text(title, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green.shade900)),
+    );
+  }
+
+  Widget _buildSeeAllButton(VoidCallback onTap) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: OutlinedButton(
+          onPressed: onTap,
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(color: Colors.black.withOpacity(0.2)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 10),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('See all', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 13)),
+              SizedBox(width: 6),
+              Icon(Icons.arrow_forward, size: 14, color: Colors.black87),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---------------- Fabric product row & card (used by Last Viewed / Favorites) ----------------
+  Widget _buildFabricRow(List<Product> products) {
+    return SizedBox(
+      height: 220,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: products.length,
+        itemBuilder: (context, index) => SizedBox(width: 150, child: _buildFabricCard(products[index])),
+      ),
+    );
+  }
+
+  Widget _buildFabricCard(Product product) {
+    final coverImage = product.colorOptions.isNotEmpty ? product.colorOptions.first.image : null;
+    final bool outOfStock = product.colorOptions.every((c) => c.stock <= 0);
+
+    return GestureDetector(
+      onTap: () => _showProductOverlay(product),
+      child: Container(
+        margin: const EdgeInsets.only(right: 14),
+        decoration: BoxDecoration(
+          color: kCardBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: kBorder, width: 0.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                  child: SizedBox(
+                    height: 120,
+                    width: double.infinity,
+                    child: coverImage != null
+                        ? Image.asset(
+                      coverImage,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: kSage.withOpacity(0.12),
+                        child: Icon(Icons.texture, size: 34, color: kSageDark),
+                      ),
+                    )
+                        : Container(color: kSage.withOpacity(0.12), child: Icon(Icons.texture, size: 34, color: kSageDark)),
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.75), borderRadius: BorderRadius.circular(10)),
+                    child: Text(product.category, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                if (outOfStock)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(color: Colors.red.withOpacity(0.85), borderRadius: BorderRadius.circular(10)),
+                      child: const Text('Out of Stock', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    product.productName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    product.priceRange,
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kSageDark),
+                  ),
+                  if (!outOfStock) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: product.colorOptions
+                          .take(4)
+                          .map((o) => Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: _colorDot(o),
+                      ))
+                          .toList(),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _colorDot(ColorOption option) {
+    final bool outOfStock = option.stock <= 0;
+    return Opacity(
+      opacity: outOfStock ? 0.35 : 1.0,
+      child: Container(
+        width: 14,
+        height: 14,
+        decoration: BoxDecoration(
+          color: _resolveColor(option.color),
+          shape: BoxShape.circle,
+          border: Border.all(color: kBorder, width: 0.5),
+        ),
+      ),
+    );
+  }
+
+  Color _resolveColor(String name) {
+    switch (name.toLowerCase()) {
+      case 'white':
+        return Colors.white;
+      case 'black':
+        return Colors.black;
+      case 'pink':
+        return Colors.pink[200]!;
+      case 'blue':
+        return Colors.blue[300]!;
+      case 'green':
+        return Colors.green[300]!;
+      case 'beige':
+        return const Color(0xFFE8DCC8);
+      case 'brown':
+        return Colors.brown[300]!;
+      case 'gold':
+        return const Color(0xFFD4AF37);
+      default:
+        return Colors.grey[300]!;
+    }
+  }
+
+  // ---------------- Tailor row & card (used by Favorites tab) ----------------
+  Widget _buildTailorRow(List<Tailor> tailors) {
+    return SizedBox(
+      height: 200,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: tailors.length,
+        itemBuilder: (context, index) => SizedBox(width: 150, child: _buildTailorCard(tailors[index])),
+      ),
+    );
+  }
+
+  Widget _buildTailorCard(Tailor tailor) {
+    final bool isTopRated = tailor.rating >= 4.8;
+    final String imageUrl = tailor.profilePicture ?? 'assets/images/fab.jpg';
+
+    return GestureDetector(
+      onTap: () => _openTailorDetail(tailor),
+      child: Container(
+        margin: const EdgeInsets.only(right: 14),
+        decoration: BoxDecoration(
+          color: kCardBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: kBorder, width: 0.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                  child: SizedBox(
+                    height: 110,
+                    width: double.infinity,
+                    child: Image.asset(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: kSage.withOpacity(0.12),
+                        child: Icon(Icons.person, size: 34, color: kSageDark),
+                      ),
+                    ),
+                  ),
+                ),
+                if (isTopRated)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(color: kSage, borderRadius: BorderRadius.circular(10)),
+                      child: const Text('⭐ Top Rated', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(8)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.star, color: Colors.amber, size: 10),
+                        const SizedBox(width: 3),
+                        Text(tailor.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(tailor.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on, size: 12, color: Colors.grey[600]),
+                      const SizedBox(width: 3),
+                      Expanded(
+                        child: Text(
+                          tailor.generalArea,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 10.5, color: Colors.grey[600]),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------- Retailer row & card (used by Favorites tab) ----------------
+  Widget _buildRetailerRow(List<Retailer> retailers) {
+    return SizedBox(
+      height: 200,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: retailers.length,
+        itemBuilder: (context, index) => SizedBox(width: 150, child: _buildRetailerCard(retailers[index])),
+      ),
+    );
+  }
+
+  Widget _buildRetailerCard(Retailer retailer) {
+    final bool isTopRated = retailer.rating >= 4.8;
+    final String imageUrl = retailer.profilePicture ?? 'assets/images/fab.jpg';
+
+    return GestureDetector(
+      onTap: () => _openRetailerDetail(retailer),
+      child: Container(
+        margin: const EdgeInsets.only(right: 14),
+        decoration: BoxDecoration(
+          color: kCardBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: kBorder, width: 0.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                  child: SizedBox(
+                    height: 110,
+                    width: double.infinity,
+                    child: Image.asset(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: kSage.withOpacity(0.12),
+                        child: Icon(Icons.store, size: 34, color: kSageDark),
+                      ),
+                    ),
+                  ),
+                ),
+                if (isTopRated)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(color: kSage, borderRadius: BorderRadius.circular(10)),
+                      child: const Text('⭐ Top Rated', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(8)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.star, color: Colors.amber, size: 10),
+                        const SizedBox(width: 3),
+                        Text(retailer.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(retailer.shopName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on, size: 12, color: Colors.grey[600]),
+                      const SizedBox(width: 3),
+                      Expanded(
+                        child: Text(
+                          retailer.generalArea,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 10.5, color: Colors.grey[600]),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
