@@ -10,6 +10,7 @@ class InventoryItem {
   int stock;
   String careLevel;
   List<String> colors;
+  String imagePath;
 
   InventoryItem({
     required this.name,
@@ -19,6 +20,7 @@ class InventoryItem {
     required this.stock,
     required this.careLevel,
     required this.colors,
+    required this.imagePath,
   });
 }
 
@@ -30,6 +32,17 @@ class InventoryScreen extends StatefulWidget {
 }
 
 class _InventoryScreenState extends State<InventoryScreen> {
+  static const productImages = [
+    'assets/images/gorgette.jpg',
+    'assets/images/gorgeous.jpg',
+    'assets/images/fab.jpg',
+    'assets/images/fab2.jpg',
+    'assets/images/silk.jpg',
+    'assets/images/lace.jpg',
+    'assets/images/embroidery.jpg',
+    'assets/images/textile.jpg',
+  ];
+
   final items = <InventoryItem>[
     InventoryItem(
       name: "Georgette Fabric",
@@ -39,6 +52,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       stock: 45,
       careLevel: "Medium Care",
       colors: ["White","Pink"],
+      imagePath: 'assets/images/gorgette.jpg',
     ),
   ];
 
@@ -49,6 +63,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final stock = TextEditingController(text: item?.stock.toString() ?? "");
     String category = item?.category ?? "Fabric";
     String care = item?.careLevel ?? "Low Care";
+    String selectedImage = item?.imagePath ?? productImages.first;
 
     showModalBottomSheet(
       context: context,
@@ -64,6 +79,66 @@ class _InventoryScreenState extends State<InventoryScreen> {
               children:[
                 Text(item==null?"Add Inventory Item":"Edit Inventory Item",
                   style:const TextStyle(fontSize:22,fontWeight:FontWeight.bold)),
+                const SizedBox(height:20),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    "Product Image",
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                const SizedBox(height:10),
+                SizedBox(
+                  height: 106,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: productImages.length,
+                    separatorBuilder: (_, __) => const SizedBox(width:10),
+                    itemBuilder: (_, index) {
+                      final imagePath = productImages[index];
+                      final isSelected = selectedImage == imagePath;
+
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => setM(() => selectedImage = imagePath),
+                        child: Container(
+                          width: 96,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Colors.grey.shade300,
+                              width: isSelected ? 3 : 1,
+                            ),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Image.asset(imagePath, fit: BoxFit.cover),
+                              if (isSelected)
+                                Container(
+                                  alignment: Alignment.topRight,
+                                  padding: const EdgeInsets.all(6),
+                                  child: CircleAvatar(
+                                    radius: 12,
+                                    backgroundColor:
+                                        Theme.of(context).colorScheme.primary,
+                                    child: const Icon(
+                                      Icons.check,
+                                      size: 16,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
                 const SizedBox(height:20),
                 TextField(controller:name,decoration:const InputDecoration(labelText:"Item Name")),
                 TextField(controller:sku,decoration:const InputDecoration(labelText:"SKU")),
@@ -98,6 +173,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           stock:int.tryParse(stock.text)??0,
                           careLevel:care,
                           colors:["White"],
+                          imagePath:selectedImage,
                         ));
                       }else{
                         item.name=name.text;
@@ -106,6 +182,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         item.price=double.tryParse(price.text)??0;
                         item.stock=int.tryParse(stock.text)??0;
                         item.careLevel=care;
+                        item.imagePath=selectedImage;
                       }
                     });
                     Navigator.pop(context);
@@ -151,7 +228,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 final item=items[i];
                 return Card(
                   child:ListTile(
-                    leading:const CircleAvatar(child:Icon(Icons.inventory_2)),
+                    leading:CircleAvatar(
+                      backgroundImage: AssetImage(item.imagePath),
+                      onBackgroundImageError: (_, __) {},
+                      child: const SizedBox.shrink(),
+                    ),
                     title:Text(item.name),
                     subtitle:Text("${item.category}\nCare: ${item.careLevel}\nStock: ${item.stock}"),
                     isThreeLine:true,
