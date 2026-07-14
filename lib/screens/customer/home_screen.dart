@@ -921,4 +921,67 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       ),
     );
   }
+  // ---------------- Explore Tailors ----------------
+  Widget _buildExploreTailorsSection() {
+    final items = kHardcodedTailors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildCenteredHeading('Explore Tailors'),
+        const SizedBox(height: 14),
+        _buildTailorRow(items),
+        _buildSeeAllButton(() => _openBrowseTab(1)),
+      ],
+    );
+  }
+
+  // ---------------- Explore Fabrics ----------------
+  Widget _buildExploreFabricsSection() {
+    final items = _fabricSectionProducts;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildCenteredHeading('Explore Fabrics'),
+        const SizedBox(height: 6),
+        Center(
+          child: Text(
+            'Get in on the trend with our curated selection of fabrics.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.55)),
+          ),
+        ),
+        const SizedBox(height: 14),
+        _buildFabricRow(items),
+        _buildSeeAllButton(() => _openBrowseTab(0)),
+      ],
+    );
+  }
+
+  // ---------------- Explore Elements ----------------
+  Widget _buildExploreElementsSection() {
+    final items = _elementSectionProducts;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildCenteredHeading('Explore Elements'),
+        const SizedBox(height: 14),
+        _buildFabricRow(items),
+        _buildSeeAllButton(() => _openBrowseTab(0)),
+      ],
+    );
+  }
+
+  // ---------------- Explore Retailers ----------------
+  Widget _buildExploreRetailersSection() {
+    final items = kHardcodedRetailers;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildCenteredHeading('Explore Retailers'),
+        const SizedBox(height: 14),
+        _buildRetailerRow(items),
+        _buildSeeAllButton(() => _openBrowseTab(2)),
+      ],
+    );
+  }
 }
