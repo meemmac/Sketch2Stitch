@@ -12,7 +12,6 @@ class AppNotification {
   final String timeAgo;
   final bool isNew;
   final String? cancelReason;
-  final bool showRating;
 
   const AppNotification({
     required this.type,
@@ -24,7 +23,6 @@ class AppNotification {
     required this.timeAgo,
     this.isNew = false,
     this.cancelReason,
-    this.showRating = false,
   });
 }
 
@@ -81,7 +79,6 @@ final List<AppNotification> kDummyNotifications = [
     partyName: 'Modern Tailor House',
     orderId: 'OR06',
     timeAgo: '5 days ago',
-    showRating: true,
   ),
 ];
 
@@ -104,8 +101,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
   void _clearAll() {
     setState(() => _notifications.clear());
     // Let the home screen know there are no unread notifications left,
-    // so it can hide the red badge on the bell icon.
-    Navigator.pop(context, true);
+    // so it can hide the red badge on the bell icon
   }
 
   void _goBack() {
@@ -163,7 +159,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
               Expanded(
                 child: Row(
                   children: [
-                    Icon(Icons.notifications_rounded, color: Colors.green.shade900, size: 26),
+                    Icon(
+                      Icons.notifications_none_rounded,
+                      color: Colors.black87,  // Changed to match home page
+                      size: 26,
+                    ),
                     const SizedBox(width: 10),
                     Text(
                       'Notification',
@@ -273,12 +273,20 @@ class _NotificationScreenState extends State<NotificationScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          if (n.type == NotificationType.cancelled) _buildCancelRow(n) else _buildFooterRow(n),
-          if (n.showRating) ...[
-            const SizedBox(height: 10),
-            const Divider(height: 1),
-            const SizedBox(height: 10),
-          ],
+          // Add review message for delivered items
+          if (n.type == NotificationType.delivered)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Please review from orders',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.blue.shade700,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+
         ],
       ),
     );
