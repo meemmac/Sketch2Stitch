@@ -11,7 +11,8 @@ import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.d
 import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
 import '../../widgets/dashboard_drawer.dart';
-
+import 'virtual_trial_screen.dart';
+import 'notification_screen.dart';
 class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key});
 
@@ -31,6 +32,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   final GlobalKey _exploreRetailersKey = GlobalKey();
 
   String _favoritesFilter = 'Fabric and elements';
+  bool _hasUnreadNotifications = true;
 
   // TODO: replace with the signed-in user's real "last viewed" history
   List<Product> get _lastViewedProducts => kHardcodedProducts.take(3).toList();
@@ -49,6 +51,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       .where((p) => ['Lace', 'Embroidery'].contains(p.category))
       .take(6)
       .toList();
+  void _openNotifications() async {
+    final cleared = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const NotificationScreen()),
+    );
+    if (cleared == true && mounted) {
+      setState(() => _hasUnreadNotifications = false);
+    }
+  }
 
   void _openBrowseTab(int index) {
     Navigator.push(
@@ -204,11 +215,28 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             const Icon(Icons.checkroom_rounded, size: 28, color: Color(0xFF2E7D32)),
           ),
           const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.notifications_none_rounded, color: Colors.black87),
-            onPressed: () {
-              // TODO: navigate to notifications
-            },
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_none_rounded, color: Colors.black87),
+                onPressed: _openNotifications,
+              ),
+              if (_hasUnreadNotifications)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    width: 9,
+                    height: 9,
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFFF4F9F1), width: 1.5),
+                    ),
+                  ),
+                ),
+            ],
           ),
           IconButton(
             icon: const Icon(Icons.shopping_cart_outlined, color: Colors.black87),
@@ -220,6 +248,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       ),
     );
   }
+
 
   // ---------------- Section nav bar ----------------
   Widget _buildSectionNavBar() {
@@ -234,8 +263,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
-            _navPill('Home', Icons.home_rounded, () => _scrollToSection(_heroKey)),
-            const SizedBox(width: 10),
             _navPill('Last Viewed', Icons.history_rounded, () => _scrollToSection(_lastViewedKey)),
             const SizedBox(width: 10),
             _navPill('Favorites', Icons.favorite_border_rounded, () => _scrollToSection(_favoritesKey)),
@@ -370,7 +397,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           const SizedBox(width: 8),
           ElevatedButton(
             onPressed: () {
-              // TODO: navigate to virtual trial screen
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const VirtualTrialScreen()),
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green.shade400,
