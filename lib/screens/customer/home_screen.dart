@@ -177,13 +177,13 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     const SizedBox(height: 30),
                     _buildTrustedBanner(),
                     const SizedBox(height: 30),
-                    Container(key: _exploreTailorsKey, child: _buildExploreTailorsSection()),
-                    const SizedBox(height: 30),
                     Container(key: _exploreFabricsKey, child: _buildExploreFabricsSection()),
                     const SizedBox(height: 30),
                     Container(key: _exploreElementsKey, child: _buildExploreElementsSection()),
                     const SizedBox(height: 30),
                     Container(key: _exploreRetailersKey, child: _buildExploreRetailersSection()),
+                    const SizedBox(height: 30),
+                    Container(key: _exploreTailorsKey, child: _buildExploreTailorsSection()),
                     const SizedBox(height: 30),
                   ],
                 ),
@@ -267,13 +267,13 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             const SizedBox(width: 10),
             _navPill('Favorites', Icons.favorite_border_rounded, () => _scrollToSection(_favoritesKey)),
             const SizedBox(width: 10),
-            _navPill('Tailors', Icons.storefront_rounded, () => _scrollToSection(_exploreTailorsKey)),
-            const SizedBox(width: 10),
             _navPill('Fabrics', Icons.texture_rounded, () => _scrollToSection(_exploreFabricsKey)),
             const SizedBox(width: 10),
             _navPill('Elements', Icons.category_outlined, () => _scrollToSection(_exploreElementsKey)),
             const SizedBox(width: 10),
             _navPill('Retailers', Icons.storefront_outlined, () => _scrollToSection(_exploreRetailersKey)),
+            const SizedBox(width: 10),
+            _navPill('Tailors', Icons.storefront_rounded, () => _scrollToSection(_exploreTailorsKey)),
           ],
         ),
       ),
@@ -326,6 +326,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 ElevatedButton(
                   onPressed: () {
                     // TODO: navigate to Browse Fabrics tab
+                    _scrollToSection(_exploreTailorsKey);
+
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black,
