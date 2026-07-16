@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() => runApp(const MaterialApp(
   debugShowCheckedModeBanner: false,
@@ -17,6 +19,20 @@ class ProductColorVariant {
     required this.imagePath,
     this.isAsset = false,
   });
+
+  Map<String, dynamic> toMap() => {
+        'colorName': colorName,
+        'imagePath': imagePath,
+        'isAsset': isAsset,
+      };
+
+  factory ProductColorVariant.fromMap(Map<String, dynamic> map) {
+    return ProductColorVariant(
+      colorName: map['colorName'] as String? ?? '',
+      imagePath: map['imagePath'] as String? ?? '',
+      isAsset: map['isAsset'] as bool? ?? false,
+    );
+  }
 }
 
 class InventoryItem {
@@ -56,6 +72,48 @@ class InventoryItem {
   String get mainImagePath => variants.isNotEmpty ? variants.first.imagePath : "";
   bool get mainIsAsset => variants.isNotEmpty ? variants.first.isAsset : false;
   List<String> get colorNames => variants.map((v) => v.colorName).toList();
+
+  Map<String, dynamic> toMap() => {
+        'name': name,
+        'category': category,
+        'materialType': materialType,
+        'sku': sku,
+        'price': price,
+        'stock': stock,
+        'description': description,
+        'variants': variants.map((variant) => variant.toMap()).toList(),
+        'canWash': canWash,
+        'canBleach': canBleach,
+        'canDryClean': canDryClean,
+        'canTumbleDry': canTumbleDry,
+        'ironLevel': ironLevel,
+      };
+
+  factory InventoryItem.fromMap(Map<String, dynamic> map) {
+    final rawVariants = map['variants'];
+    final variants = rawVariants is List
+        ? rawVariants
+            .whereType<Map>()
+            .map((variant) => ProductColorVariant.fromMap(Map<String, dynamic>.from(variant)))
+            .toList()
+        : <ProductColorVariant>[];
+
+    return InventoryItem(
+      name: map['name'] as String? ?? '',
+      category: map['category'] as String? ?? 'Accessory',
+      materialType: map['materialType'] as String? ?? 'N/A',
+      sku: map['sku'] as String? ?? '',
+      price: (map['price'] as num?)?.toDouble() ?? 0,
+      stock: (map['stock'] as num?)?.toInt() ?? 0,
+      description: map['description'] as String? ?? '',
+      variants: variants,
+      canWash: map['canWash'] as bool? ?? true,
+      canBleach: map['canBleach'] as bool? ?? false,
+      canDryClean: map['canDryClean'] as bool? ?? true,
+      canTumbleDry: map['canTumbleDry'] as bool? ?? true,
+      ironLevel: map['ironLevel'] as String? ?? 'Medium',
+    );
+  }
 }
 
 class InventoryScreen extends StatefulWidget {
@@ -68,47 +126,94 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> {
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _searchController = TextEditingController();
-  GlobalKey<AnimatedGridState> _gridKey = GlobalKey<AnimatedGridState>();
+  final ScrollController _scrollController = ScrollController();
   String _searchQuery = "";
-  
-  final List<InventoryItem> items = <InventoryItem>[
-    InventoryItem(
-      name: "Premium Egyptian Cotton",
-      category: "Fabric",
-      materialType: "Cotton",
-      sku: "COT-001",
-      price: 650,
-      stock: 45,
-      description: "Soft, breathable Egyptian cotton perfect for shirts.",
-      variants: [
-        ProductColorVariant(colorName: "White", imagePath: 'assets/images/fab.jpg', isAsset: true),
-        ProductColorVariant(colorName: "Beige", imagePath: 'assets/images/fab2.jpg', isAsset: true),
-      ],
-      canWash: true,
-      canBleach: false,
-      canDryClean: true,
-      canTumbleDry: true,
-      ironLevel: "High",
-    ),
-    InventoryItem(
-      name: "Golden Silk Blend",
-      category: "Fabric",
-      materialType: "Silk",
-      sku: "SLK-002",
-      price: 1800,
-      stock: 12,
-      description: "Luxurious silk blend with a natural sheen.",
-      variants: [
-        ProductColorVariant(colorName: "Gold", imagePath: 'assets/images/silk.jpg', isAsset: true),
-        ProductColorVariant(colorName: "Pink", imagePath: 'assets/images/saree.jpg', isAsset: true),
-      ],
-      canWash: false,
-      canBleach: false,
-      canDryClean: true,
-      canTumbleDry: false,
-      ironLevel: "Low",
-    ),
-  ];
+  static const String _cacheKey = 'retailer_inventory_cache';
+  int _gridAnimationSeed = 0;
+
+  final List<InventoryItem> items = <InventoryItem>[];
+
+  List<InventoryItem> _seedItems() {
+    return <InventoryItem>[
+      InventoryItem(
+        name: "Premium Egyptian Cotton",
+        category: "Fabric",
+        materialType: "Cotton",
+        sku: "COT-001",
+        price: 650,
+        stock: 45,
+        description: "Soft, breathable Egyptian cotton perfect for shirts.",
+        variants: [
+          ProductColorVariant(colorName: "White", imagePath: 'assets/images/fab.jpg', isAsset: true),
+          ProductColorVariant(colorName: "Beige", imagePath: 'assets/images/fab2.jpg', isAsset: true),
+        ],
+        canWash: true,
+        canBleach: false,
+        canDryClean: true,
+        canTumbleDry: true,
+        ironLevel: "High",
+      ),
+      InventoryItem(
+        name: "Golden Silk Blend",
+        category: "Fabric",
+        materialType: "Silk",
+        sku: "SLK-002",
+        price: 1800,
+        stock: 12,
+        description: "Luxurious silk blend with a natural sheen.",
+        variants: [
+          ProductColorVariant(colorName: "Gold", imagePath: 'assets/images/silk.jpg', isAsset: true),
+          ProductColorVariant(colorName: "Pink", imagePath: 'assets/images/saree.jpg', isAsset: true),
+        ],
+        canWash: false,
+        canBleach: false,
+        canDryClean: true,
+        canTumbleDry: false,
+        ironLevel: "Low",
+      ),
+      InventoryItem(
+        name: "Denim Work Shirt",
+        category: "Accessory",
+        materialType: "N/A",
+        sku: "ACC-003",
+        price: 920,
+        stock: 28,
+        description: "Durable denim shirt with a modern fit.",
+        variants: [
+          ProductColorVariant(colorName: "Indigo", imagePath: 'assets/images/fab.jpg', isAsset: true),
+        ],
+      ),
+      InventoryItem(
+        name: "Linen Summer Fabric",
+        category: "Fabric",
+        materialType: "Linen",
+        sku: "LIN-004",
+        price: 1120,
+        stock: 18,
+        description: "Lightweight linen fabric for summer wear.",
+        variants: [
+          ProductColorVariant(colorName: "Natural", imagePath: 'assets/images/fab2.jpg', isAsset: true),
+        ],
+        canWash: true,
+        canBleach: false,
+        canDryClean: true,
+        canTumbleDry: false,
+        ironLevel: "Medium",
+      ),
+      InventoryItem(
+        name: "Printed Scarf",
+        category: "Accessory",
+        materialType: "N/A",
+        sku: "SCF-005",
+        price: 380,
+        stock: 64,
+        description: "Light scarf with vibrant seasonal prints.",
+        variants: [
+          ProductColorVariant(colorName: "Multi", imagePath: 'assets/images/saree.jpg', isAsset: true),
+        ],
+      ),
+    ];
+  }
 
   List<InventoryItem> get _filteredItems {
     final query = _searchQuery.toLowerCase();
@@ -118,10 +223,71 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }).toList();
   }
 
-  bool _matchesSearch(InventoryItem item) {
-    final query = _searchQuery.toLowerCase();
-    return item.name.toLowerCase().contains(query) ||
-        item.sku.toLowerCase().contains(query);
+  @override
+  void initState() {
+    super.initState();
+    _loadInventory();
+  }
+
+  Future<void> _loadInventory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_cacheKey);
+    if (raw == null || raw.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        items
+          ..clear()
+          ..addAll(_seedItems());
+      });
+      await _saveInventory();
+      return;
+    }
+
+    final decoded = jsonDecode(raw);
+    final loaded = decoded is List
+        ? decoded
+            .whereType<Map>()
+            .map((entry) => InventoryItem.fromMap(Map<String, dynamic>.from(entry)))
+            .toList()
+        : _seedItems();
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      items
+        ..clear()
+        ..addAll(loaded.isEmpty ? _seedItems() : loaded);
+    });
+  }
+
+  Future<void> _saveInventory() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _cacheKey,
+      jsonEncode(items.map((item) => item.toMap()).toList()),
+    );
+  }
+
+  void _animateToNewestItem() {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
+    _scrollController.animateTo(
+      _scrollController.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 700),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _showProductPreview(InventoryItem item) async {
@@ -515,7 +681,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   _buildCareSwitch("Tumble Dry", canTumbleDry, (v) => setM(() => canTumbleDry = v)),
                   const SizedBox(height: 10),
                   DropdownButtonFormField(
-                    value: ironLevel,
+                    initialValue: ironLevel,
                     items: ["None", "Low", "Medium", "High"]
                         .map((e) => DropdownMenuItem(value: e, child: Text("Iron Level: $e")))
                         .toList(),
@@ -533,13 +699,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       backgroundColor: Colors.green.shade800,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                     ),
-                    onPressed: () {
+                    onPressed: () async {
                       if (workingVariants.any((v) => v.imagePath.isEmpty || v.colorName.isEmpty)) {
                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please provide color and image for all variants")));
                         return;
                       }
-                      final wasVisible = item != null && _matchesSearch(item);
-                      final previousIndex = item == null ? -1 : _filteredItems.indexOf(item);
                       final savedItem = InventoryItem(
                         name: name.text,
                         category: category,
@@ -573,39 +737,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           item.canTumbleDry = savedItem.canTumbleDry;
                           item.ironLevel = savedItem.ironLevel;
                         }
+                        _gridAnimationSeed++;
                       });
-
-                      final currentItem = item ?? savedItem;
-                      if (currentItem != null) {
-                        final isVisible = _matchesSearch(currentItem);
-                        if (item == null) {
-                          if (isVisible) {
-                            final insertedIndex = _filteredItems.indexOf(currentItem);
-                            if (insertedIndex != -1) {
-                              _gridKey.currentState?.insertItem(insertedIndex);
-                            }
-                          }
-                        } else if (wasVisible != isVisible && previousIndex != -1) {
-                          if (wasVisible && !isVisible) {
-                            _gridKey.currentState?.removeItem(
-                              previousIndex,
-                              (context, animation) => FadeTransition(
-                                opacity: animation,
-                                child: SizeTransition(
-                                  sizeFactor: animation,
-                                  child: _buildProductCard(currentItem),
-                                ),
-                              ),
-                            );
-                          } else if (!wasVisible && isVisible) {
-                            final insertedIndex = _filteredItems.indexOf(currentItem);
-                            if (insertedIndex != -1) {
-                              _gridKey.currentState?.insertItem(insertedIndex);
-                            }
-                          }
-                        }
+                      await _saveInventory();
+                      if (item == null) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) => _animateToNewestItem());
                       }
-                      Navigator.pop(context);
+                      if (!mounted) {
+                        return;
+                      }
+                      Navigator.of(context).pop();
                     },
                     child: Text(item == null ? "Add Item" : "Save Changes",
                         style: const TextStyle(color: Colors.white, fontSize: 16)),
@@ -640,7 +781,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: const TextStyle(fontSize: 14, color: Colors.black54)),
-        Switch(value: value, activeColor: Colors.green.shade700, onChanged: onChanged),
+        Switch(value: value, activeThumbColor: Colors.green.shade700, onChanged: onChanged),
       ],
     );
   }
@@ -677,7 +818,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
             onChanged: (value) {
               setState(() {
                 _searchQuery = value;
-                _gridKey = GlobalKey<AnimatedGridState>();
               });
             },
             decoration: InputDecoration(
@@ -697,17 +837,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w500),
                     ),
                   )
-                : AnimatedGrid(
-                    key: _gridKey,
+                : GridView.builder(
+                    controller: _scrollController,
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       childAspectRatio: 0.6,
                       mainAxisSpacing: 15,
                       crossAxisSpacing: 15,
                     ),
-                    initialItemCount: filteredItems.length,
-                    itemBuilder: (c, i, animation) {
-                      return _buildAnimatedProductCard(filteredItems[i], animation, i);
+                    itemCount: filteredItems.length,
+                    itemBuilder: (c, i) {
+                      return _buildAnimatedGridCard(filteredItems[i], i);
                     },
                   ),
           )
@@ -716,19 +856,29 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  Widget _buildAnimatedProductCard(InventoryItem item, Animation<double> animation, int index) {
-    final curvedAnimation = CurvedAnimation(parent: animation, curve: Curves.easeOut);
-    return FadeTransition(
-      opacity: curvedAnimation,
-      child: ScaleTransition(
-        scale: Tween<double>(begin: 0.96, end: 1.0).animate(curvedAnimation),
-        child: _buildProductCard(item, index: index),
-      ),
+  Widget _buildAnimatedGridCard(InventoryItem item, int index) {
+    return TweenAnimationBuilder<double>(
+      key: ValueKey('${item.sku}-$_gridAnimationSeed'),
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: Duration(milliseconds: 320 + (index * 40)),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 18 * (1 - value)),
+            child: Transform.scale(
+              scale: 0.96 + (0.04 * value),
+              child: child,
+            ),
+          ),
+        );
+      },
+      child: _buildProductCard(item),
     );
   }
 
-  Widget _buildProductCard(InventoryItem item, {int? index}) {
-    final filteredIndex = index ?? _filteredItems.indexWhere((e) => identical(e, item));
+  Widget _buildProductCard(InventoryItem item) {
     return GestureDetector(
       onTap: () => _showProductPreview(item),
       child: Container(
@@ -754,21 +904,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       children: [
                         _actionBtn(Icons.edit, Colors.blue, () => showItemForm(item: item)),
                         const SizedBox(width: 5),
-                        _actionBtn(Icons.delete, Colors.red, () {
-                          final removalIndex = filteredIndex;
-                          setState(() => items.remove(item));
-                          if (removalIndex != -1) {
-                            _gridKey.currentState?.removeItem(
-                              removalIndex,
-                              (context, animation) => FadeTransition(
-                                opacity: animation,
-                                child: SizeTransition(
-                                  sizeFactor: animation,
-                                  child: _buildProductCard(item, index: removalIndex),
-                                ),
-                              ),
-                            );
-                          }
+                        _actionBtn(Icons.delete, Colors.red, () async {
+                          setState(() {
+                            items.remove(item);
+                            _gridAnimationSeed++;
+                          });
+                          await _saveInventory();
                         }),
                       ],
                     ),
