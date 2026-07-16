@@ -614,14 +614,84 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Widget _summary(String t, String v, Color bg) {
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+          color: bg, borderRadius: BorderRadius.circular(20)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(v, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          CountUpText(
+            begin: 0,
+            end: double.tryParse(v) ?? 0,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
           Text(t, style: const TextStyle(color: Colors.black54, fontSize: 12)),
         ],
       ),
+    );
+  }
+}
+
+class CountUpText extends StatefulWidget {
+  final double begin;
+  final double end;
+  final Duration duration;
+  final TextStyle style;
+
+  const CountUpText({
+    super.key,
+    required this.begin,
+    required this.end,
+    this.duration = const Duration(seconds: 1),
+    required this.style,
+  });
+
+  @override
+  State<CountUpText> createState() => _CountUpTextState();
+}
+
+class _CountUpTextState extends State<CountUpText>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: widget.duration);
+    _animation = Tween<double>(begin: widget.begin, end: widget.end).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+    _controller.forward();
+  }
+
+  @override
+  void didUpdateWidget(CountUpText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.end != widget.end) {
+      _animation = Tween<double>(begin: oldWidget.end, end: widget.end).animate(
+        CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+      );
+      _controller.reset();
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Text(
+          _animation.value.toInt().toString(),
+          style: widget.style,
+        );
+      },
     );
   }
 }
