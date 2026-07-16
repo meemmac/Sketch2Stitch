@@ -68,6 +68,7 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> {
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _searchController = TextEditingController();
+  GlobalKey<AnimatedGridState> _gridKey = GlobalKey<AnimatedGridState>();
   String _searchQuery = "";
   
   final List<InventoryItem> items = <InventoryItem>[
@@ -108,6 +109,20 @@ class _InventoryScreenState extends State<InventoryScreen> {
       ironLevel: "Low",
     ),
   ];
+
+  List<InventoryItem> get _filteredItems {
+    final query = _searchQuery.toLowerCase();
+    return items.where((item) {
+      return item.name.toLowerCase().contains(query) ||
+          item.sku.toLowerCase().contains(query);
+    }).toList();
+  }
+
+  bool _matchesSearch(InventoryItem item) {
+    final query = _searchQuery.toLowerCase();
+    return item.name.toLowerCase().contains(query) ||
+        item.sku.toLowerCase().contains(query);
+  }
 
   Future<void> _showProductPreview(InventoryItem item) async {
     ProductColorVariant selectedVariant = item.variants.first;
@@ -523,42 +538,76 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please provide color and image for all variants")));
                         return;
                       }
+                      final wasVisible = item != null && _matchesSearch(item);
+                      final previousIndex = item == null ? -1 : _filteredItems.indexOf(item);
+                      final savedItem = InventoryItem(
+                        name: name.text,
+                        category: category,
+                        materialType: category == "Fabric" ? matType.text : "N/A",
+                        sku: sku.text,
+                        price: double.tryParse(price.text) ?? 0,
+                        stock: int.tryParse(stock.text) ?? 0,
+                        description: desc.text,
+                        variants: workingVariants,
+                        canWash: canWash,
+                        canBleach: canBleach,
+                        canDryClean: canDryClean,
+                        canTumbleDry: canTumbleDry,
+                        ironLevel: ironLevel,
+                      );
                       setState(() {
                         if (item == null) {
-                          items.add(InventoryItem(
-                            name: name.text,
-                            category: category,
-                            materialType: category == "Fabric" ? matType.text : "N/A",
-                            sku: sku.text,
-                            price: double.tryParse(price.text) ?? 0,
-                            stock: int.tryParse(stock.text) ?? 0,
-                            description: desc.text,
-                            variants: workingVariants,
-                            canWash: canWash,
-                            canBleach: canBleach,
-                            canDryClean: canDryClean,
-                            canTumbleDry: canTumbleDry,
-                            ironLevel: ironLevel,
-                          ));
+                          items.add(savedItem);
                         } else {
-                          item.name = name.text;
-                          item.category = category;
-                          item.materialType = category == "Fabric" ? matType.text : "N/A";
-                          item.sku = sku.text;
-                          item.price = double.tryParse(price.text) ?? 0;
-                          item.stock = int.tryParse(stock.text) ?? 0;
-                          item.description = desc.text;
-                          item.variants = workingVariants;
-                          item.canWash = canWash;
-                          item.canBleach = canBleach;
-                          item.canDryClean = canDryClean;
-                          item.canTumbleDry = canTumbleDry;
-                          item.ironLevel = ironLevel;
+                          item.name = savedItem.name;
+                          item.category = savedItem.category;
+                          item.materialType = savedItem.materialType;
+                          item.sku = savedItem.sku;
+                          item.price = savedItem.price;
+                          item.stock = savedItem.stock;
+                          item.description = savedItem.description;
+                          item.variants = savedItem.variants;
+                          item.canWash = savedItem.canWash;
+                          item.canBleach = savedItem.canBleach;
+                          item.canDryClean = savedItem.canDryClean;
+                          item.canTumbleDry = savedItem.canTumbleDry;
+                          item.ironLevel = savedItem.ironLevel;
                         }
                       });
+
+                      final currentItem = item ?? savedItem;
+                      if (currentItem != null) {
+                        final isVisible = _matchesSearch(currentItem);
+                        if (item == null) {
+                          if (isVisible) {
+                            final insertedIndex = _filteredItems.indexOf(currentItem);
+                            if (insertedIndex != -1) {
+                              _gridKey.currentState?.insertItem(insertedIndex);
+                            }
+                          }
+                        } else if (wasVisible != isVisible && previousIndex != -1) {
+                          if (wasVisible && !isVisible) {
+                            _gridKey.currentState?.removeItem(
+                              previousIndex,
+                              (context, animation) => FadeTransition(
+                                opacity: animation,
+                                child: SizeTransition(
+                                  sizeFactor: animation,
+                                  child: _buildProductCard(currentItem),
+                                ),
+                              ),
+                            );
+                          } else if (!wasVisible && isVisible) {
+                            final insertedIndex = _filteredItems.indexOf(currentItem);
+                            if (insertedIndex != -1) {
+                              _gridKey.currentState?.insertItem(insertedIndex);
+                            }
+                          }
+                        }
+                      }
                       Navigator.pop(context);
                     },
-                    child: Text(item == null ? "Publish Item" : "Save Changes",
+                    child: Text(item == null ? "Add Item" : "Save Changes",
                         style: const TextStyle(color: Colors.white, fontSize: 16)),
                   ),
                 )
@@ -598,6 +647,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredItems = _filteredItems;
     return Scaffold(
       backgroundColor: const Color(0xFFF9FBF9),
       appBar: AppBar(
@@ -627,6 +677,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             onChanged: (value) {
               setState(() {
                 _searchQuery = value;
+                _gridKey = GlobalKey<AnimatedGridState>();
               });
             },
             decoration: InputDecoration(
@@ -639,32 +690,45 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ),
           const SizedBox(height: 20),
           Expanded(
-            child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 0.6,
-                mainAxisSpacing: 15,
-                crossAxisSpacing: 15,
-              ),
-              itemCount: items.where((item) =>
-                item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                item.sku.toLowerCase().contains(_searchQuery.toLowerCase())
-              ).length,
-              itemBuilder: (c, i) {
-                final filteredItems = items.where((item) =>
-                  item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                  item.sku.toLowerCase().contains(_searchQuery.toLowerCase())
-                ).toList();
-                return _buildProductCard(filteredItems[i]);
-              },
-            ),
+            child: filteredItems.isEmpty
+                ? Center(
+                    child: Text(
+                      _searchQuery.isEmpty ? "No items in inventory yet" : "No products match your search",
+                      style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w500),
+                    ),
+                  )
+                : AnimatedGrid(
+                    key: _gridKey,
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.6,
+                      mainAxisSpacing: 15,
+                      crossAxisSpacing: 15,
+                    ),
+                    initialItemCount: filteredItems.length,
+                    itemBuilder: (c, i, animation) {
+                      return _buildAnimatedProductCard(filteredItems[i], animation, i);
+                    },
+                  ),
           )
         ]),
       ),
     );
   }
 
-  Widget _buildProductCard(InventoryItem item) {
+  Widget _buildAnimatedProductCard(InventoryItem item, Animation<double> animation, int index) {
+    final curvedAnimation = CurvedAnimation(parent: animation, curve: Curves.easeOut);
+    return FadeTransition(
+      opacity: curvedAnimation,
+      child: ScaleTransition(
+        scale: Tween<double>(begin: 0.96, end: 1.0).animate(curvedAnimation),
+        child: _buildProductCard(item, index: index),
+      ),
+    );
+  }
+
+  Widget _buildProductCard(InventoryItem item, {int? index}) {
+    final filteredIndex = index ?? _filteredItems.indexWhere((e) => identical(e, item));
     return GestureDetector(
       onTap: () => _showProductPreview(item),
       child: Container(
@@ -690,7 +754,22 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       children: [
                         _actionBtn(Icons.edit, Colors.blue, () => showItemForm(item: item)),
                         const SizedBox(width: 5),
-                        _actionBtn(Icons.delete, Colors.red, () => setState(() => items.remove(item))),
+                        _actionBtn(Icons.delete, Colors.red, () {
+                          final removalIndex = filteredIndex;
+                          setState(() => items.remove(item));
+                          if (removalIndex != -1) {
+                            _gridKey.currentState?.removeItem(
+                              removalIndex,
+                              (context, animation) => FadeTransition(
+                                opacity: animation,
+                                child: SizeTransition(
+                                  sizeFactor: animation,
+                                  child: _buildProductCard(item, index: removalIndex),
+                                ),
+                              ),
+                            );
+                          }
+                        }),
                       ],
                     ),
                   ),
