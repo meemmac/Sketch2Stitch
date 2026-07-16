@@ -7,6 +7,18 @@ void main() => runApp(const MaterialApp(
   home: InventoryScreen(),
 ));
 
+class ProductColorVariant {
+  String colorName;
+  String imagePath;
+  bool isAsset;
+
+  ProductColorVariant({
+    required this.colorName,
+    required this.imagePath,
+    this.isAsset = false,
+  });
+}
+
 class InventoryItem {
   String name;
   String category; // "Fabric" or "Accessory"
@@ -15,9 +27,7 @@ class InventoryItem {
   double price;
   int stock;
   String description;
-  List<String> colors;
-  String imagePath;
-  bool isAsset;
+  List<ProductColorVariant> variants;
 
   // Detailed Care Options
   bool canWash;
@@ -34,15 +44,18 @@ class InventoryItem {
     required this.price,
     required this.stock,
     required this.description,
-    required this.colors,
-    required this.imagePath,
-    this.isAsset = false,
+    required this.variants,
     this.canWash = true,
     this.canBleach = false,
     this.canDryClean = true,
     this.canTumbleDry = true,
     this.ironLevel = "Medium",
   });
+
+  // Helper to get first image
+  String get mainImagePath => variants.isNotEmpty ? variants.first.imagePath : "";
+  bool get mainIsAsset => variants.isNotEmpty ? variants.first.isAsset : false;
+  List<String> get colorNames => variants.map((v) => v.colorName).toList();
 }
 
 class InventoryScreen extends StatefulWidget {
@@ -66,9 +79,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
       price: 650,
       stock: 45,
       description: "Soft, breathable Egyptian cotton perfect for shirts.",
-      colors: ["White", "Beige"],
-      imagePath: 'assets/images/fab.jpg',
-      isAsset: true,
+      variants: [
+        ProductColorVariant(colorName: "White", imagePath: 'assets/images/fab.jpg', isAsset: true),
+        ProductColorVariant(colorName: "Beige", imagePath: 'assets/images/fab2.jpg', isAsset: true),
+      ],
       canWash: true,
       canBleach: false,
       canDryClean: true,
@@ -83,9 +97,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
       price: 1800,
       stock: 12,
       description: "Luxurious silk blend with a natural sheen.",
-      colors: ["Gold", "Pink"],
-      imagePath: 'assets/images/silk.jpg',
-      isAsset: true,
+      variants: [
+        ProductColorVariant(colorName: "Gold", imagePath: 'assets/images/silk.jpg', isAsset: true),
+        ProductColorVariant(colorName: "Pink", imagePath: 'assets/images/saree.jpg', isAsset: true),
+      ],
       canWash: false,
       canBleach: false,
       canDryClean: true,
@@ -95,89 +110,124 @@ class _InventoryScreenState extends State<InventoryScreen> {
   ];
 
   Future<void> _showProductPreview(InventoryItem item) async {
+    ProductColorVariant selectedVariant = item.variants.first;
+
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40, height: 4,
-                  margin: const EdgeInsets.only(bottom: 20),
-                  decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
-                ),
-              ),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: item.isAsset
-                    ? Image.asset(item.imagePath, height: 250, width: double.infinity, fit: BoxFit.cover)
-                    : Image.file(File(item.imagePath), height: 250, width: double.infinity, fit: BoxFit.cover),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(item.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                  ),
-                  Text("Tk ${item.price.toInt()}", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.green.shade800)),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  _infoBadge(item.category, Colors.blue.shade50, Colors.blue.shade800),
-                  const SizedBox(width: 8),
-                  if (item.category == "Fabric")
-                    _infoBadge(item.materialType, Colors.green.shade50, Colors.green.shade800),
-                  const SizedBox(width: 8),
-                  _infoBadge("SKU: ${item.sku}", Colors.grey.shade100, Colors.grey.shade800),
-                ],
-              ),
-              const SizedBox(height: 20),
-              const Text("Description", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text(item.description, style: const TextStyle(fontSize: 14, color: Colors.black54, height: 1.5)),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  const Text("Available Colors: ", style: TextStyle(fontWeight: FontWeight.bold)),
-                  Text(item.colors.join(", ")),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text("Current Stock: ${item.stock}", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  _infoBadge(item.stock < 10 ? "Low Stock" : "In Stock", item.stock < 10 ? Colors.red.shade50 : Colors.green.shade50, item.stock < 10 ? Colors.red : Colors.green),
-                ],
-              ),
-              if (item.category == "Fabric") ...[
-                const SizedBox(height: 25),
-                const Text("Care Instructions", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 15),
-                _careInfoRow(Icons.wash, "Machine Washable", item.canWash),
-                _careInfoRow(Icons.biotech, "Bleach Allowed", item.canBleach),
-                _careInfoRow(Icons.dry_cleaning, "Dry Clean Only", item.canDryClean),
-                _careInfoRow(Icons.settings_input_component, "Tumble Dry", item.canTumbleDry),
-                _careInfoRow(Icons.iron, "Iron Level", true, trailing: item.ironLevel),
-              ],
-              const SizedBox(height: 30),
-            ],
+      builder: (_) => StatefulBuilder(builder: (context, setP) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
           ),
-        ),
-      ),
+          padding: const EdgeInsets.all(24),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40, height: 4,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: selectedVariant.isAsset
+                      ? Image.asset(selectedVariant.imagePath, height: 250, width: double.infinity, fit: BoxFit.cover)
+                      : Image.file(File(selectedVariant.imagePath), height: 250, width: double.infinity, fit: BoxFit.cover),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(item.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                    ),
+                    Text("Tk ${item.price.toInt()}", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.green.shade800)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    _infoBadge(item.category, Colors.blue.shade50, Colors.blue.shade800),
+                    const SizedBox(width: 8),
+                    if (item.category == "Fabric")
+                      _infoBadge(item.materialType, Colors.green.shade50, Colors.green.shade800),
+                    const SizedBox(width: 8),
+                    _infoBadge("SKU: ${item.sku}", Colors.grey.shade100, Colors.grey.shade800),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // 🎨 Color Selection (Interactive)
+                const Text("Select Color", style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 45,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: item.variants.length,
+                    itemBuilder: (context, index) {
+                      final variant = item.variants[index];
+                      final isSelected = selectedVariant == variant;
+                      return GestureDetector(
+                        onTap: () => setP(() => selectedVariant = variant),
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected ? Colors.green.shade800 : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: isSelected ? Colors.green.shade800 : Colors.transparent),
+                          ),
+                          child: Center(
+                            child: Text(
+                              variant.colorName,
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : Colors.black87,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+                const Text("Description", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text(item.description, style: const TextStyle(fontSize: 14, color: Colors.black54, height: 1.5)),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("Current Stock: ${item.stock}", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    _infoBadge(item.stock < 10 ? "Low Stock" : "In Stock", item.stock < 10 ? Colors.red.shade50 : Colors.green.shade50, item.stock < 10 ? Colors.red : Colors.green),
+                  ],
+                ),
+                if (item.category == "Fabric") ...[
+                  const SizedBox(height: 25),
+                  const Text("Care Instructions", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 15),
+                  _careInfoRow(Icons.wash, "Machine Washable", item.canWash),
+                  _careInfoRow(Icons.biotech, "Bleach Allowed", item.canBleach),
+                  _careInfoRow(Icons.dry_cleaning, "Dry Clean Only", item.canDryClean),
+                  _careInfoRow(Icons.settings_input_component, "Tumble Dry", item.canTumbleDry),
+                  _careInfoRow(Icons.iron, "Iron Level", true, trailing: item.ironLevel),
+                ],
+                const SizedBox(height: 30),
+              ],
+            ),
+          ),
+        );
+      }),
     );
   }
 
@@ -210,12 +260,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final price = TextEditingController(text: item?.price.toString() ?? "");
     final stock = TextEditingController(text: item?.stock.toString() ?? "");
     final desc = TextEditingController(text: item?.description ?? "");
-    final colors = TextEditingController(text: item?.colors.join(", ") ?? "");
     final matType = TextEditingController(text: item?.materialType ?? "");
     
     String category = item?.category ?? "Fabric";
-    String? pickedImagePath = item?.imagePath;
-    bool isAsset = item?.isAsset ?? false;
+    List<ProductColorVariant> workingVariants = item != null 
+        ? List.from(item.variants) 
+        : [ProductColorVariant(colorName: "Standard", imagePath: "", isAsset: false)];
 
     // Care states
     bool canWash = item?.canWash ?? true;
@@ -266,61 +316,88 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 ),
                 const SizedBox(height: 25),
 
-                // 🖼 Image Upload Section
+                // 🌈 Multi-Color Variants Section
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Text("Product Image", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade900)),
-                ),
-                const SizedBox(height: 10),
-                GestureDetector(
-                  onTap: () async {
-                    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-                    if (image != null) {
-                      setM(() {
-                        pickedImagePath = image.path;
-                        isAsset = false;
-                      });
-                    }
-                  },
-                  child: Container(
-                    height: 150,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.green.shade100, width: 2, style: BorderStyle.solid),
-                    ),
-                    child: pickedImagePath == null
-                        ? Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.add_a_photo_rounded, size: 40, color: Colors.green.shade300),
-                              const SizedBox(height: 8),
-                              Text("Tap to upload from device", style: TextStyle(color: Colors.green.shade400)),
-                            ],
-                          )
-                        : ClipRRect(
-                            borderRadius: BorderRadius.circular(18),
-                            child: isAsset 
-                                ? Image.asset(pickedImagePath!, fit: BoxFit.cover)
-                                : Image.file(File(pickedImagePath!), fit: BoxFit.cover),
-                          ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text("Color Variants", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade900)),
+                      TextButton.icon(
+                        onPressed: () => setM(() => workingVariants.add(ProductColorVariant(colorName: "", imagePath: ""))),
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text("Add Color"),
+                      )
+                    ],
                   ),
                 ),
+                const SizedBox(height: 10),
                 
-                const SizedBox(height: 20),
+                // Variants List
+                ...workingVariants.map((variant) {
+                  int idx = workingVariants.indexOf(variant);
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 15),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () async {
+                            final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+                            if (image != null) {
+                              setM(() {
+                                variant.imagePath = image.path;
+                                variant.isAsset = false;
+                              });
+                            }
+                          },
+                          child: Container(
+                            width: 60, height: 60,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.green.shade100),
+                            ),
+                            child: variant.imagePath.isEmpty
+                                ? const Icon(Icons.add_a_photo, size: 20, color: Colors.green)
+                                : ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: variant.isAsset 
+                                        ? Image.asset(variant.imagePath, fit: BoxFit.cover)
+                                        : Image.file(File(variant.imagePath), fit: BoxFit.cover),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: 15),
+                        Expanded(
+                          child: TextField(
+                            onChanged: (v) => variant.colorName = v,
+                            controller: TextEditingController(text: variant.colorName)..selection = TextSelection.fromPosition(TextPosition(offset: variant.colorName.length)),
+                            decoration: const InputDecoration(hintText: "Color Name (e.g. Red)", border: InputBorder.none),
+                          ),
+                        ),
+                        if (workingVariants.length > 1)
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                            onPressed: () => setM(() => workingVariants.removeAt(idx)),
+                          )
+                      ],
+                    ),
+                  );
+                }),
+
+                const SizedBox(height: 10),
                 TextField(controller: name, decoration: const InputDecoration(labelText: "Product Name (e.g. Pure Silk Saree)")),
                 const SizedBox(height: 10),
                 TextField(controller: desc, maxLines: 2, decoration: const InputDecoration(labelText: "Description")),
                 
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(child: TextField(controller: sku, decoration: const InputDecoration(labelText: "Product Code (SKU)"))),
-                    const SizedBox(width: 15),
-                    Expanded(child: TextField(controller: colors, decoration: const InputDecoration(labelText: "Available Colors"))),
-                  ],
-                ),
+                TextField(controller: sku, decoration: const InputDecoration(labelText: "Product Code (SKU)")),
 
                 if (category == "Fabric") ...[
                   const SizedBox(height: 10),
@@ -367,8 +444,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                     ),
                     onPressed: () {
-                      if (pickedImagePath == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please upload an image")));
+                      if (workingVariants.any((v) => v.imagePath.isEmpty || v.colorName.isEmpty)) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please provide color and image for all variants")));
                         return;
                       }
                       setState(() {
@@ -381,9 +458,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                             price: double.tryParse(price.text) ?? 0,
                             stock: int.tryParse(stock.text) ?? 0,
                             description: desc.text,
-                            colors: colors.text.split(",").map((e) => e.trim()).toList(),
-                            imagePath: pickedImagePath!,
-                            isAsset: isAsset,
+                            variants: workingVariants,
                             canWash: canWash,
                             canBleach: canBleach,
                             canDryClean: canDryClean,
@@ -398,9 +473,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           item.price = double.tryParse(price.text) ?? 0;
                           item.stock = int.tryParse(stock.text) ?? 0;
                           item.description = desc.text;
-                          item.colors = colors.text.split(",").map((e) => e.trim()).toList();
-                          item.imagePath = pickedImagePath!;
-                          item.isAsset = isAsset;
+                          item.variants = workingVariants;
                           item.canWash = canWash;
                           item.canBleach = canBleach;
                           item.canDryClean = canDryClean;
@@ -523,7 +596,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5))],
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -533,9 +606,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  item.isAsset
-                      ? Image.asset(item.imagePath, fit: BoxFit.cover)
-                      : Image.file(File(item.imagePath), fit: BoxFit.cover),
+                  item.mainIsAsset
+                      ? Image.asset(item.mainImagePath, fit: BoxFit.cover)
+                      : Image.file(File(item.mainImagePath), fit: BoxFit.cover),
                   Positioned(
                     top: 8, right: 8,
                     child: Row(
@@ -578,7 +651,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   const SizedBox(height: 8),
                   Text(item.description, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black54, fontSize: 11)),
                   const SizedBox(height: 5),
-                  Text("Colors: ${item.colors.join(", ")}", maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black45, fontSize: 10)),
+                  Text("Colors: ${item.colorNames.join(", ")}", maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black45, fontSize: 10)),
                   const SizedBox(height: 10),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -605,7 +678,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(color: Colors.white.withOpacity(0.95), shape: BoxShape.circle),
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.95), shape: BoxShape.circle),
         child: Icon(icon, size: 14, color: color),
       ),
     );
