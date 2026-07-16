@@ -551,19 +551,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 25),
                 
-                // 🏷 Category Toggle (Fabric vs Accessory)
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildTypeToggle("Fabric", category == "Fabric", () => setM(() => category = "Fabric")),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _buildTypeToggle("Accessory", category == "Accessory", () => setM(() => category = "Accessory")),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 25),
+                // 🏷 Category Toggle (Fabric vs Accessory) - Only shown for NEW items
+                if (item == null) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTypeToggle("Fabric", category == "Fabric", () => setM(() => category = "Fabric")),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildTypeToggle("Accessory", category == "Accessory", () => setM(() => category = "Accessory")),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 25),
+                ],
 
                 // 🌈 Multi-Color Variants Section
                 Align(
@@ -653,7 +655,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 TextField(controller: desc, maxLines: 2, decoration: const InputDecoration(labelText: "Description")),
                 
                 const SizedBox(height: 10),
-                TextField(controller: sku, decoration: const InputDecoration(labelText: "Product Code (SKU)")),
+                TextField(
+                  controller: sku,
+                  enabled: item == null,
+                  decoration: InputDecoration(
+                    labelText: "Product Code (SKU)",
+                    helperText: item == null ? null : "SKU cannot be changed after creation",
+                  ),
+                ),
 
                 if (category == "Fabric") ...[
                   const SizedBox(height: 10),
