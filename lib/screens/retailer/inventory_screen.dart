@@ -254,6 +254,74 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
+  Widget _buildColorPicker(ProductColorVariant variant, StateSetter setM) {
+    final List<Map<String, dynamic>> basicColors = [
+      {'name': 'Red', 'color': Colors.red},
+      {'name': 'Pink', 'color': Colors.pink},
+      {'name': 'Purple', 'color': Colors.purple},
+      {'name': 'Deep Purple', 'color': Colors.deepPurple},
+      {'name': 'Indigo', 'color': Colors.indigo},
+      {'name': 'Blue', 'color': Colors.blue},
+      {'name': 'Light Blue', 'color': Colors.lightBlue},
+      {'name': 'Cyan', 'color': Colors.cyan},
+      {'name': 'Teal', 'color': Colors.teal},
+      {'name': 'Green', 'color': Colors.green},
+      {'name': 'Light Green', 'color': Colors.lightGreen},
+      {'name': 'Lime', 'color': Colors.lime},
+      {'name': 'Yellow', 'color': Colors.yellow},
+      {'name': 'Amber', 'color': Colors.amber},
+      {'name': 'Orange', 'color': Colors.orange},
+      {'name': 'Deep Orange', 'color': Colors.deepOrange},
+      {'name': 'Brown', 'color': Colors.brown},
+      {'name': 'Grey', 'color': Colors.grey},
+      {'name': 'Blue Grey', 'color': Colors.blueGrey},
+      {'name': 'Black', 'color': Colors.black},
+      {'name': 'White', 'color': Colors.white},
+    ];
+
+    return IconButton(
+      icon: Icon(Icons.palette_outlined, color: Colors.green.shade800),
+      onPressed: () {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Select Color"),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: GridView.builder(
+                shrinkWrap: true,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 5,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                ),
+                itemCount: basicColors.length,
+                itemBuilder: (context, index) {
+                  final colorData = basicColors[index];
+                  return GestureDetector(
+                    onTap: () {
+                      setM(() {
+                        variant.colorName = colorData['name'];
+                      });
+                      Navigator.pop(context);
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: colorData['color'],
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> showItemForm({InventoryItem? item}) async {
     final name = TextEditingController(text: item?.name ?? "");
     final sku = TextEditingController(text: item?.sku ?? "");
@@ -265,7 +333,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     String category = item?.category ?? "Fabric";
     List<ProductColorVariant> workingVariants = item != null 
         ? List.from(item.variants) 
-        : [ProductColorVariant(colorName: "Standard", imagePath: "", isAsset: false)];
+        : [ProductColorVariant(colorName: "", imagePath: "", isAsset: false)];
 
     // Care states
     bool canWash = item?.canWash ?? true;
@@ -375,10 +443,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         ),
                         const SizedBox(width: 15),
                         Expanded(
-                          child: TextField(
-                            onChanged: (v) => variant.colorName = v,
-                            controller: TextEditingController(text: variant.colorName)..selection = TextSelection.fromPosition(TextPosition(offset: variant.colorName.length)),
-                            decoration: const InputDecoration(hintText: "Color Name (e.g. Red)", border: InputBorder.none),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  onChanged: (v) => variant.colorName = v,
+                                  controller: TextEditingController(text: variant.colorName)..selection = TextSelection.fromPosition(TextPosition(offset: variant.colorName.length)),
+                                  decoration: const InputDecoration(hintText: "Color Name (e.g. Red)", border: InputBorder.none),
+                                ),
+                              ),
+                              _buildColorPicker(variant, setM),
+                            ],
                           ),
                         ),
                         if (workingVariants.length > 1)
