@@ -524,20 +524,53 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
-                      child: Text(item.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        item.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                    Text("Tk ${selectedVariant.price.toInt()}", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.green.shade800)),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: Text(
+                        "Tk ${selectedVariant.price.toInt()}",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.green.shade800,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    _infoBadge(item.category, Colors.blue.shade50, Colors.blue.shade800),
-                    const SizedBox(width: 8),
+                    _infoBadge(
+                      item.category,
+                      Colors.blue.shade50,
+                      Colors.blue.shade800,
+                    ),
                     if (item.category == "Fabric" || item.materialDisplay != "N/A")
-                      _infoBadge(_materialLabelFor(item), Colors.green.shade50, Colors.green.shade800),
-                    const SizedBox(width: 8),
-                    _infoBadge("SKU: ${item.sku}", Colors.grey.shade100, Colors.grey.shade800),
+                      _infoBadge(
+                        _materialLabelFor(item),
+                        Colors.green.shade50,
+                        Colors.green.shade800,
+                      ),
+                    _infoBadge(
+                      "SKU: ${item.sku}",
+                      Colors.grey.shade100,
+                      Colors.grey.shade800,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -591,8 +624,25 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text("Stock for ${selectedVariant.colorName}: ${selectedVariant.stock}", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    _infoBadge(selectedVariant.stock < 10 ? "Low Stock" : "In Stock", selectedVariant.stock < 10 ? Colors.red.shade50 : Colors.green.shade50, selectedVariant.stock < 10 ? Colors.red : Colors.green),
+                    Expanded(
+                      child: Text(
+                        "Stock for ${selectedVariant.colorName}: ${selectedVariant.stock}",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    _infoBadge(
+                      selectedVariant.stock < 10 ? "Low Stock" : "In Stock",
+                      selectedVariant.stock < 10
+                          ? Colors.red.shade50
+                          : Colors.green.shade50,
+                      selectedVariant.stock < 10 ? Colors.red : Colors.green,
+                    ),
                   ],
                 ),
                 if (item.category == "Fabric") ...[
@@ -615,10 +665,27 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
   }
 
   Widget _infoBadge(String label, Color bg, Color text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
-      child: Text(label, style: TextStyle(color: text, fontSize: 12, fontWeight: FontWeight.bold)),
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width - 48,
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: text,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
     );
   }
 
@@ -629,9 +696,27 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
         children: [
           Icon(icon, size: 20, color: isOk ? Colors.green : Colors.grey),
           const SizedBox(width: 12),
-          Text(label, style: TextStyle(color: isOk ? Colors.black87 : Colors.grey)),
-          const Spacer(),
-          Text(trailing ?? (isOk ? "Yes" : "No"), style: TextStyle(fontWeight: FontWeight.bold, color: isOk ? Colors.green.shade800 : Colors.grey)),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: isOk ? Colors.black87 : Colors.grey),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              trailing ?? (isOk ? "Yes" : "No"),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isOk ? Colors.green.shade800 : Colors.grey,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -858,7 +943,6 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
                 // Variants List
                 ...workingVariants.map((variant) {
                   int idx = workingVariants.indexOf(variant);
-                  bool isExistingVariant = item != null && idx < item.variants.length;
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 15),
@@ -935,13 +1019,11 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
                             const SizedBox(width: 15),
                             Expanded(
                               child: TextField(
-                                enabled: !isExistingVariant, // Locked for existing variants
                                 onChanged: (v) => variant.stock = int.tryParse(v) ?? 0,
                                 controller: TextEditingController(text: variant.stock > 0 ? variant.stock.toString() : "")..selection = TextSelection.fromPosition(TextPosition(offset: (variant.stock > 0 ? variant.stock.toString() : "").length)),
                                 keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
+                                decoration: const InputDecoration(
                                   labelText: "Stock",
-                                  helperText: isExistingVariant ? "Locked" : null,
                                 ),
                               ),
                             ),
@@ -1239,19 +1321,29 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
                 children: [
                   _buildVariantImage(selectedVariant),
                   Positioned(
-                    top: 8, right: 8,
-                    child: Row(
-                      children: [
-                        _actionBtn(Icons.edit, Colors.blue, () => showItemForm(item: item)),
-                        const SizedBox(width: 5),
-                        _actionBtn(Icons.delete, Colors.red, () async {
-                          setState(() {
-                            items.remove(item);
-                            _gridAnimationSeed++;
-                          });
-                          await _saveInventory();
-                        }),
-                      ],
+                    top: 8,
+                    right: 8,
+                    left: 8,
+                    child: Align(
+                      alignment: Alignment.topRight,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.topRight,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _actionBtn(Icons.edit, Colors.blue, () => showItemForm(item: item)),
+                            const SizedBox(width: 5),
+                            _actionBtn(Icons.delete, Colors.red, () async {
+                              setState(() {
+                                items.remove(item);
+                                _gridAnimationSeed++;
+                              });
+                              await _saveInventory();
+                            }),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                   Positioned(
@@ -1361,18 +1453,17 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
                     ),
                     const SizedBox(height: 8),
                   ],
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Expanded(
-                        child: Text(
-                          selectedVariant == null ? "Tk 0" : "Tk ${selectedVariant.price.toInt()}",
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.w900, fontSize: 15),
-                        ),
+                      Text(
+                        selectedVariant == null ? "Tk 0" : "Tk ${selectedVariant.price.toInt()}",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.w900, fontSize: 15),
                       ),
-                      const SizedBox(width: 6),
                       Text(
                         "Total: ${item.totalStock}",
                         style: const TextStyle(color: Colors.black45, fontSize: 10, fontWeight: FontWeight.w600),
