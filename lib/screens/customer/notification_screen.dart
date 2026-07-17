@@ -492,3 +492,399 @@ class _NotificationStyle {
     required this.messageSuffix,
   });
 }
+
+// For retailer
+
+
+enum RetailerNotificationType {
+  orderPlaced,
+  stockOut,
+  newReview
+}
+
+class RetailerNotification {
+  final RetailerNotificationType type;
+  final String avatarImage;
+  final String customerName;
+  final String itemName;
+  final String orderId;
+  final String timeAgo;
+  final bool isNew;
+  final String? colorName;
+  final String? reviewText;
+  final double? rating;
+  final String? customerImage;
+
+  const RetailerNotification({
+    required this.type,
+    required this.avatarImage,
+    required this.customerName,
+    required this.itemName,
+    required this.orderId,
+    required this.timeAgo,
+    this.isNew = false,
+    this.colorName,
+    this.reviewText,
+    this.rating,
+    this.customerImage,
+  });
+}
+
+// Dummy notifications for retailer
+final List<RetailerNotification> kRetailerDummyNotifications = [
+  const RetailerNotification(
+    type: RetailerNotificationType.orderPlaced,
+    avatarImage: 'assets/images/fab.jpg',
+    customerName: 'Sarah Ahmed',
+    itemName: 'Salwar Kameez',
+    orderId: 'OR001',
+    timeAgo: '2 hours ago',
+    isNew: true,
+  ),
+  const RetailerNotification(
+    type: RetailerNotificationType.orderPlaced,
+    avatarImage: 'assets/images/fab2.jpg',
+    customerName: 'Fatima Khan',
+    itemName: 'Bridal Lehenga',
+    orderId: 'OR002',
+    timeAgo: '3 hours ago',
+    isNew: true,
+  ),
+  const RetailerNotification(
+    type: RetailerNotificationType.stockOut,
+    avatarImage: 'assets/images/textile.jpg',
+    customerName: 'Premium Cotton Fabric',
+    itemName: 'Premium Cotton Fabric',
+    orderId: 'PROD003',
+    timeAgo: '5 hours ago',
+    isNew: true,
+    colorName: 'White',
+  ),
+  const RetailerNotification(
+    type: RetailerNotificationType.stockOut,
+    avatarImage: 'assets/images/silk.jpg',
+    customerName: 'Silk Saree',
+    itemName: 'Silk Saree',
+    orderId: 'PROD004',
+    timeAgo: '1 day ago',
+    colorName: 'Red',
+  ),
+  const RetailerNotification(
+    type: RetailerNotificationType.newReview,
+    avatarImage: 'assets/images/lace.jpg',
+    customerName: 'Aisha Rahman',
+    itemName: 'Wedding Sherwani',
+    orderId: 'OR005',
+    timeAgo: '2 days ago',
+    rating: 4.5,
+    reviewText: 'Excellent quality and timely delivery! The fabric was exactly as described. Highly recommend this retailer.',
+    customerImage: 'assets/images/fab.jpg',
+  ),
+  const RetailerNotification(
+    type: RetailerNotificationType.newReview,
+    avatarImage: 'assets/images/fab2.jpg',
+    customerName: 'Nadia Hasan',
+    itemName: 'Casual Shirt',
+    orderId: 'OR006',
+    timeAgo: '3 days ago',
+    rating: 5.0,
+    reviewText: 'Perfect fit and great service. Will order again.',
+    customerImage: 'assets/images/fab2.jpg',
+  ),
+];
+
+class RetailerNotificationScreen extends StatefulWidget {
+  const RetailerNotificationScreen({super.key});
+
+  @override
+  State<RetailerNotificationScreen> createState() => _RetailerNotificationScreenState();
+}
+
+class _RetailerNotificationScreenState extends State<RetailerNotificationScreen> {
+  late List<RetailerNotification> _notifications;
+
+  @override
+  void initState() {
+    super.initState();
+    _notifications = List.of(kRetailerDummyNotifications);
+  }
+
+  void _clearAll() {
+    setState(() => _notifications.clear());
+  }
+
+  void _goBack() {
+    Navigator.pop(context, false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _goBack();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF6FAF6),
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: _notifications.isEmpty
+                    ? _buildEmptyState()
+                    : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  itemCount: _notifications.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 14),
+                  itemBuilder: (context, index) => _buildCard(_notifications[index]),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---------------- Header ----------------
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.green.shade200, Colors.green.shade50],
+        ),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.notifications_none_rounded,
+                      color: Colors.black87,
+                      size: 26,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Notifications',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: _goBack,
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                ),
+                child: const Text('Back', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: _notifications.isEmpty ? null : _clearAll,
+              style: TextButton.styleFrom(
+                backgroundColor: const Color(0xFF16332A),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              ),
+              child: const Text('clear all', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12.5)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.notifications_off_outlined, size: 56, color: Colors.grey.shade400),
+          const SizedBox(height: 12),
+          Text("You're all caught up", style: TextStyle(color: Colors.grey.shade600, fontSize: 14, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  // ---------------- Notification card ----------------
+  Widget _buildCard(RetailerNotification n) {
+    final style = _styleFor(n.type);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: style.background,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: Colors.white,
+                backgroundImage: AssetImage(n.avatarImage),
+                onBackgroundImageError: (_, __) {},
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(style.icon, size: 18, color: style.iconColor),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            style.title,
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        if (n.isNew) _buildNewBadge(),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    _buildMessageText(n, style),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          //_buildFooter(n),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMessageText(RetailerNotification n, _RetailerNotificationStyle style) {
+    return RichText(
+      text: TextSpan(
+        style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
+        children: [
+          TextSpan(text: style.messagePrefix),
+          TextSpan(
+            text: n.customerName,
+            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+          ),
+          TextSpan(text: style.messageMiddle),
+          TextSpan(
+            text: n.itemName,
+            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+          ),
+          if (n.colorName != null) ...[
+            TextSpan(text: ' (Color: '),
+            TextSpan(
+              text: n.colorName!,
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+            ),
+            TextSpan(text: ')'),
+          ],
+          if (style.messageSuffix.isNotEmpty) TextSpan(text: style.messageSuffix),
+          if (n.type == RetailerNotificationType.orderPlaced) ...[
+            TextSpan(text: ' '),
+            TextSpan(
+              text: 'View Order Details',
+              style: TextStyle(
+                color: Colors.blue.shade700,
+                fontWeight: FontWeight.bold,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNewBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF16332A),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Text('New', style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700)),
+    );
+  }
+
+
+
+  _RetailerNotificationStyle _styleFor(RetailerNotificationType type) {
+    switch (type) {
+      case RetailerNotificationType.orderPlaced:
+        return _RetailerNotificationStyle(
+          background: const Color(0xFFCDEFD3), // Green color (same as order confirmed)
+          icon: Icons.shopping_cart_rounded,
+          iconColor: Colors.green.shade800,
+          title: 'New Order Placed',
+          messagePrefix: '',
+          messageMiddle: ' placed an order for ',
+          messageSuffix: '. ',
+        );
+      case RetailerNotificationType.stockOut:
+        return _RetailerNotificationStyle(
+          background: const Color(0xFFF7D6D6),
+          icon: Icons.warning_rounded,
+          iconColor: Colors.red.shade700,
+          title: 'Stock Alert',
+          messagePrefix: '',
+          messageMiddle: ' is out of stock for ',
+          messageSuffix: '.',
+        );
+      case RetailerNotificationType.newReview:
+        return _RetailerNotificationStyle(
+          background: const Color(0xFFCDEFD3), // Green color (same as order placed)
+          icon: Icons.star_rate_rounded,
+          iconColor: Colors.green.shade800,
+          title: 'New Review',
+          messagePrefix: '',
+          messageMiddle: ' reviewed ',
+          messageSuffix: '',
+        );
+    }
+  }
+}
+
+class _RetailerNotificationStyle {
+  final Color background;
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String messagePrefix;
+  final String messageMiddle;
+  final String messageSuffix;
+
+  const _RetailerNotificationStyle({
+    required this.background,
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.messagePrefix,
+    required this.messageMiddle,
+    required this.messageSuffix,
+  });
+}
