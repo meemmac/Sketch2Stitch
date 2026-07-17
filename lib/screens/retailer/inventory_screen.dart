@@ -140,6 +140,7 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
   String _searchQuery = "";
   static const String _cacheKey = 'retailer_inventory_cache';
   int _gridAnimationSeed = 0;
+  final Map<String, int> _selectedVariantIndexes = <String, int>{};
 
   final List<InventoryItem> items = <InventoryItem>[];
 
@@ -154,6 +155,7 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
         variants: [
           ProductColorVariant(colorName: "White", imagePath: 'assets/images/fab.jpg', isAsset: true, price: 650, stock: 45),
           ProductColorVariant(colorName: "Beige", imagePath: 'assets/images/fab2.jpg', isAsset: true, price: 680, stock: 30),
+          ProductColorVariant(colorName: "Ivory", imagePath: 'assets/images/fab.jpg', isAsset: true, price: 720, stock: 6),
         ],
         canWash: true,
         canBleach: false,
@@ -170,6 +172,7 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
         variants: [
           ProductColorVariant(colorName: "Gold", imagePath: 'assets/images/silk.jpg', isAsset: true, price: 1800, stock: 12),
           ProductColorVariant(colorName: "Pink", imagePath: 'assets/images/saree.jpg', isAsset: true, price: 1750, stock: 8),
+          ProductColorVariant(colorName: "Emerald", imagePath: 'assets/images/gorgeous.jpg', isAsset: true, price: 1950, stock: 5),
         ],
         canWash: false,
         canBleach: false,
@@ -185,6 +188,7 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
         description: "Durable denim shirt with a modern fit.",
         variants: [
           ProductColorVariant(colorName: "Indigo", imagePath: 'assets/images/fab.jpg', isAsset: true, price: 920, stock: 28),
+          ProductColorVariant(colorName: "Washed Blue", imagePath: 'assets/images/fabric_waves.jpg', isAsset: true, price: 980, stock: 7),
         ],
       ),
       InventoryItem(
@@ -195,6 +199,7 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
         description: "Lightweight linen fabric for summer wear.",
         variants: [
           ProductColorVariant(colorName: "Natural", imagePath: 'assets/images/fab2.jpg', isAsset: true, price: 1120, stock: 18),
+          ProductColorVariant(colorName: "Sage", imagePath: 'assets/images/fabrics_rolled.jpg', isAsset: true, price: 1180, stock: 9),
         ],
         canWash: true,
         canBleach: false,
@@ -210,9 +215,27 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
         description: "Light scarf with vibrant seasonal prints.",
         variants: [
           ProductColorVariant(colorName: "Multi", imagePath: 'assets/images/saree.jpg', isAsset: true, price: 380, stock: 64),
+          ProductColorVariant(colorName: "Black", imagePath: 'assets/images/lace.jpg', isAsset: true, price: 420, stock: 4),
         ],
       ),
     ];
+  }
+
+  String _itemKey(InventoryItem item) {
+    return item.sku.isNotEmpty ? item.sku : item.name;
+  }
+
+  ProductColorVariant? _selectedVariantFor(InventoryItem item) {
+    if (item.variants.isEmpty) {
+      return null;
+    }
+
+    final index = _selectedVariantIndexes[_itemKey(item)] ?? 0;
+    if (index < 0 || index >= item.variants.length) {
+      return item.variants.first;
+    }
+
+    return item.variants[index];
   }
 
   List<InventoryItem> get _filteredItems {
@@ -227,6 +250,26 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
   void initState() {
     super.initState();
     _loadInventory();
+  }
+
+  List<InventoryItem> _withHardcodedDemoValues(List<InventoryItem> loaded) {
+    final seedItems = _seedItems();
+    final seedsBySku = <String, InventoryItem>{
+      for (final item in seedItems) item.sku: item,
+    };
+
+    final merged = loaded.isEmpty
+        ? <InventoryItem>[...seedItems]
+        : loaded.map((item) => seedsBySku[item.sku] ?? item).toList();
+    final existingSkus = merged.map((item) => item.sku).toSet();
+
+    for (final seed in seedItems) {
+      if (!existingSkus.contains(seed.sku)) {
+        merged.add(seed);
+      }
+    }
+
+    return merged;
   }
 
   Future<void> _loadInventory() async {
@@ -252,6 +295,7 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
             .map((entry) => InventoryItem.fromMap(Map<String, dynamic>.from(entry)))
             .toList()
         : _seedItems();
+    final inventory = _withHardcodedDemoValues(loaded);
 
     if (!mounted) {
       return;
@@ -259,8 +303,9 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
     setState(() {
       items
         ..clear()
-        ..addAll(loaded.isEmpty ? _seedItems() : loaded);
+        ..addAll(inventory);
     });
+    await _saveInventory();
   }
 
   Future<void> _saveInventory() async {
@@ -291,7 +336,14 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
   }
 
   Future<void> _showProductPreview(InventoryItem item) async {
-    ProductColorVariant selectedVariant = item.variants.first;
+    if (item.variants.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("This item has no color variants yet")),
+      );
+      return;
+    }
+
+    ProductColorVariant selectedVariant = _selectedVariantFor(item) ?? item.variants.first;
 
     await showModalBottomSheet(
       context: context,
@@ -357,7 +409,12 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
                       final variant = item.variants[index];
                       final isSelected = selectedVariant == variant;
                       return GestureDetector(
-                        onTap: () => setP(() => selectedVariant = variant),
+                        onTap: () {
+                          setState(() {
+                            _selectedVariantIndexes[_itemKey(item)] = index;
+                          });
+                          setP(() => selectedVariant = variant);
+                        },
                         child: Container(
                           margin: const EdgeInsets.only(right: 10),
                           padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
@@ -834,12 +891,16 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(children: [
-          Row(children: [
-            Expanded(child: _summary("Inventory", items.length.toString(), Colors.green.shade50)),
-            const SizedBox(width: 12),
-            Expanded(child: _summary("Low Stock", items.where((e) => e.variants.any((v) => v.stock < 10)).length.toString(), Colors.red.shade50)),
-          ]),
-          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: _summary(
+              "Inventory",
+              items.length.toString(),
+              "total items",
+              Colors.green.shade50,
+            ),
+          ),
+          const SizedBox(height: 14),
           TextField(
             controller: _searchController,
             onChanged: (value) {
@@ -906,6 +967,9 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
   }
 
   Widget _buildProductCard(InventoryItem item) {
+    final selectedVariant = _selectedVariantFor(item);
+    final variantIndex = selectedVariant == null ? -1 : item.variants.indexOf(selectedVariant);
+
     return GestureDetector(
       onTap: () => _showProductPreview(item),
       child: Container(
@@ -922,9 +986,7 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  item.mainIsAsset
-                      ? Image.asset(item.mainImagePath, fit: BoxFit.cover)
-                      : Image.file(File(item.mainImagePath), fit: BoxFit.cover),
+                  _buildVariantImage(selectedVariant),
                   Positioned(
                     top: 8, right: 8,
                     child: Row(
@@ -946,7 +1008,12 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(8)),
-                      child: Text("Stock: ${item.totalStock}", style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        selectedVariant == null
+                            ? "No stock"
+                            : "${selectedVariant.colorName}: ${selectedVariant.stock}",
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
                     ),
                   )
                 ],
@@ -973,12 +1040,68 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
                   const SizedBox(height: 8),
                   Text(item.description, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black54, fontSize: 11)),
                   const SizedBox(height: 5),
-                  Text("Colors: ${item.colorNames.join(", ")}", maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black45, fontSize: 10)),
-                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 30,
+                    child: item.variants.isEmpty
+                        ? const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text("No colors", style: TextStyle(color: Colors.black45, fontSize: 10)),
+                          )
+                        : ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: item.variants.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 6),
+                            itemBuilder: (context, index) {
+                              final variant = item.variants[index];
+                              final isSelected = index == variantIndex;
+                              return GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedVariantIndexes[_itemKey(item)] = index;
+                                  });
+                                },
+                                child: Container(
+                                  constraints: const BoxConstraints(maxWidth: 82),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: isSelected ? Colors.green.shade800 : Colors.green.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isSelected ? Colors.green.shade800 : Colors.green.shade100,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    variant.colorName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: isSelected ? Colors.white : Colors.green.shade900,
+                                      fontSize: 10,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                  const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text("Tk ${item.minPrice.toInt()}", style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.w900, fontSize: 15)),
+                      Expanded(
+                        child: Text(
+                          selectedVariant == null ? "Tk 0" : "Tk ${selectedVariant.price.toInt()}",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.w900, fontSize: 15),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        "Total: ${item.totalStock}",
+                        style: const TextStyle(color: Colors.black45, fontSize: 10, fontWeight: FontWeight.w600),
+                      ),
                       if (item.category == "Fabric")
                         GestureDetector(
                           onTap: () => _showProductPreview(item),
@@ -995,6 +1118,19 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
     );
   }
 
+  Widget _buildVariantImage(ProductColorVariant? variant) {
+    if (variant == null || variant.imagePath.isEmpty) {
+      return Container(
+        color: Colors.green.shade50,
+        child: Icon(Icons.image_not_supported_outlined, color: Colors.green.shade200),
+      );
+    }
+
+    return variant.isAsset
+        ? Image.asset(variant.imagePath, fit: BoxFit.cover)
+        : Image.file(File(variant.imagePath), fit: BoxFit.cover);
+  }
+
   Widget _actionBtn(IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -1006,20 +1142,37 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
     );
   }
 
-  Widget _summary(String t, String v, Color bg) {
+  Widget _summary(String t, String v, String subtitle, Color bg, {String? detail}) {
     return Container(
-      padding: const EdgeInsets.all(15),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-          color: bg, borderRadius: BorderRadius.circular(20)),
+          color: bg, borderRadius: BorderRadius.circular(14)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           CountUpText(
             begin: 0,
             end: double.tryParse(v) ?? 0,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          Text(t, style: const TextStyle(color: Colors.black54, fontSize: 12)),
+          Text(t, style: const TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.black54, fontSize: 10),
+          ),
+          if (detail != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              detail,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.black45, fontSize: 9, fontWeight: FontWeight.w600),
+            ),
+          ],
         ],
       ),
     );
