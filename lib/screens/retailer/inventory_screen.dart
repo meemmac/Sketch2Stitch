@@ -967,33 +967,35 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
                   ),
                 ),
 
-                const SizedBox(height: 20),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text("Material Composition",
-                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade900)),
-                      TextButton.icon(
-                        onPressed: () => setM(
-                          () => workingMaterialBlends.add(FabricMaterialBlend(material: "")),
+                if (category == "Fabric") ...[
+                  const SizedBox(height: 20),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text("Material Composition",
+                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade900)),
+                        TextButton.icon(
+                          onPressed: () => setM(
+                            () => workingMaterialBlends.add(FabricMaterialBlend(material: "")),
+                          ),
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text("Add Material"),
                         ),
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text("Add Material"),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 10),
-                ...workingMaterialBlends.asMap().entries.map((entry) {
-                  return _buildMaterialBlendRow(
-                    entry.value,
-                    entry.key,
-                    workingMaterialBlends,
-                    setM,
-                  );
-                }),
+                  const SizedBox(height: 10),
+                  ...workingMaterialBlends.asMap().entries.map((entry) {
+                    return _buildMaterialBlendRow(
+                      entry.value,
+                      entry.key,
+                      workingMaterialBlends,
+                      setM,
+                    );
+                  }),
+                ],
 
                 if (category == "Fabric") ...[
                   const SizedBox(height: 25),
@@ -1042,13 +1044,15 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
                       final savedItem = InventoryItem(
                         name: name.text,
                         category: category,
-                        materialType: materialDisplay.isNotEmpty
+                        materialType: category == "Fabric" && materialDisplay.isNotEmpty
                             ? materialDisplay
                             : "N/A",
                         sku: sku.text,
                         description: desc.text,
                         variants: workingVariants,
-                        materialBlends: cleanMaterialBlends,
+                        materialBlends: category == "Fabric"
+                            ? cleanMaterialBlends
+                            : <FabricMaterialBlend>[],
                         canWash: canWash,
                         canBleach: canBleach,
                         canDryClean: canDryClean,
