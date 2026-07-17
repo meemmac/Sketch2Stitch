@@ -43,6 +43,38 @@ class ProductColorVariant {
   }
 }
 
+class FabricMaterialBlend {
+  String material;
+  String blend;
+
+  FabricMaterialBlend({
+    required this.material,
+    this.blend = "",
+  });
+
+  String get displayText {
+    final cleanBlend = blend.trim();
+    final cleanMaterial = material.trim();
+    if (cleanBlend.isEmpty) {
+      return cleanMaterial;
+    }
+
+    return "$cleanBlend $cleanMaterial";
+  }
+
+  Map<String, dynamic> toMap() => {
+        'material': material,
+        'blend': blend,
+      };
+
+  factory FabricMaterialBlend.fromMap(Map<String, dynamic> map) {
+    return FabricMaterialBlend(
+      material: map['material'] as String? ?? '',
+      blend: map['blend'] as String? ?? '',
+    );
+  }
+}
+
 class InventoryItem {
   String name;
   String category; // "Fabric" or "Element"
@@ -50,6 +82,7 @@ class InventoryItem {
   String sku;
   String description;
   List<ProductColorVariant> variants;
+  List<FabricMaterialBlend> materialBlends;
 
   // Detailed Care Options
   bool canWash;
@@ -65,17 +98,32 @@ class InventoryItem {
     required this.sku,
     required this.description,
     required this.variants,
+    List<FabricMaterialBlend>? materialBlends,
     this.canWash = true,
     this.canBleach = false,
     this.canDryClean = true,
     this.canTumbleDry = true,
     this.ironLevel = "Medium",
-  });
+  }) : materialBlends = materialBlends ?? <FabricMaterialBlend>[];
 
   // Helpers
   String get mainImagePath => variants.isNotEmpty ? variants.first.imagePath : "";
   bool get mainIsAsset => variants.isNotEmpty ? variants.first.isAsset : false;
   List<String> get colorNames => variants.map((v) => v.colorName).toList();
+
+  String get materialDisplay {
+    final cleanBlends = materialBlends
+        .where((blend) => blend.material.trim().isNotEmpty)
+        .map((blend) => blend.displayText)
+        .where((text) => text.trim().isNotEmpty)
+        .toList();
+
+    if (cleanBlends.isNotEmpty) {
+      return cleanBlends.join(", ");
+    }
+
+    return materialType.trim().isNotEmpty ? materialType : "N/A";
+  }
   
   double get minPrice {
     if (variants.isEmpty) return 0;
@@ -91,6 +139,8 @@ class InventoryItem {
         'name': name,
         'category': category,
         'materialType': materialType,
+        'materialBlends':
+            materialBlends.map((blend) => blend.toMap()).toList(),
         'sku': sku,
         'description': description,
         'variants': variants.map((variant) => variant.toMap()).toList(),
@@ -109,6 +159,13 @@ class InventoryItem {
             .map((variant) => ProductColorVariant.fromMap(Map<String, dynamic>.from(variant)))
             .toList()
         : <ProductColorVariant>[];
+    final rawMaterialBlends = map['materialBlends'];
+    final materialBlends = rawMaterialBlends is List
+        ? rawMaterialBlends
+            .whereType<Map>()
+            .map((blend) => FabricMaterialBlend.fromMap(Map<String, dynamic>.from(blend)))
+            .toList()
+        : <FabricMaterialBlend>[];
 
     return InventoryItem(
       name: map['name'] as String? ?? '',
@@ -117,6 +174,7 @@ class InventoryItem {
       sku: map['sku'] as String? ?? '',
       description: map['description'] as String? ?? '',
       variants: variants,
+      materialBlends: materialBlends,
       canWash: map['canWash'] as bool? ?? true,
       canBleach: map['canBleach'] as bool? ?? false,
       canDryClean: map['canDryClean'] as bool? ?? true,
@@ -141,6 +199,20 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
   static const String _cacheKey = 'retailer_inventory_cache';
   int _gridAnimationSeed = 0;
   final Map<String, int> _selectedVariantIndexes = <String, int>{};
+  static const List<String> _commonMaterials = <String>[
+    "Cotton",
+    "Linen",
+    "Silk",
+    "Wool",
+    "Cashmere",
+    "Viscose",
+    "Polyester",
+    "Nylon",
+    "Spandex (Lycra/Elastane)",
+    "Khadi",
+    "Muslin",
+    "Jamdani",
+  ];
 
   final List<InventoryItem> items = <InventoryItem>[];
 
@@ -152,6 +224,9 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
         materialType: "Cotton",
         sku: "COT-001",
         description: "Soft, breathable Egyptian cotton perfect for shirts.",
+        materialBlends: [
+          FabricMaterialBlend(material: "Cotton", blend: "100%"),
+        ],
         variants: [
           ProductColorVariant(colorName: "White", imagePath: 'assets/images/fab.jpg', isAsset: true, price: 650, stock: 45),
           ProductColorVariant(colorName: "Beige", imagePath: 'assets/images/fab2.jpg', isAsset: true, price: 680, stock: 30),
@@ -169,6 +244,10 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
         materialType: "Silk",
         sku: "SLK-002",
         description: "Luxurious silk blend with a natural sheen.",
+        materialBlends: [
+          FabricMaterialBlend(material: "Silk", blend: "70%"),
+          FabricMaterialBlend(material: "Viscose", blend: "30%"),
+        ],
         variants: [
           ProductColorVariant(colorName: "Gold", imagePath: 'assets/images/silk.jpg', isAsset: true, price: 1800, stock: 12),
           ProductColorVariant(colorName: "Pink", imagePath: 'assets/images/saree.jpg', isAsset: true, price: 1750, stock: 8),
@@ -186,6 +265,10 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
         materialType: "N/A",
         sku: "ACC-003",
         description: "Durable denim shirt with a modern fit.",
+        materialBlends: [
+          FabricMaterialBlend(material: "Cotton", blend: "98%"),
+          FabricMaterialBlend(material: "Spandex (Lycra/Elastane)", blend: "2%"),
+        ],
         variants: [
           ProductColorVariant(colorName: "Indigo", imagePath: 'assets/images/fab.jpg', isAsset: true, price: 920, stock: 28),
           ProductColorVariant(colorName: "Washed Blue", imagePath: 'assets/images/fabric_waves.jpg', isAsset: true, price: 980, stock: 7),
@@ -197,6 +280,10 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
         materialType: "Linen",
         sku: "LIN-004",
         description: "Lightweight linen fabric for summer wear.",
+        materialBlends: [
+          FabricMaterialBlend(material: "Linen", blend: "85%"),
+          FabricMaterialBlend(material: "Cotton", blend: "15%"),
+        ],
         variants: [
           ProductColorVariant(colorName: "Natural", imagePath: 'assets/images/fab2.jpg', isAsset: true, price: 1120, stock: 18),
           ProductColorVariant(colorName: "Sage", imagePath: 'assets/images/fabrics_rolled.jpg', isAsset: true, price: 1180, stock: 9),
@@ -213,6 +300,10 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
         materialType: "N/A",
         sku: "SCF-005",
         description: "Light scarf with vibrant seasonal prints.",
+        materialBlends: [
+          FabricMaterialBlend(material: "Polyester", blend: "95%"),
+          FabricMaterialBlend(material: "Spandex (Lycra/Elastane)", blend: "5%"),
+        ],
         variants: [
           ProductColorVariant(colorName: "Multi", imagePath: 'assets/images/saree.jpg', isAsset: true, price: 380, stock: 64),
           ProductColorVariant(colorName: "Black", imagePath: 'assets/images/lace.jpg', isAsset: true, price: 420, stock: 4),
@@ -250,6 +341,46 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
 
   bool _hasLowStockColor(InventoryItem item) {
     return item.variants.any((variant) => variant.stock < 5);
+  }
+
+  String _materialTextFrom(List<FabricMaterialBlend> blends) {
+    return blends
+        .where((blend) => blend.material.trim().isNotEmpty)
+        .map((blend) => blend.displayText)
+        .where((text) => text.trim().isNotEmpty)
+        .join(", ");
+  }
+
+  List<FabricMaterialBlend> _initialMaterialBlendsFor(InventoryItem? item) {
+    if (item == null) {
+      return <FabricMaterialBlend>[FabricMaterialBlend(material: "")];
+    }
+
+    if (item.materialBlends.isNotEmpty) {
+      return item.materialBlends
+          .map((blend) => FabricMaterialBlend(
+                material: blend.material,
+                blend: blend.blend,
+              ))
+          .toList();
+    }
+
+    if (item.materialType.trim().isNotEmpty && item.materialType != "N/A") {
+      return <FabricMaterialBlend>[
+        FabricMaterialBlend(material: item.materialType),
+      ];
+    }
+
+    return <FabricMaterialBlend>[FabricMaterialBlend(material: "")];
+  }
+
+  String _materialLabelFor(InventoryItem item) {
+    final material = item.materialDisplay.trim();
+    if (material.isNotEmpty && material != "N/A") {
+      return material;
+    }
+
+    return item.category == "Fabric" ? "Fabric" : "Element";
   }
 
   List<InventoryItem> get _filteredItems {
@@ -403,8 +534,8 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
                   children: [
                     _infoBadge(item.category, Colors.blue.shade50, Colors.blue.shade800),
                     const SizedBox(width: 8),
-                    if (item.category == "Fabric")
-                      _infoBadge(item.materialType, Colors.green.shade50, Colors.green.shade800),
+                    if (item.category == "Fabric" || item.materialDisplay != "N/A")
+                      _infoBadge(_materialLabelFor(item), Colors.green.shade50, Colors.green.shade800),
                     const SizedBox(width: 8),
                     _infoBadge("SKU: ${item.sku}", Colors.grey.shade100, Colors.grey.shade800),
                   ],
@@ -574,16 +705,87 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
     );
   }
 
+  Widget _buildMaterialBlendRow(
+    FabricMaterialBlend blend,
+    int index,
+    List<FabricMaterialBlend> workingMaterialBlends,
+    StateSetter setM,
+  ) {
+    final materialText = blend.material;
+    final blendText = blend.blend;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: TextField(
+              controller: TextEditingController(text: materialText)
+                ..selection = TextSelection.fromPosition(
+                  TextPosition(offset: materialText.length),
+                ),
+              onChanged: (value) => blend.material = value,
+              decoration: InputDecoration(
+                labelText: "Material Type",
+                hintText: "Cotton, Polyester, Jamdani",
+                suffixIcon: PopupMenuButton<String>(
+                  icon: const Icon(Icons.arrow_drop_down),
+                  onSelected: (value) => setM(() => blend.material = value),
+                  itemBuilder: (context) => _commonMaterials
+                      .map(
+                        (material) => PopupMenuItem<String>(
+                          value: material,
+                          child: Text(material),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            flex: 2,
+            child: TextField(
+              controller: TextEditingController(text: blendText)
+                ..selection = TextSelection.fromPosition(
+                  TextPosition(offset: blendText.length),
+                ),
+              onChanged: (value) => blend.blend = value,
+              decoration: const InputDecoration(
+                labelText: "Blend",
+                hintText: "95%",
+              ),
+            ),
+          ),
+          if (workingMaterialBlends.length > 1)
+            IconButton(
+              icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+              onPressed: () => setM(() => workingMaterialBlends.removeAt(index)),
+            ),
+        ],
+      ),
+    );
+  }
+
   Future<void> showItemForm({InventoryItem? item}) async {
     final name = TextEditingController(text: item?.name ?? "");
     final sku = TextEditingController(text: item?.sku ?? "");
     final desc = TextEditingController(text: item?.description ?? "");
-    final matType = TextEditingController(text: item?.materialType ?? "");
     
     String category = item?.category ?? "Fabric";
     List<ProductColorVariant> workingVariants = item != null 
         ? List.from(item.variants) 
         : [ProductColorVariant(colorName: "", imagePath: "", isAsset: false, price: 0, stock: 0)];
+    List<FabricMaterialBlend> workingMaterialBlends =
+        _initialMaterialBlendsFor(item);
 
     // Care states
     bool canWash = item?.canWash ?? true;
@@ -765,10 +967,33 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
                   ),
                 ),
 
-                if (category == "Fabric") ...[
-                  const SizedBox(height: 10),
-                  TextField(controller: matType, decoration: const InputDecoration(labelText: "Material Type (Cotton, Silk, etc.)")),
-                ],
+                const SizedBox(height: 20),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text("Material Composition",
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade900)),
+                      TextButton.icon(
+                        onPressed: () => setM(
+                          () => workingMaterialBlends.add(FabricMaterialBlend(material: "")),
+                        ),
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text("Add Material"),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ...workingMaterialBlends.asMap().entries.map((entry) {
+                  return _buildMaterialBlendRow(
+                    entry.value,
+                    entry.key,
+                    workingMaterialBlends,
+                    setM,
+                  );
+                }),
 
                 if (category == "Fabric") ...[
                   const SizedBox(height: 25),
@@ -806,13 +1031,24 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please provide color, image, price and stock for all variants")));
                         return;
                       }
+                      final cleanMaterialBlends = workingMaterialBlends
+                          .where((blend) => blend.material.trim().isNotEmpty)
+                          .map((blend) => FabricMaterialBlend(
+                                material: blend.material.trim(),
+                                blend: blend.blend.trim(),
+                              ))
+                          .toList();
+                      final materialDisplay = _materialTextFrom(cleanMaterialBlends);
                       final savedItem = InventoryItem(
                         name: name.text,
                         category: category,
-                        materialType: category == "Fabric" ? matType.text : "N/A",
+                        materialType: materialDisplay.isNotEmpty
+                            ? materialDisplay
+                            : "N/A",
                         sku: sku.text,
                         description: desc.text,
                         variants: workingVariants,
+                        materialBlends: cleanMaterialBlends,
                         canWash: canWash,
                         canBleach: canBleach,
                         canDryClean: canDryClean,
@@ -826,6 +1062,7 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
                           item.name = savedItem.name;
                           item.category = savedItem.category;
                           item.materialType = savedItem.materialType;
+                          item.materialBlends = savedItem.materialBlends;
                           item.sku = savedItem.sku;
                           item.description = savedItem.description;
                           item.variants = savedItem.variants;
@@ -1038,10 +1275,13 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(5)),
-                        child: Text(item.category == "Fabric" ? item.materialType : "Element", style: TextStyle(color: Colors.green.shade800, fontSize: 10, fontWeight: FontWeight.bold)),
+                      Expanded(
+                        flex: 2,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(5)),
+                          child: Text(_materialLabelFor(item), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.green.shade800, fontSize: 10, fontWeight: FontWeight.bold)),
+                        ),
                       ),
                       const SizedBox(width: 5),
                       Expanded(child: Text(item.sku, style: const TextStyle(color: Colors.grey, fontSize: 10), overflow: TextOverflow.ellipsis)),
