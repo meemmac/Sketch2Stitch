@@ -1081,3 +1081,563 @@ class _RetailerNotificationStyle {
     required this.messageSuffix,
   });
 }
+
+
+enum TailorNotificationType {
+  newOrder,
+  orderConfirmationReminder,
+  deliveryDeadline,
+  newReview
+}
+
+class TailorNotification {
+  final TailorNotificationType type;
+  final String avatarImage;
+  final String customerName;
+  final String itemName;
+  final String orderId;
+  final String timeAgo;
+  final bool isNew;
+  final String? reviewText;
+  final double? rating;
+  final String? customerImage;
+  final String? deadlineDate;
+
+  const TailorNotification({
+    required this.type,
+    required this.avatarImage,
+    required this.customerName,
+    required this.itemName,
+    required this.orderId,
+    required this.timeAgo,
+    this.isNew = false,
+    this.reviewText,
+    this.rating,
+    this.customerImage,
+    this.deadlineDate,
+  });
+}
+
+// Dummy notifications for tailor
+final List<TailorNotification> kTailorDummyNotifications = [
+  const TailorNotification(
+    type: TailorNotificationType.newOrder,
+    avatarImage: 'assets/images/fab.jpg',
+    customerName: 'Sarah Ahmed',
+    itemName: 'Salwar Kameez',
+    orderId: 'OR001',
+    timeAgo: '2 hours ago',
+    isNew: true,
+  ),
+  const TailorNotification(
+    type: TailorNotificationType.newOrder,
+    avatarImage: 'assets/images/fab2.jpg',
+    customerName: 'Fatima Khan',
+    itemName: 'Bridal Lehenga',
+    orderId: 'OR002',
+    timeAgo: '3 hours ago',
+    isNew: true,
+  ),
+  const TailorNotification(
+    type: TailorNotificationType.orderConfirmationReminder,
+    avatarImage: 'assets/images/lace.jpg',
+    customerName: 'Aisha Rahman',
+    itemName: 'Wedding Sherwani',
+    orderId: 'OR003',
+    timeAgo: '1 day ago',
+  ),
+  const TailorNotification(
+    type: TailorNotificationType.orderConfirmationReminder,
+    avatarImage: 'assets/images/silk.jpg',
+    customerName: 'Nadia Hasan',
+    itemName: 'Casual Shirt',
+    orderId: 'OR004',
+    timeAgo: '2 days ago',
+  ),
+  const TailorNotification(
+    type: TailorNotificationType.deliveryDeadline,
+    avatarImage: 'assets/images/textile.jpg',
+    customerName: 'Zara Malik',
+    itemName: 'Premium Suit',
+    orderId: 'OR005',
+    timeAgo: '5 hours ago',
+    isNew: true,
+    deadlineDate: '2026-07-20',
+  ),
+  const TailorNotification(
+    type: TailorNotificationType.deliveryDeadline,
+    avatarImage: 'assets/images/fab2.jpg',
+    customerName: 'Mariam Ali',
+    itemName: 'Evening Gown',
+    orderId: 'OR006',
+    timeAgo: '1 day ago',
+    deadlineDate: '2026-07-18',
+  ),
+  const TailorNotification(
+    type: TailorNotificationType.newReview,
+    avatarImage: 'assets/images/fab.jpg',
+    customerName: 'Hassan Raza',
+    itemName: 'Traditional Kurta',
+    orderId: 'OR007',
+    timeAgo: '3 days ago',
+    rating: 4.5,
+    reviewText: 'Excellent stitching and timely delivery! The fit was perfect. Highly recommend this tailor.',
+    customerImage: 'assets/images/fab.jpg',
+  ),
+  const TailorNotification(
+    type: TailorNotificationType.newReview,
+    avatarImage: 'assets/images/lace.jpg',
+    customerName: 'Sana Khan',
+    itemName: 'Designer Lehenga',
+    orderId: 'OR008',
+    timeAgo: '4 days ago',
+    rating: 5.0,
+    reviewText: 'Amazing work! The design was exactly what I wanted.',
+    customerImage: 'assets/images/lace.jpg',
+  ),
+];
+
+class TailorNotificationScreen extends StatefulWidget {
+  const TailorNotificationScreen({super.key});
+
+  @override
+  State<TailorNotificationScreen> createState() => _TailorNotificationScreenState();
+}
+
+class _TailorNotificationScreenState extends State<TailorNotificationScreen> {
+  late List<TailorNotification> _notifications;
+
+  @override
+  void initState() {
+    super.initState();
+    _notifications = List.of(kTailorDummyNotifications);
+  }
+
+  void _clearAll() {
+    setState(() => _notifications.clear());
+  }
+
+  void _goBack() {
+    Navigator.pop(context, false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _goBack();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF6FAF6),
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: _notifications.isEmpty
+                    ? _buildEmptyState()
+                    : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  itemCount: _notifications.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 14),
+                  itemBuilder: (context, index) => _buildCard(_notifications[index]),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---------------- Header ----------------
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.green.shade200, Colors.green.shade50],
+        ),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.notifications_none_rounded,
+                      color: Colors.black87,
+                      size: 26,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Notifications',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: _goBack,
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                ),
+                child: const Text('Back', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: _notifications.isEmpty ? null : _clearAll,
+              style: TextButton.styleFrom(
+                backgroundColor: const Color(0xFF16332A),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              ),
+              child: const Text('clear all', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12.5)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.notifications_off_outlined, size: 56, color: Colors.grey.shade400),
+          const SizedBox(height: 12),
+          Text("You're all caught up", style: TextStyle(color: Colors.grey.shade600, fontSize: 14, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  // ---------------- Notification card ----------------
+  Widget _buildCard(TailorNotification n) {
+    final style = _styleFor(n.type);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: style.background,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: Colors.white,
+                backgroundImage: AssetImage(n.avatarImage),
+                onBackgroundImageError: (_, __) {},
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(style.icon, size: 18, color: style.iconColor),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            style.title,
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        if (n.isNew) //_buildNewBadge(),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                   // _buildMessageText(n, style),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildFooter(n),
+        ],
+      ),
+    );
+  }
+
+
+
+  Widget _buildFooter(TailorNotification n) {
+    if (n.type == TailorNotificationType.newReview) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('Order ID: ${n.orderId}', style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
+          Row(
+            children: [
+              OutlinedButton(
+                onPressed: () => _showReviewDetails(n),
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  side: BorderSide(color: Colors.green.shade300),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  'View Review',
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.green.shade700),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withOpacity(0.45)),
+              const SizedBox(width: 4),
+              Text(n.timeAgo, style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
+            ],
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text('Order ID: ${n.orderId}',
+            style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
+        Row(
+          children: [
+            Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withOpacity(0.45)),
+            const SizedBox(width: 4),
+            Text(n.timeAgo, style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _showReviewDetails(TailorNotification n) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        alignment: Alignment.center,
+        insetPadding: const EdgeInsets.all(20),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Customer Review',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundImage: AssetImage(n.customerImage ?? 'assets/images/fab.jpg'),
+                    onBackgroundImageError: (_, __) {},
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          n.customerName,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Product: ${n.itemName}',
+                          style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.6)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: List.generate(5, (index) {
+                  int roundedRating = (n.rating ?? 0).round();
+                  if (index < roundedRating) {
+                    return Icon(
+                      Icons.star,
+                      color: Colors.amber,
+                      size: 28,
+                    );
+                  } else {
+                    return Icon(
+                      Icons.star_border,
+                      color: Colors.amber,
+                      size: 28,
+                    );
+                  }
+                }),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${n.rating?.toStringAsFixed(1) ?? '0'} / 5.0',
+                style: TextStyle(fontSize: 14, color: Colors.black.withOpacity(0.6)),
+              ),
+              if (n.reviewText != null && n.reviewText!.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 12),
+                Text(
+                  'Feedback:',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black.withOpacity(0.8)),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Text(
+                    n.reviewText!,
+                    style: TextStyle(fontSize: 14, height: 1.6, color: Colors.black.withOpacity(0.8)),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Close',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  _TailorNotificationStyle _styleFor(TailorNotificationType type) {
+    switch (type) {
+      case TailorNotificationType.newOrder:
+        return _TailorNotificationStyle(
+          background: const Color(0xFFCDEFD3),
+          icon: Icons.shopping_cart_rounded,
+          iconColor: Colors.green.shade800,
+          title: 'New Order Received',
+          messagePrefix: '',
+          messageMiddle: ' placed a new order for ',
+          messageSuffix: '.',
+        );
+      case TailorNotificationType.orderConfirmationReminder:
+        return _TailorNotificationStyle(
+          background: const Color(0xFFF7D6D6),
+          icon: Icons.warning_rounded,
+          iconColor: Colors.red.shade700,
+          title: 'Confirm Order',
+          messagePrefix: '',
+          messageMiddle: '\'s order for ',
+          messageSuffix: ' will be cancelled if not confirmed.',
+        );
+      case TailorNotificationType.deliveryDeadline:
+        return _TailorNotificationStyle(
+          background: const Color(0xFFFBE7C0),
+          icon: Icons.timer_rounded,
+          iconColor: Colors.orange.shade800,
+          title: 'Delivery Deadline Approaching',
+          messagePrefix: 'Order from ',
+          messageMiddle: ' for ',
+          messageSuffix: ' is approaching deadline.',
+        );
+      case TailorNotificationType.newReview:
+        return _TailorNotificationStyle(
+          background: const Color(0xFFD3E9F7),
+          icon: Icons.star_rate_rounded,
+          iconColor: Colors.blue.shade700,
+          title: 'New Review',
+          messagePrefix: '',
+          messageMiddle: ' reviewed ',
+          messageSuffix: '',
+        );
+    }
+  }
+}
+
+class _TailorNotificationStyle {
+  final Color background;
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String messagePrefix;
+  final String messageMiddle;
+  final String messageSuffix;
+
+  const _TailorNotificationStyle({
+    required this.background,
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.messagePrefix,
+    required this.messageMiddle,
+    required this.messageSuffix,
+  });
+}
