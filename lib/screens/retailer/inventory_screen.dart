@@ -238,6 +238,20 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
     return item.variants[index];
   }
 
+  String _lowStockTextFor(InventoryItem item) {
+    final lowStockVariants =
+        item.variants.where((variant) => variant.stock < 5).toList();
+
+    final colorStocks = lowStockVariants
+        .map((variant) => "${variant.stock} ${variant.colorName}")
+        .join(", ");
+    return "Low stock: $colorStocks";
+  }
+
+  bool _hasLowStockColor(InventoryItem item) {
+    return item.variants.any((variant) => variant.stock < 5);
+  }
+
   List<InventoryItem> get _filteredItems {
     final query = _searchQuery.toLowerCase();
     return items.where((item) {
@@ -893,12 +907,7 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
         child: Column(children: [
           SizedBox(
             width: double.infinity,
-            child: _summary(
-              "Inventory",
-              items.length.toString(),
-              "total items",
-              Colors.green.shade50,
-            ),
+            child: _inventorySummary(items.length),
           ),
           const SizedBox(height: 14),
           TextField(
@@ -929,7 +938,7 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
                     controller: _scrollController,
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
-                      childAspectRatio: 0.6,
+                      childAspectRatio: 0.55,
                       mainAxisSpacing: 15,
                       crossAxisSpacing: 15,
                     ),
@@ -969,6 +978,7 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
   Widget _buildProductCard(InventoryItem item) {
     final selectedVariant = _selectedVariantFor(item);
     final variantIndex = selectedVariant == null ? -1 : item.variants.indexOf(selectedVariant);
+    final hasLowStockColor = _hasLowStockColor(item);
 
     return GestureDetector(
       onTap: () => _showProductPreview(item),
@@ -1086,6 +1096,27 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
                           ),
                   ),
                   const SizedBox(height: 8),
+                  if (hasLowStockColor) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      child: Text(
+                        _lowStockTextFor(item),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -1142,37 +1173,37 @@ class _InventoryScreenState extends State<InventoryScreen> with TickerProviderSt
     );
   }
 
-  Widget _summary(String t, String v, String subtitle, Color bg, {String? detail}) {
+  Widget _inventorySummary(int itemCount) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-          color: bg, borderRadius: BorderRadius.circular(14)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+          color: Colors.green.shade50, borderRadius: BorderRadius.circular(14)),
+      child: Row(
         children: [
+          Icon(Icons.inventory_2_outlined, size: 18, color: Colors.green.shade800),
+          const SizedBox(width: 8),
           CountUpText(
             begin: 0,
-            end: double.tryParse(v) ?? 0,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            end: itemCount.toDouble(),
+            style: TextStyle(
+              color: Colors.green.shade900,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
           ),
-          Text(t, style: const TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.black54, fontSize: 10),
-          ),
-          if (detail != null) ...[
-            const SizedBox(height: 2),
-            Text(
-              detail,
+          const SizedBox(width: 4),
+          const Expanded(
+            child: Text(
+              "products currently available in inventory",
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.black45, fontSize: 9, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: Colors.black87,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ],
+          ),
         ],
       ),
     );
