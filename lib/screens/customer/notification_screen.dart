@@ -774,7 +774,7 @@ class _RetailerNotificationScreenState extends State<RetailerNotificationScreen>
             ],
           ),
           const SizedBox(height: 12),
-          //_buildFooter(n),
+          _buildFooter(n),
         ],
       ),
     );
@@ -831,7 +831,200 @@ class _RetailerNotificationScreenState extends State<RetailerNotificationScreen>
     );
   }
 
+  Widget _buildFooter(RetailerNotification n) {
+    if (n.type == RetailerNotificationType.newReview) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('Order ID: ${n.orderId}', style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
+          Row(
+            children: [
+              OutlinedButton(
+                onPressed: () => _showReviewDetails(n),
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  side: BorderSide(color: Colors.green.shade300),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  'View Review',
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.green.shade700),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withOpacity(0.45)),
+              const SizedBox(width: 4),
+              Text(n.timeAgo, style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
+            ],
+          ),
+        ],
+      );
+    }
 
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text('${n.type == RetailerNotificationType.stockOut ? 'Product' : 'Order'} ID: ${n.orderId}',
+            style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
+        Row(
+          children: [
+            Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withOpacity(0.45)),
+            const SizedBox(width: 4),
+            Text(n.timeAgo, style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _showReviewDetails(RetailerNotification n) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        alignment: Alignment.center,
+        insetPadding: const EdgeInsets.all(20),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Customer Review',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundImage: AssetImage(n.customerImage ?? 'assets/images/fab.jpg'),
+                    onBackgroundImageError: (_, __) {},
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          n.customerName,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Product: ${n.itemName}',
+                          style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.6)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Show stars based on actual rating (rounded to nearest whole number)
+              Row(
+                children: List.generate(5, (index) {
+                  // Round the rating to nearest whole number
+                  int roundedRating = (n.rating ?? 0).round();
+
+                  // Show filled star if index is less than rounded rating
+                  if (index < roundedRating) {
+                    return Icon(
+                      Icons.star,
+                      color: Colors.amber,
+                      size: 28,
+                    );
+                  } else {
+                    // Show empty star
+                    return Icon(
+                      Icons.star_border,
+                      color: Colors.amber,
+                      size: 28,
+                    );
+                  }
+                }),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${n.rating?.toStringAsFixed(1) ?? '0'} / 5.0',
+                style: TextStyle(fontSize: 14, color: Colors.black.withOpacity(0.6)),
+              ),
+              if (n.reviewText != null && n.reviewText!.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 12),
+                Text(
+                  'Feedback:',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black.withOpacity(0.8)),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Text(
+                    n.reviewText!,
+                    style: TextStyle(fontSize: 14, height: 1.6, color: Colors.black.withOpacity(0.8)),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Close',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   _RetailerNotificationStyle _styleFor(RetailerNotificationType type) {
     switch (type) {
