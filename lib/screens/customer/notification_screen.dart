@@ -1367,11 +1367,11 @@ class _TailorNotificationScreenState extends State<TailorNotificationScreen> {
                             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                         ),
-                        if (n.isNew) //_buildNewBadge(),
+                        if (n.isNew) _buildNewBadge(),
                       ],
                     ),
                     const SizedBox(height: 6),
-                   // _buildMessageText(n, style),
+                    _buildMessageText(n, style),
                   ],
                 ),
               ),
@@ -1384,7 +1384,65 @@ class _TailorNotificationScreenState extends State<TailorNotificationScreen> {
     );
   }
 
+  Widget _buildMessageText(TailorNotification n, _TailorNotificationStyle style) {
+    return RichText(
+      text: TextSpan(
+        style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
+        children: [
+          TextSpan(text: style.messagePrefix),
+          TextSpan(
+            text: n.customerName,
+            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+          ),
+          TextSpan(text: style.messageMiddle),
+          TextSpan(
+            text: n.itemName,
+            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+          ),
+          if (style.messageSuffix.isNotEmpty) TextSpan(text: style.messageSuffix),
+          if (n.type == TailorNotificationType.deliveryDeadline && n.deadlineDate != null) ...[
+            TextSpan(
+              text: ' Deadline: ${n.deadlineDate}',
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+            ),
+          ],
+          if (n.type == TailorNotificationType.newOrder) ...[
+            TextSpan(text: ' '),
+            TextSpan(
+              text: 'View Order',
+              style: TextStyle(
+                color: Colors.blue.shade700,
+                fontWeight: FontWeight.bold,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ],
+          if (n.type == TailorNotificationType.orderConfirmationReminder) ...[
+            TextSpan(text: ' '),
+            TextSpan(
+              text: 'Confirm Now',
+              style: TextStyle(
+                color: Colors.blue.shade700,
+                fontWeight: FontWeight.bold,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
+  Widget _buildNewBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF16332A),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Text('New', style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700)),
+    );
+  }
 
   Widget _buildFooter(TailorNotification n) {
     if (n.type == TailorNotificationType.newReview) {
