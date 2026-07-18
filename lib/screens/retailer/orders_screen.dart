@@ -37,14 +37,15 @@ class RetailerOrder {
   final List<OrderItem> items;
   final double amount;
   final DateTime orderDate;
-  final DateTime? deliveryDate;
-  final String status;
-  final bool isDelivered;
-  final String paymentStatus;
+  DateTime? deliveryDate;
+  String status;
+  bool isDelivered;
   final String? review;
   final double? rating;
+  final String recipientType; // "Customer" or "Tailor"
+  final String deliveryAddress;
 
-  const RetailerOrder({
+  RetailerOrder({
     required this.id,
     required this.customerName,
     required this.items,
@@ -52,7 +53,8 @@ class RetailerOrder {
     required this.orderDate,
     required this.status,
     required this.isDelivered,
-    required this.paymentStatus,
+    required this.recipientType,
+    required this.deliveryAddress,
     this.deliveryDate,
     this.review,
     this.rating,
@@ -76,8 +78,8 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
   DateTime? _customEndDate;
   bool _showOngoing = true;
 
-  // Updated toggle green: A professional forest green
-  final Color primaryGreen = const Color(0xFF439647);
+  // Primary color: #4F7942
+  final Color primaryGreen = const Color(0xFF4F7942);
 
   late final List<RetailerOrder> _orders = <RetailerOrder>[
     RetailerOrder(
@@ -87,7 +89,8 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       orderDate: DateTime.now().subtract(const Duration(days: 12)),
       status: "Preparing",
       isDelivered: false,
-      paymentStatus: "Unpaid",
+      recipientType: "Tailor",
+      deliveryAddress: "123 Stitch St, Dhaka Fashion District",
       items: [
         OrderItem(
           name: "Premium Egyptian Cotton",
@@ -96,7 +99,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
           imagePath: "assets/images/fabrics_rolled.jpg",
           color: "White",
           description:
-              "Soft, breathable Egyptian cotton perfect for high-end shirts and summer wear.",
+              "Soft, breathable Egyptian cotton perfect for high-end shirts.",
           itemComment: "The cotton texture is incredibly smooth.",
           ironLevel: "High",
         ),
@@ -117,7 +120,8 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       orderDate: DateTime.now().subtract(const Duration(days: 28)),
       status: "Packed",
       isDelivered: false,
-      paymentStatus: "Paid",
+      recipientType: "Customer",
+      deliveryAddress: "House 45, Road 12, Banani, Dhaka",
       items: [
         OrderItem(
           name: "Golden Silk Blend",
@@ -125,8 +129,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
           price: 5400,
           imagePath: "assets/images/silk.jpg",
           color: "Gold",
-          description:
-              "Luxurious silk blend with a natural sheen and elegant drape.",
+          description: "Luxurious silk blend with a natural sheen.",
           itemComment: "Exactly the shade of gold I needed.",
           canWash: false,
           canTumbleDry: false,
@@ -142,7 +145,8 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       deliveryDate: DateTime.now().subtract(const Duration(days: 35)),
       status: "Delivered",
       isDelivered: true,
-      paymentStatus: "Paid",
+      recipientType: "Customer",
+      deliveryAddress: "Dhanmondi 27, Dhaka",
       review: "Amazing quality fabric! The selection was perfect.",
       rating: 4.8,
       items: [
@@ -152,8 +156,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
           price: 5600,
           imagePath: "assets/images/fab2.jpg",
           color: "Light Blue",
-          description:
-              "Lightweight linen fabric, highly breathable and ideal for humid weather.",
+          description: "Lightweight linen fabric, highly breathable.",
           itemComment: "The linen is so soft and cool.",
           canTumbleDry: false,
         ),
@@ -174,7 +177,8 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       deliveryDate: DateTime.now().subtract(const Duration(days: 89)),
       status: "Delivered",
       isDelivered: true,
-      paymentStatus: "Paid",
+      recipientType: "Tailor",
+      deliveryAddress: "Shop 12, Gulshan Market, Dhaka",
       review: "Very soft and beautiful patterns. Delivery was fast.",
       rating: 4.5,
       items: [
@@ -184,31 +188,9 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
           price: 4560,
           imagePath: "assets/images/gorgeous.jpg",
           color: "Multi",
-          description: "Vibrant seasonal patterns on soft, comfortable material.",
+          description: "Vibrant seasonal patterns on soft material.",
           canDryClean: false,
           ironLevel: "Low",
-        ),
-      ],
-    ),
-    RetailerOrder(
-      id: "ORD-1018",
-      customerName: "Jaima Haque",
-      amount: 3680,
-      orderDate: DateTime.now().subtract(const Duration(days: 142)),
-      deliveryDate: DateTime.now().subtract(const Duration(days: 134)),
-      status: "Delivered",
-      isDelivered: true,
-      paymentStatus: "Paid",
-      review: "Strong and stylish. Perfect for daily wear.",
-      rating: 5.0,
-      items: [
-        OrderItem(
-          name: "Denim Work Shirt",
-          quantity: 4,
-          price: 3680,
-          imagePath: "assets/images/denim.jpg",
-          color: "Indigo",
-          description: "Durable denim construction designed for longevity.",
         ),
       ],
     ),
@@ -266,6 +248,19 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     return _filteredOrders.where((order) => order.isDelivered).toList();
   }
 
+  void _updateOrderStatus(RetailerOrder order, String newStatus) {
+    setState(() {
+      order.status = newStatus;
+      if (newStatus == "Delivered") {
+        order.isDelivered = true;
+        order.deliveryDate = DateTime.now();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Order ${order.id} marked as Delivered")),
+        );
+      }
+    });
+  }
+
   Future<void> _pickCustomDateRange() async {
     final initialStart =
         _customStartDate ?? DateTime.now().subtract(const Duration(days: 30));
@@ -284,8 +279,8 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: Colors.green.shade800,
-              secondary: Colors.green.shade100,
+              primary: primaryGreen,
+              secondary: primaryGreen.withValues(alpha: 0.1),
             ),
           ),
           child: child!,
@@ -392,10 +387,10 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 2),
       leading: CircleAvatar(
-        backgroundColor: selected ? Colors.green.shade800 : Colors.green.shade50,
+        backgroundColor: selected ? primaryGreen : Colors.green.shade50,
         child: Icon(
           selected ? Icons.check : Icons.calendar_month_outlined,
-          color: selected ? Colors.white : Colors.green.shade800,
+          color: selected ? Colors.white : primaryGreen,
           size: 20,
         ),
       ),
@@ -465,7 +460,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                         children: [
                           Icon(
                             Icons.tune,
-                            color: Colors.green.shade800,
+                            color: primaryGreen,
                             size: 20,
                           ),
                           const SizedBox(width: 6),
@@ -475,7 +470,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: Colors.green.shade900,
+                                color: primaryGreen,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w800,
                               ),
@@ -488,7 +483,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 24), // Proper gap
+            const SizedBox(height: 24),
             Row(
               children: [
                 Expanded(
@@ -510,20 +505,20 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             if (_showOngoing)
               _ordersSection(
                 title: "Ongoing Orders",
                 icon: Icons.local_shipping_outlined,
                 orders: _ongoingOrders,
-                emptyText: "No ongoing orders for this filter",
+                emptyText: "No ongoing orders found",
               )
             else
               _ordersSection(
                 title: "Delivered Orders",
                 icon: Icons.check_circle_outline,
                 orders: _deliveredOrders,
-                emptyText: "No delivered orders for this filter",
+                emptyText: "No delivered orders found",
               ),
           ],
         ),
@@ -540,23 +535,38 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
           color: isSelected ? primaryGreen : Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? primaryGreen : Colors.green.shade100,
+            color: isSelected
+                ? primaryGreen.withValues(alpha: 0.8)
+                : Colors.green.shade100,
+            width: isSelected ? 1.5 : 1,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: primaryGreen.withValues(alpha: 0.25),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
+                    color: primaryGreen.withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 1,
+                    offset: const Offset(0, 1),
                   ),
                 ]
-              : null,
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
         child: Column(
           children: [
@@ -565,16 +575,19 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
               style: TextStyle(
                 color: isSelected ? Colors.white : Colors.green.shade900,
                 fontSize: 16,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 3),
             Text(
               "$count orders",
               style: TextStyle(
-                color: isSelected ? Colors.white70 : Colors.green.shade700,
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.8)
+                    : Colors.green.shade700,
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],
@@ -594,7 +607,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       children: [
         Row(
           children: [
-            Icon(icon, color: Colors.green.shade800, size: 20),
+            Icon(icon, color: primaryGreen, size: 20),
             const SizedBox(width: 8),
             Text(
               title,
@@ -653,15 +666,16 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
   }
 
   Widget _orderCard(RetailerOrder order) {
-    // Status colors: Professional Indigo for Preparing/Packed, Green for Delivered
-    final Color statusBg = order.isDelivered
-        ? Colors.green.shade50
-        : Colors.indigo.shade50;
-    final Color statusText = order.isDelivered
-        ? Colors.green.shade800
-        : Colors.indigo.shade800;
+    final Color statusColor =
+        order.isDelivered ? primaryGreen : Colors.blueAccent;
 
     final firstItem = order.items.first;
+
+    // Deliver to display logic
+    String deliverToText = order.recipientType;
+    if (!order.isDelivered && order.recipientType == "Tailor") {
+      deliverToText = "Tailor (Pending)";
+    }
 
     return GestureDetector(
       onTap: () => _showOrderPreview(order),
@@ -695,10 +709,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                       width: 52,
                       height: 52,
                       color: Colors.green.shade50,
-                      child: Icon(
-                        Icons.receipt_long,
-                        color: Colors.green.shade800,
-                      ),
+                      child: Icon(Icons.receipt_long, color: primaryGreen),
                     ),
                   ),
                 ),
@@ -729,6 +740,30 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+                      const SizedBox(height: 4),
+                      // Deliver To Section
+                      Row(
+                        children: [
+                          const Text(
+                            "Deliver to: ",
+                            style: TextStyle(
+                              color: Colors.black45,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            deliverToText,
+                            style: TextStyle(
+                              color: order.recipientType == "Tailor" && !order.isDelivered
+                                  ? Colors.orange.shade800
+                                  : primaryGreen,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -742,27 +777,36 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: statusBg,
+                        color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
                         order.status,
                         style: TextStyle(
-                          color: statusText,
+                          color: statusColor,
                           fontSize: 11,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      order.paymentStatus,
-                      style: TextStyle(
-                        color: Colors.green.shade700,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
+                    if (!order.isDelivered)
+                      TextButton(
+                        onPressed: () => _showStatusPicker(order),
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(0, 20),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          "Change",
+                          style: TextStyle(
+                            color: primaryGreen,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ],
@@ -845,6 +889,41 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     );
   }
 
+  void _showStatusPicker(RetailerOrder order) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Update Order Status",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            ...["Preparing", "Packed", "Delivered"].map((s) => ListTile(
+                  title: Text(s),
+                  onTap: () {
+                    _updateOrderStatus(order, s);
+                    Navigator.pop(context);
+                  },
+                  trailing: order.status == s
+                      ? Icon(Icons.check_circle, color: primaryGreen)
+                      : null,
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _showOrderPreview(RetailerOrder order) async {
     await showModalBottomSheet(
       context: context,
@@ -904,14 +983,28 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                   _infoBadge(
                     order.status,
                     order.isDelivered
-                        ? Colors.green.shade50
-                        : Colors.indigo.shade50,
-                    order.isDelivered
-                        ? Colors.green.shade800
-                        : Colors.indigo.shade800,
+                        ? primaryGreen.withValues(alpha: 0.1)
+                        : Colors.blueAccent.withValues(alpha: 0.1),
+                    order.isDelivered ? primaryGreen : Colors.blueAccent,
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+              if (!order.isDelivered)
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _showStatusPicker(order);
+                  },
+                  icon: const Icon(Icons.edit, size: 16, color: Colors.white),
+                  label: const Text("Change Status",
+                      style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryGreen,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
               const SizedBox(height: 25),
               const Text(
                 "Products",
@@ -930,7 +1023,38 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
               _detailRow("Order Date", _formatDate(order.orderDate)),
               if (order.deliveryDate != null)
                 _detailRow("Delivery Date", _formatDate(order.deliveryDate!)),
-              _detailRow("Payment Status", order.paymentStatus),
+              const SizedBox(height: 8),
+              const Text(
+                "Delivery Address",
+                style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.location_on_outlined, size: 16, color: primaryGreen),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        order.deliveryAddress,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          height: 1.4,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const Divider(height: 32),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1088,7 +1212,8 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 _careTag(Icons.wash, "Wash", item.canWash),
                 _careTag(Icons.biotech, "Bleach", item.canBleach),
                 _careTag(Icons.dry_cleaning, "Dry Clean", item.canDryClean),
-                _careTag(Icons.settings_input_component, "Tumble", item.canTumbleDry),
+                _careTag(
+                    Icons.settings_input_component, "Tumble", item.canTumbleDry),
                 _careTag(Icons.iron, "Iron: ${item.ironLevel}", true),
               ],
             ),
@@ -1104,7 +1229,8 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.chat_bubble_outline, size: 14, color: Colors.green.shade700),
+                  Icon(Icons.chat_bubble_outline,
+                      size: 14, color: Colors.green.shade700),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -1136,7 +1262,8 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: isOk ? Colors.green.shade700 : Colors.grey),
+          Icon(icon,
+              size: 12, color: isOk ? Colors.green.shade700 : Colors.grey),
           const SizedBox(width: 4),
           Text(
             label,
@@ -1171,7 +1298,9 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+          Text(label,
+              style:
+                  const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
         ],
       ),
