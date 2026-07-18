@@ -2,10 +2,15 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import '../shared/welcome_screen.dart';
 import '../../models/appearance_profile.dart';
 import '../../services/ai_service.dart';
 import '../../utils/api_config.dart';
 import '../../widgets/dashboard_drawer.dart';
+import 'home_screen.dart';
+import 'package:gal/gal.dart';
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Colour palette & tokens
@@ -95,14 +100,15 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     'Hips': TextEditingController(text: '36"'),
     'Under Bust': TextEditingController(text: '30"'),
     'Bust': TextEditingController(text: '35"'),
-    'Bust Span': TextEditingController(text: '7.5"'),
-    'Shoulder to Hips': TextEditingController(text: '22"'),
+    'Waist': TextEditingController(text: '28"'),
     'Shoulder to Knee': TextEditingController(text: '38"'),
     'Shoulder to Under Bust': TextEditingController(text: '13.5"'),
     'Shoulder to Bust': TextEditingController(text: '9.5"'),
     'Thigh': TextEditingController(text: '20"'),
     'Knee': TextEditingController(text: '14"'),
     'Ankle': TextEditingController(text: '9"'),
+    'Waist to Ankle': TextEditingController(text: '40"'),
+    'Shoulder to Ankle': TextEditingController(text: '57"'),
   };
 
   final Set<String> _selectedStyles = {};
@@ -206,25 +212,44 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     );
 
     try {
-      // Collect reference image bytes
-      final List<Uint8List> refBytes = [];
-      for (final f in _referenceImages) {
-        refBytes.add(await File(f.path).readAsBytes());
-      }
+      // 1. Call Gemini for fabric estimation
+      setState(() {
+        _statusMessage = 'Estimating fabric requirements with Gemini...';
+      });
 
-      final (imageBytes, fabric) =
-          await AIService.generateVirtualTrialFromProfile(
+      final fabric = await AIService.estimateFabricWithGemini(
         geminiApiKey: geminiKey,
-        hfToken: hfToken,
-        profile: profileSnapshot,
-        referenceImageBytes: refBytes,
         measurements: _measurements,
         stylePreferences: _selectedStyles.toList(),
         customInstructions: _customInstructionsController.text.trim(),
-        onStatus: (s) {
-          if (mounted) setState(() => _statusMessage = s);
-        },
       );
+
+      // 2. Local mock delay for image loading
+      setState(() {
+        _statusMessage = 'Loading virtual trial preview...';
+      });
+      await Future.delayed(const Duration(seconds: 1));
+
+      // 3. Load random mock image from assets (image generation is disconnected from API)
+      final List<String> mockImages = [
+        'crochet.jpg',
+        'embroidery.jpg',
+        'fab.jpg',
+        'fab2.jpg',
+        'fabric_waves.jpg',
+        'gorgeous.jpg',
+        'lace.jpg',
+        'saree.jpg',
+        'silk.jpg',
+        'tassel.jpg',
+        'textile.jpg',
+      ];
+      mockImages.shuffle();
+      final selectedAssetName = 'assets/images/${mockImages.first}';
+
+      // Load image bytes from Flutter asset bundle
+      final assetData = await DefaultAssetBundle.of(context).load(selectedAssetName);
+      final imageBytes = assetData.buffer.asUint8List();
 
       if (!mounted) return;
       setState(() {
@@ -243,14 +268,35 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
           _scrollController.position.maxScrollExtent,
           duration: const Duration(milliseconds: 600),
           curve: Curves.easeInOut,
-        );
+        ).catchError((_) {});
       }
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _statusMessage = 'Error: ${e.toString()}';
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _statusMessage = '';
+        });
+        _showSnack('Error generating mock preview: $e');
+      }
+    }
+  }
+
+  Future<void> _downloadImage() async {
+    if (_generatedImageBytes == null) return;
+    try {
+      // Check and request photo library access
+      final hasAccess = await Gal.hasAccess();
+      if (!hasAccess) {
+        final granted = await Gal.requestAccess();
+        if (!granted) {
+          _showSnack('Gallery permission denied. Please enable permission to save.');
+          return;
+        }
+      }
+      await Gal.putImageBytes(_generatedImageBytes!);
+      _showSnack('Successfully saved to device photo gallery!');
+    } catch (e) {
+      _showSnack('Failed to save to gallery: $e');
     }
   }
 
@@ -276,7 +322,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       appBar: _buildAppBar(),
       body: SingleChildScrollView(
         controller: _scrollController,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 25),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -332,7 +378,16 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             ),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              } else {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const UnifiedHomeScreen()),
+                );
+              }
+            },
             child: const Text('Back',
                 style:
                     TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
@@ -980,38 +1035,37 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
             }
           },
           children: [
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate:
-                  const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 2.5,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-              ),
-              itemCount: _measurements.length,
-              itemBuilder: (_, i) {
-                final key =
-                    _measurements.keys.elementAt(i);
-                return TextField(
-                  controller: _measurements[key],
-                  decoration: InputDecoration(
-                    labelText: key,
-                    labelStyle: const TextStyle(fontSize: 10),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    contentPadding:
-                        const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 8),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide:
-                          const BorderSide(color: _sage),
-                    ),
-                  ),
-                  style: const TextStyle(fontSize: 13),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final cellWidth = (constraints.maxWidth - 10) / 2;
+                final keys = _measurements.keys.toList();
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: List.generate(keys.length, (i) {
+                    final key = keys[i];
+                    return SizedBox(
+                      width: cellWidth,
+                      height: 72,
+                      child: TextField(
+                        controller: _measurements[key],
+                        decoration: InputDecoration(
+                          labelText: key,
+                          labelStyle: const TextStyle(fontSize: 10),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 14),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: _sage),
+                          ),
+                        ),
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    );
+                  }),
                 );
               },
             ),
@@ -1201,13 +1255,29 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Your AI Preview',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: _ink,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Your AI Preview',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: _ink,
+                ),
+              ),
+              IconButton.filledTonal(
+                onPressed: _downloadImage,
+                icon: const Icon(Icons.download_rounded, color: _sageDark),
+                style: IconButton.styleFrom(
+                  backgroundColor: _sagePale,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                tooltip: 'Download Try-On Image',
+              ),
+            ],
           ),
           const SizedBox(height: 16),
 
@@ -1323,6 +1393,35 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   }
 
   Widget _buildFabricLedger(Map<String, String> fabric) {
+    if (fabric.containsKey('_error')) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFBEB),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFFDE68A)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706), size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                fabric['_error']!,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFB45309),
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1386,22 +1485,21 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                     spacing: 6,
                     runSpacing: 4,
                     children: parts.map((part) {
-                      final isInch  = part.toLowerCase().contains('inch');
-                      final isMeter = part.toLowerCase().contains('meter');
+                      final isInch   = part.toLowerCase().contains('inch');
+                      final isGauge  = part.toLowerCase().contains('gauge');
                       Color bg, border, fg;
                       if (isInch) {
                         bg = const Color(0xFFE8F0FE);
                         border = const Color(0xFFADC8F5);
                         fg = const Color(0xFF2558C1);
-                      } else if (isMeter) {
-                        bg = const Color(0xFFFFF8E1);
-                        border = const Color(0xFFFFCC80);
-                        fg = const Color(0xFFBF7800);
-                      } else {
-                        // Gauge
+                      } else if (isGauge) {
                         bg = _sagePale;
                         border = _border;
                         fg = _sageDark;
+                      } else {
+                        bg = const Color(0xFFF3F4F6);
+                        border = const Color(0xFFD1D5DB);
+                        fg = const Color(0xFF374151);
                       }
                       return Container(
                         padding: const EdgeInsets.symmetric(

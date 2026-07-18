@@ -5,7 +5,6 @@ import 'login_screen.dart';
 import 'register_screen.dart';
 import 'about_us_screen.dart';
 import 'firebase_test_screen.dart';
-import '../customer/virtual_trial_screen.dart';
 import '../customer/browsing/browse_shell.dart'; // Changed from browse_fabrics_screen
 import '../test_cloudinary_screen.dart';
 
@@ -283,13 +282,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                       MaterialPageRoute(builder: (context) => const FirebaseTestScreen()),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.psychology, size: 16),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const VirtualTrialScreen()),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -448,18 +440,23 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                       ),
                     ],
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: ListView(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade50.withValues(alpha: 0.8),
-                          shape: BoxShape.circle,
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50.withAlpha(200),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(icon, color: Colors.green.shade800, size: 30),
                         ),
-                        child: Icon(icon, color: Colors.green.shade800, size: 30),
                       ),
-                      const Spacer(),
+                      const SizedBox(height: 16),
                       Text(
                         title,
                         style: TextStyle(
@@ -474,7 +471,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                         desc,
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.black87.withValues(alpha: 0.7),
+                          color: Colors.black87.withAlpha(180),
                           height: 1.5,
                         ),
                       ),
