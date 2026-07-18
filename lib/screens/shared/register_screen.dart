@@ -535,7 +535,6 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
               style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
             ),
             SizedBox(width: 8),
-            Icon(Icons.arrow_forward, color: Colors.white, size: 18),
           ],
         ),
       ),
