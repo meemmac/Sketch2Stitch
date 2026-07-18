@@ -19,6 +19,8 @@ class RetailerOrder {
   final bool canDryClean;
   final bool canTumbleDry;
   final String ironLevel;
+  final String? review;
+  final double? rating;
 
   const RetailerOrder({
     required this.id,
@@ -33,12 +35,15 @@ class RetailerOrder {
     required this.color,
     required this.paymentStatus,
     this.deliveryDate,
-    this.description = "Premium quality material with excellent durability and comfort.",
+    this.description =
+        "Premium quality material with excellent durability and comfort.",
     this.canWash = true,
     this.canBleach = false,
     this.canDryClean = true,
     this.canTumbleDry = true,
     this.ironLevel = "Medium",
+    this.review,
+    this.rating,
   });
 }
 
@@ -55,6 +60,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
   OrderFilterPreset _filterPreset = OrderFilterPreset.last3Months;
   DateTime? _customStartDate;
   DateTime? _customEndDate;
+  bool _showOngoing = true;
 
   late final List<RetailerOrder> _orders = <RetailerOrder>[
     RetailerOrder(
@@ -69,7 +75,8 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       imagePath: "assets/images/fabrics_rolled.jpg",
       color: "White",
       paymentStatus: "Unpaid",
-      description: "Soft, breathable Egyptian cotton perfect for high-end shirts and summer wear.",
+      description:
+          "Soft, breathable Egyptian cotton perfect for high-end shirts and summer wear.",
       canWash: true,
       canBleach: false,
       canDryClean: true,
@@ -108,12 +115,15 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       imagePath: "assets/images/fab2.jpg",
       color: "Light Blue",
       paymentStatus: "Paid",
-      description: "Lightweight linen fabric, highly breathable and ideal for humid weather.",
+      description:
+          "Lightweight linen fabric, highly breathable and ideal for humid weather.",
       canWash: true,
       canBleach: false,
       canDryClean: true,
       canTumbleDry: false,
       ironLevel: "Medium",
+      rating: 4.8,
+      review: "Amazing quality fabric! The color is exactly as shown.",
     ),
     RetailerOrder(
       id: "ORD-1051",
@@ -134,6 +144,8 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       canDryClean: false,
       canTumbleDry: true,
       ironLevel: "Low",
+      rating: 4.5,
+      review: "Very soft and beautiful patterns. Delivery was fast.",
     ),
     RetailerOrder(
       id: "ORD-1018",
@@ -154,6 +166,8 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       canDryClean: true,
       canTumbleDry: true,
       ironLevel: "Medium",
+      rating: 5.0,
+      review: "Strong and stylish. Perfect for daily wear.",
     ),
   ];
 
@@ -426,69 +440,96 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 18),
-            _orderSummary(),
+            Row(
+              children: [
+                Expanded(
+                  child: _sectionToggle(
+                    label: "Ongoing",
+                    isSelected: _showOngoing,
+                    count: _ongoingOrders.length,
+                    onTap: () => setState(() => _showOngoing = true),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _sectionToggle(
+                    label: "Delivered",
+                    isSelected: !_showOngoing,
+                    count: _deliveredOrders.length,
+                    onTap: () => setState(() => _showOngoing = false),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 20),
-            _ordersSection(
-              title: "Ongoing Orders",
-              icon: Icons.local_shipping_outlined,
-              orders: _ongoingOrders,
-              emptyText: "No ongoing orders for this filter",
-            ),
-            const SizedBox(height: 18),
-            _ordersSection(
-              title: "Delivered Orders",
-              icon: Icons.check_circle_outline,
-              orders: _deliveredOrders,
-              emptyText: "No delivered orders for this filter",
-            ),
+            if (_showOngoing)
+              _ordersSection(
+                title: "Ongoing Orders",
+                icon: Icons.local_shipping_outlined,
+                orders: _ongoingOrders,
+                emptyText: "No ongoing orders for this filter",
+              )
+            else
+              _ordersSection(
+                title: "Delivered Orders",
+                icon: Icons.check_circle_outline,
+                orders: _deliveredOrders,
+                emptyText: "No delivered orders for this filter",
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _orderSummary() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF67B36B),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          _summaryItem("Ongoing", _ongoingOrders.length.toString()),
-          Container(width: 1, height: 38, color: Colors.white24),
-          _summaryItem("Delivered", _deliveredOrders.length.toString()),
-          Container(width: 1, height: 38, color: Colors.white24),
-          _summaryItem("Total", _filteredOrders.length.toString()),
-        ],
-      ),
-    );
-  }
-
-  Widget _summaryItem(String label, String value) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
+  Widget _sectionToggle({
+    required String label,
+    required bool isSelected,
+    required int count,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF67B36B) : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF67B36B) : Colors.green.shade100,
           ),
-          const SizedBox(height: 3),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF67B36B).withValues(alpha: 0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.green.shade900,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 2),
+            Text(
+              "$count orders",
+              style: TextStyle(
+                color: isSelected ? Colors.white70 : Colors.green.shade700,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -691,6 +732,44 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 ),
               ],
             ),
+            if (order.isDelivered && order.rating != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.star, color: Colors.amber.shade800, size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      order.rating.toString(),
+                      style: TextStyle(
+                        color: Colors.amber.shade900,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        order.review ?? "No comment provided",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.amber.shade900.withValues(alpha: 0.8),
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             if (order.deliveryDate != null) ...[
               const SizedBox(height: 10),
               Text(
@@ -855,6 +934,61 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 if (order.deliveryDate != null)
                   _detailRow("Delivery Date", _formatDate(order.deliveryDate!)),
                 _detailRow("Payment Status", order.paymentStatus),
+                if (order.isDelivered && order.review != null) ...[
+                  const SizedBox(height: 30),
+                  const Text(
+                    "Customer Review",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: Colors.amber.shade100),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            ...List.generate(
+                              5,
+                              (index) => Icon(
+                                index < (order.rating ?? 0).floor()
+                                    ? Icons.star
+                                    : Icons.star_border,
+                                color: Colors.amber.shade800,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              order.rating?.toString() ?? "0.0",
+                              style: TextStyle(
+                                color: Colors.amber.shade900,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          "\"${order.review}\"",
+                          style: TextStyle(
+                            color: Colors.amber.shade900,
+                            fontSize: 14,
+                            fontStyle: FontStyle.italic,
+                            height: 1.4,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 40),
               ],
             ),
