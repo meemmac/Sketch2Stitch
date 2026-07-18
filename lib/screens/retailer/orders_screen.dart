@@ -366,11 +366,19 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final horizontalPadding = screenWidth > 600 ? screenWidth * 0.08 : 16.0;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FBF9),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            18,
+            horizontalPadding,
+            24,
+          ),
           children: [
             Row(
               children: [
@@ -384,11 +392,11 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Expanded(
+                Expanded(
                   child: Text(
                     "Orders",
                     style: TextStyle(
-                      fontSize: 30,
+                      fontSize: screenWidth > 400 ? 30 : 24,
                       fontWeight: FontWeight.w900,
                       color: Colors.black87,
                     ),
@@ -399,47 +407,45 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(14),
                     onTap: _showFilterSheet,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 190),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: Colors.green.shade100),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.tune,
-                              color: Colors.green.shade800,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                _filterLabel,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Colors.green.shade900,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.green.shade100),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.tune,
+                            color: Colors.green.shade800,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              _filterLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.green.shade900,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 18),
             Row(
               children: [
                 Expanded(
@@ -737,17 +743,17 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.amber.shade50,
+                  color: Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.star, color: Colors.amber.shade800, size: 16),
+                    Icon(Icons.star, color: Colors.blue.shade800, size: 16),
                     const SizedBox(width: 4),
                     Text(
                       order.rating.toString(),
                       style: TextStyle(
-                        color: Colors.amber.shade900,
+                        color: Colors.blue.shade900,
                         fontWeight: FontWeight.w900,
                         fontSize: 13,
                       ),
@@ -759,7 +765,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.amber.shade900.withValues(alpha: 0.8),
+                          color: Colors.blue.shade900.withValues(alpha: 0.8),
                           fontSize: 12,
                           fontStyle: FontStyle.italic,
                           fontWeight: FontWeight.w600,
@@ -944,9 +950,9 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
+                      color: Colors.blue.shade50,
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: Colors.amber.shade100),
+                      border: Border.all(color: Colors.blue.shade100),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -959,7 +965,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                                 index < (order.rating ?? 0).floor()
                                     ? Icons.star
                                     : Icons.star_border,
-                                color: Colors.amber.shade800,
+                                color: Colors.blue.shade800,
                                 size: 20,
                               ),
                             ),
@@ -967,7 +973,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                             Text(
                               order.rating?.toString() ?? "0.0",
                               style: TextStyle(
-                                color: Colors.amber.shade900,
+                                color: Colors.blue.shade900,
                                 fontWeight: FontWeight.w900,
                                 fontSize: 16,
                               ),
@@ -978,7 +984,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                         Text(
                           "\"${order.review}\"",
                           style: TextStyle(
-                            color: Colors.amber.shade900,
+                            color: Colors.blue.shade900,
                             fontSize: 14,
                             fontStyle: FontStyle.italic,
                             height: 1.4,
