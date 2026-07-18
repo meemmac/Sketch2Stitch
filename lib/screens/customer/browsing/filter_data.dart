@@ -1,14 +1,13 @@
 // lib/screens/customer/browsing/filter_data.dart
 
-class FabricsFilterData {
+abstract class ProductFilterData {
   final double minPrice;
   final double maxPrice;
   final String color;
   final String materialType;
   final String sortBy; // 'default', 'lowToHigh', 'highToLow'
-  // NO RATING FOR FABRICS
 
-  FabricsFilterData({
+  ProductFilterData({
     required this.minPrice,
     required this.maxPrice,
     required this.color,
@@ -23,6 +22,26 @@ class FabricsFilterData {
         materialType != 'All' ||
         sortBy != 'default';
   }
+}
+
+class FabricsFilterData extends ProductFilterData {
+  FabricsFilterData({
+    required super.minPrice,
+    required super.maxPrice,
+    required super.color,
+    required super.materialType,
+    super.sortBy = 'default',
+  });
+}
+
+class ElementsFilterData extends ProductFilterData {
+  ElementsFilterData({
+    required super.minPrice,
+    required super.maxPrice,
+    required super.color,
+    required super.materialType,
+    super.sortBy = 'default',
+  });
 }
 
 class TailorsFilterData {

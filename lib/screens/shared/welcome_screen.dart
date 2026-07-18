@@ -110,20 +110,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                         // Top Right Buttons
                         Row(
                           children: [
-                            // Browse Fabrics Button - Using BrowseShell directly
-                            _buildTopRightButton(
-                              icon: Icons.shopping_bag_outlined,
-                              tooltip: 'Browse Fabrics',
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const BrowseShell(initialIndex: 0), // Use BrowseShell directly
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(width: 8),
                             // Cloudinary Test Button
                             _buildTopRightButton(
                               icon: Icons.cloud_upload,

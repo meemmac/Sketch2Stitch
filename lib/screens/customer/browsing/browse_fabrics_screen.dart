@@ -167,16 +167,116 @@ final List<Product> kHardcodedProducts = [
   ),
 ];
 
-/// The actual fabrics tab content, rendered as one page inside the
+/// Hardcoded sample elements with assets images
+final List<Product> kHardcodedElements = [
+  Product(
+    id: 'e1',
+    retailerId: 'r1',
+    productName: 'Premium Zipper',
+    category: 'Fasteners',
+    materialType: 'Metal',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'Silver', image: 'assets/images/zipper.jpg', price: 120, stock: 100),
+      ColorOption(optionId: 2, color: 'Gold', image: 'assets/images/zipper_gold.jpg', price: 150, stock: 50),
+      ColorOption(optionId: 3, color: 'Black', image: 'assets/images/zipper.jpg', price: 130, stock: 75),
+    ],
+    description:
+        'High-quality metal zippers with smooth operation. '
+        'Perfect for jackets, bags, and formal wear.',
+    careSymbol: ['Do not iron directly', 'Clean with damp cloth'],
+  ),
+  Product(
+    id: 'e2',
+    retailerId: 'r1',
+    productName: 'Decorative Buttons Set',
+    category: 'Buttons',
+    materialType: 'Plastic',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/buttons.jpg', price: 80, stock: 200),
+      ColorOption(optionId: 2, color: 'Black', image: 'assets/images/buttons.jpg', price: 80, stock: 150),
+      ColorOption(optionId: 3, color: 'Gold', image: 'assets/images/buttons.jpg', price: 100, stock: 100),
+    ],
+    description:
+        'Elegant button sets in various sizes and finishes. '
+        'Suitable for shirts, blazers, and decorative purposes.',
+    careSymbol: ['Hand wash', 'Do not bleach'],
+  ),
+  Product(
+    id: 'e3',
+    retailerId: 'r2',
+    productName: 'Sewing Thread Collection',
+    category: 'Threads',
+    materialType: 'Cotton',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/thread.jpg', price: 45, stock: 300),
+      ColorOption(optionId: 2, color: 'Black', image: 'assets/images/thread.jpg', price: 45, stock: 250),
+      ColorOption(optionId: 3, color: 'Beige', image: 'assets/images/thread.jpg', price: 45, stock: 200),
+    ],
+    description:
+        'Premium quality sewing thread in essential colors. '
+        'Strong and durable for all your stitching needs.',
+    careSymbol: ['Store in cool dry place'],
+  ),
+  Product(
+    id: 'e4',
+    retailerId: 'r2',
+    productName: 'Pearl Embellishments',
+    category: 'Embellishments',
+    materialType: 'Glass',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/pearls.jpg', price: 200, stock: 80),
+      ColorOption(optionId: 2, color: 'Pink', image: 'assets/images/pearls.jpg', price: 220, stock: 60),
+    ],
+    description:
+        'Beautiful pearl embellishments for bridal and formal wear. '
+        'Adds elegance to any garment or accessory.',
+    careSymbol: ['Dry clean only', 'Handle with care'],
+  ),
+  Product(
+    id: 'e5',
+    retailerId: 'r3',
+    productName: 'Lace Trim',
+    category: 'Trims',
+    materialType: 'Lace',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/lace_trim.jpg', price: 180, stock: 40),
+      ColorOption(optionId: 2, color: 'Black', image: 'assets/images/lace_trim.jpg', price: 180, stock: 35),
+    ],
+    description:
+        'Fine lace trim with delicate patterns. '
+        'Perfect for adding feminine touches to garments.',
+    careSymbol: ['Hand wash', 'Do not bleach'],
+  ),
+  Product(
+    id: 'e6',
+    retailerId: 'r3',
+    productName: 'Ribbon Collection',
+    category: 'Ribbons',
+    materialType: 'Satin',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/ribbon.jpg', price: 60, stock: 150),
+      ColorOption(optionId: 2, color: 'Gold', image: 'assets/images/ribbon.jpg', price: 70, stock: 120),
+      ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/ribbon.jpg', price: 65, stock: 100),
+    ],
+    description:
+        'Versatile satin ribbons in various colors and widths. '
+        'Ideal for gift wrapping, bows, and garment decoration.',
+    careSymbol: ['Iron on low heat', 'Do not bleach'],
+  ),
+];
+
+/// The actual fabrics/elements tab content, rendered as one page inside the
 /// shared [BrowseShell] PageView.
 class FabricsPageBody extends StatefulWidget {
   final ValueNotifier<String> searchQuery;
-  final FabricsFilterData filterData;
+  final ProductFilterData filterData;
+  final bool showFabrics;
 
   const FabricsPageBody({
     super.key,
     required this.searchQuery,
     required this.filterData,
+    this.showFabrics = true,
   });
 
   @override
@@ -188,7 +288,8 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
   @override
   bool get wantKeepAlive => true;
 
-  final List<Product> _products = kHardcodedProducts;
+  final List<Product> _fabrics = kHardcodedProducts;
+  final List<Product> _elements = kHardcodedElements;
 
   @override
   Widget build(BuildContext context) {
@@ -196,33 +297,28 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
     return ValueListenableBuilder<String>(
       valueListenable: widget.searchQuery,
       builder: (context, searchQuery, _) {
-        final filteredProducts = _products.where((p) {
-          // Search filter
+        // Use fabrics or elements based on showFabrics flag
+        final products = widget.showFabrics ? _fabrics : _elements;
+        final type = widget.showFabrics ? 'Fabrics' : 'Elements';
+        
+        // Filter products
+        final filteredProducts = products.where((p) {
           final matchesSearch = p.productName
               .toLowerCase()
               .contains(searchQuery.toLowerCase());
-          
-          // Price filter
           final productMinPrice = p.minPrice;
           final matchesPrice = productMinPrice >= widget.filterData.minPrice &&
               productMinPrice <= widget.filterData.maxPrice;
-          
-          // Color filter
           final matchesColor = widget.filterData.color == 'All' || 
               p.colorOptions.any((c) => c.color == widget.filterData.color);
-          
-          // Material Type filter - check BOTH category and materialType
           final matchesMaterial = widget.filterData.materialType == 'All' || 
               p.category == widget.filterData.materialType ||
               p.materialType == widget.filterData.materialType;
-          
-          // NO RATING FILTER FOR FABRICS
-          
           return matchesSearch && matchesPrice && 
                  matchesColor && matchesMaterial;
         }).toList();
 
-        // Sort by price based on filterData.sortBy
+        // Sort based on filterData.sortBy
         if (widget.filterData.sortBy == 'lowToHigh') {
           filteredProducts.sort((a, b) => a.minPrice.compareTo(b.minPrice));
         } else if (widget.filterData.sortBy == 'highToLow') {
@@ -231,8 +327,10 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
 
         return Column(
           children: [
-            _buildHeroSection(),
-            Expanded(child: _buildProductGrid(filteredProducts)),
+            _buildHeroSection(type),
+            Expanded(
+              child: _buildProductGrid(filteredProducts, type),
+            ),
           ],
         );
       },
@@ -241,7 +339,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
 
   // ─── Hero Section ─────────────────────────────────────────────────────────
 
-  Widget _buildHeroSection() {
+  Widget _buildHeroSection(String type) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 400;
     
@@ -260,7 +358,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Premium Fabrics',
+            'Premium $type',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w800,
@@ -270,7 +368,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
           ),
           const SizedBox(height: 4),
           Text(
-            'High-quality fabrics for your style',
+            'High-quality materials for your style',
             style: TextStyle(
               fontSize: 13,
               color: Colors.white.withValues(alpha: 0.9),
@@ -316,7 +414,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
 
   // ─── Product Grid ──────────────────────────────────────────────────────
 
-  Widget _buildProductGrid(List<Product> products) {
+  Widget _buildProductGrid(List<Product> products, String type) {
     if (products.isEmpty) {
       return Center(
         child: Column(
@@ -329,7 +427,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
             ),
             const SizedBox(height: 16),
             Text(
-              'No products found',
+              'No $type found',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w800,
@@ -352,7 +450,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
 
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    
+
     final isSmallScreen = screenWidth < 400;
     final spacing = isSmallScreen ? 10.0 : 12.0;
     final cardAspectRatio = screenHeight < 700 ? 0.72 : 0.78;
@@ -409,12 +507,20 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) => Container(
                                     color: kSage.withValues(alpha: 0.12),
-                                    child: Icon(Icons.texture, size: isSmallScreen ? 36 : 40, color: kSageDark),
+                                    child: Icon(
+                                      type == 'Fabrics' ? Icons.texture : Icons.category,
+                                      size: isSmallScreen ? 36 : 40,
+                                      color: kSageDark,
+                                    ),
                                   ),
                                 )
                               : Container(
                                   color: kSage.withValues(alpha: 0.12),
-                                  child: Icon(Icons.texture, size: isSmallScreen ? 36 : 40, color: kSageDark),
+                                  child: Icon(
+                                    type == 'Fabrics' ? Icons.texture : Icons.category,
+                                    size: isSmallScreen ? 36 : 40,
+                                    color: kSageDark,
+                                  ),
                                 ),
                         ),
                       ),
@@ -474,11 +580,10 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                             ),
                           ),
                         ),
-                      // NO RATING BADGE FOR FABRICS
                     ],
                   ),
                 ),
-                // Content section - LARGER TEXT
+                // Content section
                 Flexible(
                   flex: 4,
                   child: Padding(
@@ -573,6 +678,10 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         return Colors.brown[300]!;
       case 'gold':
         return const Color(0xFFD4AF37);
+      case 'silver':
+        return Colors.grey[400]!;
+      case 'purple':
+        return Colors.purple[300]!;
       default:
         return Colors.grey[300]!;
     }

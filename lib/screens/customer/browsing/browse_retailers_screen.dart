@@ -1,11 +1,228 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/retailer.dart';
+import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
 import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
 
-/// Hardcoded sample retailers.
+// ─── Sample Color Options ──────────────────────────────────────────────────
+
+ColorOption _createColorOption(int id, String color, String? image, double price, int stock) {
+  return ColorOption(
+    optionId: id,
+    color: color,
+    image: image,
+    price: price,
+    stock: stock,
+  );
+}
+
+// ─── Sample Products ───────────────────────────────────────────────────────
+
+final List<Product> _sampleProducts = [
+  // Products for Dhaka Fabric House (r1)
+  Product(
+    id: 'p1',
+    retailerId: 'r1',
+    productName: 'Premium Cotton Fabric',
+    category: 'Cotton',
+    materialType: 'Cotton',
+    colorOptions: [
+      _createColorOption(1, 'Red', 'assets/images/fab.jpg', 1200, 10),
+      _createColorOption(2, 'Blue', 'assets/images/textile.jpg', 1300, 8),
+      _createColorOption(3, 'Green', 'assets/images/silk.jpg', 1100, 15),
+    ],
+    description: 'High quality premium cotton fabric perfect for summer wear.',
+    careSymbol: ['Machine Wash', 'Do Not Bleach'],
+  ),
+  Product(
+    id: 'p2',
+    retailerId: 'r1',
+    productName: 'Silk Blend Saree',
+    category: 'Silk',
+    materialType: 'Silk',
+    colorOptions: [
+      _createColorOption(1, 'Gold', 'assets/images/silk.jpg', 2500, 5),
+      _createColorOption(2, 'Red', 'assets/images/fab2.jpg', 2800, 3),
+    ],
+    description: 'Beautiful silk blend saree with intricate embroidery.',
+    careSymbol: ['Dry Clean Only'],
+  ),
+  Product(
+    id: 'p3',
+    retailerId: 'r1',
+    productName: 'Linen Shirt Fabric',
+    category: 'Linen',
+    materialType: 'Linen',
+    colorOptions: [
+      _createColorOption(1, 'White', 'assets/images/fab.jpg', 800, 20),
+      _createColorOption(2, 'Beige', 'assets/images/textile.jpg', 850, 18),
+    ],
+    description: 'Premium linen fabric perfect for formal shirts.',
+    careSymbol: ['Machine Wash', 'Iron Medium'],
+  ),
+  Product(
+    id: 'p4',
+    retailerId: 'r1',
+    productName: 'Printed Cotton Dress',
+    category: 'Cotton',
+    materialType: 'Cotton',
+    colorOptions: [
+      _createColorOption(1, 'Pink', 'assets/images/fab2.jpg', 950, 12),
+      _createColorOption(2, 'Purple', 'assets/images/fab.jpg', 1000, 10),
+    ],
+    description: 'Beautiful printed cotton fabric for dresses and tops.',
+    careSymbol: ['Machine Wash', 'Do Not Bleach'],
+  ),
+  
+  // Products for Chowdhury Textiles (r2)
+  Product(
+    id: 'p5',
+    retailerId: 'r2',
+    productName: 'Traditional Jamdani',
+    category: 'Cotton',
+    materialType: 'Cotton',
+    colorOptions: [
+      _createColorOption(1, 'White', 'assets/images/textile.jpg', 1500, 7),
+      _createColorOption(2, 'Cream', 'assets/images/fab2.jpg', 1600, 5),
+    ],
+    description: 'Authentic Jamdani fabric with traditional patterns.',
+    careSymbol: ['Hand Wash', 'Do Not Bleach'],
+  ),
+  Product(
+    id: 'p6',
+    retailerId: 'r2',
+    productName: 'Georgette Chiffon',
+    category: 'Polyester',
+    materialType: 'Polyester',
+    colorOptions: [
+      _createColorOption(1, 'Pink', 'assets/images/fab2.jpg', 950, 12),
+      _createColorOption(2, 'Purple', 'assets/images/silk.jpg', 1000, 8),
+    ],
+    description: 'Light weight georgette chiffon for elegant drapes.',
+    careSymbol: ['Dry Clean Only'],
+  ),
+  
+  // Products for Silk & Lace Emporium (r3)
+  Product(
+    id: 'p7',
+    retailerId: 'r3',
+    productName: 'Raw Silk',
+    category: 'Silk',
+    materialType: 'Silk',
+    colorOptions: [
+      _createColorOption(1, 'Gold', 'assets/images/silk.jpg', 3200, 4),
+      _createColorOption(2, 'Silver', 'assets/images/lace.jpg', 3500, 3),
+    ],
+    description: 'Luxurious raw silk with a natural sheen.',
+    careSymbol: ['Dry Clean Only'],
+  ),
+  Product(
+    id: 'p8',
+    retailerId: 'r3',
+    productName: 'Lace Trim Fabric',
+    category: 'Lace',
+    materialType: 'Lace',
+    colorOptions: [
+      _createColorOption(1, 'White', 'assets/images/lace.jpg', 1800, 6),
+      _createColorOption(2, 'Cream', 'assets/images/silk.jpg', 1900, 5),
+    ],
+    description: 'Beautiful lace fabric with intricate floral patterns.',
+    careSymbol: ['Hand Wash', 'Do Not Wring'],
+  ),
+  Product(
+    id: 'p9',
+    retailerId: 'r3',
+    productName: 'Velvet Evening Fabric',
+    category: 'Velvet',
+    materialType: 'Velvet',
+    colorOptions: [
+      _createColorOption(1, 'Red', 'assets/images/fab.jpg', 2200, 7),
+      _createColorOption(2, 'Blue', 'assets/images/textile.jpg', 2300, 5),
+      _createColorOption(3, 'Green', 'assets/images/silk.jpg', 2400, 4),
+    ],
+    description: 'Luxurious velvet fabric for evening wear.',
+    careSymbol: ['Dry Clean Only'],
+  ),
+  
+  // Products for Bengal Cotton Co. (r4)
+  Product(
+    id: 'p10',
+    retailerId: 'r4',
+    productName: 'Cotton Khadi',
+    category: 'Cotton',
+    materialType: 'Cotton',
+    colorOptions: [
+      _createColorOption(1, 'Natural', 'assets/images/fab2.jpg', 700, 25),
+      _createColorOption(2, 'Brown', 'assets/images/fab.jpg', 750, 20),
+    ],
+    description: 'Hand-spun khadi cotton fabric with a rustic feel.',
+    careSymbol: ['Machine Wash'],
+  ),
+  Product(
+    id: 'p11',
+    retailerId: 'r4',
+    productName: 'Denim Fabric',
+    category: 'Denim',
+    materialType: 'Denim',
+    colorOptions: [
+      _createColorOption(1, 'Blue', 'assets/images/textile.jpg', 850, 15),
+      _createColorOption(2, 'Black', 'assets/images/fab2.jpg', 900, 12),
+    ],
+    description: 'Premium denim fabric for jeans and jackets.',
+    careSymbol: ['Machine Wash', 'Do Not Bleach'],
+  ),
+  
+  // Products for Heritage Weaves (r5)
+  Product(
+    id: 'p12',
+    retailerId: 'r5',
+    productName: 'Embroidery Fabric',
+    category: 'Embroidery',
+    materialType: 'Embroidery',
+    colorOptions: [
+      _createColorOption(1, 'Green', 'assets/images/lace.jpg', 2100, 8),
+      _createColorOption(2, 'Gold', 'assets/images/silk.jpg', 2300, 6),
+    ],
+    description: 'Hand-embroidered fabric with traditional motifs.',
+    careSymbol: ['Dry Clean Only'],
+  ),
+  Product(
+    id: 'p13',
+    retailerId: 'r5',
+    productName: 'Tussar Silk',
+    category: 'Silk',
+    materialType: 'Silk',
+    colorOptions: [
+      _createColorOption(1, 'Copper', 'assets/images/textile.jpg', 2800, 4),
+      _createColorOption(2, 'Gold', 'assets/images/silk.jpg', 3000, 3),
+    ],
+    description: 'Beautiful tussar silk with a textured finish.',
+    careSymbol: ['Dry Clean Only'],
+  ),
+  Product(
+    id: 'p14',
+    retailerId: 'r5',
+    productName: 'Satin Bridal Fabric',
+    category: 'Satin',
+    materialType: 'Satin',
+    colorOptions: [
+      _createColorOption(1, 'Pink', 'assets/images/fab.jpg', 1200, 10),
+      _createColorOption(2, 'White', 'assets/images/lace.jpg', 1300, 8),
+    ],
+    description: 'Smooth satin fabric for bridal and formal wear.',
+    careSymbol: ['Dry Clean Only'],
+  ),
+];
+
+// ─── Helper to get products by retailer ID ──────────────────────────────────
+
+List<Product> _getProductsForRetailer(String retailerId) {
+  return _sampleProducts.where((p) => p.retailerId == retailerId).toList();
+}
+
+/// Hardcoded sample retailers with products.
 final List<Retailer> kHardcodedRetailers = [
   Retailer(
     id: 'r1',
@@ -15,7 +232,7 @@ final List<Retailer> kHardcodedRetailers = [
     address: '12 New Market Road, Dhanmondi, Dhaka',
     rating: 4.8,
     profilePicture: 'assets/images/fab.jpg',
-    products: [],
+    products: _getProductsForRetailer('r1'),
   ),
   Retailer(
     id: 'r2',
@@ -25,7 +242,7 @@ final List<Retailer> kHardcodedRetailers = [
     address: '45 Islampur Road, Islampur, Dhaka',
     rating: 4.6,
     profilePicture: 'assets/images/textile.jpg',
-    products: [],
+    products: _getProductsForRetailer('r2'),
   ),
   Retailer(
     id: 'r3',
@@ -35,7 +252,7 @@ final List<Retailer> kHardcodedRetailers = [
     address: '7 Gausia Market, Elephant Road, Dhaka',
     rating: 4.9,
     profilePicture: 'assets/images/silk.jpg',
-    products: [],
+    products: _getProductsForRetailer('r3'),
   ),
   Retailer(
     id: 'r4',
@@ -45,7 +262,7 @@ final List<Retailer> kHardcodedRetailers = [
     address: '89 Karwan Bazar, Tejgaon, Dhaka',
     rating: 4.3,
     profilePicture: 'assets/images/fab2.jpg',
-    products: [],
+    products: _getProductsForRetailer('r4'),
   ),
   Retailer(
     id: 'r5',
@@ -55,7 +272,7 @@ final List<Retailer> kHardcodedRetailers = [
     address: '3 Mirpur Road, Mohammadpur, Dhaka',
     rating: 4.7,
     profilePicture: 'assets/images/lace.jpg',
-    products: [],
+    products: _getProductsForRetailer('r5'),
   ),
 ];
 
@@ -401,6 +618,19 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                         ),
                       ],
                     ),
+                    // Show product count if available
+                    if (retailer.products != null && retailer.products!.isNotEmpty)
+                      Padding(
+                        padding: EdgeInsets.only(top: isSmall ? 2 : 4),
+                        child: Text(
+                          '${retailer.products!.length} products',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: kSage,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
