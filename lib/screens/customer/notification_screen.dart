@@ -265,7 +265,6 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
           break;
       }
     });
-    Navigator.pop(context, true);
   }
 
   void _goBack() {
@@ -286,10 +285,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) _goBack();
-      },
+      canPop: true,
       child: Scaffold(
         backgroundColor: const Color(0xFFF6FAF6),
         body: SafeArea(
@@ -775,7 +771,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
       case RetailerNotificationType.stockOut:
         return _RetailerNotificationStyle(background: const Color(0xFFF7D6D6), icon: Icons.warning_rounded, iconColor: Colors.red.shade700, title: 'Stock Alert', messagePrefix: '', messageMiddle: ' is out of stock for ', messageSuffix: '.');
       case RetailerNotificationType.newReview:
-        return _RetailerNotificationStyle(background: const Color(0xFFCDEFD3), icon: Icons.star_rate_rounded, iconColor: Colors.green.shade800, title: 'New Review', messagePrefix: '', messageMiddle: ' reviewed ', messageSuffix: '');
+        return _RetailerNotificationStyle(background: const Color(0xFFCDEFD3), icon: Icons.star_rate_rounded, iconColor: Colors.blue.shade700, title: 'New Review', messagePrefix: '', messageMiddle: ' reviewed ', messageSuffix: '');
     }
   }
 

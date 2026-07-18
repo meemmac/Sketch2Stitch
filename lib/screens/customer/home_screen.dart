@@ -84,14 +84,6 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
       });
     }
 
-
-    final cleared = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => UnifiedNotificationScreen(role: _currentRole)),
-    );
-    if (cleared == true && mounted) {
-      setState(() => _hasUnreadNotifications = false);
-    }
   }
 
   void _openBrowseTab(int index) {
