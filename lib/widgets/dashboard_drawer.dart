@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../screens/customer/virtual_trial_screen.dart';
 import '../screens/retailer/inventory_screen.dart';
+import '../screens/customer/measurement_screen.dart';
+import '../models/measurement.dart';
 
 
 /// Enum representing the three user roles.
@@ -69,11 +71,30 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
   late DrawerProfileData _customerProfile;
   late DrawerProfileData _tailorProfile;
   late DrawerProfileData _retailerProfile;
+  late Measurement _customerMeasurement;
 
   @override
   void initState() {
     super.initState();
     _currentRole = widget.initialRole;
+
+    _customerMeasurement = Measurement(
+      id: "meas_1",
+      customerId: "maria_doe",
+      upperBustCircumference: 34.0,
+      roundShoulderCircumference: 38.0,
+      hipsCircumference: 36.0,
+      underBustCircumference: 32.0,
+      bustCircumference: 35.0,
+      bustSpan: 7.5,
+      shoulderToHips: 20.0,
+      shoulderToKnee: 38.0,
+      shoulderToUnderBust: 12.5,
+      shoulderToBust: 10.0,
+      thigh: 21.0,
+      knee: 14.0,
+      ankle: 9.0,
+    );
 
     // Initialize mock data
     _customerProfile = const DrawerProfileData(
@@ -176,6 +197,13 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                           child: DrawerNavigationSection(
                             role: _currentRole,
                             themeColor: themeColor,
+                            measurement: _customerMeasurement,
+                            onSave: (updated) async {
+                              await Future.delayed(const Duration(milliseconds: 500));
+                              setState(() {
+                                _customerMeasurement = updated;
+                              });
+                            },
                           ),
                         ),
                         const Divider(height: 1),
@@ -418,11 +446,15 @@ class DrawerProfileSection extends StatelessWidget {
 class DrawerNavigationSection extends StatelessWidget {
   final AppUserRole role;
   final Color themeColor;
+  final Measurement? measurement;
+  final Future<void> Function(Measurement)? onSave;
 
   const DrawerNavigationSection({
     super.key,
     required this.role,
     required this.themeColor,
+    this.measurement,
+    this.onSave,
   });
 
   @override
@@ -446,6 +478,18 @@ class DrawerNavigationSection extends StatelessWidget {
                     builder: (_) => const VirtualTrialScreen(),
                   ),
                 );
+              } else if (item['title'] == 'Measurements') {
+                if (measurement != null && onSave != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MeasurementScreen(
+                        measurement: measurement!,
+                        onSave: onSave!,
+                      ),
+                    ),
+                  );
+                }
               } else if (item['title'] == 'Inventory') {
                 Navigator.push(
                   context,
