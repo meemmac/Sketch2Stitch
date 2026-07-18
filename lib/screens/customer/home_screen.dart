@@ -703,7 +703,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Colors.green.shade100, Colors.green.shade50],
+          colors: [Colors.teal.shade100, Colors.teal.shade50],
         ),
         borderRadius: BorderRadius.circular(24),
       ),
@@ -715,12 +715,12 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
               children: [
                 Text(
                   'Your Orders',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green.shade900),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal.shade900),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Manage your tailoring orders efficiently',
-                  style: TextStyle(fontSize: 13, color: Colors.green.shade700),
+                  style: TextStyle(fontSize: 13, color: Colors.teal.shade700),
                 ),
               ],
             ),
@@ -730,7 +730,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
               // TODO: Navigate to orders
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade700,
+              backgroundColor: Colors.teal.shade700,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),
@@ -750,7 +750,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Colors.green.shade100, Colors.green.shade50],
+          colors: [Colors.teal.shade100, Colors.teal.shade50],
         ),
         borderRadius: BorderRadius.circular(24),
       ),
@@ -762,12 +762,12 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
               children: [
                 Text(
                   ' Inventory Management',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green.shade900),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal.shade900),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Track your stock and manage products',
-                  style: TextStyle(fontSize: 13, color: Colors.green.shade700),
+                  style: TextStyle(fontSize: 13, color: Colors.teal.shade700),
                 ),
               ],
             ),
@@ -783,7 +783,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade700,
+              backgroundColor: Colors.teal.shade700,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),

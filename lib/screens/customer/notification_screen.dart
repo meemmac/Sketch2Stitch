@@ -651,13 +651,13 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                 onPressed: () => _showRetailerReviewDetails(n),
                 style: OutlinedButton.styleFrom(
                   backgroundColor: Colors.white,
-                  side: BorderSide(color: Colors.green.shade300),
+                  side: BorderSide(color: Colors.blue.shade300),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                child: Text('View Review', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.green.shade700)),
+                child: Text('View Review', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.blue.shade700)),
               ),
               const SizedBox(width: 10),
               Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withOpacity(0.45)),
@@ -771,7 +771,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
       case RetailerNotificationType.stockOut:
         return _RetailerNotificationStyle(background: const Color(0xFFF7D6D6), icon: Icons.warning_rounded, iconColor: Colors.red.shade700, title: 'Stock Alert', messagePrefix: '', messageMiddle: ' is out of stock for ', messageSuffix: '.');
       case RetailerNotificationType.newReview:
-        return _RetailerNotificationStyle(background: const Color(0xFFCDEFD3), icon: Icons.star_rate_rounded, iconColor: Colors.blue.shade700, title: 'New Review', messagePrefix: '', messageMiddle: ' reviewed ', messageSuffix: '');
+        return _RetailerNotificationStyle(background: const Color(0xFFD3E9F7), icon: Icons.star_rate_rounded, iconColor: Colors.blue.shade800, title: 'New Review', messagePrefix: '', messageMiddle: ' reviewed ', messageSuffix: '');
     }
   }
 
@@ -850,13 +850,13 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                 onPressed: () => _showTailorReviewDetails(n),
                 style: OutlinedButton.styleFrom(
                   backgroundColor: Colors.white,
-                  side: BorderSide(color: Colors.green.shade300),
+                  side: BorderSide(color: Colors.blue.shade300),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                child: Text('View Review', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.green.shade700)),
+                child: Text('View Review', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.blue.shade700)),
               ),
               const SizedBox(width: 10),
               Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withOpacity(0.45)),
