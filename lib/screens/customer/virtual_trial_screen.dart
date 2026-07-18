@@ -8,6 +8,8 @@ import '../../models/appearance_profile.dart';
 import '../../services/ai_service.dart';
 import '../../utils/api_config.dart';
 import '../../widgets/dashboard_drawer.dart';
+import 'home_screen.dart';
+import 'package:gal/gal.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Colour palette & tokens
@@ -209,25 +211,44 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     );
 
     try {
-      // Collect reference image bytes
-      final List<Uint8List> refBytes = [];
-      for (final f in _referenceImages) {
-        refBytes.add(await File(f.path).readAsBytes());
-      }
+      // 1. Call Gemini for fabric estimation
+      setState(() {
+        _statusMessage = 'Estimating fabric requirements with Gemini...';
+      });
 
-      final (imageBytes, fabric) =
-          await AIService.generateVirtualTrialFromProfile(
+      final fabric = await AIService.estimateFabricWithGemini(
         geminiApiKey: geminiKey,
-        hfToken: hfToken,
-        profile: profileSnapshot,
-        referenceImageBytes: refBytes,
         measurements: _measurements,
         stylePreferences: _selectedStyles.toList(),
         customInstructions: _customInstructionsController.text.trim(),
-        onStatus: (s) {
-          if (mounted) setState(() => _statusMessage = s);
-        },
       );
+
+      // 2. Local mock delay for image loading
+      setState(() {
+        _statusMessage = 'Loading virtual trial preview...';
+      });
+      await Future.delayed(const Duration(seconds: 1));
+
+      // 3. Load random mock image from assets (image generation is disconnected from API)
+      final List<String> mockImages = [
+        'crochet.jpg',
+        'embroidery.jpg',
+        'fab.jpg',
+        'fab2.jpg',
+        'fabric_waves.jpg',
+        'gorgeous.jpg',
+        'lace.jpg',
+        'saree.jpg',
+        'silk.jpg',
+        'tassel.jpg',
+        'textile.jpg',
+      ];
+      mockImages.shuffle();
+      final selectedAssetName = 'assets/images/${mockImages.first}';
+
+      // Load image bytes from Flutter asset bundle
+      final assetData = await DefaultAssetBundle.of(context).load(selectedAssetName);
+      final imageBytes = assetData.buffer.asUint8List();
 
       if (!mounted) return;
       setState(() {
@@ -254,7 +275,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
           _isLoading = false;
           _statusMessage = '';
         });
-        _showSnack('Error generating: $e');
+        _showSnack('Error generating mock preview: $e');
       }
     }
   }
@@ -262,13 +283,19 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   Future<void> _downloadImage() async {
     if (_generatedImageBytes == null) return;
     try {
-      final appDir = await getApplicationDocumentsDirectory();
-      final fileName = 'virtual_trial_${DateTime.now().millisecondsSinceEpoch}.png';
-      final file = File('${appDir.path}/$fileName');
-      await file.writeAsBytes(_generatedImageBytes!);
-      _showSnack('Image saved to: ${file.path}');
+      // Check and request photo library access
+      final hasAccess = await Gal.hasAccess();
+      if (!hasAccess) {
+        final granted = await Gal.requestAccess();
+        if (!granted) {
+          _showSnack('Gallery permission denied. Please enable permission to save.');
+          return;
+        }
+      }
+      await Gal.putImageBytes(_generatedImageBytes!);
+      _showSnack('Successfully saved to device photo gallery!');
     } catch (e) {
-      _showSnack('Failed to save image: $e');
+      _showSnack('Failed to save to gallery: $e');
     }
   }
 
@@ -356,7 +383,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
               } else {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+                  MaterialPageRoute(builder: (_) => const CustomerHomeScreen()),
                 );
               }
             },
@@ -1007,38 +1034,37 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
             }
           },
           children: [
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate:
-                  const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 2.5,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-              ),
-              itemCount: _measurements.length,
-              itemBuilder: (_, i) {
-                final key =
-                    _measurements.keys.elementAt(i);
-                return TextField(
-                  controller: _measurements[key],
-                  decoration: InputDecoration(
-                    labelText: key,
-                    labelStyle: const TextStyle(fontSize: 10),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    contentPadding:
-                        const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 8),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide:
-                          const BorderSide(color: _sage),
-                    ),
-                  ),
-                  style: const TextStyle(fontSize: 13),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final cellWidth = (constraints.maxWidth - 10) / 2;
+                final keys = _measurements.keys.toList();
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: List.generate(keys.length, (i) {
+                    final key = keys[i];
+                    return SizedBox(
+                      width: cellWidth,
+                      height: 72,
+                      child: TextField(
+                        controller: _measurements[key],
+                        decoration: InputDecoration(
+                          labelText: key,
+                          labelStyle: const TextStyle(fontSize: 10),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 14),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: _sage),
+                          ),
+                        ),
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    );
+                  }),
                 );
               },
             ),
@@ -1366,6 +1392,35 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   }
 
   Widget _buildFabricLedger(Map<String, String> fabric) {
+    if (fabric.containsKey('_error')) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFBEB),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFFDE68A)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706), size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                fabric['_error']!,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFB45309),
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1429,22 +1484,21 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                     spacing: 6,
                     runSpacing: 4,
                     children: parts.map((part) {
-                      final isInch  = part.toLowerCase().contains('inch');
-                      final isMeter = part.toLowerCase().contains('meter');
+                      final isInch   = part.toLowerCase().contains('inch');
+                      final isGauge  = part.toLowerCase().contains('gauge');
                       Color bg, border, fg;
                       if (isInch) {
                         bg = const Color(0xFFE8F0FE);
                         border = const Color(0xFFADC8F5);
                         fg = const Color(0xFF2558C1);
-                      } else if (isMeter) {
-                        bg = const Color(0xFFFFF8E1);
-                        border = const Color(0xFFFFCC80);
-                        fg = const Color(0xFFBF7800);
-                      } else {
-                        // Gauge
+                      } else if (isGauge) {
                         bg = _sagePale;
                         border = _border;
                         fg = _sageDark;
+                      } else {
+                        bg = const Color(0xFFF3F4F6);
+                        border = const Color(0xFFD1D5DB);
+                        fg = const Color(0xFF374151);
                       }
                       return Container(
                         padding: const EdgeInsets.symmetric(

@@ -213,7 +213,7 @@ class AIService {
         'TASK:\n'
         '1. Carefully inspect the Additional Instructions and Style Preferences to identify what specific garment parts are being requested (e.g. Saree, Blouse, Shirt, Dress, Trousers, Lehenga, Kameez, Salwar, etc.).\n'
         '2. If the user\'s instructions and style preferences are empty, vague, or do not describe any garments to make, return an empty array [] for the "garments" key.\n'
-        '3. For each identified garment piece, calculate the fabric quantity required using the body measurements provided. Express the quantity in BOTH Gauge and Meters (e.g., "2.5 Gauge / 2.3 meters"). For smaller parts, accents, or trims, use inches.\n'
+        '3. For each identified garment piece, calculate the fabric quantity required using the body measurements provided. Express the quantity in BOTH Gauge and Inches (e.g., "2.5 Gauge / 90 inches").\n'
         '4. Write a vivid 80-word image-generation prompt describing the finished outfit on the model.\n\n'
         'CRITICAL: Output ONLY a raw, valid JSON block. Do NOT wrap it in markdown. Do NOT add explanation text. Format exactly like this:\n'
         '{"garments":[{"name":"[Garment Name]","quantity":"[Value]"}],"image_generation_prompt":"[Prompt]"}';
@@ -316,5 +316,87 @@ class AIService {
     );
 
     return (resultBytes, fabricEstimates);
+  }
+
+  /// Estimate required fabric via Gemini based explicitly on mentioned garments.
+  /// If insufficient style info is found, returns a map containing a `_error` key.
+  static Future<Map<String, String>> estimateFabricWithGemini({
+    required String geminiApiKey,
+    required Map<String, TextEditingController> measurements,
+    required List<String> stylePreferences,
+    required String customInstructions,
+  }) async {
+    final measurementString =
+        measurements.entries.map((e) => '${e.key}: ${e.value.text}').join('\n');
+
+    final styleString = stylePreferences.isEmpty
+        ? 'No specific style preference'
+        : stylePreferences.join(', ');
+
+    final geminiAnalysisPrompt =
+        'You are a professional tailor, fashion designer, and garment estimator.\n\n'
+        '=== BODY MEASUREMENTS (inches) ===\n'
+        '$measurementString\n\n'
+        '=== STYLE PREFERENCES & CUSTOM INSTRUCTIONS ===\n'
+        'Preferences: $styleString\n'
+        'Custom Instructions: $customInstructions\n\n'
+        'TASK:\n'
+        '1. Identify ALL components, elements, and accessories explicitly mentioned by the user in the style preferences or custom instructions. This includes but is not limited to: garment pieces (shirt, salwar, kameez, dupatta, skirt, etc.), trims and embellishments (lace, buttons, embroidery, ribbon, etc.).\n'
+        '2. Do NOT assume, guess, or add any items that were NOT explicitly mentioned by the user.\n'
+        '3. If the user\'s preferences and instructions are empty, too vague, or do not contain enough information to confidently identify any specific components, you MUST set the "error" key in the JSON response to exactly: "The provided style information is insufficient to generate a fabric estimation." and the "garments" list to an empty array [].\n'
+        '4. If there is sufficient information, estimate the required quantity for EACH mentioned item:\n'
+        '   - Give estimation only on the basis of body measurment given by the user. Do not add extra estimation.\n'
+        '   - For fabric-based garments (salwar, kameez, shirt, etc.): Express in BOTH Gauge and Inches (e.g., "2.5 Gauge / 90 inches").\n'
+        '   - For trims and lace: Express in Inches (e.g., "48 inches").\n'
+        '   - For accessories (shoes, bag etc): Avoid them in fabric estimation unless they can be made of fabric and have value as measurement that enables to estimate.\n'
+        '   - In this case, set "error" to null.\n\n'
+        'CRITICAL: Output ONLY a raw, valid JSON block. Do NOT wrap it in markdown. Do NOT add explanation text. Format exactly like this:\n'
+        '{"garments":[{"name":"[Item Name]","quantity":"[Value]"}],"error":null}';
+
+    final responseText = await testGemini(
+      apiKey: geminiApiKey,
+      prompt: geminiAnalysisPrompt,
+    );
+
+    // Parse logic
+    String cleaned = responseText
+        .replaceAll(RegExp(r'```json\s*'), '')
+        .replaceAll(RegExp(r'```\s*'), '')
+        .trim();
+
+    final startIdx = cleaned.indexOf('{');
+    final endIdx   = cleaned.lastIndexOf('}');
+
+    if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
+      final jsonStr = cleaned.substring(startIdx, endIdx + 1);
+      final parsed  = jsonDecode(jsonStr) as Map<String, dynamic>;
+
+      final errorMsg = parsed['error'];
+      if (errorMsg != null && errorMsg.toString().trim().isNotEmpty) {
+        return {
+          '_error': errorMsg.toString().trim(),
+        };
+      }
+
+      final rawGarments = parsed['garments'];
+      if (rawGarments is List) {
+        final Map<String, String> estimates = {};
+        for (final g in rawGarments) {
+          if (g is Map) {
+            estimates[g['name'].toString().trim()] = g['quantity'].toString().trim();
+          }
+        }
+        if (estimates.isEmpty) {
+          return {
+            '_error': 'The provided style information is insufficient to generate a fabric estimation.',
+          };
+        }
+        return estimates;
+      }
+    }
+
+    return {
+      '_error': 'The provided style information is insufficient to generate a fabric estimation.',
+    };
   }
 }
