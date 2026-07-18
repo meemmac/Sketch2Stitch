@@ -21,7 +21,7 @@ class OrderItem {
     required this.color,
     required this.price,
     this.description =
-        "Premium quality material with excellent durability and comfort.",
+    "Premium quality material with excellent durability and comfort.",
     this.itemComment,
     this.canWash = true,
     this.canBleach = false,
@@ -99,7 +99,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
           imagePath: "assets/images/fabrics_rolled.jpg",
           color: "White",
           description:
-              "Soft, breathable Egyptian cotton perfect for high-end shirts.",
+          "Soft, breathable Egyptian cotton perfect for high-end shirts.",
           itemComment: "The cotton texture is incredibly smooth.",
           ironLevel: "High",
         ),
@@ -549,24 +549,24 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
           ),
           boxShadow: isSelected
               ? [
-                  BoxShadow(
-                    color: primaryGreen.withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6),
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 1,
-                    offset: const Offset(0, 1),
-                  ),
-                ]
+            BoxShadow(
+              color: primaryGreen.withValues(alpha: 0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 1,
+              offset: const Offset(0, 1),
+            ),
+          ]
               : [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           children: [
@@ -636,7 +636,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
           _emptyOrdersCard(emptyText)
         else
           ...orders.map(
-            (order) => Padding(
+                (order) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: _orderCard(order),
             ),
@@ -667,7 +667,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
 
   Widget _orderCard(RetailerOrder order) {
     final Color statusColor =
-        order.isDelivered ? primaryGreen : Colors.blueAccent;
+    order.isDelivered ? primaryGreen : Colors.blueAccent;
 
     final firstItem = order.items.first;
 
@@ -719,9 +719,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        order.items.length > 1
-                            ? "${firstItem.name} , ${order.items.length - 1} more"
-                            : firstItem.name,
+                        order.id,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -731,7 +729,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        "${order.id} - ${order.customerName}",
+                        order.customerName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -909,15 +907,15 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
             ),
             const SizedBox(height: 16),
             ...["Preparing", "Packed", "Delivered"].map((s) => ListTile(
-                  title: Text(s),
-                  onTap: () {
-                    _updateOrderStatus(order, s);
-                    Navigator.pop(context);
-                  },
-                  trailing: order.status == s
-                      ? Icon(Icons.check_circle, color: primaryGreen)
-                      : null,
-                )),
+              title: Text(s),
+              onTap: () {
+                _updateOrderStatus(order, s);
+                Navigator.pop(context);
+              },
+              trailing: order.status == s
+                  ? Icon(Icons.check_circle, color: primaryGreen)
+                  : null,
+            )),
           ],
         ),
       ),
@@ -1094,7 +1092,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                         children: [
                           ...List.generate(
                             5,
-                            (index) => Icon(
+                                (index) => Icon(
                               index < (order.rating ?? 0).floor()
                                   ? Icons.star
                                   : Icons.star_border,
@@ -1218,34 +1216,6 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
               ],
             ),
           ),
-          if (item.itemComment != null) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.green.shade100),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.chat_bubble_outline,
-                      size: 14, color: Colors.green.shade700),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      item.itemComment!,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.green.shade900,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -1300,7 +1270,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
         children: [
           Text(label,
               style:
-                  const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+              const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
         ],
       ),
