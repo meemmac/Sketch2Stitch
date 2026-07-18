@@ -12,20 +12,32 @@ import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dar
 import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
 import '../../widgets/dashboard_drawer.dart';
 import 'virtual_trial_screen.dart';
-import 'notification_screen.dart';
-class CustomerHomeScreen extends StatefulWidget {
-  const CustomerHomeScreen({super.key});
+import 'notification_screen.dart' ;
+import 'package:sketch2stitch/screens/retailer/inventory_screen.dart';
+import 'track_order.dart';
+
+class UnifiedHomeScreen extends StatefulWidget {
+  final AppUserRole initialRole;
+
+  const UnifiedHomeScreen({
+    super.key,
+    this.initialRole = AppUserRole.customer,
+  });
 
   @override
-  State<CustomerHomeScreen> createState() => _CustomerHomeScreenState();
+  State<UnifiedHomeScreen> createState() => _UnifiedHomeScreenState();
 }
 
-class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
+class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
+  late AppUserRole _currentRole;
   final ScrollController _scrollController = ScrollController();
 
+  // Customer specific keys
   final GlobalKey _heroKey = GlobalKey();
   final GlobalKey _lastViewedKey = GlobalKey();
   final GlobalKey _favoritesKey = GlobalKey();
+
+  // Common keys
   final GlobalKey _exploreTailorsKey = GlobalKey();
   final GlobalKey _exploreFabricsKey = GlobalKey();
   final GlobalKey _exploreElementsKey = GlobalKey();
@@ -51,14 +63,43 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       .where((p) => ['Lace', 'Embroidery'].contains(p.category))
       .take(6)
       .toList();
+
+  @override
+  void initState() {
+    super.initState();
+    _currentRole = widget.initialRole;
+  }
+
   void _openNotifications() async {
-    final cleared = await Navigator.push<bool>(
+    final result = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => const NotificationScreen()),
+      MaterialPageRoute(
+        builder: (_) => UnifiedNotificationScreen(role: _currentRole),
+      ),
     );
-    if (cleared == true && mounted) {
-      setState(() => _hasUnreadNotifications = false);
+
+    if (result == true && mounted) {
+      setState(() {
+        _hasUnreadNotifications = false;
+      });
     }
+
+  }
+  void _openTrackOrder() {
+    // Navigate to Order Track Screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OrderTrackScreen(
+          orderId: 'OR05',
+          status: 'Pending Retailer Confirmation',
+          estimatedDelivery: '25 Dec 2026',
+          lastUpdated: '22 Dec 2026',
+          deliveryAddress: 'The Shakespeare Centre, Henley Street, CV37 6QW Stratford-upon-Avon, UK.',
+          userRole: AppUserRole.customer,
+        ),
+      ),
+    );
   }
 
   void _openBrowseTab(int index) {
@@ -153,7 +194,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F9F1),
-      drawer: const DashboardDrawer(initialRole: AppUserRole.customer),
+      // Pass the current role to the drawer
+      drawer: DashboardDrawer(
+        initialRole: _currentRole,
+        onRoleChanged: (role) {
+          setState(() {
+            _currentRole = role;
+          });
+        },
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -169,22 +218,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     const SizedBox(height: 16),
                     Container(key: _heroKey, child: _buildHeroSection()),
                     const SizedBox(height: 20),
-                    _buildVirtualTrialBanner(),
-                    const SizedBox(height: 30),
-                    Container(key: _lastViewedKey, child: _buildLastViewedSection()),
-                    const SizedBox(height: 30),
-                    Container(key: _favoritesKey, child: _buildFavoritesSection()),
-                    const SizedBox(height: 30),
-                    _buildTrustedBanner(),
-                    const SizedBox(height: 30),
-                    Container(key: _exploreFabricsKey, child: _buildExploreFabricsSection()),
-                    const SizedBox(height: 30),
-                    Container(key: _exploreElementsKey, child: _buildExploreElementsSection()),
-                    const SizedBox(height: 30),
-                    Container(key: _exploreRetailersKey, child: _buildExploreRetailersSection()),
-                    const SizedBox(height: 30),
-                    Container(key: _exploreTailorsKey, child: _buildExploreTailorsSection()),
-                    const SizedBox(height: 30),
+                    _buildRoleSpecificSections(),
                   ],
                 ),
               ),
@@ -207,12 +241,14 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
           ),
-          Image.asset(
-            'assets/images/transparent_logo.png',
-            height: 36,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) =>
-            const Icon(Icons.checkroom_rounded, size: 28, color: Color(0xFF2E7D32)),
+          Flexible(
+            child: Image.asset(
+              'assets/images/transparent_logo.png',
+              height: 36,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) =>
+              const Icon(Icons.checkroom_rounded, size: 28, color: Color(0xFF2E7D32)),
+            ),
           ),
           const Spacer(),
           Stack(
@@ -238,20 +274,94 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 ),
             ],
           ),
-          IconButton(
-            icon: const Icon(Icons.shopping_cart_outlined, color: Colors.black87),
-            onPressed: () {
-              // TODO: navigate to cart
-            },
-          ),
+          // Track Order icon - only for customer
+          if (_currentRole == AppUserRole.customer)
+            IconButton(
+              icon: const Icon(Icons.track_changes_rounded, color: Colors.black87),
+              onPressed: () {
+                _openTrackOrder();
+              },
+            ),
+          // Show cart icon only for customer
+          if (_currentRole == AppUserRole.customer)
+            IconButton(
+              icon: const Icon(Icons.shopping_cart_outlined, color: Colors.black87),
+              onPressed: () {
+                // TODO: navigate to cart
+              },
+            ),
+          // Role dropdown for testing
+          _buildRoleDropdown(),
         ],
       ),
     );
   }
 
+  Widget _buildRoleDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: DropdownButton<AppUserRole>(
+        value: _currentRole,
+        underline: const SizedBox(),
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF1E392A),
+        ),
+        items: const [
+          DropdownMenuItem(
+            value: AppUserRole.customer,
+            child: Text("Customer"),
+          ),
+          DropdownMenuItem(
+            value: AppUserRole.tailor,
+            child: Text("Tailor"),
+          ),
+          DropdownMenuItem(
+            value: AppUserRole.retailer,
+            child: Text("Retailer"),
+          ),
+        ],
+        onChanged: (role) {
+          if (role != null) {
+            setState(() {
+              _currentRole = role;
+            });
+          }
+        },
+      ),
+    );
+  }
 
   // ---------------- Section nav bar ----------------
   Widget _buildSectionNavBar() {
+    List<Widget> pills = [];
+
+    // Customer specific sections
+    if (_currentRole == AppUserRole.customer) {
+      pills.addAll([
+        _navPill('Last Viewed', Icons.history_rounded, () => _scrollToSection(_lastViewedKey)),
+        const SizedBox(width: 10),
+        _navPill('Favorites', Icons.favorite_border_rounded, () => _scrollToSection(_favoritesKey)),
+        const SizedBox(width: 10),
+      ]);
+    }
+
+    // Common sections for all roles
+    pills.addAll([
+      _navPill('Fabrics', Icons.texture_rounded, () => _scrollToSection(_exploreFabricsKey)),
+      const SizedBox(width: 10),
+      _navPill('Elements', Icons.category_outlined, () => _scrollToSection(_exploreElementsKey)),
+      const SizedBox(width: 10),
+      _navPill('Retailers', Icons.storefront_outlined, () => _scrollToSection(_exploreRetailersKey)),
+      const SizedBox(width: 10),
+      _navPill('Tailors', Icons.storefront_rounded, () => _scrollToSection(_exploreTailorsKey)),
+    ]);
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
@@ -261,21 +371,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: [
-            _navPill('Last Viewed', Icons.history_rounded, () => _scrollToSection(_lastViewedKey)),
-            const SizedBox(width: 10),
-            _navPill('Favorites', Icons.favorite_border_rounded, () => _scrollToSection(_favoritesKey)),
-            const SizedBox(width: 10),
-            _navPill('Fabrics', Icons.texture_rounded, () => _scrollToSection(_exploreFabricsKey)),
-            const SizedBox(width: 10),
-            _navPill('Elements', Icons.category_outlined, () => _scrollToSection(_exploreElementsKey)),
-            const SizedBox(width: 10),
-            _navPill('Retailers', Icons.storefront_outlined, () => _scrollToSection(_exploreRetailersKey)),
-            const SizedBox(width: 10),
-            _navPill('Tailors', Icons.storefront_rounded, () => _scrollToSection(_exploreTailorsKey)),
-          ],
-        ),
+        child: Row(children: pills),
       ),
     );
   }
@@ -307,6 +403,28 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
   // ---------------- Hero section ----------------
   Widget _buildHeroSection() {
+    String title;
+    String imagePath;
+    bool showButton;
+
+    switch (_currentRole) {
+      case AppUserRole.customer:
+        title = 'Tailoring made easy for you, all in one place.';
+        imagePath = 'assets/images/Mask group.png';
+        showButton = true;
+        break;
+      case AppUserRole.tailor:
+        title = 'Tailoring workspace, digitally organized.';
+        imagePath = 'assets/images/tailer_Mask group.png';
+        showButton = false;
+        break;
+      case AppUserRole.retailer:
+        title = 'Manage inventory, track orders and communicate';
+        imagePath = 'assets/images/pexels-dima-valkov-6402847 2.png';
+        showButton = false;
+        break;
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(24),
@@ -319,23 +437,23 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Tailoring made easy for you, all in one place.',
+                  title,
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.green.shade900, height: 1.25),
                 ),
-                const SizedBox(height: 18),
-                ElevatedButton(
-                  onPressed: () {
-                    // TODO: navigate to Browse Fabrics tab
-                    _scrollToSection(_exploreTailorsKey);
-
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                if (showButton) ...[
+                  const SizedBox(height: 18),
+                  ElevatedButton(
+                    onPressed: () {
+                      _scrollToSection(_exploreTailorsKey);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    ),
+                    child: const Text('Explore Now', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
                   ),
-                  child: const Text('Explore Now', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
-                ),
+                ],
               ],
             ),
           ),
@@ -345,7 +463,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(20),
               child: Image.asset(
-                'assets/images/Mask group.png',
+                imagePath,
                 fit: BoxFit.cover,
                 height: 150,
                 errorBuilder: (context, error, stackTrace) => Container(
@@ -361,7 +479,61 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     );
   }
 
-  // ---------------- Virtual trial banner ----------------
+  // ---------------- Role specific sections ----------------
+  Widget _buildRoleSpecificSections() {
+    switch (_currentRole) {
+      case AppUserRole.customer:
+        return Column(
+          children: [
+            _buildVirtualTrialBanner(),
+            const SizedBox(height: 30),
+            Container(key: _lastViewedKey, child: _buildLastViewedSection()),
+            const SizedBox(height: 30),
+            Container(key: _favoritesKey, child: _buildFavoritesSection()),
+            const SizedBox(height: 30),
+            _buildTrustedBanner(),
+            const SizedBox(height: 30),
+            _buildCommonSections(),
+          ],
+        );
+      case AppUserRole.tailor:
+        return Column(
+          children: [
+            const SizedBox(height: 10),
+            _buildTailorSpecificBanner(),
+            const SizedBox(height: 30),
+            _buildCommonSections(),
+          ],
+        );
+      case AppUserRole.retailer:
+        return Column(
+          children: [
+            const SizedBox(height: 10),
+            _buildRetailerSpecificBanner(),
+            const SizedBox(height: 30),
+            _buildCommonSections(),
+          ],
+        );
+    }
+  }
+
+  // ---------------- Common sections (Fabrics, Elements, Retailers, Tailors) ----------------
+  Widget _buildCommonSections() {
+    return Column(
+      children: [
+        Container(key: _exploreFabricsKey, child: _buildExploreFabricsSection()),
+        const SizedBox(height: 30),
+        Container(key: _exploreElementsKey, child: _buildExploreElementsSection()),
+        const SizedBox(height: 30),
+        Container(key: _exploreRetailersKey, child: _buildExploreRetailersSection()),
+        const SizedBox(height: 30),
+        Container(key: _exploreTailorsKey, child: _buildExploreTailorsSection()),
+        const SizedBox(height: 30),
+      ],
+    );
+  }
+
+  // ---------------- Customer specific widgets ----------------
   Widget _buildVirtualTrialBanner() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -416,7 +588,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     );
   }
 
-  // ---------------- Trusted banner ----------------
   Widget _buildTrustedBanner() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -454,7 +625,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     );
   }
 
-  // ---------------- Your last viewed ----------------
   Widget _buildLastViewedSection() {
     final items = _lastViewedProducts;
     return Column(
@@ -468,7 +638,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     );
   }
 
-  // ---------------- Favorites ----------------
   Widget _buildFavoritesSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -551,6 +720,106 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     );
   }
 
+  // ---------------- Tailor specific banner ----------------
+  Widget _buildTailorSpecificBanner() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.teal.shade100, Colors.teal.shade50],
+        ),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your Orders',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal.shade900),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Manage your tailoring orders efficiently',
+                  style: TextStyle(fontSize: 13, color: Colors.teal.shade700),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              // TODO: Navigate to orders
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.teal.shade700,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+            child: const Text('View Orders', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------- Retailer specific banner ----------------
+  Widget _buildRetailerSpecificBanner() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.teal.shade100, Colors.teal.shade50],
+        ),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  ' Inventory Management',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal.shade900),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Track your stock and manage products',
+                  style: TextStyle(fontSize: 13, color: Colors.teal.shade700),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              // TODO: Navigate to inventory
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const InventoryScreen(),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.teal.shade700,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+            child: const Text('Manage Stock', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ---------------- Shared headers & buttons ----------------
   Widget _buildSectionHeader(String title) {
     return Padding(
@@ -593,7 +862,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     );
   }
 
-  // ---------------- Fabric product row & card (used by Last Viewed / Favorites) ----------------
+  // ---------------- Fabric product row & card ----------------
   Widget _buildFabricRow(List<Product> products) {
     return SizedBox(
       height: 220,
@@ -740,7 +1009,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     }
   }
 
-  // ---------------- Tailor row & card (used by Favorites tab) ----------------
+  // ---------------- Tailor row & card ----------------
   Widget _buildTailorRow(List<Tailor> tailors) {
     return SizedBox(
       height: 200,
@@ -846,7 +1115,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     );
   }
 
-  // ---------------- Retailer row & card (used by Favorites tab) ----------------
+  // ---------------- Retailer row & card ----------------
   Widget _buildRetailerRow(List<Retailer> retailers) {
     return SizedBox(
       height: 200,
@@ -952,21 +1221,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     );
   }
 
-  // ---------------- Explore Tailors ----------------
-  Widget _buildExploreTailorsSection() {
-    final items = kHardcodedTailors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildCenteredHeading('Explore Tailors'),
-        const SizedBox(height: 14),
-        _buildTailorRow(items),
-        _buildSeeAllButton(() => _openBrowseTab(1)),
-      ],
-    );
-  }
-
-  // ---------------- Explore Fabrics ----------------
+  // ---------------- Explore Sections ----------------
   Widget _buildExploreFabricsSection() {
     final items = _fabricSectionProducts;
     return Column(
@@ -988,7 +1243,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     );
   }
 
-  // ---------------- Explore Elements ----------------
   Widget _buildExploreElementsSection() {
     final items = _elementSectionProducts;
     return Column(
@@ -1002,7 +1256,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     );
   }
 
-  // ---------------- Explore Retailers ----------------
   Widget _buildExploreRetailersSection() {
     final items = kHardcodedRetailers;
     return Column(
@@ -1015,11 +1268,22 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       ],
     );
   }
+
+  Widget _buildExploreTailorsSection() {
+    final items = kHardcodedTailors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildCenteredHeading('Explore Tailors'),
+        const SizedBox(height: 14),
+        _buildTailorRow(items),
+        _buildSeeAllButton(() => _openBrowseTab(1)),
+      ],
+    );
+  }
 }
 
 // ---------------- Generic "See all" grid screen ----------------
-// Reused for Last Viewed / Favorites so tapping "See all" always opens a
-// full grid of that exact list, using the same card widget shown on Home.
 class _SeeAllGridScreen<T> extends StatelessWidget {
   final String title;
   final List<T> items;
