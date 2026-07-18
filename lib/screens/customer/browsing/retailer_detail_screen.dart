@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
+import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 
 class RetailerDetailScreen extends StatefulWidget {
   final Retailer retailer;
@@ -311,7 +312,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
           
           return GestureDetector(
             onTap: () {
-              _navigateToProductDetail(product);
+              _showProductDetailOverlay(context, product);
             },
             child: Container(
               width: 140,
@@ -410,7 +411,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         
         return GestureDetector(
           onTap: () {
-            _navigateToProductDetail(product);
+            _showProductDetailOverlay(context, product);
           },
           child: Container(
             decoration: BoxDecoration(
@@ -630,14 +631,14 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     );
   }
 
-  // ─── Navigation Methods ──────────────────────────────────────────────
+  // ─── Product Detail Overlay ──────────────────────────────────────────
 
-  void _navigateToProductDetail(Product product) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('View details of ${product.productName}'),
-        backgroundColor: const Color(0xFF2C5C44),
-      ),
+  void _showProductDetailOverlay(BuildContext context, Product product) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ProductDetailOverlay(product: product),
     );
   }
 }

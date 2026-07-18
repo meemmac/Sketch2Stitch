@@ -1,6 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/screens/shared/register_screen.dart';
+import 'package:sketch2stitch/screens/shared/welcome_screen.dart'; // Add this import
+import 'package:sketch2stitch/screens/shared/forgot_password_screen.dart';
+import 'package:sketch2stitch/screens/customer/home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -212,7 +215,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                                 const SizedBox(height: 6),
                                 DropdownButtonFormField<String>(
-                                  initialValue: _selectedUserType,
+                                  value: _selectedUserType,
                                   dropdownColor: const Color(0xFFDFF2DF),
                                   hint: const Text('User Type'),
                                   icon: Container(
@@ -279,7 +282,6 @@ class _LoginScreenState extends State<LoginScreen>
                                 const SizedBox(height: 8),
 
                                 // Get Started button
-                                // Inside LoginScreen's build method
                                 SizedBox(
                                   width: double.infinity,
                                   height: 50,
@@ -290,7 +292,8 @@ class _LoginScreenState extends State<LoginScreen>
                                       Navigator.pushReplacement(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => const CustomerHomeScreen(),
+                                          builder: (context) =>
+                                              const CustomerHomeScreen(),
                                         ),
                                       );
                                     },
@@ -352,15 +355,20 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
 
-              // Back button — last child so it always renders on top,
-              // and the reserved top padding above keeps the card from
-              // ever reaching it.
+              // Back button - Navigates to Welcome Screen
               Positioned(
                 top: 10,
                 right: 10,
                 child: TextButton(
                   onPressed: () {
-                    Navigator.pop(context);
+                    // Navigate to Welcome Screen and clear the navigation stack
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const WelcomeScreen(),
+                      ),
+                      (route) => false, // Removes all previous routes
+                    );
                   },
                   style: TextButton.styleFrom(
                     backgroundColor: Colors.white,

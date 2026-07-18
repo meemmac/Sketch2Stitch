@@ -54,7 +54,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     OverlayState? overlayState = Overlay.of(context);
     _overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
-        top: MediaQuery.of(context).padding.top + 60, // Position below status bar
+        top: MediaQuery.of(context).padding.top + 60,
         left: 24,
         right: 24,
         child: Material(
@@ -109,7 +109,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     
     overlayState?.insert(_overlayEntry!);
     
-    // Auto hide after 3 seconds
     Future.delayed(const Duration(seconds: 3), () {
       _hideOverlayNotification();
     });
@@ -198,7 +197,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context); // Close dialog
+                Navigator.pop(context);
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
@@ -226,18 +225,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: Container(
-        decoration: BoxDecoration(
-          image: const DecorationImage(
-            image: AssetImage('assets/images/forgot_password.jpg'),
-            fit: BoxFit.cover,
-          ),
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              const Color(0xFFCDECCB).withOpacity(0.6),
-              const Color(0xFFEFF9EE).withOpacity(0.6),
-            ],
+            colors: [Color(0xFFCDECCB), Color(0xFFEFF9EE)],
           ),
         ),
         child: SafeArea(
@@ -551,37 +543,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                     ),
                                     TextButton(
                                       onPressed: () {
-                                        if (_currentStep > 0) {
-                                          // Go back to previous step
-                                          setState(() {
-                                            if (_currentStep == 1) {
-                                              _currentStep = 0;
-                                              _otpController.clear();
-                                            } else if (_currentStep == 2) {
-                                              _currentStep = 1;
-                                              _newPasswordController.clear();
-                                              _confirmPasswordController.clear();
-                                            }
-                                          });
-                                        } else {
-                                          // Navigate back to login screen
-                                          Navigator.pushReplacement(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => const LoginScreen(),
-                                            ),
-                                          );
-                                        }
+                                        Navigator.pushReplacement(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => const LoginScreen(),
+                                          ),
+                                        );
                                       },
                                       style: TextButton.styleFrom(
                                         padding: EdgeInsets.zero,
                                         minimumSize: const Size(0, 0),
                                       ),
-                                      child: Text(
-                                        _currentStep > 0 
-                                            ? (_currentStep == 1 ? 'Sign in' : 'Sign in')
-                                            : 'Sign in',
-                                        style: const TextStyle(
+                                      child: const Text(
+                                        'Sign in',
+                                        style: TextStyle(
                                           color: Colors.black87,
                                           fontWeight: FontWeight.bold,
                                         ),
@@ -599,14 +574,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                 ),
               ),
 
-              // Back button - goes to previous step or login
+              // Back button
               Positioned(
                 top: 10,
                 right: 10,
                 child: TextButton(
                   onPressed: () {
                     if (_currentStep > 0) {
-                      // Go back to previous step
                       setState(() {
                         if (_currentStep == 1) {
                           _currentStep = 0;
@@ -618,7 +592,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                         }
                       });
                     } else {
-                      // Navigate back to login screen
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(

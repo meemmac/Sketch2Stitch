@@ -23,13 +23,15 @@ class BrowseShell extends StatefulWidget {
 
 class _BrowseShellState extends State<BrowseShell> {
   static const List<String> _tabLabels = [
-    'Browse Clothing and Elements',
+    'Browse Fabrics',
+    'Browse Elements',
     'Browse Tailors',
     'Browse Retailers',
   ];
 
   static const List<String> _searchHints = [
     'Search fabrics...',
+    'Search elements...',
     'Search tailors...',
     'Search retailers...',
   ];
@@ -62,6 +64,19 @@ class _BrowseShellState extends State<BrowseShell> {
     'Satin',
   ];
 
+  // Element "type" options mirror the element categories (Fasteners,
+  // Buttons, Threads, etc.) rather than fabric materials, since elements
+  // are tagged/filtered by category, not by textile material.
+  static const List<String> _elementTypes = [
+    'All',
+    'Fasteners',
+    'Buttons',
+    'Threads',
+    'Embellishments',
+    'Trims',
+    'Ribbons',
+  ];
+
   static const List<String> _colorOptions = [
     'All',
     'White',
@@ -82,19 +97,26 @@ class _BrowseShellState extends State<BrowseShell> {
   double _page = 0;
 
   // ─── Tab-Specific Filter Values ──────────────────────────────────────
-  
+
   // Fabrics Filters (Price, Color, Material Type) - NO RATING
   double _fabricsMinPrice = 0;
   double _fabricsMaxPrice = 5000;
   String _fabricsSelectedColor = 'All';
   String _fabricsSelectedMaterial = 'All';
   String _fabricsSortBy = 'default'; // 'default', 'lowToHigh', 'highToLow'
-  
+
+  // Elements Filters (Price, Color, Material Type) - NO RATING
+  double _elementsMinPrice = 0;
+  double _elementsMaxPrice = 5000;
+  String _elementsSelectedColor = 'All';
+  String _elementsSelectedMaterial = 'All';
+  String _elementsSortBy = 'default'; // 'default', 'lowToHigh', 'highToLow'
+
   // Tailors Filters (Rating, Location)
   double _tailorsMinRating = 0;
   String _tailorsSelectedLocation = 'All';
   String _tailorsSortBy = 'default'; // 'default', 'ratingHighToLow', 'ratingLowToHigh'
-  
+
   // Retailers Filters (Rating, Location)
   double _retailersMinRating = 0;
   String _retailersSelectedLocation = 'All';
@@ -161,17 +183,24 @@ class _BrowseShellState extends State<BrowseShell> {
       _fabricsSelectedColor = 'All';
       _fabricsSelectedMaterial = 'All';
       _fabricsSortBy = 'default';
-      
+
+      // Reset Elements filters
+      _elementsMinPrice = 0;
+      _elementsMaxPrice = 5000;
+      _elementsSelectedColor = 'All';
+      _elementsSelectedMaterial = 'All';
+      _elementsSortBy = 'default';
+
       // Reset Tailors filters
       _tailorsMinRating = 0;
       _tailorsSelectedLocation = 'All';
       _tailorsSortBy = 'default';
-      
+
       // Reset Retailers filters
       _retailersMinRating = 0;
       _retailersSelectedLocation = 'All';
       _retailersSortBy = 'default';
-      
+
       _showFilterOverlay = false;
     });
     _searchNotifier.value = _searchNotifier.value;
@@ -179,24 +208,31 @@ class _BrowseShellState extends State<BrowseShell> {
 
   bool get _hasActiveFilters {
     final currentIndex = _page.round().clamp(0, _tabLabels.length - 1);
-    
+
     if (currentIndex == 0) {
       // Fabrics tab - NO RATING
-      return _fabricsMinPrice > 0 || 
-             _fabricsMaxPrice < 5000 || 
-             _fabricsSelectedColor != 'All' || 
-             _fabricsSelectedMaterial != 'All' ||
-             _fabricsSortBy != 'default';
+      return _fabricsMinPrice > 0 ||
+          _fabricsMaxPrice < 5000 ||
+          _fabricsSelectedColor != 'All' ||
+          _fabricsSelectedMaterial != 'All' ||
+          _fabricsSortBy != 'default';
     } else if (currentIndex == 1) {
+      // Elements tab - NO RATING
+      return _elementsMinPrice > 0 ||
+          _elementsMaxPrice < 5000 ||
+          _elementsSelectedColor != 'All' ||
+          _elementsSelectedMaterial != 'All' ||
+          _elementsSortBy != 'default';
+    } else if (currentIndex == 2) {
       // Tailors tab - Rating + Location
-      return _tailorsMinRating > 0 || 
-             _tailorsSelectedLocation != 'All' ||
-             _tailorsSortBy != 'default';
+      return _tailorsMinRating > 0 ||
+          _tailorsSelectedLocation != 'All' ||
+          _tailorsSortBy != 'default';
     } else {
       // Retailers tab - Rating + Location
-      return _retailersMinRating > 0 || 
-             _retailersSelectedLocation != 'All' ||
-             _retailersSortBy != 'default';
+      return _retailersMinRating > 0 ||
+          _retailersSelectedLocation != 'All' ||
+          _retailersSortBy != 'default';
     }
   }
 
@@ -211,6 +247,14 @@ class _BrowseShellState extends State<BrowseShell> {
       color: _fabricsSelectedColor,
       materialType: _fabricsSelectedMaterial,
       sortBy: _fabricsSortBy,
+    );
+
+    final elementsFilterData = ElementsFilterData(
+      minPrice: _elementsMinPrice,
+      maxPrice: _elementsMaxPrice,
+      color: _elementsSelectedColor,
+      materialType: _elementsSelectedMaterial,
+      sortBy: _elementsSortBy,
     );
 
     final tailorsFilterData = TailorsFilterData(
@@ -242,6 +286,12 @@ class _BrowseShellState extends State<BrowseShell> {
                     FabricsPageBody(
                       searchQuery: _searchNotifier,
                       filterData: fabricsFilterData,
+                      showFabrics: true,
+                    ),
+                    FabricsPageBody(
+                      searchQuery: _searchNotifier,
+                      filterData: elementsFilterData,
+                      showFabrics: false,
                     ),
                     TailorsPageBody(
                       searchQuery: _searchNotifier,
@@ -256,7 +306,7 @@ class _BrowseShellState extends State<BrowseShell> {
               ),
             ],
           ),
-          
+
           // Filter Overlay
           if (_showFilterOverlay)
             GestureDetector(
@@ -286,7 +336,7 @@ class _BrowseShellState extends State<BrowseShell> {
                 ),
               ),
             ),
-          
+
           // Search Overlay
           if (_showSearchOverlay)
             GestureDetector(
@@ -333,9 +383,18 @@ class _BrowseShellState extends State<BrowseShell> {
       ),
       child: Row(
         children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 24),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+          const SizedBox(width: 4),
           Builder(
             builder: (ctx) => IconButton(
-              icon: const Icon(Icons.menu, color: kSage, size: 28),
+              icon: const Icon(Icons.menu, color: kSage, size: 24),
               onPressed: () => Scaffold.of(ctx).openDrawer(),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
@@ -371,7 +430,7 @@ class _BrowseShellState extends State<BrowseShell> {
             onPressed: _toggleSearchOverlay,
             icon: Icon(
               Icons.search,
-              color: _showSearchOverlay ? kSage : kSageDark,
+              color: _showSearchOverlay ? kSage : Colors.black87,
               size: 24,
             ),
             padding: EdgeInsets.zero,
@@ -406,12 +465,12 @@ class _BrowseShellState extends State<BrowseShell> {
             ],
           ),
           const SizedBox(width: 8),
-          if (currentIndex == 0)
+          if (currentIndex == 0 || currentIndex == 1)
             IconButton(
               onPressed: () {},
               icon: const Icon(
                 Icons.shopping_cart_outlined,
-                color: kSage,
+                color: Colors.black87,
                 size: 24,
               ),
               padding: EdgeInsets.zero,
@@ -428,6 +487,8 @@ class _BrowseShellState extends State<BrowseShell> {
     if (currentTab == 0) {
       return _buildFabricsFilterPanel();
     } else if (currentTab == 1) {
+      return _buildElementsFilterPanel();
+    } else if (currentTab == 2) {
       return _buildTailorsFilterPanel();
     } else {
       return _buildRetailersFilterPanel();
@@ -435,7 +496,7 @@ class _BrowseShellState extends State<BrowseShell> {
   }
 
   // ─── Search Panel ────────────────────────────────────────────────────────
-  
+
   Widget _buildSearchPanel(int currentIndex) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -497,7 +558,7 @@ class _BrowseShellState extends State<BrowseShell> {
   }
 
   // ─── Fabrics Filter Panel (NO RATING) ─────────────────────────────
-  
+
   Widget _buildFabricsFilterPanel() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -594,12 +655,14 @@ class _BrowseShellState extends State<BrowseShell> {
                   label: 'Low to High',
                   icon: Icons.arrow_upward,
                   value: 'lowToHigh',
+                  isFabrics: true,
                 ),
                 const SizedBox(width: 8),
                 _buildSortChip(
                   label: 'High to Low',
                   icon: Icons.arrow_downward,
                   value: 'highToLow',
+                  isFabrics: true,
                 ),
               ],
             ),
@@ -738,18 +801,268 @@ class _BrowseShellState extends State<BrowseShell> {
     );
   }
 
+  // ─── Elements Filter Panel (NO RATING) ───────────────────────────
+
+  Widget _buildElementsFilterPanel() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      constraints: const BoxConstraints(maxHeight: 480),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Filter Elements',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                TextButton(
+                  onPressed: _resetFilters,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    'Reset All',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Price Range
+            const Text(
+              'Price Range',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Tk ${_elementsMinPrice.toStringAsFixed(0)}',
+                    style: const TextStyle(fontSize: 13, color: Colors.grey),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    'Tk ${_elementsMaxPrice.toStringAsFixed(0)}',
+                    style: const TextStyle(fontSize: 13, color: Colors.grey),
+                    textAlign: TextAlign.end,
+                  ),
+                ),
+              ],
+            ),
+            RangeSlider(
+              values: RangeValues(_elementsMinPrice, _elementsMaxPrice),
+              min: 0,
+              max: 5000,
+              divisions: 50,
+              activeColor: kSage,
+              inactiveColor: Colors.grey.shade300,
+              onChanged: (values) {
+                setState(() {
+                  _elementsMinPrice = values.start;
+                  _elementsMaxPrice = values.end;
+                });
+              },
+            ),
+            const SizedBox(height: 6),
+
+            // Sort by Price (small toggle buttons)
+            const Text(
+              'Sort by Price',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                _buildSortChip(
+                  label: 'Low to High',
+                  icon: Icons.arrow_upward,
+                  value: 'lowToHigh',
+                  isFabrics: false,
+                ),
+                const SizedBox(width: 8),
+                _buildSortChip(
+                  label: 'High to Low',
+                  icon: Icons.arrow_downward,
+                  value: 'highToLow',
+                  isFabrics: false,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Color Filter
+            const Text(
+              'Color',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: _colorOptions.map((color) {
+                final isSelected = _elementsSelectedColor == color;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _elementsSelectedColor = color;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isSelected ? kSage : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? kSage : Colors.grey.shade300,
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (color != 'All')
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: _resolveColor(color),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.grey.shade300, width: 0.5),
+                            ),
+                          ),
+                        if (color != 'All') const SizedBox(width: 4),
+                        Text(
+                          color,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isSelected ? Colors.white : Colors.grey.shade700,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
+
+            // Type Filter (element categories, e.g. Buttons, Threads)
+            const Text(
+              'Type',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: _elementTypes.map((material) {
+                final isSelected = _elementsSelectedMaterial == material;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _elementsSelectedMaterial = material;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isSelected ? kSage : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? kSage : Colors.grey.shade300,
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Text(
+                      material,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isSelected ? Colors.white : Colors.grey.shade700,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 14),
+
+            // Apply Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _applyFilters,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kSage,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  minimumSize: const Size(double.infinity, 40),
+                ),
+                child: const Text(
+                  'Apply Filters',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // Small pill-style sort toggle button used under the Price Range slider.
   // Tapping the already-selected chip clears the sort back to 'default'.
   Widget _buildSortChip({
     required String label,
     required IconData icon,
     required String value,
+    required bool isFabrics,
   }) {
-    final isSelected = _fabricsSortBy == value;
+    final sortBy = isFabrics ? _fabricsSortBy : _elementsSortBy;
+    final isSelected = sortBy == value;
     return GestureDetector(
       onTap: () {
         setState(() {
-          _fabricsSortBy = isSelected ? 'default' : value;
+          if (isFabrics) {
+            _fabricsSortBy = isSelected ? 'default' : value;
+          } else {
+            _elementsSortBy = isSelected ? 'default' : value;
+          }
         });
       },
       child: Container(
@@ -878,7 +1191,7 @@ class _BrowseShellState extends State<BrowseShell> {
   }
 
   // ─── Tailors Filter Panel (Rating + Location) ──────────────────────
-  
+
   Widget _buildTailorsFilterPanel() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1060,7 +1373,7 @@ class _BrowseShellState extends State<BrowseShell> {
   }
 
   // ─── Retailers Filter Panel (Rating + Location) ────────────────────
-  
+
   Widget _buildRetailersFilterPanel() {
     return Container(
       padding: const EdgeInsets.all(16),
