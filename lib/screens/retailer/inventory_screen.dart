@@ -130,18 +130,28 @@ class InventoryItem {
   }
 
   Map<String, dynamic> toMap() => {
-    'name': name,
+    'productName': name,
     'category': category,
-    'materialType': materialType,
-    'materialBlends': materialBlends.map((blend) => blend.toMap()).toList(),
-    'sku': sku,
+    'materialType': materialBlends.map((blend) => {
+      'type': blend.material,
+      'blend': int.tryParse(blend.blend.replaceAll('%', '').trim()) ?? 100,
+    }).toList(),
+    'productCode': sku,
     'description': description,
-    'variants': variants.map((variant) => variant.toMap()).toList(),
-    'canWash': canWash,
-    'canBleach': canBleach,
-    'canDryClean': canDryClean,
-    'canTumbleDry': canTumbleDry,
-    'ironLevel': ironLevel,
+    'colorOptions': variants.map((variant) => {
+      'optionId': variants.indexOf(variant) + 1,
+      'color': variant.colorName,
+      'price': variant.price,
+      'stock': variant.stock,
+      'image': variant.imagePath,
+    }).toList(),
+    'careSymbol': [
+      if (canWash) 'Machine Washable',
+      if (canBleach) 'Bleach Safe',
+      if (canDryClean) 'Dry Clean Only',
+      if (canTumbleDry) 'Tumble Dry Safe',
+      'Iron Level: $ironLevel',
+    ],
   };
 
   factory InventoryItem.fromMap(Map<String, dynamic> map) {
