@@ -12,7 +12,7 @@ import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dar
 import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
 import '../../widgets/dashboard_drawer.dart';
 import 'virtual_trial_screen.dart';
-import 'notification_screen.dart' as customer;
+import 'notification_screen.dart' ;
 import 'package:sketch2stitch/screens/retailer/inventory_screen.dart';
 
 
@@ -71,23 +71,23 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   }
 
   void _openNotifications() async {
-    Widget notificationScreen;
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UnifiedNotificationScreen(role: _currentRole),
+      ),
+    );
 
-    switch (_currentRole) {
-      case AppUserRole.customer:
-        notificationScreen = const customer.NotificationScreen();
-        break;
-      case AppUserRole.tailor:
-        notificationScreen = const customer.NotificationScreen();
-        break;
-      case AppUserRole.retailer:
-        notificationScreen = const customer.NotificationScreen();
-        break;
+    if (result == true && mounted) {
+      setState(() {
+        _hasUnreadNotifications = false;
+      });
     }
+
 
     final cleared = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => notificationScreen),
+      MaterialPageRoute(builder: (_) => UnifiedNotificationScreen(role: _currentRole)),
     );
     if (cleared == true && mounted) {
       setState(() => _hasUnreadNotifications = false);
