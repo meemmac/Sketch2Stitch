@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
 
-enum TrackEventType { requested, confirmed, dismissed }
+enum TrackEventType {
+  pendingRetailerConfirmation,
+  orderConfirmedRetailer,
+  orderConfirmedTailor,
+  shippingToTailor,
+  shippingToCustomer,
+  delivered,
+  requested,
+  confirmed,
+  dismissed
+}
 
 class TrackEvent {
   final TrackEventType type;
@@ -25,18 +35,22 @@ class OrderTrackScreen extends StatelessWidget {
   const OrderTrackScreen({
     super.key,
     this.orderId = 'OR05',
-    this.status = 'Waiting for checkout',
-    this.estimatedDelivery = '-',
+    this.status = 'Pending Retailer Confirmation',
+    this.estimatedDelivery = '25 Dec 2026',
     this.lastUpdated = '22 Dec 2026',
     this.deliveryAddress = 'The Shakespeare Centre, Henley Street, CV37 6QW Stratford-upon-Avon, UK.',
     // TODO: replace with the real order's event history from the backend
     this.events = const [
-      TrackEvent(type: TrackEventType.requested, material: 'Fine Cotton', partyName: 'Cotton Palace'),
+      TrackEvent(type: TrackEventType.pendingRetailerConfirmation, material: 'Fine Cotton', partyName: 'Cotton Palace'),
+      TrackEvent(type: TrackEventType.orderConfirmedRetailer, material: 'Fine Cotton', partyName: 'Cotton Palace'),
+      TrackEvent(type: TrackEventType.orderConfirmedTailor, material: 'Fine Cotton', partyName: 'Master Tailor'),
+      TrackEvent(type: TrackEventType.shippingToTailor, material: 'Fine Cotton', partyName: 'Cotton Palace'),
+      TrackEvent(type: TrackEventType.shippingToCustomer, material: 'Fine Cotton', partyName: 'DHL Express'),
+      TrackEvent(type: TrackEventType.delivered, material: 'Fine Cotton', partyName: 'Customer'),
+      // Additional events for other materials
       TrackEvent(type: TrackEventType.requested, material: 'Embroidery', partyName: 'Jhakanaka Embroidery Place'),
-      TrackEvent(type: TrackEventType.requested, material: 'Linen', partyName: 'Mukta Kapors'),
-      TrackEvent(type: TrackEventType.confirmed, material: 'Fine Cotton', partyName: 'Cotton Palace'),
-      TrackEvent(type: TrackEventType.dismissed, material: 'Embroidery', partyName: 'Jhakanaka Embroidery Place'),
-      TrackEvent(type: TrackEventType.confirmed, material: 'Linen', partyName: 'Mukta Kapors'),
+      TrackEvent(type: TrackEventType.confirmed, material: 'Embroidery', partyName: 'Jhakanaka Embroidery Place'),
+      TrackEvent(type: TrackEventType.dismissed, material: 'Linen', partyName: 'Mukta Kapors'),
     ],
   });
 
@@ -214,10 +228,15 @@ class OrderTrackScreen extends StatelessWidget {
                 text: TextSpan(
                   style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
                   children: [
-                    TextSpan(text: '${style.verb} for '),
-                    TextSpan(text: event.material, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    const TextSpan(text: ' from '),
-                    TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    TextSpan(text: '${style.verb} '),
+                    if (event.material.isNotEmpty) ...[
+                      TextSpan(text: 'for ', style: const TextStyle(fontWeight: FontWeight.normal)),
+                      TextSpan(text: event.material, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      const TextSpan(text: ' from '),
+                      TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ] else ...[
+                      TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ],
                   ],
                 ),
               ),
@@ -230,12 +249,60 @@ class OrderTrackScreen extends StatelessWidget {
 
   _TrackEventStyle _styleFor(TrackEventType type) {
     switch (type) {
+      case TrackEventType.pendingRetailerConfirmation:
+        return _TrackEventStyle(
+          color: Colors.orange.shade600,
+          icon: Icons.pending_rounded,
+          verb: 'Pending Retailer Confirmation',
+        );
+      case TrackEventType.orderConfirmedRetailer:
+        return _TrackEventStyle(
+          color: Colors.blue.shade600,
+          icon: Icons.storefront_rounded,
+          verb: 'Order Confirmed from Retailer(s)',
+        );
+      case TrackEventType.orderConfirmedTailor:
+        return _TrackEventStyle(
+          color: Colors.purple.shade600,
+          icon: Icons.design_services_rounded,
+          verb: 'Order Confirmed from Tailor',
+        );
+      case TrackEventType.shippingToTailor:
+        return _TrackEventStyle(
+          color: Colors.teal.shade600,
+          icon: Icons.local_shipping_rounded,
+          verb: 'Shipping to Tailor',
+        );
+      case TrackEventType.shippingToCustomer:
+        return _TrackEventStyle(
+          color: Colors.indigo.shade600,
+          icon: Icons.delivery_dining_rounded,
+          verb: 'Shipping to Customer',
+        );
+      case TrackEventType.delivered:
+        return _TrackEventStyle(
+          color: Colors.green.shade700,
+          icon: Icons.check_circle_rounded,
+          verb: 'Delivered',
+        );
       case TrackEventType.requested:
-        return _TrackEventStyle(color: Colors.blue.shade600, icon: Icons.north_east_rounded, verb: 'Requested');
+        return _TrackEventStyle(
+          color: Colors.blue.shade600,
+          icon: Icons.north_east_rounded,
+          verb: 'Requested',
+        );
       case TrackEventType.confirmed:
-        return _TrackEventStyle(color: Colors.green.shade600, icon: Icons.check_rounded, verb: 'Order confirmed');
+        return _TrackEventStyle(
+          color: Colors.green.shade600,
+          icon: Icons.check_rounded,
+          verb: 'Order confirmed',
+        );
       case TrackEventType.dismissed:
-        return _TrackEventStyle(color: Colors.red.shade500, icon: Icons.close_rounded, verb: 'Order dismissed');
+        return _TrackEventStyle(
+          color: Colors.red.shade500,
+          icon: Icons.close_rounded,
+          verb: 'Order dismissed',
+        );
     }
   }
 }
