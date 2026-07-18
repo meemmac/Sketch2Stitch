@@ -70,8 +70,7 @@ class MeasurementGuideContent {
 const Map<String, MeasurementGuideContent> kMeasurementGuides = {
   'upperBustCircumference': MeasurementGuideContent(
     text:
-        'Wrap the tape across the fullest part of your chest, just above the '
-        'bust, keeping it horizontal and snug but not tight.',
+        'Wrap the tape above the fullest part of your chest, keeping it horizontal and snug but not tight.',
     assetPath: 'assets/images/guides/upperBustCircumference.png',
   ),
   'roundShoulderCircumference': MeasurementGuideContent(
@@ -200,11 +199,6 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
         initialInches: widget.measurement.upperBustCircumference,
       ),
       _MeasurementEntry(
-        label: 'Round Shoulder Circumference',
-        fieldKey: 'roundShoulderCircumference',
-        initialInches: widget.measurement.roundShoulderCircumference,
-      ),
-      _MeasurementEntry(
         label: 'Bust Circumference',
         fieldKey: 'bustCircumference',
         initialInches: widget.measurement.bustCircumference,
@@ -215,9 +209,9 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
         initialInches: widget.measurement.underBustCircumference,
       ),
       _MeasurementEntry(
-        label: 'Hips Circumference',
-        fieldKey: 'hipsCircumference',
-        initialInches: widget.measurement.hipsCircumference,
+        label: 'Round Shoulder Circumference',
+        fieldKey: 'roundShoulderCircumference',
+        initialInches: widget.measurement.roundShoulderCircumference,
       ),
       _MeasurementEntry(
         label: 'Shoulder to Bust',
@@ -230,14 +224,25 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
         initialInches: widget.measurement.shoulderToUnderBust,
       ),
       _MeasurementEntry(
-        label: 'Waist',
-        fieldKey: 'waist',
-        initialInches: widget.measurement.waist,
-      ),
-      _MeasurementEntry(
         label: 'Shoulder to Knee',
         fieldKey: 'shoulderToKnee',
         initialInches: widget.measurement.shoulderToKnee,
+      ),
+      _MeasurementEntry(
+        label: 'Shoulder to Ankle',
+        fieldKey: 'shoulderToAnkle',
+        initialInches: widget.measurement.shoulderToAnkle,
+      ),
+      
+      _MeasurementEntry(
+        label: 'Waist to Ankle',
+        fieldKey: 'waistToAnkle',
+        initialInches: widget.measurement.waistToAnkle,
+      ),
+      _MeasurementEntry(
+        label: 'Waist',
+        fieldKey: 'waist',
+        initialInches: widget.measurement.waist,
       ),
       _MeasurementEntry(
         label: 'Thigh',
@@ -254,15 +259,10 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
         fieldKey: 'ankle',
         initialInches: widget.measurement.ankle,
       ),
-      _MeasurementEntry(
-        label: 'Waist to Ankle',
-        fieldKey: 'waistToAnkle',
-        initialInches: widget.measurement.waistToAnkle,
-      ),
-      _MeasurementEntry(
-        label: 'Shoulder to Ankle',
-        fieldKey: 'shoulderToAnkle',
-        initialInches: widget.measurement.shoulderToAnkle,
+       _MeasurementEntry(
+        label: 'Hips Circumference',
+        fieldKey: 'hipsCircumference',
+        initialInches: widget.measurement.hipsCircumference,
       ),
     ];
   }
@@ -376,12 +376,12 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 if (guide != null) ...[
                   ClipRRect(
                     borderRadius: BorderRadius.circular(14),
                     child: AspectRatio(
-                      aspectRatio: 1.1,
+                      aspectRatio: 1.6,
                       child: Container(
                         color: _MeasurementColors.background,
                         child: Image.asset(
@@ -393,7 +393,7 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
                               child: Icon(
                                 Icons.image_not_supported_outlined,
                                 color: _MeasurementColors.subtleText,
-                                size: 28,
+                                size: 32,
                               ),
                             );
                           },
@@ -427,7 +427,10 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
   }
 
   double _valueFor(String label) {
-    final entry = _entries.firstWhere((e) => e.label == label);
+    final entry = _entries.firstWhere(
+      (e) => e.label == label,
+      orElse: () => _MeasurementEntry(label: label, fieldKey: '', initialInches: 0),
+    );
     return entry.currentInches;
   }
 
@@ -629,6 +632,7 @@ class _MeasurementFieldState extends State<MeasurementField> {
   }
 
   void _recalculate() {
+    if (!mounted) return;
     final entry = widget.entry;
     final parsed = double.tryParse(entry.controller.text.trim());
     setState(() {
@@ -644,7 +648,7 @@ class _MeasurementFieldState extends State<MeasurementField> {
   }
 
   void _onUnitChanged(MeasurementUnit? newUnit) {
-    if (newUnit == null) return;
+    if (newUnit == null || !mounted) return;
     final entry = widget.entry;
 
     // Preserve the physical measurement: convert the current displayed
