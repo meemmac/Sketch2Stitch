@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/screens/shared/register_screen.dart';
-import 'package:sketch2stitch/screens/shared/forgot_password_screen.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -279,12 +279,20 @@ class _LoginScreenState extends State<LoginScreen>
                                 const SizedBox(height: 8),
 
                                 // Get Started button
+                                // Inside LoginScreen's build method
                                 SizedBox(
                                   width: double.infinity,
                                   height: 50,
                                   child: ElevatedButton(
                                     onPressed: () {
-                                      // TODO: Handle login logic
+                                      // In a real app, you would verify credentials here.
+                                      // For now, we navigate to the Home screen based on the user type.
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => const CustomerHomeScreen(),
+                                        ),
+                                      );
                                     },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.black,
