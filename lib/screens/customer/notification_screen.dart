@@ -613,7 +613,6 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                           TextSpan(text: style.messagePrefix),
                           TextSpan(text: n.customerName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
                           TextSpan(text: style.messageMiddle),
-                          TextSpan(text: n.itemName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
                           if (n.colorName != null) ...[
                             TextSpan(text: ' (Color: '),
                             TextSpan(text: n.colorName!, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
@@ -720,8 +719,6 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(n.customerName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 4),
-                        Text('Product: ${n.itemName}', style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.6))),
                       ],
                     ),
                   ),
@@ -771,7 +768,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
       case RetailerNotificationType.stockOut:
         return _RetailerNotificationStyle(background: const Color(0xFFF7D6D6), icon: Icons.warning_rounded, iconColor: Colors.red.shade700, title: 'Stock Alert', messagePrefix: '', messageMiddle: ' is out of stock for ', messageSuffix: '.');
       case RetailerNotificationType.newReview:
-        return _RetailerNotificationStyle(background: const Color(0xFFD3E9F7), icon: Icons.star_rate_rounded, iconColor: Colors.blue.shade800, title: 'New Review', messagePrefix: '', messageMiddle: ' reviewed ', messageSuffix: '');
+        return _RetailerNotificationStyle(background: const Color(0xFFD3E9F7), icon: Icons.star_rate_rounded, iconColor: Colors.blue.shade800, title: 'New Review', messagePrefix: '', messageMiddle: ' left a new review. ', messageSuffix: '');
     }
   }
 
@@ -810,7 +807,6 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                           TextSpan(text: style.messagePrefix),
                           TextSpan(text: n.customerName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
                           TextSpan(text: style.messageMiddle),
-                          TextSpan(text: n.itemName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
                           if (style.messageSuffix.isNotEmpty) TextSpan(text: style.messageSuffix),
                           if (n.type == TailorNotificationType.deliveryDeadline && n.deadlineDate != null) ...[
                             TextSpan(text: ' Deadline: ${n.deadlineDate}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
@@ -919,8 +915,6 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(n.customerName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 4),
-                        Text('Product: ${n.itemName}', style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.6))),
                       ],
                     ),
                   ),
@@ -972,7 +966,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
       case TailorNotificationType.deliveryDeadline:
         return _TailorNotificationStyle(background: const Color(0xFFFBE7C0), icon: Icons.timer_rounded, iconColor: Colors.orange.shade800, title: 'Delivery Deadline Approaching', messagePrefix: 'Order from ', messageMiddle: ' for ', messageSuffix: ' is approaching deadline.');
       case TailorNotificationType.newReview:
-        return _TailorNotificationStyle(background: const Color(0xFFD3E9F7), icon: Icons.star_rate_rounded, iconColor: Colors.blue.shade700, title: 'New Review', messagePrefix: '', messageMiddle: ' reviewed ', messageSuffix: '');
+        return _TailorNotificationStyle(background: const Color(0xFFD3E9F7), icon: Icons.star_rate_rounded, iconColor: Colors.blue.shade700, title: 'New Review', messagePrefix: '', messageMiddle: ' left a new review. ', messageSuffix: '');
     }
   }
 }
