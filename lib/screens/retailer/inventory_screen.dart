@@ -130,29 +130,19 @@ class InventoryItem {
   }
 
   Map<String, dynamic> toMap() => {
-    'productName': name,
-    'category': category,
-    'materialType': materialBlends.map((blend) => {
-      'type': blend.material,
-      'blend': int.tryParse(blend.blend.replaceAll('%', '').trim()) ?? 100,
-    }).toList(),
-    'productCode': sku,
-    'description': description,
-    'colorOptions': variants.map((variant) => {
-      'optionId': variants.indexOf(variant) + 1,
-      'color': variant.colorName,
-      'price': variant.price,
-      'stock': variant.stock,
-      'image': variant.imagePath,
-    }).toList(),
-    'careSymbol': [
-      if (canWash) 'Machine Washable',
-      if (canBleach) 'Bleach Safe',
-      if (canDryClean) 'Dry Clean Only',
-      if (canTumbleDry) 'Tumble Dry Safe',
-      'Iron Level: $ironLevel',
-    ],
-  };
+  'name': name,
+  'category': category,
+  'materialType': materialType,
+  'sku': sku,
+  'description': description,
+  'variants': variants.map((v) => v.toMap()).toList(),
+  'materialBlends': materialBlends.map((b) => b.toMap()).toList(),
+  'canWash': canWash,
+  'canBleach': canBleach,
+  'canDryClean': canDryClean,
+  'canTumbleDry': canTumbleDry,
+  'ironLevel': ironLevel,
+};
 
   factory InventoryItem.fromMap(Map<String, dynamic> map) {
     final rawVariants = map['variants'];
@@ -208,7 +198,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   String _searchQuery = "";
-  static const String _cacheKey = 'retailer_inventory_cache';
+  static const String _cacheKey = 'retailer_inventory_cache_v2';
   int _gridAnimationSeed = 0;
   final Map<String, int> _selectedVariantIndexes = <String, int>{};
   static const List<String> _commonMaterials = <String>[

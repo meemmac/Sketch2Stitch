@@ -55,6 +55,8 @@ class TailorJob {
   final List<String> designIds;
   final TailorJobStatus status;
   final DateTime? confirmedAt;
+  final DateTime? createdAt;
+  final DateTime? requestedAt;
   final DateTime? estimatedDeliveryDate;
   final String? specialInstructions;
   final String? rejectionReason;
@@ -77,6 +79,8 @@ class TailorJob {
     this.designIds = const [],
     required this.status,
     this.confirmedAt,
+    this.createdAt,
+    this.requestedAt,
     this.estimatedDeliveryDate,
     this.specialInstructions,
     this.rejectionReason,
@@ -137,6 +141,8 @@ class TailorJob {
     List<String>? designIds,
     TailorJobStatus? status,
     DateTime? confirmedAt,
+    DateTime? createdAt,
+    DateTime? requestedAt,
     DateTime? estimatedDeliveryDate,
     String? specialInstructions,
     String? rejectionReason,
@@ -157,6 +163,8 @@ class TailorJob {
       designIds: designIds ?? this.designIds,
       status: status ?? this.status,
       confirmedAt: confirmedAt ?? this.confirmedAt,
+      createdAt: createdAt ?? this.createdAt,
+      requestedAt: requestedAt ?? this.requestedAt,
       estimatedDeliveryDate: estimatedDeliveryDate ?? this.estimatedDeliveryDate,
       specialInstructions: specialInstructions ?? this.specialInstructions,
       rejectionReason: rejectionReason ?? this.rejectionReason,
@@ -179,6 +187,8 @@ class TailorJob {
     'designIds': designIds,
     'status': status.toValue,
     'confirmedAt': confirmedAt?.toIso8601String(),
+    'createdAt': createdAt?.toIso8601String(),
+    'requestedAt': requestedAt?.toIso8601String(),
     'estimatedDeliveryDate': estimatedDeliveryDate?.toIso8601String(),
     'specialInstructions': specialInstructions,
     'rejectionReason': rejectionReason,
@@ -200,6 +210,12 @@ class TailorJob {
       status: TailorJobStatus.fromValue(json['status'] ?? 'pending'),
       confirmedAt: json['confirmedAt'] != null
           ? DateTime.parse(json['confirmedAt'])
+          : null,
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'])
+          : null,
+      requestedAt: json['requestedAt'] != null
+          ? DateTime.parse(json['requestedAt'])
           : null,
       estimatedDeliveryDate: json['estimatedDeliveryDate'] != null
           ? DateTime.parse(json['estimatedDeliveryDate'])
