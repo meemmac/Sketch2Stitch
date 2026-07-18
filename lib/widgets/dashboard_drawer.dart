@@ -86,14 +86,15 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       hipsCircumference: 36.0,
       underBustCircumference: 32.0,
       bustCircumference: 35.0,
-      bustSpan: 7.5,
-      shoulderToHips: 20.0,
+      waist: 28.0,
       shoulderToKnee: 38.0,
       shoulderToUnderBust: 12.5,
       shoulderToBust: 10.0,
       thigh: 21.0,
       knee: 14.0,
       ankle: 9.0,
+      waistToAnkle: 40.0,
+      shoulderToAnkle: 57.0,
     );
 
     // Initialize mock data

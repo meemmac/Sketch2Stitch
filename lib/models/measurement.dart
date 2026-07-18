@@ -7,14 +7,15 @@ class Measurement {
   final double hipsCircumference;
   final double underBustCircumference;
   final double bustCircumference;
-  final double bustSpan;
-  final double shoulderToHips;
+  final double waist;
   final double shoulderToKnee;
   final double shoulderToUnderBust;
   final double shoulderToBust;
   final double thigh;
   final double knee;
   final double ankle;
+  final double waistToAnkle;
+  final double shoulderToAnkle;
 
   
   Measurement({
@@ -25,14 +26,15 @@ class Measurement {
     required this.hipsCircumference,
     required this.underBustCircumference,
     required this.bustCircumference,
-    required this.bustSpan,
-    required this.shoulderToHips,
+    required this.waist,
     required this.shoulderToKnee,
     required this.shoulderToUnderBust,
     required this.shoulderToBust,
     required this.thigh,
     required this.knee,
     required this.ankle,
+    required this.waistToAnkle,
+    required this.shoulderToAnkle,
   });
 
   Measurement copyWith({
@@ -43,14 +45,15 @@ class Measurement {
     double? hipsCircumference,
     double? underBustCircumference,
     double? bustCircumference,
-    double? bustSpan,
-    double? shoulderToHips,
+    double? waist,
     double? shoulderToKnee,
     double? shoulderToUnderBust,
     double? shoulderToBust,
     double? thigh,
     double? knee,
     double? ankle,
+    double? waistToAnkle,
+    double? shoulderToAnkle,
   }) {
     return Measurement(
       id: id ?? this.id,
@@ -60,14 +63,15 @@ class Measurement {
       hipsCircumference: hipsCircumference ?? this.hipsCircumference,
       underBustCircumference: underBustCircumference ?? this.underBustCircumference,
       bustCircumference: bustCircumference ?? this.bustCircumference,
-      bustSpan: bustSpan ?? this.bustSpan,
-      shoulderToHips: shoulderToHips ?? this.shoulderToHips,
+      waist: waist ?? this.waist,
       shoulderToKnee: shoulderToKnee ?? this.shoulderToKnee,
       shoulderToUnderBust: shoulderToUnderBust ?? this.shoulderToUnderBust,
       shoulderToBust: shoulderToBust ?? this.shoulderToBust,
       thigh: thigh ?? this.thigh,
       knee: knee ?? this.knee,
       ankle: ankle ?? this.ankle,
+      waistToAnkle: waistToAnkle ?? this.waistToAnkle,
+      shoulderToAnkle: shoulderToAnkle ?? this.shoulderToAnkle,
     );
   }
 
@@ -79,14 +83,15 @@ class Measurement {
     'hipsCircumference': hipsCircumference,
     'underBustCircumference': underBustCircumference,
     'bustCircumference': bustCircumference,
-    'bustSpan': bustSpan,
-    'shoulderToHips': shoulderToHips,
+    'waist': waist,
     'shoulderToKnee': shoulderToKnee,
     'shoulderToUnderBust': shoulderToUnderBust,
     'shoulderToBust': shoulderToBust,
     'thigh': thigh,
     'knee': knee,
     'ankle': ankle,
+    'waistToAnkle': waistToAnkle,
+    'shoulderToAnkle': shoulderToAnkle,
   };
 
   factory Measurement.fromJson(Map<String, dynamic> json) {
@@ -98,14 +103,15 @@ class Measurement {
       hipsCircumference: (json['hipsCircumference'] ?? 0).toDouble(),
       underBustCircumference: (json['underBustCircumference'] ?? 0).toDouble(),
       bustCircumference: (json['bustCircumference'] ?? 0).toDouble(),
-      bustSpan: (json['bustSpan'] ?? 0).toDouble(),
-      shoulderToHips: (json['shoulderToHips'] ?? 0).toDouble(),
+      waist: (json['waist'] ?? 0).toDouble(),
       shoulderToKnee: (json['shoulderToKnee'] ?? 0).toDouble(),
       shoulderToUnderBust: (json['shoulderToUnderBust'] ?? 0).toDouble(),
       shoulderToBust: (json['shoulderToBust'] ?? 0).toDouble(),
       thigh: (json['thigh'] ?? 0).toDouble(),
       knee: (json['knee'] ?? 0).toDouble(),
       ankle: (json['ankle'] ?? 0).toDouble(),
+      waistToAnkle: (json['waistToAnkle'] ?? 0).toDouble(),
+      shoulderToAnkle: (json['shoulderToAnkle'] ?? 0).toDouble(),
     );
   }
 }

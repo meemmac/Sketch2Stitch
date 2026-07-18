@@ -92,12 +92,6 @@ const Map<String, MeasurementGuideContent> kMeasurementGuides = {
         'sit, keeping the tape snug and horizontal.',
     assetPath: 'assets/images/guides/underBustCircumference.png',
   ),
-  'bustSpan': MeasurementGuideContent(
-    text:
-        'Measure the horizontal distance between the two bust points '
-        '(nipple to nipple).',
-    assetPath: 'assets/images/guides/bustSpan.png',
-  ),
   'hipsCircumference': MeasurementGuideContent(
     text:
         'Wrap the tape around the fullest part of your hips and buttocks, '
@@ -116,11 +110,11 @@ const Map<String, MeasurementGuideContent> kMeasurementGuides = {
         'beneath the bust.',
     assetPath: 'assets/images/guides/shoulderToUnderBust.png',
   ),
-  'shoulderToHips': MeasurementGuideContent(
+  'waist': MeasurementGuideContent(
     text:
-        'Measure vertically from the top of your shoulder down to the '
-        'widest point of your hips.',
-    assetPath: 'assets/images/guides/shoulderToHips.png',
+        'Wrap the tape around the narrowest part of your natural waist, '
+        'usually just above the belly button.',
+    assetPath: 'assets/images/guides/waist.png',
   ),
   'shoulderToKnee': MeasurementGuideContent(
     text:
@@ -143,6 +137,17 @@ const Map<String, MeasurementGuideContent> kMeasurementGuides = {
         'Wrap the tape around the narrowest part of your ankle, just above '
         'the ankle bone.',
     assetPath: 'assets/images/guides/ankle.png',
+  ),
+  'waistToAnkle': MeasurementGuideContent(
+    text:
+        'Measure vertically from your natural waist down to the ankle bone.',
+    assetPath: 'assets/images/guides/waistToAnkle.png',
+  ),
+  'shoulderToAnkle': MeasurementGuideContent(
+    text:
+        'Measure vertically from the top of your shoulder all the way down '
+        'to the ankle bone.',
+    assetPath: 'assets/images/guides/shoulderToAnkle.png',
   ),
 };
 
@@ -210,11 +215,6 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
         initialInches: widget.measurement.underBustCircumference,
       ),
       _MeasurementEntry(
-        label: 'Bust Span',
-        fieldKey: 'bustSpan',
-        initialInches: widget.measurement.bustSpan,
-      ),
-      _MeasurementEntry(
         label: 'Hips Circumference',
         fieldKey: 'hipsCircumference',
         initialInches: widget.measurement.hipsCircumference,
@@ -230,9 +230,9 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
         initialInches: widget.measurement.shoulderToUnderBust,
       ),
       _MeasurementEntry(
-        label: 'Shoulder to Hips',
-        fieldKey: 'shoulderToHips',
-        initialInches: widget.measurement.shoulderToHips,
+        label: 'Waist',
+        fieldKey: 'waist',
+        initialInches: widget.measurement.waist,
       ),
       _MeasurementEntry(
         label: 'Shoulder to Knee',
@@ -253,6 +253,16 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
         label: 'Ankle',
         fieldKey: 'ankle',
         initialInches: widget.measurement.ankle,
+      ),
+      _MeasurementEntry(
+        label: 'Waist to Ankle',
+        fieldKey: 'waistToAnkle',
+        initialInches: widget.measurement.waistToAnkle,
+      ),
+      _MeasurementEntry(
+        label: 'Shoulder to Ankle',
+        fieldKey: 'shoulderToAnkle',
+        initialInches: widget.measurement.shoulderToAnkle,
       ),
     ];
   }
@@ -292,15 +302,16 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
       roundShoulderCircumference: _valueFor('Round Shoulder Circumference'),
       bustCircumference: _valueFor('Bust Circumference'),
       underBustCircumference: _valueFor('Under Bust Circumference'),
-      bustSpan: _valueFor('Bust Span'),
       hipsCircumference: _valueFor('Hips Circumference'),
       shoulderToBust: _valueFor('Shoulder to Bust'),
       shoulderToUnderBust: _valueFor('Shoulder to Under Bust'),
-      shoulderToHips: _valueFor('Shoulder to Hips'),
+      waist: _valueFor('Waist'),
       shoulderToKnee: _valueFor('Shoulder to Knee'),
       thigh: _valueFor('Thigh'),
       knee: _valueFor('Knee'),
       ankle: _valueFor('Ankle'),
+      waistToAnkle: _valueFor('Waist to Ankle'),
+      shoulderToAnkle: _valueFor('Shoulder to Ankle'),
     );
 
     try {
@@ -377,11 +388,12 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
                           guide.assetPath,
                           fit: BoxFit.contain,
                           errorBuilder: (context, error, stackTrace) {
+                            debugPrint('ERROR LOADING IMAGE: $error');
                             return const Center(
                               child: Icon(
                                 Icons.image_not_supported_outlined,
                                 color: _MeasurementColors.subtleText,
-                                size: 32,
+                                size: 28,
                               ),
                             );
                           },

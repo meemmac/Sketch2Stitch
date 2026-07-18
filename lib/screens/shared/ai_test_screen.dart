@@ -28,14 +28,15 @@ class _AITestScreenState extends State<AITestScreen> {
     'Hips': TextEditingController(text: '36"'),
     'Under Bust': TextEditingController(text: '30"'),
     'Bust': TextEditingController(text: '35"'),
-    'Bust Span': TextEditingController(text: '7.5"'),
-    'Shoulder to Hips': TextEditingController(text: '22"'),
+    'Waist': TextEditingController(text: '28"'),
     'Shoulder to Knee': TextEditingController(text: '38"'),
     'Shoulder to Under Bust': TextEditingController(text: '13.5"'),
     'Shoulder to Bust': TextEditingController(text: '9.5"'),
     'Thigh': TextEditingController(text: '20"'),
     'Knee': TextEditingController(text: '14"'),
     'Ankle': TextEditingController(text: '9"'),
+    'Waist to Ankle': TextEditingController(text: '40"'),
+    'Shoulder to Ankle': TextEditingController(text: '57"'),
   };
 
   // Custom Prompt Instruction (empty by default — user fills this in)
