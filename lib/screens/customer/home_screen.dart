@@ -238,6 +238,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           Builder(
             builder: (context) => IconButton(
               icon: const Icon(Icons.menu_rounded, color: Colors.black87),
+              iconSize: 24,
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
           ),
@@ -256,6 +257,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
             children: [
               IconButton(
                 icon: const Icon(Icons.notifications_none_rounded, color: Colors.black87),
+                iconSize: 24,
                 onPressed: _openNotifications,
               ),
               if (_hasUnreadNotifications)
@@ -278,6 +280,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           if (_currentRole == AppUserRole.customer)
             IconButton(
               icon: const Icon(Icons.track_changes_rounded, color: Colors.black87),
+              iconSize: 24,
               onPressed: () {
                 _openTrackOrder();
               },
@@ -286,6 +289,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           if (_currentRole == AppUserRole.customer)
             IconButton(
               icon: const Icon(Icons.shopping_cart_outlined, color: Colors.black87),
+              iconSize: 24,
               onPressed: () {
                 // TODO: navigate to cart
               },

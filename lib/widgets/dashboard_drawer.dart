@@ -553,13 +553,6 @@ class DrawerNavigationSection extends StatelessWidget {
                     builder: (_) => const InventoryScreen(),
                   ),
                 );
-              } else if (item['title'] == 'About') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const AboutUsScreen(),
-                  ),
-                );
               } else {
                 debugPrint("Navigation clicked: ${item['title']}");
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -590,13 +583,11 @@ class DrawerNavigationSection extends StatelessWidget {
         return [
           {'title': 'Orders', 'icon': Icons.receipt_long_rounded},
           {'title': 'Messages', 'icon': Icons.chat_bubble_outline_rounded},
-          {'title': 'About', 'icon': Icons.info_outline},
         ];
       case AppUserRole.retailer:
         return [
           {'title': 'Orders', 'icon': Icons.receipt_long_rounded},
           {'title': 'Inventory', 'icon': Icons.inventory_2_outlined},
-          {'title': 'About', 'icon': Icons.info_outline},
         ];
     }
   }
