@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../screens/customer/virtual_trial_screen.dart';
 import '../screens/retailer/inventory_screen.dart';
-
+import '../screens/retailer/orders_screen.dart';
 
 /// Enum representing the three user roles.
 enum AppUserRole {
@@ -444,6 +444,14 @@ class DrawerNavigationSection extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (_) => const VirtualTrialScreen(),
+                  ),
+                );
+              } else if (role == AppUserRole.retailer &&
+                  item['title'] == 'Orders') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const RetailerOrdersScreen(),
                   ),
                 );
               } else if (item['title'] == 'Inventory') {
