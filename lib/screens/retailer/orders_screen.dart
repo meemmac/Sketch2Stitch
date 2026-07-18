@@ -379,7 +379,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.green.shade800,
+        color: const Color(0xFF67B36B),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
