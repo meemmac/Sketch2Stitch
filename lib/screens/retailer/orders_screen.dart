@@ -10,6 +10,9 @@ class RetailerOrder {
   final DateTime? deliveryDate;
   final String status;
   final bool isDelivered;
+  final String imagePath;
+  final String color;
+  final String paymentStatus;
 
   const RetailerOrder({
     required this.id,
@@ -20,6 +23,9 @@ class RetailerOrder {
     required this.orderDate,
     required this.status,
     required this.isDelivered,
+    required this.imagePath,
+    required this.color,
+    required this.paymentStatus,
     this.deliveryDate,
   });
 }
@@ -41,27 +47,33 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
   late final List<RetailerOrder> _orders = <RetailerOrder>[
     RetailerOrder(
       id: "ORD-1087",
-      customerName: "Nadia Rahman",
+      customerName: "Nazia Tasphia",
       itemName: "Premium Egyptian Cotton",
       quantity: 8,
       amount: 5200,
       orderDate: DateTime.now().subtract(const Duration(days: 12)),
       status: "Preparing",
       isDelivered: false,
+      imagePath: "assets/images/fabrics_rolled.jpg",
+      color: "Cream",
+      paymentStatus: "Paid",
     ),
     RetailerOrder(
       id: "ORD-1083",
-      customerName: "Arif Hossain",
+      customerName: "Israt Jahan",
       itemName: "Golden Silk Blend",
       quantity: 3,
       amount: 5400,
       orderDate: DateTime.now().subtract(const Duration(days: 28)),
       status: "Packed",
       isDelivered: false,
+      imagePath: "assets/images/silk.jpg",
+      color: "Gold",
+      paymentStatus: "Paid",
     ),
     RetailerOrder(
       id: "ORD-1076",
-      customerName: "Sadia Islam",
+      customerName: "Nishat Tasnim",
       itemName: "Linen Summer Fabric",
       quantity: 5,
       amount: 5600,
@@ -69,10 +81,13 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       deliveryDate: DateTime.now().subtract(const Duration(days: 35)),
       status: "Delivered",
       isDelivered: true,
+      imagePath: "assets/images/fab2.jpg",
+      color: "Light Blue",
+      paymentStatus: "Paid",
     ),
     RetailerOrder(
       id: "ORD-1051",
-      customerName: "Tanvir Ahmed",
+      customerName: "Farzana Yasmin",
       itemName: "Printed Scarf",
       quantity: 12,
       amount: 4560,
@@ -80,10 +95,13 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       deliveryDate: DateTime.now().subtract(const Duration(days: 89)),
       status: "Delivered",
       isDelivered: true,
+      imagePath: "assets/images/gorgeous.jpg",
+      color: "Multi",
+      paymentStatus: "Paid",
     ),
     RetailerOrder(
       id: "ORD-1018",
-      customerName: "Maliha Chowdhury",
+      customerName: "Jaima Haque",
       itemName: "Denim Work Shirt",
       quantity: 4,
       amount: 3680,
@@ -91,6 +109,9 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       deliveryDate: DateTime.now().subtract(const Duration(days: 134)),
       status: "Delivered",
       isDelivered: true,
+      imagePath: "assets/images/denim.jpg",
+      color: "Indigo",
+      paymentStatus: "Paid",
     ),
   ];
 
@@ -297,6 +318,16 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
           children: [
             Row(
               children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                  style: IconButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(40, 40),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
                     "Orders",
@@ -510,14 +541,21 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(14),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.asset(
+                  order.imagePath,
+                  width: 52,
+                  height: 52,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    width: 52,
+                    height: 52,
+                    color: Colors.green.shade50,
+                    child:
+                        Icon(Icons.receipt_long, color: Colors.green.shade800),
+                  ),
                 ),
-                child: Icon(Icons.receipt_long, color: Colors.green.shade800),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -548,20 +586,35 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(
-                  color: statusColor.shade50,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  order.status,
-                  style: TextStyle(
-                    color: statusColor.shade800,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: statusColor.shade50,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      order.status,
+                      style: TextStyle(
+                        color: statusColor.shade800,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 4),
+                  Text(
+                    order.paymentStatus,
+                    style: TextStyle(
+                      color: Colors.green.shade700,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -571,6 +624,11 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
               _orderInfo(
                 Icons.shopping_bag_outlined,
                 "Qty ${order.quantity}",
+              ),
+              const SizedBox(width: 10),
+              _orderInfo(
+                Icons.palette_outlined,
+                order.color,
               ),
               const SizedBox(width: 10),
               _orderInfo(
