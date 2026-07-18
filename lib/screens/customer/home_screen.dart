@@ -14,7 +14,7 @@ import '../../widgets/dashboard_drawer.dart';
 import 'virtual_trial_screen.dart';
 import 'notification_screen.dart' ;
 import 'package:sketch2stitch/screens/retailer/inventory_screen.dart';
-
+import 'track_order.dart';
 
 class UnifiedHomeScreen extends StatefulWidget {
   final AppUserRole initialRole;
@@ -84,6 +84,22 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
       });
     }
 
+  }
+  void _openTrackOrder() {
+    // Navigate to Order Track Screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const OrderTrackScreen(
+          orderId: 'OR05',
+          status: 'Pending Retailer Confirmation',
+          estimatedDelivery: '25 Dec 2026',
+          lastUpdated: '22 Dec 2026',
+          deliveryAddress: 'The Shakespeare Centre, Henley Street, CV37 6QW Stratford-upon-Avon, UK.',
+          userRole: AppUserRole.customer,
+        ),
+      ),
+    );
   }
 
   void _openBrowseTab(int index) {
@@ -256,6 +272,14 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                 ),
             ],
           ),
+          // Track Order icon - only for customer
+          if (_currentRole == AppUserRole.customer)
+            IconButton(
+              icon: const Icon(Icons.track_changes_rounded, color: Colors.black87),
+              onPressed: () {
+                _openTrackOrder();
+              },
+            ),
           // Show cart icon only for customer
           if (_currentRole == AppUserRole.customer)
             IconButton(

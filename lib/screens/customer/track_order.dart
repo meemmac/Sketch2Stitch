@@ -53,7 +53,7 @@ class OrderTrackScreen extends StatelessWidget {
       TrackEvent(type: TrackEventType.requested, material: 'Embroidery', partyName: 'Jhakanaka Embroidery Place'),
       TrackEvent(type: TrackEventType.confirmed, material: 'Embroidery', partyName: 'Jhakanaka Embroidery Place'),
       TrackEvent(type: TrackEventType.dismissed, material: 'Linen', partyName: 'Mukta Kapors'),
-    ],
+    ], required AppUserRole userRole,
   });
 
   @override
