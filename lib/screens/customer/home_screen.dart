@@ -569,7 +569,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           const SizedBox(width: 8),
           ElevatedButton(
             onPressed: () {
-              Navigator.pushReplacement(
+              Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const VirtualTrialScreen()),
               );
