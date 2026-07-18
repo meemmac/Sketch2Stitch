@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../screens/customer/virtual_trial_screen.dart';
 import '../screens/retailer/inventory_screen.dart';
+import '../screens/retailer/orders_screen.dart';
 import '../screens/customer/measurement_screen.dart';
 import '../models/measurement.dart';
 import '../screens/shared/welcome_screen.dart';
@@ -523,6 +524,14 @@ class DrawerNavigationSection extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (_) => const VirtualTrialScreen(),
+                  ),
+                );
+              } else if (role == AppUserRole.retailer &&
+                  item['title'] == 'Orders') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const RetailerOrdersScreen(),
                   ),
                 );
               } else if (item['title'] == 'Measurements') {
