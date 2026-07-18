@@ -11,6 +11,7 @@ import '../../widgets/dashboard_drawer.dart';
 import 'home_screen.dart';
 import 'package:gal/gal.dart';
 
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Colour palette & tokens
 // ─────────────────────────────────────────────────────────────────────────────
@@ -383,7 +384,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
               } else {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (_) => const CustomerHomeScreen()),
+                  MaterialPageRoute(builder: (_) => const UnifiedHomeScreen()),
                 );
               }
             },

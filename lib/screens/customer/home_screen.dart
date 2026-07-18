@@ -90,7 +90,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const OrderTrackScreen(
+        builder: (context) => OrderTrackScreen(
           orderId: 'OR05',
           status: 'Pending Retailer Confirmation',
           estimatedDelivery: '25 Dec 2026',
@@ -241,12 +241,14 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
           ),
-          Image.asset(
-            'assets/images/transparent_logo.png',
-            height: 36,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) =>
-            const Icon(Icons.checkroom_rounded, size: 28, color: Color(0xFF2E7D32)),
+          Flexible(
+            child: Image.asset(
+              'assets/images/transparent_logo.png',
+              height: 36,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) =>
+              const Icon(Icons.checkroom_rounded, size: 28, color: Color(0xFF2E7D32)),
+            ),
           ),
           const Spacer(),
           Stack(

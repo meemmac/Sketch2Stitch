@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
 import '../../widgets/dashboard_drawer.dart';
 import 'home_screen.dart';
-
+// TODO(backend): Replace static `events` list with data fetched from Firestore.
+// For a given `orderId`:
+//   1. Fetch `Orders/{orderId}` → orderDate (order placed event)
+//   2. Fetch all `Sub-orders` where orderId == this order → for each, use
+//      confirmedAt/deliveryDate/status to generate retailer-related events
+//   3. Fetch `Tailor-jobs` where orderId == this order → use confirmedAt/
+//      autoReleaseAt/status to generate tailor-related events
+//   4. Merge all events into a single List<TrackEvent>, sort by `date` ascending
+//   5. Pass the sorted list into OrderTrackScreen(events: ...)
+// Only include events where the corresponding timestamp field is non-null.
 enum TrackEventType {
   pendingRetailerConfirmation,
   orderConfirmedRetailer,
@@ -18,11 +27,13 @@ class TrackEvent {
   final TrackEventType type;
   final String material;
   final String partyName;
+  final DateTime date; // ← added
 
   const TrackEvent({
     required this.type,
     required this.material,
     required this.partyName,
+    required this.date, // ← added
   });
 }
 
@@ -32,7 +43,25 @@ class OrderTrackScreen extends StatelessWidget {
   final String estimatedDelivery;
   final String lastUpdated;
   final String deliveryAddress;
-  final List<TrackEvent> events;
+  // Nullable so the constructor default can be `null` (DateTime is not const).
+  // Falls back to [_demoEvents] at runtime when null.
+  final List<TrackEvent>? events;
+
+  // TODO: replace with the real order's event history from the backend
+  static final List<TrackEvent> _demoEvents = [
+    TrackEvent(type: TrackEventType.pendingRetailerConfirmation, material: 'Fine Cotton', partyName: 'Cotton Palace', date: DateTime(2026, 12, 20)),
+    TrackEvent(type: TrackEventType.orderConfirmedRetailer, material: 'Fine Cotton', partyName: 'Cotton Palace', date: DateTime(2026, 12, 21)),
+    TrackEvent(type: TrackEventType.requested, material: 'Embroidery', partyName: 'Jhakanaka Embroidery Place', date: DateTime(2026, 12, 21)),
+    TrackEvent(type: TrackEventType.confirmed, material: 'Embroidery', partyName: 'Jhakanaka Embroidery Place', date: DateTime(2026, 12, 22)),
+     TrackEvent(type: TrackEventType.requested, material: 'Linen', partyName: 'Mukta Kapors', date: DateTime(2026, 12, 22)),
+    TrackEvent(type: TrackEventType.dismissed, material: 'Linen', partyName: 'Mukta Kapors', date: DateTime(2026, 12, 22)),
+    TrackEvent(type: TrackEventType.orderConfirmedTailor, material: 'Fine Cotton', partyName: 'Master Tailor', date: DateTime(2026, 12, 22)),
+    TrackEvent(type: TrackEventType.shippingToTailor, material: 'Fine Cotton', partyName: 'Jhakanaka Tailor Place', date: DateTime(2026, 12, 23)),
+    TrackEvent(type: TrackEventType.shippingToCustomer, material: 'Jhakanaka Tailor Place', partyName: 'DHL Express', date: DateTime(2026, 12, 24)),
+    TrackEvent(type: TrackEventType.delivered, material: 'Jhakanaka Tailor Place', partyName: 'Customer', date: DateTime(2026, 12, 25)),
+  ];
+
+  List<TrackEvent> get resolvedEvents => events ?? _demoEvents;
 
   const OrderTrackScreen({
     super.key,
@@ -41,19 +70,8 @@ class OrderTrackScreen extends StatelessWidget {
     this.estimatedDelivery = '25 Dec 2026',
     this.lastUpdated = '22 Dec 2026',
     this.deliveryAddress = 'The Shakespeare Centre, Henley Street, CV37 6QW Stratford-upon-Avon, UK.',
-    // TODO: replace with the real order's event history from the backend
-    this.events = const [
-      TrackEvent(type: TrackEventType.pendingRetailerConfirmation, material: 'Fine Cotton', partyName: 'Cotton Palace'),
-      TrackEvent(type: TrackEventType.orderConfirmedRetailer, material: 'Fine Cotton', partyName: 'Cotton Palace'),
-      TrackEvent(type: TrackEventType.orderConfirmedTailor, material: 'Fine Cotton', partyName: 'Master Tailor'),
-      TrackEvent(type: TrackEventType.shippingToTailor, material: 'Fine Cotton', partyName: 'Cotton Palace'),
-      TrackEvent(type: TrackEventType.shippingToCustomer, material: 'Fine Cotton', partyName: 'DHL Express'),
-      TrackEvent(type: TrackEventType.delivered, material: 'Fine Cotton', partyName: 'Customer'),
-      // Additional events for other materials
-      TrackEvent(type: TrackEventType.requested, material: 'Embroidery', partyName: 'Jhakanaka Embroidery Place'),
-      TrackEvent(type: TrackEventType.confirmed, material: 'Embroidery', partyName: 'Jhakanaka Embroidery Place'),
-      TrackEvent(type: TrackEventType.dismissed, material: 'Linen', partyName: 'Mukta Kapors'),
-    ], required AppUserRole userRole,
+    this.events,
+    required AppUserRole userRole,
   });
 
   @override
@@ -132,7 +150,7 @@ class OrderTrackScreen extends StatelessWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             ),
-            child: const Text('Back to Home', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 12.5)),
+            child: const Text('Back', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 12.5)),
           ),
         ],
       ),
@@ -207,9 +225,9 @@ class OrderTrackScreen extends StatelessWidget {
   Widget _buildTimeline() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: List.generate(events.length, (index) {
-        final bool isLast = index == events.length - 1;
-        return _buildTimelineItem(events[index], isLast);
+      children: List.generate(resolvedEvents.length, (index) {
+        final bool isLast = index == resolvedEvents.length - 1;
+        return _buildTimelineItem(resolvedEvents[index], isLast);
       }),
     );
   }
@@ -234,26 +252,36 @@ class OrderTrackScreen extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 22, top: 2),
-              child: RichText(
-                text: TextSpan(
-                  style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
-                  children: [
-                    TextSpan(text: '${style.verb} '),
-                    if (event.material.isNotEmpty) ...[
-                      TextSpan(text: 'for ', style: const TextStyle(fontWeight: FontWeight.normal)),
-                      TextSpan(text: event.material, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      const TextSpan(text: ' from '),
-                      TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    ] else ...[
-                      TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    ],
-                  ],
-                ),
-              ),
-            ),
+  child: Padding(
+    padding: const EdgeInsets.only(bottom: 22, top: 2),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        RichText(
+          text: TextSpan(
+            style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
+            children: [
+              TextSpan(text: '${style.verb} '),
+              if (event.material.isNotEmpty) ...[
+                TextSpan(text: 'for ', style: const TextStyle(fontWeight: FontWeight.normal)),
+                TextSpan(text: event.material, style: const TextStyle(fontWeight: FontWeight.bold)),
+                const TextSpan(text: ' from '),
+                TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+              ] else ...[
+                TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ],
           ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          '${event.date.day}/${event.date.month}/${event.date.year}',
+          style: TextStyle(fontSize: 11, color: Colors.black.withOpacity(0.45)),
+        ),
+      ],
+    ),
+  ),
+),
         ],
       ),
     );
