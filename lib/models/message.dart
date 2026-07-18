@@ -1,14 +1,13 @@
-enum SenderRole {
-  customer,
-  tailor,
-  retailer,
-}
+import 'user_role.dart';
+
+// SenderRole is an alias for UserRole — same values: customer, tailor, retailer
+typedef SenderRole = UserRole;
 
 class Message {
   final String id;
   final String conversationId;
   final String senderId;
-  final SenderRole senderRole;
+  final UserRole senderRole;
   final String msgText;
   final String? attachment;
   final DateTime sentAt;
@@ -25,11 +24,11 @@ class Message {
 
   String get senderRoleText {
     switch (senderRole) {
-      case SenderRole.customer:
+      case UserRole.customer:
         return 'Customer';
-      case SenderRole.tailor:
+      case UserRole.tailor:
         return 'Tailor';
-      case SenderRole.retailer:
+      case UserRole.retailer:
         return 'Retailer';
     }
   }
@@ -38,7 +37,7 @@ class Message {
     String? id,
     String? conversationId,
     String? senderId,
-    SenderRole? senderRole,
+    UserRole? senderRole,
     String? msgText,
     String? attachment,
     DateTime? sentAt,
@@ -58,7 +57,7 @@ class Message {
     'id': id,
     'conversationId': conversationId,
     'senderId': senderId,
-    'senderRole': senderRole.index,
+    'senderRole': senderRole.name,
     'msgText': msgText,
     'attachment': attachment,
     'sentAt': sentAt.toIso8601String(),
@@ -69,11 +68,11 @@ class Message {
       id: json['id'] ?? '',
       conversationId: json['conversationId'] ?? '',
       senderId: json['senderId'] ?? '',
-      senderRole: SenderRole.values[json['senderRole'] ?? 0],
+      senderRole: UserRole.values.byName(json['senderRole'] ?? 'customer'),
       msgText: json['msgText'] ?? '',
       attachment: json['attachment'],
-      sentAt: json['sentAt'] != null 
-          ? DateTime.parse(json['sentAt']) 
+      sentAt: json['sentAt'] != null
+          ? DateTime.parse(json['sentAt'])
           : DateTime.now(),
     );
   }

@@ -1,21 +1,50 @@
-import 'order.dart';
 import 'design.dart';
 import 'measurement.dart';
 
 enum TailorJobStatus {
   pending,
-  accepted,
-  inProgress,
-  completed,
   rejected,
-  cancelled,
+  quoted,
+  confirmed,
+  expired,
+  cancelled;
+
+  String get toValue => name; // all match Firestore strings directly
+
+  static TailorJobStatus fromValue(String v) =>
+      TailorJobStatus.values.byName(v);
 }
 
 enum QuoteStatus {
-  pending,
-  quoted,
-  approved,
-  rejected,
+  notSent,
+  sent,
+  accepted,
+  expired;
+
+  String get toValue => const {
+    QuoteStatus.notSent: 'not_sent',
+    QuoteStatus.sent: 'sent',
+    QuoteStatus.accepted: 'accepted',
+    QuoteStatus.expired: 'expired',
+  }[this]!;
+
+  static QuoteStatus fromValue(String v) => const {
+    'not_sent': QuoteStatus.notSent,
+    'sent': QuoteStatus.sent,
+    'accepted': QuoteStatus.accepted,
+    'expired': QuoteStatus.expired,
+  }[v] ?? QuoteStatus.notSent;
+}
+
+/// Separate from Payments.status — only "unpaid" / "paid" apply to tailor jobs.
+enum TailorPaymentStatus {
+  unpaid,
+  paid;
+
+  String get toValue => name; // already match Firestore strings
+
+  static TailorPaymentStatus fromValue(String v) =>
+      TailorPaymentStatus.values.byName(v);
 }
 
 class TailorJob {
@@ -26,16 +55,14 @@ class TailorJob {
   final List<String> designIds;
   final TailorJobStatus status;
   final DateTime? confirmedAt;
+  final DateTime? estimatedDeliveryDate;
   final String? specialInstructions;
   final String? rejectionReason;
   final double? quoteAmount;
   final String? quoteNote;
   final QuoteStatus quoteStatus;
-  final PaymentStatus tailorPaymentStatus;
-  final DateTime? tailorSelectionDeadline;
+  final TailorPaymentStatus tailorPaymentStatus;
   final DateTime? quoteResponseDeadline;
-  final DateTime? quoteApprovalDeadline;
-  final DateTime? paymentReleaseDeadline;
   final DateTime? autoReleaseAt;
 
   // Relationships (lazy loaded)
@@ -50,16 +77,14 @@ class TailorJob {
     this.designIds = const [],
     required this.status,
     this.confirmedAt,
+    this.estimatedDeliveryDate,
     this.specialInstructions,
     this.rejectionReason,
     this.quoteAmount,
     this.quoteNote,
     required this.quoteStatus,
     required this.tailorPaymentStatus,
-    this.tailorSelectionDeadline,
     this.quoteResponseDeadline,
-    this.quoteApprovalDeadline,
-    this.paymentReleaseDeadline,
     this.autoReleaseAt,
     this.designs,
     this.measurements,
@@ -69,14 +94,14 @@ class TailorJob {
     switch (status) {
       case TailorJobStatus.pending:
         return 'Pending';
-      case TailorJobStatus.accepted:
-        return 'Accepted';
-      case TailorJobStatus.inProgress:
-        return 'In Progress';
-      case TailorJobStatus.completed:
-        return 'Completed';
       case TailorJobStatus.rejected:
         return 'Rejected';
+      case TailorJobStatus.quoted:
+        return 'Quoted';
+      case TailorJobStatus.confirmed:
+        return 'Confirmed';
+      case TailorJobStatus.expired:
+        return 'Expired';
       case TailorJobStatus.cancelled:
         return 'Cancelled';
     }
@@ -84,27 +109,23 @@ class TailorJob {
 
   String get quoteStatusText {
     switch (quoteStatus) {
-      case QuoteStatus.pending:
-        return 'Pending';
-      case QuoteStatus.quoted:
-        return 'Quoted';
-      case QuoteStatus.approved:
-        return 'Approved';
-      case QuoteStatus.rejected:
-        return 'Rejected';
+      case QuoteStatus.notSent:
+        return 'Not Sent';
+      case QuoteStatus.sent:
+        return 'Sent';
+      case QuoteStatus.accepted:
+        return 'Accepted';
+      case QuoteStatus.expired:
+        return 'Expired';
     }
   }
 
-  String get paymentStatusText {
+  String get tailorPaymentStatusText {
     switch (tailorPaymentStatus) {
-      case PaymentStatus.pending:
-        return 'Pending';
-      case PaymentStatus.paid:
+      case TailorPaymentStatus.unpaid:
+        return 'Unpaid';
+      case TailorPaymentStatus.paid:
         return 'Paid';
-      case PaymentStatus.failed:
-        return 'Failed';
-      case PaymentStatus.refunded:
-        return 'Refunded';
     }
   }
 
@@ -116,16 +137,14 @@ class TailorJob {
     List<String>? designIds,
     TailorJobStatus? status,
     DateTime? confirmedAt,
+    DateTime? estimatedDeliveryDate,
     String? specialInstructions,
     String? rejectionReason,
     double? quoteAmount,
     String? quoteNote,
     QuoteStatus? quoteStatus,
-    PaymentStatus? tailorPaymentStatus,
-    DateTime? tailorSelectionDeadline,
+    TailorPaymentStatus? tailorPaymentStatus,
     DateTime? quoteResponseDeadline,
-    DateTime? quoteApprovalDeadline,
-    DateTime? paymentReleaseDeadline,
     DateTime? autoReleaseAt,
     List<Design>? designs,
     List<Measurement>? measurements,
@@ -138,16 +157,14 @@ class TailorJob {
       designIds: designIds ?? this.designIds,
       status: status ?? this.status,
       confirmedAt: confirmedAt ?? this.confirmedAt,
+      estimatedDeliveryDate: estimatedDeliveryDate ?? this.estimatedDeliveryDate,
       specialInstructions: specialInstructions ?? this.specialInstructions,
       rejectionReason: rejectionReason ?? this.rejectionReason,
       quoteAmount: quoteAmount ?? this.quoteAmount,
       quoteNote: quoteNote ?? this.quoteNote,
       quoteStatus: quoteStatus ?? this.quoteStatus,
       tailorPaymentStatus: tailorPaymentStatus ?? this.tailorPaymentStatus,
-      tailorSelectionDeadline: tailorSelectionDeadline ?? this.tailorSelectionDeadline,
       quoteResponseDeadline: quoteResponseDeadline ?? this.quoteResponseDeadline,
-      quoteApprovalDeadline: quoteApprovalDeadline ?? this.quoteApprovalDeadline,
-      paymentReleaseDeadline: paymentReleaseDeadline ?? this.paymentReleaseDeadline,
       autoReleaseAt: autoReleaseAt ?? this.autoReleaseAt,
       designs: designs ?? this.designs,
       measurements: measurements ?? this.measurements,
@@ -160,18 +177,16 @@ class TailorJob {
     'tailorId': tailorId,
     'measurementId': measurementId,
     'designIds': designIds,
-    'status': status.index,
+    'status': status.toValue,
     'confirmedAt': confirmedAt?.toIso8601String(),
+    'estimatedDeliveryDate': estimatedDeliveryDate?.toIso8601String(),
     'specialInstructions': specialInstructions,
     'rejectionReason': rejectionReason,
     'quoteAmount': quoteAmount,
     'quoteNote': quoteNote,
-    'quoteStatus': quoteStatus.index,
-    'tailorPaymentStatus': tailorPaymentStatus.index,
-    'tailorSelectionDeadline': tailorSelectionDeadline?.toIso8601String(),
+    'quoteStatus': quoteStatus.toValue,
+    'tailorPaymentStatus': tailorPaymentStatus.toValue,
     'quoteResponseDeadline': quoteResponseDeadline?.toIso8601String(),
-    'quoteApprovalDeadline': quoteApprovalDeadline?.toIso8601String(),
-    'paymentReleaseDeadline': paymentReleaseDeadline?.toIso8601String(),
     'autoReleaseAt': autoReleaseAt?.toIso8601String(),
   };
 
@@ -182,30 +197,26 @@ class TailorJob {
       tailorId: json['tailorId'] ?? '',
       measurementId: json['measurementId'] ?? '',
       designIds: List<String>.from(json['designIds'] ?? []),
-      status: TailorJobStatus.values[json['status'] ?? 0],
-      confirmedAt: json['confirmedAt'] != null 
-          ? DateTime.parse(json['confirmedAt']) 
+      status: TailorJobStatus.fromValue(json['status'] ?? 'pending'),
+      confirmedAt: json['confirmedAt'] != null
+          ? DateTime.parse(json['confirmedAt'])
+          : null,
+      estimatedDeliveryDate: json['estimatedDeliveryDate'] != null
+          ? DateTime.parse(json['estimatedDeliveryDate'])
           : null,
       specialInstructions: json['specialInstructions'],
       rejectionReason: json['rejectionReason'],
       quoteAmount: json['quoteAmount']?.toDouble(),
       quoteNote: json['quoteNote'],
-      quoteStatus: QuoteStatus.values[json['quoteStatus'] ?? 0],
-      tailorPaymentStatus: PaymentStatus.values[json['tailorPaymentStatus'] ?? 0],
-      tailorSelectionDeadline: json['tailorSelectionDeadline'] != null 
-          ? DateTime.parse(json['tailorSelectionDeadline']) 
+      quoteStatus: QuoteStatus.fromValue(json['quoteStatus'] ?? 'not_sent'),
+      tailorPaymentStatus: TailorPaymentStatus.fromValue(
+        json['tailorPaymentStatus'] ?? 'unpaid',
+      ),
+      quoteResponseDeadline: json['quoteResponseDeadline'] != null
+          ? DateTime.parse(json['quoteResponseDeadline'])
           : null,
-      quoteResponseDeadline: json['quoteResponseDeadline'] != null 
-          ? DateTime.parse(json['quoteResponseDeadline']) 
-          : null,
-      quoteApprovalDeadline: json['quoteApprovalDeadline'] != null 
-          ? DateTime.parse(json['quoteApprovalDeadline']) 
-          : null,
-      paymentReleaseDeadline: json['paymentReleaseDeadline'] != null 
-          ? DateTime.parse(json['paymentReleaseDeadline']) 
-          : null,
-      autoReleaseAt: json['autoReleaseAt'] != null 
-          ? DateTime.parse(json['autoReleaseAt']) 
+      autoReleaseAt: json['autoReleaseAt'] != null
+          ? DateTime.parse(json['autoReleaseAt'])
           : null,
     );
   }

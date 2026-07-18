@@ -1,29 +1,31 @@
-class Notifications {
+import 'user_role.dart';
+
+class AppNotification {
   final String id;
   final String userId;
-  final String userRole;
+  final UserRole userRole;
   final String message;
   final bool isRead;
   final DateTime createdAt;
 
-  Notifications({
+  AppNotification({
     required this.id,
     required this.userId,
     required this.userRole,
     required this.message,
     this.isRead = false,
-    required this.createdAt,  
+    required this.createdAt,
   });
 
-  Notifications copyWith({
+  AppNotification copyWith({
     String? id,
     String? userId,
-    String? userRole,
+    UserRole? userRole,
     String? message,
     bool? isRead,
     DateTime? createdAt,
   }) {
-    return Notifications(
+    return AppNotification(
       id: id ?? this.id,
       userId: userId ?? this.userId,
       userRole: userRole ?? this.userRole,
@@ -36,22 +38,22 @@ class Notifications {
   Map<String, dynamic> toJson() => {
     'id': id,
     'userId': userId,
-    'userRole': userRole,
+    'userRole': userRole.name,
     'message': message,
     'isRead': isRead,
-    'createdAt': createdAt.toIso8601String(),  // Convert to string
+    'createdAt': createdAt.toIso8601String(),
   };
 
-  factory Notifications.fromJson(Map<String, dynamic> json) {
-    return Notifications(
+  factory AppNotification.fromJson(Map<String, dynamic> json) {
+    return AppNotification(
       id: json['id'] ?? '',
       userId: json['userId'] ?? '',
-      userRole: json['userRole'] ?? '',
+      userRole: UserRole.values.byName(json['userRole'] ?? 'customer'),
       message: json['message'] ?? '',
       isRead: json['isRead'] ?? false,
-      createdAt: json['createdAt'] != null 
-          ? DateTime.parse(json['createdAt']) 
-          : DateTime.now(),  // Fallback to now if null
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'])
+          : DateTime.now(),
     );
   }
 }

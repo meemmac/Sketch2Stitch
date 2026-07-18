@@ -1,17 +1,31 @@
-import 'order.dart';  // Import PaymentStatus from order.dart
+import 'order.dart'; // For PaymentStatus
 
 enum PaymentMethod {
-  bKash,
-  nagad,
-  rocket,
-  creditCard,
-  bankTransfer,
+  card,
+  mobileBanking,
+  cashOnDelivery;
+
+  String get toValue => const {
+    PaymentMethod.card: 'card',
+    PaymentMethod.mobileBanking: 'mobile_banking',
+    PaymentMethod.cashOnDelivery: 'cash_on_delivery',
+  }[this]!;
+
+  static PaymentMethod fromValue(String v) => const {
+    'card': PaymentMethod.card,
+    'mobile_banking': PaymentMethod.mobileBanking,
+    'cash_on_delivery': PaymentMethod.cashOnDelivery,
+  }[v] ?? PaymentMethod.card;
 }
 
 enum PaymentTargetType {
-  order,
-  subOrder,
-  tailorJob,
+  retailer,
+  tailor;
+
+  String get toValue => name; // already match Firestore strings
+
+  static PaymentTargetType fromValue(String v) =>
+      PaymentTargetType.values.byName(v);
 }
 
 class Payment {
@@ -19,7 +33,7 @@ class Payment {
   final String orderId;
   final PaymentMethod method;
   final double amount;
-  final PaymentStatus status;  // Uses PaymentStatus from order.dart
+  final PaymentStatus status; // Uses PaymentStatus from order.dart
   final DateTime date;
   final String? transactionId;
   final PaymentTargetType targetType;
@@ -39,16 +53,12 @@ class Payment {
 
   String get methodText {
     switch (method) {
-      case PaymentMethod.bKash:
-        return 'bKash';
-      case PaymentMethod.nagad:
-        return 'Nagad';
-      case PaymentMethod.rocket:
-        return 'Rocket';
-      case PaymentMethod.creditCard:
-        return 'Credit Card';
-      case PaymentMethod.bankTransfer:
-        return 'Bank Transfer';
+      case PaymentMethod.card:
+        return 'Card';
+      case PaymentMethod.mobileBanking:
+        return 'Mobile Banking';
+      case PaymentMethod.cashOnDelivery:
+        return 'Cash on Delivery';
     }
   }
 
@@ -56,8 +66,8 @@ class Payment {
     switch (status) {
       case PaymentStatus.pending:
         return 'Pending';
-      case PaymentStatus.paid:
-        return 'Paid';
+      case PaymentStatus.completed:
+        return 'Completed';
       case PaymentStatus.failed:
         return 'Failed';
       case PaymentStatus.refunded:
@@ -67,12 +77,10 @@ class Payment {
 
   String get targetTypeText {
     switch (targetType) {
-      case PaymentTargetType.order:
-        return 'Order';
-      case PaymentTargetType.subOrder:
-        return 'Sub Order';
-      case PaymentTargetType.tailorJob:
-        return 'Tailor Job';
+      case PaymentTargetType.retailer:
+        return 'Retailer';
+      case PaymentTargetType.tailor:
+        return 'Tailor';
     }
   }
 
@@ -103,12 +111,12 @@ class Payment {
   Map<String, dynamic> toJson() => {
     'id': id,
     'orderId': orderId,
-    'method': method.index,
+    'method': method.toValue,
     'amount': amount,
-    'status': status.index,
+    'status': status.toValue,
     'date': date.toIso8601String(),
     'transactionId': transactionId,
-    'targetType': targetType.index,
+    'targetType': targetType.toValue,
     'targetId': targetId,
   };
 
@@ -116,14 +124,14 @@ class Payment {
     return Payment(
       id: json['id'] ?? '',
       orderId: json['orderId'] ?? '',
-      method: PaymentMethod.values[json['method'] ?? 0],
+      method: PaymentMethod.fromValue(json['method'] ?? 'card'),
       amount: (json['amount'] ?? 0).toDouble(),
-      status: PaymentStatus.values[json['status'] ?? 0],
-      date: json['date'] != null 
-          ? DateTime.parse(json['date']) 
+      status: PaymentStatus.fromValue(json['status'] ?? 'pending'),
+      date: json['date'] != null
+          ? DateTime.parse(json['date'])
           : DateTime.now(),
       transactionId: json['transactionId'],
-      targetType: PaymentTargetType.values[json['targetType'] ?? 0],
+      targetType: PaymentTargetType.fromValue(json['targetType'] ?? 'retailer'),
       targetId: json['targetId'] ?? '',
     );
   }

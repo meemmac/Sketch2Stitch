@@ -6,31 +6,52 @@ import 'conversation.dart';
 import 'review.dart';
 
 enum OrderStatus {
-  pending,
-  confirmed,
-  tailoring,
-  ready,
-  delivered,
-  cancelled,
+  awaitingConfirmation,
+  processing,
+  awaitingTailorSearch,
+  tailorPending,
+  completed,
+  cancelled;
+
+  String get toValue => const {
+    OrderStatus.awaitingConfirmation: 'awaiting_confirmation',
+    OrderStatus.processing: 'processing',
+    OrderStatus.awaitingTailorSearch: 'awaiting_tailor_search',
+    OrderStatus.tailorPending: 'tailor_pending',
+    OrderStatus.completed: 'completed',
+    OrderStatus.cancelled: 'cancelled',
+  }[this]!;
+
+  static OrderStatus fromValue(String v) => const {
+    'awaiting_confirmation': OrderStatus.awaitingConfirmation,
+    'processing': OrderStatus.processing,
+    'awaiting_tailor_search': OrderStatus.awaitingTailorSearch,
+    'tailor_pending': OrderStatus.tailorPending,
+    'completed': OrderStatus.completed,
+    'cancelled': OrderStatus.cancelled,
+  }[v] ?? OrderStatus.awaitingConfirmation;
 }
 
+/// Used for Payments.status — separate from TailorJob's tailorPaymentStatus.
 enum PaymentStatus {
   pending,
-  paid,
+  completed,
   failed,
-  refunded,
+  refunded;
+
+  String get toValue => name; // values already match Firestore strings
+
+  static PaymentStatus fromValue(String v) =>
+      PaymentStatus.values.byName(v);
 }
 
 class Order {
   final String id;
   final String customerId;
   final DateTime orderDate;
-  final double totalPrice;
   final OrderStatus status;
-  final PaymentStatus paymentStatus;
-  final DateTime? paymentDeadline;
   final DateTime? tailorSelectionDeadline;
-  
+
   // Relationships
   List<SubOrder>? subOrders;
   List<Payment>? payments;
@@ -42,10 +63,7 @@ class Order {
     required this.id,
     required this.customerId,
     required this.orderDate,
-    required this.totalPrice,
     required this.status,
-    required this.paymentStatus,
-    this.paymentDeadline,
     this.tailorSelectionDeadline,
     this.subOrders = const [],
     this.payments = const [],
@@ -56,16 +74,16 @@ class Order {
 
   String get statusText {
     switch (status) {
-      case OrderStatus.pending:
-        return 'Pending';
-      case OrderStatus.confirmed:
-        return 'Confirmed';
-      case OrderStatus.tailoring:
-        return 'In Tailoring';
-      case OrderStatus.ready:
-        return 'Ready for Delivery';
-      case OrderStatus.delivered:
-        return 'Delivered';
+      case OrderStatus.awaitingConfirmation:
+        return 'Awaiting Confirmation';
+      case OrderStatus.processing:
+        return 'Processing';
+      case OrderStatus.awaitingTailorSearch:
+        return 'Awaiting Tailor Search';
+      case OrderStatus.tailorPending:
+        return 'Tailor Pending';
+      case OrderStatus.completed:
+        return 'Completed';
       case OrderStatus.cancelled:
         return 'Cancelled';
     }
@@ -73,31 +91,18 @@ class Order {
 
   Color get statusColor {
     switch (status) {
-      case OrderStatus.pending:
+      case OrderStatus.awaitingConfirmation:
         return Colors.orange;
-      case OrderStatus.confirmed:
+      case OrderStatus.processing:
         return Colors.blue;
-      case OrderStatus.tailoring:
+      case OrderStatus.awaitingTailorSearch:
         return Colors.purple;
-      case OrderStatus.ready:
+      case OrderStatus.tailorPending:
+        return Colors.amber;
+      case OrderStatus.completed:
         return Colors.green;
-      case OrderStatus.delivered:
-        return Colors.teal;
       case OrderStatus.cancelled:
         return Colors.red;
-    }
-  }
-
-  String get paymentStatusText {
-    switch (paymentStatus) {
-      case PaymentStatus.pending:
-        return 'Pending';
-      case PaymentStatus.paid:
-        return 'Paid';
-      case PaymentStatus.failed:
-        return 'Failed';
-      case PaymentStatus.refunded:
-        return 'Refunded';
     }
   }
 
@@ -105,10 +110,7 @@ class Order {
     String? id,
     String? customerId,
     DateTime? orderDate,
-    double? totalPrice,
     OrderStatus? status,
-    PaymentStatus? paymentStatus,
-    DateTime? paymentDeadline,
     DateTime? tailorSelectionDeadline,
     List<SubOrder>? subOrders,
     List<Payment>? payments,
@@ -120,10 +122,7 @@ class Order {
       id: id ?? this.id,
       customerId: customerId ?? this.customerId,
       orderDate: orderDate ?? this.orderDate,
-      totalPrice: totalPrice ?? this.totalPrice,
       status: status ?? this.status,
-      paymentStatus: paymentStatus ?? this.paymentStatus,
-      paymentDeadline: paymentDeadline ?? this.paymentDeadline,
       tailorSelectionDeadline: tailorSelectionDeadline ?? this.tailorSelectionDeadline,
       subOrders: subOrders ?? this.subOrders,
       payments: payments ?? this.payments,
@@ -137,10 +136,7 @@ class Order {
     'id': id,
     'customerId': customerId,
     'orderDate': orderDate.toIso8601String(),
-    'totalPrice': totalPrice,
-    'status': status.index,
-    'paymentStatus': paymentStatus.index,
-    'paymentDeadline': paymentDeadline?.toIso8601String(),
+    'status': status.toValue,
     'tailorSelectionDeadline': tailorSelectionDeadline?.toIso8601String(),
   };
 
@@ -148,17 +144,12 @@ class Order {
     return Order(
       id: json['id'] ?? '',
       customerId: json['customerId'] ?? '',
-      orderDate: json['orderDate'] != null 
-          ? DateTime.parse(json['orderDate']) 
+      orderDate: json['orderDate'] != null
+          ? DateTime.parse(json['orderDate'])
           : DateTime.now(),
-      totalPrice: (json['totalPrice'] ?? 0).toDouble(),
-      status: OrderStatus.values[json['status'] ?? 0],
-      paymentStatus: PaymentStatus.values[json['paymentStatus'] ?? 0],
-      paymentDeadline: json['paymentDeadline'] != null 
-          ? DateTime.parse(json['paymentDeadline']) 
-          : null,
-      tailorSelectionDeadline: json['tailorSelectionDeadline'] != null 
-          ? DateTime.parse(json['tailorSelectionDeadline']) 
+      status: OrderStatus.fromValue(json['status'] ?? 'awaiting_confirmation'),
+      tailorSelectionDeadline: json['tailorSelectionDeadline'] != null
+          ? DateTime.parse(json['tailorSelectionDeadline'])
           : null,
     );
   }

@@ -1,6 +1,6 @@
 enum ReviewTargetRole {
-  retailer,
   tailor,
+  retailer,
   product,
 }
 
@@ -12,7 +12,7 @@ class Review {
   final String? orderId;
   final double rating;
   final String comment;
-  final DateTime createdAt; // ✅ Added createdAt
+  final DateTime createdAt;
 
   Review({
     required this.id,
@@ -22,7 +22,7 @@ class Review {
     this.orderId,
     required this.rating,
     required this.comment,
-    required this.createdAt, // ✅ Added to constructor
+    required this.createdAt,
   });
 
   Review copyWith({
@@ -33,7 +33,7 @@ class Review {
     String? orderId,
     double? rating,
     String? comment,
-    DateTime? createdAt, // ✅ Added to copyWith
+    DateTime? createdAt,
   }) {
     return Review(
       id: id ?? this.id,
@@ -43,7 +43,7 @@ class Review {
       orderId: orderId ?? this.orderId,
       rating: rating ?? this.rating,
       comment: comment ?? this.comment,
-      createdAt: createdAt ?? this.createdAt, // ✅ Added to copyWith
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 
@@ -51,11 +51,11 @@ class Review {
     'id': id,
     'customerId': customerId,
     'targetId': targetId,
-    'targetRole': targetRole.index,
+    'targetRole': targetRole.name,
     'orderId': orderId,
     'rating': rating,
     'comment': comment,
-    'createdAt': createdAt.toIso8601String(), // ✅ Added to toJson
+    'createdAt': createdAt.toIso8601String(),
   };
 
   factory Review.fromJson(Map<String, dynamic> json) {
@@ -63,19 +63,19 @@ class Review {
       id: json['id'] ?? '',
       customerId: json['customerId'] ?? '',
       targetId: json['targetId'] ?? '',
-      targetRole: ReviewTargetRole.values[json['targetRole'] ?? 0],
+      targetRole: ReviewTargetRole.values.byName(json['targetRole'] ?? 'tailor'),
       orderId: json['orderId'],
       rating: (json['rating'] ?? 0).toDouble(),
       comment: json['comment'] ?? '',
-      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()), // ✅ Added to fromJson
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'])
+          : DateTime.now(),
     );
   }
 
-  // Helper method to get time ago string
   String get timeAgo {
     final now = DateTime.now();
     final difference = now.difference(createdAt);
-
     if (difference.inDays > 365) {
       return '${difference.inDays ~/ 365} year${(difference.inDays ~/ 365) > 1 ? 's' : ''} ago';
     } else if (difference.inDays > 30) {
@@ -99,13 +99,11 @@ class Review {
     }
   }
 
-  // Helper to format date as string
-  String get formattedDate {
-    return '${createdAt.day}/${createdAt.month}/${createdAt.year}';
-  }
+  String get formattedDate =>
+      '${createdAt.day}/${createdAt.month}/${createdAt.year}';
 
-  // Helper to get full date and time
-  String get fullDateTime {
-    return '${createdAt.day}/${createdAt.month}/${createdAt.year} at ${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}';
-  }
+  String get fullDateTime =>
+      '${createdAt.day}/${createdAt.month}/${createdAt.year} at '
+      '${createdAt.hour.toString().padLeft(2, '0')}:'
+      '${createdAt.minute.toString().padLeft(2, '0')}';
 }
