@@ -744,9 +744,9 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                       // Deliver To Section
                       Row(
                         children: [
-                          const Text(
-                            "Deliver to: ",
-                            style: TextStyle(
+                          Text(
+                            order.isDelivered ? "Delivered to: " : "Deliver to: ",
+                            style: const TextStyle(
                               color: Colors.black45,
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
