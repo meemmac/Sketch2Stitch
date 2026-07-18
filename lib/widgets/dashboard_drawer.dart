@@ -1,6 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../screens/customer/virtual_trial_screen.dart';
 import '../screens/retailer/inventory_screen.dart';
+import '../screens/customer/measurement_screen.dart';
+import '../models/measurement.dart';
+import '../screens/shared/welcome_screen.dart';
+import '../screens/shared/about_us_screen.dart';
 
 
 /// Enum representing the three user roles.
@@ -18,6 +24,8 @@ class DrawerProfileData {
   final String phone;
   final String address;
   final double rating; // For Tailor and Retailer
+  final String? profilePicture;
+  final String? about;
 
   const DrawerProfileData({
     required this.name,
@@ -26,6 +34,8 @@ class DrawerProfileData {
     required this.phone,
     required this.address,
     this.rating = 0.0,
+    this.profilePicture,
+    this.about = '',
   });
 
   DrawerProfileData copyWith({
@@ -35,6 +45,8 @@ class DrawerProfileData {
     String? phone,
     String? address,
     double? rating,
+    String? profilePicture,
+    String? about,
   }) {
     return DrawerProfileData(
       name: name ?? this.name,
@@ -43,6 +55,8 @@ class DrawerProfileData {
       phone: phone ?? this.phone,
       address: address ?? this.address,
       rating: rating ?? this.rating,
+      profilePicture: profilePicture ?? this.profilePicture,
+      about: about ?? this.about,
     );
   }
 }
@@ -69,11 +83,31 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
   late DrawerProfileData _customerProfile;
   late DrawerProfileData _tailorProfile;
   late DrawerProfileData _retailerProfile;
+  late Measurement _customerMeasurement;
 
   @override
   void initState() {
     super.initState();
     _currentRole = widget.initialRole;
+
+    _customerMeasurement = Measurement(
+      id: "meas_1",
+      customerId: "maria_doe",
+      upperBustCircumference: 34.0,
+      roundShoulderCircumference: 38.0,
+      hipsCircumference: 36.0,
+      underBustCircumference: 32.0,
+      bustCircumference: 35.0,
+      waist: 28.0,
+      shoulderToKnee: 38.0,
+      shoulderToUnderBust: 12.5,
+      shoulderToBust: 10.0,
+      thigh: 21.0,
+      knee: 14.0,
+      ankle: 9.0,
+      waistToAnkle: 40.0,
+      shoulderToAnkle: 57.0,
+    );
 
     // Initialize mock data
     _customerProfile = const DrawerProfileData(
@@ -89,6 +123,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       phone: "+880 1234567890",
       address: "Suite 4B, Concord Tower, Dhaka",
       rating: 4.8,
+      about: "Bespoke traditional and modern wear expert with over 15 years of experience in custom tailoring.",
     );
 
     _retailerProfile = const DrawerProfileData(
@@ -98,6 +133,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       phone: "+880 1234567890",
       address: "Shop 12, Banani Super Market, Dhaka",
       rating: 4.6,
+      about: "Premium local and imported fabric supplier specializing in silk, cotton, and wedding collections.",
     );
   }
 
@@ -176,6 +212,14 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                           child: DrawerNavigationSection(
                             role: _currentRole,
                             themeColor: themeColor,
+                            measurement: _customerMeasurement,
+                            onSave: (updated) async {
+                              await Future.delayed(const Duration(milliseconds: 500));
+                              if (!mounted) return;
+                              setState(() {
+                                _customerMeasurement = updated;
+                              });
+                            },
                           ),
                         ),
                         const Divider(height: 1),
@@ -187,7 +231,11 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text("Logged out successfully!")),
                             );
-                            Navigator.pop(context);
+                            Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+                              (route) => false,
+                            );
                           },
                         ),
                       ],
@@ -301,15 +349,20 @@ class DrawerProfileSection extends StatelessWidget {
               CircleAvatar(
                 radius: 28,
                 backgroundColor: themeColor.withValues(alpha: 0.15),
-                child: Icon(
-                  isCustomer
-                      ? Icons.person_rounded
-                      : (role == AppUserRole.tailor
-                          ? Icons.design_services_rounded
-                          : Icons.storefront_rounded),
-                  color: themeColor,
-                  size: 32,
-                ),
+                backgroundImage: profile.profilePicture != null && profile.profilePicture!.isNotEmpty
+                    ? FileImage(File(profile.profilePicture!))
+                    : null,
+                child: profile.profilePicture != null && profile.profilePicture!.isNotEmpty
+                    ? null
+                    : Icon(
+                        isCustomer
+                            ? Icons.person_rounded
+                            : (role == AppUserRole.tailor
+                                ? Icons.design_services_rounded
+                                : Icons.storefront_rounded),
+                        color: themeColor,
+                        size: 32,
+                      ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -388,6 +441,28 @@ class DrawerProfileSection extends StatelessWidget {
           _buildInfoRow(Icons.phone_outlined, profile.phone),
           const SizedBox(height: 8),
           _buildInfoRow(Icons.location_on_outlined, profile.address),
+          if (!isCustomer && profile.about != null && profile.about!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Divider(),
+            const SizedBox(height: 8),
+            const Text(
+              "About",
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E392A),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              profile.about!,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.black54,
+                height: 1.4,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -418,11 +493,15 @@ class DrawerProfileSection extends StatelessWidget {
 class DrawerNavigationSection extends StatelessWidget {
   final AppUserRole role;
   final Color themeColor;
+  final Measurement? measurement;
+  final Future<void> Function(Measurement)? onSave;
 
   const DrawerNavigationSection({
     super.key,
     required this.role,
     required this.themeColor,
+    this.measurement,
+    this.onSave,
   });
 
   @override
@@ -446,11 +525,30 @@ class DrawerNavigationSection extends StatelessWidget {
                     builder: (_) => const VirtualTrialScreen(),
                   ),
                 );
+              } else if (item['title'] == 'Measurements') {
+                if (measurement != null && onSave != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MeasurementScreen(
+                        measurement: measurement!,
+                        onSave: onSave!,
+                      ),
+                    ),
+                  );
+                }
               } else if (item['title'] == 'Inventory') {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => const InventoryScreen(),
+                  ),
+                );
+              } else if (item['title'] == 'About') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AboutUsScreen(),
                   ),
                 );
               } else {
@@ -483,11 +581,13 @@ class DrawerNavigationSection extends StatelessWidget {
         return [
           {'title': 'Orders', 'icon': Icons.receipt_long_rounded},
           {'title': 'Messages', 'icon': Icons.chat_bubble_outline_rounded},
+          {'title': 'About', 'icon': Icons.info_outline},
         ];
       case AppUserRole.retailer:
         return [
           {'title': 'Orders', 'icon': Icons.receipt_long_rounded},
           {'title': 'Inventory', 'icon': Icons.inventory_2_outlined},
+          {'title': 'About', 'icon': Icons.info_outline},
         ];
     }
   }
@@ -604,6 +704,9 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
   late TextEditingController _addressController;
+  late TextEditingController _aboutController;
+
+  String? _profilePicturePath;
 
   @override
   void initState() {
@@ -613,6 +716,22 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
     _emailController = TextEditingController(text: widget.initialProfile.email);
     _phoneController = TextEditingController(text: widget.initialProfile.phone);
     _addressController = TextEditingController(text: widget.initialProfile.address);
+    _aboutController = TextEditingController(text: widget.initialProfile.about ?? '');
+    _profilePicturePath = widget.initialProfile.profilePicture;
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: ImageSource.gallery);
+      if (picked != null) {
+        setState(() {
+          _profilePicturePath = picked.path;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error picking profile image: $e");
+    }
   }
 
   @override
@@ -622,12 +741,14 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
     _emailController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
+    _aboutController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final bool isRetailer = widget.role == AppUserRole.retailer;
+    final bool isCustomer = widget.role == AppUserRole.customer;
 
     return AlertDialog(
       shape: RoundedRectangleBorder(
@@ -644,6 +765,45 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (!isCustomer) ...[
+              Center(
+                child: Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 40,
+                      backgroundColor: Colors.grey.shade200,
+                      backgroundImage: _profilePicturePath != null && _profilePicturePath!.isNotEmpty
+                          ? FileImage(File(_profilePicturePath!))
+                          : null,
+                      child: _profilePicturePath == null || _profilePicturePath!.isEmpty
+                          ? Icon(
+                              isRetailer ? Icons.storefront_rounded : Icons.design_services_rounded,
+                              size: 40,
+                              color: Colors.grey.shade600,
+                            )
+                          : null,
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: _pickImage,
+                        child: CircleAvatar(
+                          radius: 14,
+                          backgroundColor: const Color(0xFF6C9985),
+                          child: const Icon(
+                            Icons.camera_alt,
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             if (isRetailer) ...[
               TextField(
                 controller: _shopNameController,
@@ -694,6 +854,18 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
               ),
               maxLines: 2,
             ),
+            if (!isCustomer) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _aboutController,
+                decoration: const InputDecoration(
+                  labelText: "About / Biography",
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.info_outline),
+                ),
+                maxLines: 3,
+              ),
+            ],
           ],
         ),
       ),
@@ -717,6 +889,8 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
               email: _emailController.text,
               phone: _phoneController.text,
               address: _addressController.text,
+              about: _aboutController.text,
+              profilePicture: _profilePicturePath,
             );
             widget.onSave(updated);
             Navigator.pop(context);

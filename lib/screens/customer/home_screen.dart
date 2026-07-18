@@ -399,7 +399,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           const SizedBox(width: 8),
           ElevatedButton(
             onPressed: () {
-              Navigator.pushReplacement(
+              Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const VirtualTrialScreen()),
               );
