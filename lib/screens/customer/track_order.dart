@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../widgets/dashboard_drawer.dart';
+import 'home_screen.dart';
 
 enum TrackEventType {
   pendingRetailerConfirmation,
@@ -114,7 +116,17 @@ class OrderTrackScreen extends StatelessWidget {
           const Text('Sketch2Stitch', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87)),
           const Spacer(),
           TextButton(
-            onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
+            onPressed: (){
+              Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const UnifiedHomeScreen(
+                initialRole: AppUserRole.customer,
+              ),
+            ),
+                (route) => route.isFirst,
+          );
+    },
             style: TextButton.styleFrom(
               backgroundColor: Colors.white.withOpacity(0.85),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
