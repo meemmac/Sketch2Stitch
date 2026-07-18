@@ -51,3 +51,9 @@ lib/firebase_options.dart
 
 # Private API Configuration
 lib/utils/api_config.dart
+
+# Xcode SwiftPM state (regenerated automatically)
+ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+ios/Runner.xcworkspace/xcshareddata/swiftpm/
+macos/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+macos/Runner.xcworkspace/xcshareddata/swiftpm/
