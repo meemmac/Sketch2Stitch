@@ -2,6 +2,8 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import '../shared/welcome_screen.dart';
 import '../../models/appearance_profile.dart';
 import '../../services/ai_service.dart';
 import '../../utils/api_config.dart';
@@ -244,14 +246,29 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
           _scrollController.position.maxScrollExtent,
           duration: const Duration(milliseconds: 600),
           curve: Curves.easeInOut,
-        );
+        ).catchError((_) {});
       }
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _statusMessage = 'Error: ${e.toString()}';
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _statusMessage = '';
+        });
+        _showSnack('Error generating: $e');
+      }
+    }
+  }
+
+  Future<void> _downloadImage() async {
+    if (_generatedImageBytes == null) return;
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final fileName = 'virtual_trial_${DateTime.now().millisecondsSinceEpoch}.png';
+      final file = File('${appDir.path}/$fileName');
+      await file.writeAsBytes(_generatedImageBytes!);
+      _showSnack('Image saved to: ${file.path}');
+    } catch (e) {
+      _showSnack('Failed to save image: $e');
     }
   }
 
@@ -277,7 +294,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       appBar: _buildAppBar(),
       body: SingleChildScrollView(
         controller: _scrollController,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 25),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -333,7 +350,16 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             ),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              } else {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+                );
+              }
+            },
             child: const Text('Back',
                 style:
                     TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
@@ -1202,13 +1228,29 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Your AI Preview',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: _ink,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Your AI Preview',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: _ink,
+                ),
+              ),
+              IconButton.filledTonal(
+                onPressed: _downloadImage,
+                icon: const Icon(Icons.download_rounded, color: _sageDark),
+                style: IconButton.styleFrom(
+                  backgroundColor: _sagePale,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                tooltip: 'Download Try-On Image',
+              ),
+            ],
           ),
           const SizedBox(height: 16),
 
