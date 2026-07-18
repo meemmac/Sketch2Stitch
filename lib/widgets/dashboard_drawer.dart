@@ -750,6 +750,9 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
     final bool isRetailer = widget.role == AppUserRole.retailer;
     final bool isCustomer = widget.role == AppUserRole.customer;
 
+    const fieldTextStyle = TextStyle(fontSize: 13);
+    const fieldLabelStyle = TextStyle(fontSize: 13);
+
     return AlertDialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
@@ -807,8 +810,10 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
             if (isRetailer) ...[
               TextField(
                 controller: _shopNameController,
+                style: fieldTextStyle,
                 decoration: const InputDecoration(
                   labelText: "Shop Name",
+                  labelStyle: fieldLabelStyle,
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.storefront_rounded),
                 ),
@@ -817,8 +822,10 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
             ] else ...[
               TextField(
                 controller: _nameController,
+                style: fieldTextStyle,
                 decoration: const InputDecoration(
                   labelText: "Name",
+                  labelStyle: fieldLabelStyle,
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.person_rounded),
                 ),
@@ -827,8 +834,10 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
             ],
             TextField(
               controller: _emailController,
+              style: fieldTextStyle,
               decoration: const InputDecoration(
                 labelText: "Email",
+                labelStyle: fieldLabelStyle,
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.email_outlined),
               ),
@@ -837,8 +846,10 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
             const SizedBox(height: 12),
             TextField(
               controller: _phoneController,
+              style: fieldTextStyle,
               decoration: const InputDecoration(
                 labelText: "Phone",
+                labelStyle: fieldLabelStyle,
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.phone_outlined),
               ),
@@ -847,8 +858,10 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
             const SizedBox(height: 12),
             TextField(
               controller: _addressController,
+              style: fieldTextStyle,
               decoration: const InputDecoration(
                 labelText: "Address",
+                labelStyle: fieldLabelStyle,
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.location_on_outlined),
               ),
@@ -858,8 +871,10 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
               const SizedBox(height: 12),
               TextField(
                 controller: _aboutController,
+                style: fieldTextStyle,
                 decoration: const InputDecoration(
                   labelText: "About / Biography",
+                  labelStyle: fieldLabelStyle,
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.info_outline),
                 ),

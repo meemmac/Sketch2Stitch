@@ -434,19 +434,17 @@ class _BrowseShellState extends State<BrowseShell> {
                 ),
             ],
           ),
-          if (currentIndex == 0 || currentIndex == 1) ...[
-            const SizedBox(width: 8),
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(
-                Icons.shopping_cart_outlined,
-                color: Colors.black87,
-                size: 24,
-              ),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-          ],
+          const SizedBox(width: 8),
+IconButton(
+  onPressed: () {},
+  icon: const Icon(
+    Icons.shopping_cart_outlined,
+    color: Colors.black87,
+    size: 24,
+  ),
+  padding: EdgeInsets.zero,
+  constraints: const BoxConstraints(),
+),
           const SizedBox(width: 8),
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 24),

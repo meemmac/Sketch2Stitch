@@ -4,7 +4,6 @@ class OrderItem {
   final String productId;
   final int optionId; // matches Firestore "number" type
   final int quantity;
-  final String? instruction;
 
   OrderItem({
     required this.id,
@@ -12,7 +11,6 @@ class OrderItem {
     required this.productId,
     required this.optionId,
     required this.quantity,
-    this.instruction,
   });
 
   OrderItem copyWith({
@@ -21,7 +19,6 @@ class OrderItem {
     String? productId,
     int? optionId,
     int? quantity,
-    String? instruction,
   }) {
     return OrderItem(
       id: id ?? this.id,
@@ -29,7 +26,6 @@ class OrderItem {
       productId: productId ?? this.productId,
       optionId: optionId ?? this.optionId,
       quantity: quantity ?? this.quantity,
-      instruction: instruction ?? this.instruction,
     );
   }
 
@@ -39,7 +35,6 @@ class OrderItem {
     'productId': productId,
     'optionId': optionId,
     'quantity': quantity,
-    'instruction': instruction,
   };
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
@@ -49,7 +44,6 @@ class OrderItem {
       productId: json['productId'] ?? '',
       optionId: (json['optionId'] ?? 0) as int,
       quantity: (json['quantity'] ?? 1) as int,
-      instruction: json['instruction'],
     );
   }
 }
