@@ -8,7 +8,8 @@ import '../screens/customer/measurement_screen.dart';
 import '../models/measurement.dart';
 import '../screens/shared/welcome_screen.dart';
 import '../screens/shared/about_us_screen.dart';
-
+import '../screens/retailer/orders_screen.dart';
+import '../screens/tailor/portfolio_screen.dart';
 
 /// Enum representing the three user roles.
 enum AppUserRole {
@@ -553,7 +554,14 @@ class DrawerNavigationSection extends StatelessWidget {
                     builder: (_) => const InventoryScreen(),
                   ),
                 );
-              } else {
+              } else if (item['title'] == 'Portfolio') {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const TailorPortfolioScreen(),
+    ),
+  );
+}else {
                 debugPrint("Navigation clicked: ${item['title']}");
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -582,6 +590,7 @@ class DrawerNavigationSection extends StatelessWidget {
       case AppUserRole.tailor:
         return [
           {'title': 'Orders', 'icon': Icons.receipt_long_rounded},
+           {'title': 'Portfolio', 'icon': Icons.design_services_outlined},
           {'title': 'Messages', 'icon': Icons.chat_bubble_outline_rounded},
         ];
       case AppUserRole.retailer:
