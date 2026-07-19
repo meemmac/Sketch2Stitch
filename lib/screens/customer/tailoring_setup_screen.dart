@@ -610,6 +610,39 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     );
   }
 
+  void _promptCancelConfirmedJob(_TailorJobState job) {
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      title: const Text("Cancel this tailor?"),
+      content: const Text(
+        "The tailor confirmed this job, but you haven't paid yet. "
+        "Cancelling will let you browse and request a different tailor.",
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Keep This Tailor"),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red.shade700,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: () {
+            Navigator.pop(context);
+            // TODO: wire a real callback (e.g. onCancelTailorJob(job.jobId))
+            // to set Tailor-jobs.status = 'cancelled' on the backend.
+            setState(() => _tailorJob = null);
+          },
+          child: const Text("Cancel Job"),
+        ),
+      ],
+    ),
+  );
+}
+
   /// Shown once the order has actually reached a terminal, "you're done
   /// here" state (skipped tailoring, or paid a confirmed tailor). Surfaces
   /// the order id and lets the customer jump straight to tracking instead
@@ -715,67 +748,70 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   }
 
   Widget _buildStepIndicator() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+  const double circleSize = 26;
+  const double connectorWidth = 36;
+
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+    child: Center(
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: List.generate(_stepLabels.length, (index) {
           final bool isActive = index == _currentStep;
           final bool isLastStep = index == _stepLabels.length - 1;
           final bool isDone =
               index < _currentStep || (isLastStep && index <= _currentStep);
-          return Expanded(
-            child: Row(
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  width: 26,
-                  height: 26,
-                  decoration: BoxDecoration(
-                    color: isActive || isDone
-                        ? Colors.green.shade800
-                        : Colors.grey.shade200,
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: isDone
-                      ? (index == _stepLabels.length - 1
-                          ? TweenAnimationBuilder<double>(
-                              key: const ValueKey('completed_check'),
-                              tween: Tween(begin: 0.0, end: 1.0),
-                              duration: const Duration(milliseconds: 600),
-                              curve: Curves.elasticOut,
-                              builder: (context, value, child) =>
-                                  Transform.scale(scale: value, child: child),
-                              child: const Icon(Icons.check,
-                                  size: 14, color: Colors.white),
-                            )
-                          : const Icon(Icons.check,
-                              size: 14, color: Colors.white))
-                      : Text(
-                          "${index + 1}",
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: isActive ? Colors.white : Colors.black45,
-                          ),
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                width: circleSize,
+                height: circleSize,
+                decoration: BoxDecoration(
+                  color: isActive || isDone
+                      ? Colors.green.shade800
+                      : Colors.grey.shade200,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: isDone
+                    ? (index == _stepLabels.length - 1
+                        ? TweenAnimationBuilder<double>(
+                            key: const ValueKey('completed_check'),
+                            tween: Tween(begin: 0.0, end: 1.0),
+                            duration: const Duration(milliseconds: 600),
+                            curve: Curves.elasticOut,
+                            builder: (context, value, child) =>
+                                Transform.scale(scale: value, child: child),
+                            child: const Icon(Icons.check,
+                                size: 14, color: Colors.white),
+                          )
+                        : const Icon(Icons.check,
+                            size: 14, color: Colors.white))
+                    : Text(
+                        "${index + 1}",
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isActive ? Colors.white : Colors.black45,
                         ),
+                      ),
+              ),
+              if (!isLastStep)
+                Container(
+                  width: connectorWidth,
+                  height: 2,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  color: isDone ? Colors.green.shade800 : Colors.grey.shade200,
                 ),
-                Expanded(
-                  child: Container(
-                    height: 2,
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    color: index == _stepLabels.length - 1
-                        ? Colors.transparent
-                        : (isDone ? Colors.green.shade800 : Colors.grey.shade200),
-                  ),
-                ),
-              ],
-            ),
+            ],
           );
         }),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildStepBody() {
     switch (_currentStep) {
@@ -1484,51 +1520,70 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   }
 
   Widget _buildConfirmedCard(_TailorJobState job) {
-    return _statusCard(
-      icon: Icons.check_circle_rounded,
-      iconBg: Colors.green.shade50,
-      iconColor: Colors.green.shade800,
-      title: "Tailor confirmed!",
-      subtitle: "Complete payment to lock in your job.",
-      children: [
-        const SizedBox(height: 18),
-        _infoRow(
-          icon: Icons.payments_outlined,
-          label: "Total Cost",
-          value: job.quoteAmount != null
-              ? "Tk ${job.quoteAmount!.toStringAsFixed(0)}"
-              : "—",
-        ),
-        const SizedBox(height: 10),
-        _infoRow(
-          icon: Icons.local_shipping_outlined,
-          label: "Estimated delivery",
-          value: job.estimatedDeliveryDate != null
-              ? _formatDateTime(job.estimatedDeliveryDate!)
-              : "—",
-        ),
-        const SizedBox(height: 22),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () => _promptTailorPayment(job.jobId),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade800,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
-            ),
-            child: const Text(
-              "Pay Now",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+  return _statusCard(
+    icon: Icons.check_circle_rounded,
+    iconBg: Colors.green.shade50,
+    iconColor: Colors.green.shade800,
+    title: "Tailor confirmed!",
+    subtitle: "Complete payment to lock in your job.",
+    children: [
+      const SizedBox(height: 18),
+      _infoRow(
+        icon: Icons.payments_outlined,
+        label: "Total Cost",
+        value: job.quoteAmount != null
+            ? "Tk ${job.quoteAmount!.toStringAsFixed(0)}"
+            : "—",
+      ),
+      const SizedBox(height: 10),
+      _infoRow(
+        icon: Icons.local_shipping_outlined,
+        label: "Estimated delivery",
+        value: job.estimatedDeliveryDate != null
+            ? _formatDateTime(job.estimatedDeliveryDate!)
+            : "—",
+      ),
+      const SizedBox(height: 22),
+      SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: () => _promptTailorPayment(job.jobId),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green.shade800,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
             ),
           ),
+          child: const Text(
+            "Pay Now",
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          ),
         ),
-      ],
-    );
-  }
+      ),
+      const SizedBox(height: 10),
+      SizedBox(
+        width: double.infinity,
+        child: OutlinedButton(
+          onPressed: () => _promptCancelConfirmedJob(job),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.red.shade700,
+            side: BorderSide(color: Colors.red.shade200),
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+          ),
+          child: const Text(
+            "Cancel",
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          ),
+        ),
+      ),
+    ],
+  );
+}
 
   Widget _buildRejectedCard(_TailorJobState job) {
     return _statusCard(

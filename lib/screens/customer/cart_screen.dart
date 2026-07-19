@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/measurement.dart';
 import 'package:sketch2stitch/screens/customer/checkout_screen.dart';
+import 'browsing/browse_shell.dart';
 
 /// ─── Local Cart Models ──────────────────────────────────────────────────
 ///
@@ -162,6 +163,13 @@ class _CartScreenState extends State<CartScreen> {
       }
     });
   }
+
+  void _addMore() {
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const BrowseShell()),
+  );
+}
 
   void _removeLine(CartLine line) {
     setState(() => _cartLines.remove(line));
@@ -517,74 +525,94 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Widget _buildSummaryBar() {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        14,
-        16,
-        MediaQuery.of(context).padding.bottom + 14,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, -3),
+  return Container(
+    padding: EdgeInsets.fromLTRB(16, 14, 16, MediaQuery.of(context).padding.bottom + 14),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      boxShadow: [
+        BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, -3)),
+      ],
+    ),
+    child: SafeArea(
+      top: false,
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      "$_totalItems ${_totalItems == 1 ? 'item' : 'items'}",
+                      style: const TextStyle(fontSize: 12, color: Colors.black45, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(width: 8),
+                    _addMoreChip(),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  "Tk ${_grandTotal.toStringAsFixed(0)}",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.green.shade900),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          ElevatedButton(
+            onPressed: _cartLines.isEmpty ? null : _checkout,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade800,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              elevation: 0,
+            ),
+            child: const Text("Checkout", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           ),
         ],
       ),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "$_totalItems ${_totalItems == 1 ? 'item' : 'items'}",
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.black45,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    "Tk ${_grandTotal.toStringAsFixed(0)}",
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.green.shade900,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 16),
-            ElevatedButton(
-              onPressed: _cartLines.isEmpty ? null : _checkout,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green.shade800,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 16,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                elevation: 0,
-              ),
-              child: const Text(
-                "Checkout",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-            ),
-          ],
+    ),
+  );
+}
+
+Widget _addMoreChip() {
+  return GestureDetector(
+    onTap: _addMore,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.green.shade700, Colors.green.shade900],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.shade800.withValues(alpha: 0.3),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-    );
-  }
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.add, size: 12, color: Colors.white),
+          SizedBox(width: 3),
+          Text(
+            "Add More",
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 }
