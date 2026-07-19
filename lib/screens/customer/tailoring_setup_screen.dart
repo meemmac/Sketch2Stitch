@@ -506,38 +506,38 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   // ─── Step 4 actions ────────────────────────────────────────────────
 
   Future<void> _findTailor() async {
-    // TODO: replace this with your real tailor-selection flow (e.g. a
-    // version of BrowseShell's Tailors tab that returns a chosen Tailor
-    // instead of just opening TailorDetailScreen).
-    //
-    // BrowseShell tab order: 0=Fabrics, 1=Elements, 2=Tailors, 3=Retailers.
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const BrowseShell(initialIndex: 2)),
-    );
-    if (!mounted) return;
-    await _requestTailorJob();
-  }
+  final selectedTailorId = await Navigator.push<String>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => BrowseShell(
+        initialIndex: 2,
+        onTailorSelected: (tailorId) => Navigator.pop(context, tailorId),
+      ),
+    ),
+  );
+  if (!mounted || selectedTailorId == null) return;
+  await _requestTailorJob(tailorId: selectedTailorId);
+}
 
-  Future<void> _requestTailorJob() async {
-    String? jobId;
-    await _withLoading(() async {
-      jobId = await widget.callbacks.onCreateTailorJob(
-        measurementId: _selectedMeasurement?.id ?? '',
-        designIds: _designs.map((d) => d.path).toList(),
-        tailorId: 'demo_tailor_id', // TODO: real selected tailor id
-      );
-    });
-    if (!mounted || jobId == null) return;
-    setState(() {
-      _tailorJob = _TailorJobState(
-        jobId: jobId!,
-        tailorId: 'demo_tailor_id',
-        status: _JobStatus.pending,
-        requestedAt: DateTime.now(),
-      );
-    });
-  }
+Future<void> _requestTailorJob({required String tailorId}) async {
+  String? jobId;
+  await _withLoading(() async {
+    jobId = await widget.callbacks.onCreateTailorJob(
+      measurementId: _selectedMeasurement?.id ?? '',
+      designIds: _designs.map((d) => d.path).toList(),
+      tailorId: tailorId,
+    );
+  });
+  if (!mounted || jobId == null) return;
+  setState(() {
+    _tailorJob = _TailorJobState(
+      jobId: jobId!,
+      tailorId: tailorId,
+      status: _JobStatus.pending,
+      requestedAt: DateTime.now(),
+    );
+  });
+}
 
   void _onTailorConfirmed() {
     if (_tailorJob == null) return;
