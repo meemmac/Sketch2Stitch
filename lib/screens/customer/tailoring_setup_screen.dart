@@ -1,9 +1,14 @@
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:image_picker/image_picker.dart';
+// Local-only progress memory (no DB writes) so the screen can resume at the
+// right step if the customer navigates away before a tailor job exists.
+// Add `shared_preferences` to pubspec.yaml if it isn't already a dependency.
+import 'package:shared_preferences/shared_preferences.dart';
 
 // TODO: point this at your real Measurement model
 // (the same one used by MeasurementScreen / DashboardDrawer).
@@ -211,6 +216,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     "Measurements",
     "Design",
     "Find Tailor",
+    "Completed",
   ];
 
   // (asset path, display label)
@@ -231,6 +237,126 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   DateTime? _tailorSelectionDeadline;
   _TailorJobState? _tailorJob;
 
+  // ── Editable measurement grid (mirrors VirtualTrialScreen's layout) ──
+  // Field order/labels match the Measurement schema. Editing here is a
+  // local override for this order only — wire onCreateTailorJob (or a
+  // dedicated callback) to persist edits if you want them to update the
+  // saved profile.
+  static const List<(String, String)> _measurementFields = [
+    ('bustCircumference', 'Bust'),
+    ('waist', 'Waist'),
+    ('hipsCircumference', 'Hips'),
+    ('upperBustCircumference', 'Upper Bust / Over Bust'),
+    ('underBustCircumference', 'Under Bust'),
+    ('roundShoulderCircumference', 'Round Shoulder'),
+    ('shoulderToBust', 'Shoulder to Bust'),
+    ('shoulderToUnderBust', 'Shoulder to Under Bust'),
+    ('shoulderToKnee', 'Shoulder to Knee'),
+    ('shoulderToAnkle', 'Shoulder to Ankle'),
+    ('waistToAnkle', 'Waist to Ankle'),
+    ('thigh', 'Thigh'),
+    ('knee', 'Knee'),
+    ('ankle', 'Ankle'),
+  ];
+
+  late Map<String, TextEditingController> _measurementControllers;
+
+  double? _measurementValue(Measurement m, String field) {
+    switch (field) {
+      case 'bustCircumference':
+        return m.bustCircumference;
+      case 'waist':
+        return m.waist;
+      case 'hipsCircumference':
+        return m.hipsCircumference;
+      case 'upperBustCircumference':
+        return m.upperBustCircumference;
+      case 'underBustCircumference':
+        return m.underBustCircumference;
+      case 'roundShoulderCircumference':
+        return m.roundShoulderCircumference;
+      case 'shoulderToBust':
+        return m.shoulderToBust;
+      case 'shoulderToUnderBust':
+        return m.shoulderToUnderBust;
+      case 'shoulderToKnee':
+        return m.shoulderToKnee;
+      case 'shoulderToAnkle':
+        return m.shoulderToAnkle;
+      case 'waistToAnkle':
+        return m.waistToAnkle;
+      case 'thigh':
+        return m.thigh;
+      case 'knee':
+        return m.knee;
+      case 'ankle':
+        return m.ankle;
+      default:
+        return null;
+    }
+  }
+
+  void _initMeasurementControllers() {
+    final m = _selectedMeasurement;
+    _measurementControllers = {
+      for (final (field, _) in _measurementFields)
+        field: TextEditingController(
+          text: m == null
+              ? ''
+              : () {
+                  final v = _measurementValue(m, field);
+                  return v == null ? '' : v.toStringAsFixed(1);
+                }(),
+        ),
+    };
+  }
+
+  // ── Local-only progress memory ──────────────────────────────────────
+  // Keys are scoped to this order so multiple in-flight orders don't
+  // collide. This is purely device-local (SharedPreferences) — no DB
+  // writes — so it only helps the *same device* resume; it's a stopgap
+  // until step/measurement/design state is written to Orders/Tailor-jobs
+  // for real.
+  String get _stepPrefKey => 'tailoring_step_${widget.orderId}';
+  String get _designsPrefKey => 'tailoring_designs_${widget.orderId}';
+
+  Future<void> _saveLocalProgress() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_stepPrefKey, _currentStep);
+      await prefs.setStringList(
+        _designsPrefKey,
+        _designs.map((d) => d.path).toList(),
+      );
+    } catch (_) {
+      // Best-effort only — losing local resume state shouldn't block flow.
+    }
+  }
+
+  Future<void> _clearLocalProgress() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_stepPrefKey);
+      await prefs.remove(_designsPrefKey);
+    } catch (_) {
+      // Nothing to clean up, or storage unavailable — either way, fine.
+    }
+  }
+
+  Future<void> _loadLocalProgress() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final step = prefs.getInt(_stepPrefKey);
+      final designPaths = prefs.getStringList(_designsPrefKey);
+      if (step != null) _currentStep = step;
+      if (designPaths != null) {
+        _designs.addAll(designPaths.map((p) => DesignItem(path: p)));
+      }
+    } catch (_) {
+      // No local progress saved yet — fine, start fresh.
+    }
+  }
+
   Future<void> _withLoading(Future<void> Function() action) async {
     setState(() => _loading = true);
     try {
@@ -247,7 +373,16 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     if (widget.savedMeasurements.isNotEmpty) {
       _selectedMeasurement = widget.savedMeasurements.first;
     }
+    _initMeasurementControllers();
     _resumeFromBackend();
+  }
+
+  @override
+  void dispose() {
+    for (final c in _measurementControllers.values) {
+      c.dispose();
+    }
+    super.dispose();
   }
 
   /// Read-only rehydration: if the customer already progressed past step 1
@@ -257,9 +392,16 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   /// nothing to resume, this is a no-op and the screen behaves exactly as
   /// before (starts at step 0).
   Future<void> _resumeFromBackend() async {
+    // Local-only step memory first — this is what lets someone who never
+    // requested a tailor (so there's no Tailor-jobs doc yet) come back to
+    // wherever they left off, e.g. mid-way through Measurements or Design.
+    await _loadLocalProgress();
+
     try {
       final resume = await widget.callbacks.onFetchResumeState();
-      if (!mounted || resume == null) return;
+      if (!mounted) return;
+
+      if (resume == null) return;
 
       setState(() {
         if (resume.tailorSelectionDeadline != null) {
@@ -276,14 +418,14 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
             estimatedDeliveryDate: resume.estimatedDeliveryDate,
             rejectionReason: resume.rejectionReason,
           );
-          // A tailor job only ever exists once the customer reached step 4.
-          _currentStep = 3;
-        } else if (_tailorSelectionDeadline != null) {
-          // They opted into tailoring but haven't requested a job yet —
-          // resume wherever they'd naturally continue (step 4, since
-          // measurements/design are quick to redo/skip if needed).
+          // A tailor job only ever exists once the customer reached step 4
+          // — this overrides local step memory since a real backend job
+          // is more authoritative than "last step tapped on this device."
           _currentStep = 3;
         }
+        // If there's no tailor job yet, we deliberately leave _currentStep
+        // as whatever _loadLocalProgress restored (or 0, if nothing was
+        // saved) rather than forcing step 3.
       });
     } finally {
       if (mounted) setState(() => _resuming = false);
@@ -310,6 +452,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
       _tailorSelectionDeadline = deadline;
       _currentStep = 1;
     });
+    _saveLocalProgress();
   }
 
   // ─── Step 2 actions ────────────────────────────────────────────────
@@ -338,6 +481,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     setState(() {
       _designs.add(DesignItem(path: image.path));
     });
+    _saveLocalProgress();
   }
 
   Future<void> _openTemplateForDrawing(String templatePath) async {
@@ -351,10 +495,12 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     setState(() {
       _designs.add(DesignItem(path: result));
     });
+    _saveLocalProgress();
   }
 
   void _removeDesign(DesignItem item) {
     setState(() => _designs.remove(item));
+    _saveLocalProgress();
   }
 
   // ─── Step 4 actions ────────────────────────────────────────────────
@@ -469,6 +615,8 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   /// the order id and lets the customer jump straight to tracking instead
   /// of just flashing a snackbar and popping immediately.
   void _showOrderCompleteDialog(String message) {
+    _clearLocalProgress();
+    setState(() => _currentStep = 4);
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -572,7 +720,9 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
       child: Row(
         children: List.generate(_stepLabels.length, (index) {
           final bool isActive = index == _currentStep;
-          final bool isDone = index < _currentStep;
+          final bool isLastStep = index == _stepLabels.length - 1;
+          final bool isDone =
+              index < _currentStep || (isLastStep && index <= _currentStep);
           return Expanded(
             child: Row(
               children: [
@@ -588,7 +738,19 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
                   ),
                   alignment: Alignment.center,
                   child: isDone
-                      ? const Icon(Icons.check, size: 14, color: Colors.white)
+                      ? (index == _stepLabels.length - 1
+                          ? TweenAnimationBuilder<double>(
+                              key: const ValueKey('completed_check'),
+                              tween: Tween(begin: 0.0, end: 1.0),
+                              duration: const Duration(milliseconds: 600),
+                              curve: Curves.elasticOut,
+                              builder: (context, value, child) =>
+                                  Transform.scale(scale: value, child: child),
+                              child: const Icon(Icons.check,
+                                  size: 14, color: Colors.white),
+                            )
+                          : const Icon(Icons.check,
+                              size: 14, color: Colors.white))
                       : Text(
                           "${index + 1}",
                           style: TextStyle(
@@ -598,16 +760,15 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
                           ),
                         ),
                 ),
-                if (index != _stepLabels.length - 1)
-                  Expanded(
-                    child: Container(
-                      height: 2,
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      color: isDone
-                          ? Colors.green.shade800
-                          : Colors.grey.shade200,
-                    ),
+                Expanded(
+                  child: Container(
+                    height: 2,
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    color: index == _stepLabels.length - 1
+                        ? Colors.transparent
+                        : (isDone ? Colors.green.shade800 : Colors.grey.shade200),
                   ),
+                ),
               ],
             ),
           );
@@ -624,9 +785,42 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
         return _buildMeasurementsStep();
       case 2:
         return _buildDesignStep();
-      default:
+      case 3:
         return _buildFindTailorStep();
+      default:
+        return _buildCompletedStep();
     }
+  }
+
+  Widget _buildCompletedStep() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 600),
+            curve: Curves.elasticOut,
+            builder: (context, value, child) =>
+                Transform.scale(scale: value, child: child),
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.check_rounded,
+                  color: Colors.green.shade800, size: 40),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            "Order Complete",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _card({required Widget child}) {
@@ -727,7 +921,29 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   // ─── Step 2 ────────────────────────────────────────────────────────
 
   Widget _buildMeasurementsStep() {
-    return Padding(
+    if (widget.savedMeasurements.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Your measurement profile",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              "Your tailor will use this to fit your garment.",
+              style: TextStyle(color: Colors.black54),
+            ),
+            const SizedBox(height: 16),
+            _buildEmptyMeasurementsCard(),
+          ],
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -738,29 +954,93 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
           ),
           const SizedBox(height: 4),
           const Text(
-            "Your tailor will use this to fit your garment.",
+            "Tap any field to adjust it for this order.",
             style: TextStyle(color: Colors.black54),
           ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: widget.savedMeasurements.isEmpty
-                ? _buildEmptyMeasurementsCard()
-                : ListView.separated(
-                    itemCount: widget.savedMeasurements.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final m = widget.savedMeasurements[index];
-                      final isSelected = _selectedMeasurement?.id == m.id;
-                      return _buildMeasurementCard(m, isSelected);
-                    },
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.straighten_rounded,
+                    size: 14, color: Colors.green.shade800),
+                const SizedBox(width: 6),
+                Text(
+                  "All measurements are in inches",
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.green.shade800,
                   ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.grey.shade200),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            // Same 2-column editable-field grid as VirtualTrialScreen's
+            // Advanced Measurements section.
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final cellWidth = (constraints.maxWidth - 10) / 2;
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: _measurementFields.map((entry) {
+                    final (field, label) = entry;
+                    return SizedBox(
+                      width: cellWidth,
+                      height: 72,
+                      child: TextField(
+                        controller: _measurementControllers[field],
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: label,
+                          labelStyle: const TextStyle(fontSize: 10),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 14),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: Colors.green.shade800),
+                          ),
+                        ),
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
           ),
           const SizedBox(height: 12),
           TextButton.icon(
             onPressed: _goToMeasurementScreen,
             icon: Icon(Icons.edit_outlined, color: Colors.green.shade800),
             label: Text(
-              "Edit measurement profile",
+              "Edit saved profile",
               style: TextStyle(
                 color: Colors.green.shade800,
                 fontWeight: FontWeight.w600,
@@ -771,9 +1051,10 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _selectedMeasurement == null
-                  ? null
-                  : () => setState(() => _currentStep = 2),
+              onPressed: () {
+                setState(() => _currentStep = 2);
+                _saveLocalProgress();
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green.shade800,
                 foregroundColor: Colors.white,
@@ -811,79 +1092,6 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
             child: const Text("Add measurement profile"),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildMeasurementCard(Measurement m, bool isSelected) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isSelected ? Colors.green.shade800 : Colors.grey.shade200,
-          width: isSelected ? 1.5 : 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.straighten_rounded,
-                color: Colors.green.shade800, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Saved profile",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    _measurementChip("Bust", m.bustCircumference),
-                    _measurementChip("Waist", m.waist),
-                    _measurementChip("Hips", m.hipsCircumference),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Icon(Icons.check_circle, color: Colors.green.shade800),
-        ],
-      ),
-    );
-  }
-
-  Widget _measurementChip(String label, double value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: Colors.green.shade50,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        "$label: ${value.toStringAsFixed(1)}\"",
-        overflow: TextOverflow.ellipsis,
-        maxLines: 1,
-        style: TextStyle(fontSize: 11, color: Colors.green.shade800),
       ),
     );
   }
@@ -1007,7 +1215,10 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () => setState(() => _currentStep = 3),
+              onPressed: () {
+                setState(() => _currentStep = 3);
+                _saveLocalProgress();
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green.shade800,
                 foregroundColor: Colors.white,
@@ -1283,7 +1494,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
         const SizedBox(height: 18),
         _infoRow(
           icon: Icons.payments_outlined,
-          label: "Quote",
+          label: "Total Cost",
           value: job.quoteAmount != null
               ? "Tk ${job.quoteAmount!.toStringAsFixed(0)}"
               : "—",
@@ -1400,28 +1611,27 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, size: 18, color: Colors.green.shade800),
           const SizedBox(width: 10),
-          Flexible(
-            child: Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Colors.green.shade900,
-              ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.green.shade900,
             ),
           ),
-          const Spacer(),
-          Flexible(
+          const SizedBox(width: 10),
+          // Value gets the rest of the row and wraps to a second line
+          // instead of being cut off — this is what was clipping the
+          // estimated delivery date before.
+          Expanded(
             child: Text(
               value,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
               textAlign: TextAlign.right,
+              softWrap: true,
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
@@ -1748,13 +1958,50 @@ class _SketchPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     for (final stroke in strokes) {
-      final paint = Paint()
-        ..color = stroke.color
-        ..strokeWidth = stroke.width
-        ..strokeCap = StrokeCap.round
-        ..style = PaintingStyle.stroke;
-      for (int i = 0; i < stroke.points.length - 1; i++) {
-        canvas.drawLine(stroke.points[i], stroke.points[i + 1], paint);
+      final isEraser = stroke.color == Colors.white;
+
+      if (isEraser) {
+        final paint = Paint()
+          ..color = stroke.color
+          ..strokeWidth = stroke.width
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..style = PaintingStyle.stroke;
+        for (int i = 0; i < stroke.points.length - 1; i++) {
+          canvas.drawLine(stroke.points[i], stroke.points[i + 1], paint);
+        }
+        continue;
+      }
+
+      // Graphite/pencil texture: a handful of semi-transparent, slightly
+      // jittered passes layered with multiply blending, so the stroke
+      // reads as grainy pencil shading rather than a flat marker line.
+      // The seed is derived from the stroke itself so a given stroke's
+      // texture stays stable across repaints instead of flickering.
+      final seed = stroke.points.length * 7 + stroke.color.toARGB32();
+      final rand = Random(seed);
+
+      for (int layer = 0; layer < 3; layer++) {
+        final paint = Paint()
+          ..color = stroke.color.withValues(alpha: 0.32)
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = stroke.width * (0.65 + rand.nextDouble() * 0.5)
+          ..blendMode = BlendMode.multiply;
+
+        final jitterRange = stroke.width * 0.18;
+        for (int i = 0; i < stroke.points.length - 1; i++) {
+          final jitter = Offset(
+            (rand.nextDouble() - 0.5) * jitterRange,
+            (rand.nextDouble() - 0.5) * jitterRange,
+          );
+          canvas.drawLine(
+            stroke.points[i] + jitter,
+            stroke.points[i + 1] + jitter,
+            paint,
+          );
+        }
       }
     }
   }
