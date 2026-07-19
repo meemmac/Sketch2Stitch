@@ -212,69 +212,127 @@ class _CartScreenState extends State<CartScreen> {
 }
 
   @override
-  Widget build(BuildContext context) {
-    final grouped = _groupedByRetailer;
-    final retailerIds = grouped.keys.toList();
+Widget build(BuildContext context) {
+  final grouped = _groupedByRetailer;
+  final retailerIds = grouped.keys.toList();
+  final hasActiveOrder = OrderSession.instance.hasActiveOrder;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF9FBF9),
-      appBar: AppBar(
-        title: const Text(
-          "My Cart",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0,
-        foregroundColor: Colors.black,
+  return Scaffold(
+    backgroundColor: const Color(0xFFF9FBF9),
+    appBar: AppBar(
+      title: const Text(
+        "My Cart",
+        style: TextStyle(fontWeight: FontWeight.bold),
       ),
-      body: _cartLines.isEmpty
-          ? _buildEmptyState()
-          : Column(
-              children: [
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    itemCount: retailerIds.length,
-                    itemBuilder: (context, index) {
-                      final retailerId = retailerIds[index];
-                      final lines = grouped[retailerId]!;
-                      return _buildAnimatedRetailerSection(
-                        retailerId,
-                        lines,
-                        index,
-                      );
-                    },
+      centerTitle: true,
+      backgroundColor: Colors.white,
+      elevation: 0,
+      foregroundColor: Colors.black,
+    ),
+    body: hasActiveOrder
+        ? _buildActiveOrderState()
+        : (_cartLines.isEmpty
+            ? _buildEmptyState()
+            : Column(
+                children: [
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      itemCount: retailerIds.length,
+                      itemBuilder: (context, index) {
+                        final retailerId = retailerIds[index];
+                        final lines = grouped[retailerId]!;
+                        return _buildAnimatedRetailerSection(
+                          retailerId,
+                          lines,
+                          index,
+                        );
+                      },
+                    ),
                   ),
-                ),
-                _buildSummaryBar(),
-              ],
-            ),
-    );
-  }
+                  _buildSummaryBar(),
+                ],
+              )),
+  );
+}
+Widget _buildEmptyState() {
+  return Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.shopping_cart_outlined,
+          size: 56,
+          color: Colors.green.shade200,
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          "Your cart is empty",
+          style: TextStyle(
+            color: Colors.black54,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
-  Widget _buildEmptyState() {
-    return Center(
+  
+
+Widget _buildActiveOrderState() {
+  final session = OrderSession.instance;
+  return Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.shopping_cart_outlined,
-            size: 56,
-            color: Colors.green.shade200,
-          ),
+          Icon(Icons.local_shipping_outlined, size: 56, color: Colors.green.shade300),
           const SizedBox(height: 12),
           const Text(
-            "Your cart is empty",
-            style: TextStyle(
-              color: Colors.black54,
-              fontWeight: FontWeight.w500,
+            "You have an order in progress",
+            style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 15),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            "Order #${session.orderId}",
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            "Finish this order before adding a new one to your cart.",
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TailoringSetupScreen(
+                    orderId: session.orderId!,
+                    orderDate: session.orderDate!,
+                    savedMeasurements: [_measurement],
+                    callbacks: buildTailoringCallbacks(),
+                  ),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade800,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
             ),
+            child: const Text("Continue Your Order"),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildAnimatedRetailerSection(
     String retailerId,
