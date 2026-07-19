@@ -10,6 +10,7 @@ import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
+import 'package:sketch2stitch/screens/customer/cart_screen.dart';
 import '../../widgets/dashboard_drawer.dart';
 import 'virtual_trial_screen.dart';
 import 'notification_screen.dart' ;
@@ -238,6 +239,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           Builder(
             builder: (context) => IconButton(
               icon: const Icon(Icons.menu_rounded, color: Colors.black87),
+              iconSize: 28,
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
           ),
@@ -256,6 +258,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
             children: [
               IconButton(
                 icon: const Icon(Icons.notifications_none_rounded, color: Colors.black87),
+                iconSize: 28,
                 onPressed: _openNotifications,
               ),
               if (_hasUnreadNotifications)
@@ -278,6 +281,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           if (_currentRole == AppUserRole.customer)
             IconButton(
               icon: const Icon(Icons.track_changes_rounded, color: Colors.black87),
+              iconSize: 28,
               onPressed: () {
                 _openTrackOrder();
               },
@@ -286,8 +290,12 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           if (_currentRole == AppUserRole.customer)
             IconButton(
               icon: const Icon(Icons.shopping_cart_outlined, color: Colors.black87),
+              iconSize: 28,
               onPressed: () {
-                // TODO: navigate to cart
+                Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const CartScreen()),
+      );
               },
             ),
           // Role dropdown for testing

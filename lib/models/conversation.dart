@@ -1,12 +1,13 @@
 import 'message.dart';
+import 'user_role.dart';
 
 class Conversation {
   final String id;
   final String customerId;
   final String otherId;
-  final String otherRole; // 'tailor' or 'retailer'
-  final String? orderId;
-  
+  final UserRole otherRole;
+  final String orderId;
+
   // Relationships
   List<Message>? messages;
 
@@ -15,7 +16,7 @@ class Conversation {
     required this.customerId,
     required this.otherId,
     required this.otherRole,
-    this.orderId,
+    required this.orderId,
     this.messages = const [],
   });
 
@@ -23,7 +24,7 @@ class Conversation {
     String? id,
     String? customerId,
     String? otherId,
-    String? otherRole,
+    UserRole? otherRole,
     String? orderId,
     List<Message>? messages,
   }) {
@@ -41,7 +42,7 @@ class Conversation {
     'id': id,
     'customerId': customerId,
     'otherId': otherId,
-    'otherRole': otherRole,
+    'otherRole': otherRole.name,
     'orderId': orderId,
   };
 
@@ -50,8 +51,8 @@ class Conversation {
       id: json['id'] ?? '',
       customerId: json['customerId'] ?? '',
       otherId: json['otherId'] ?? '',
-      otherRole: json['otherRole'] ?? '',
-      orderId: json['orderId'],
+      otherRole: UserRole.values.byName(json['otherRole'] ?? 'tailor'),
+      orderId: json['orderId'] ?? '',
     );
   }
 }

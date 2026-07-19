@@ -1,81 +1,100 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
 
-// ============= CUSTOMER NOTIFICATION =============
+// ============= CUSTOMER NOTIFICATION (UI mock, renamed to avoid
+// collision with the real Firestore-backed AppNotification model) =============
 enum NotificationType { confirmed, delivered, cancelled, paymentDue }
 
-class AppNotification {
+class CustomerNotificationCardData {
   final NotificationType type;
   final String avatarImage;
   final String itemName;
   final String partyLabel;
   final String partyName;
   final String orderId;
+  final String? subOrderId;
   final String timeAgo;
   final bool isNew;
   final String? cancelReason;
 
-  const AppNotification({
+  const CustomerNotificationCardData({
     required this.type,
     required this.avatarImage,
     required this.itemName,
     required this.partyLabel,
     required this.partyName,
     required this.orderId,
+    this.subOrderId,
     required this.timeAgo,
     this.isNew = false,
     this.cancelReason,
   });
 }
 
-final List<AppNotification> kCustomerDummyNotifications = [
-  const AppNotification(
-    type: NotificationType.confirmed,
-    avatarImage: 'assets/images/fab.jpg',
-    itemName: 'Salwar Kameez',
-    partyLabel: 'confirmed by',
-    partyName: 'Rahman Tailors',
-    orderId: 'OR01',
-    timeAgo: '2 hours ago',
-    isNew: true,
-  ),
-  const AppNotification(
-    type: NotificationType.paymentDue,
-    avatarImage: 'assets/images/fab2.jpg',
-    itemName: 'Bridal Lehenga',
-    partyLabel: 'is due for',
-    partyName: 'Noor Fashion House',
-    orderId: 'OR02',
-    timeAgo: '5 hours ago',
-    isNew: true,
-  ),
-  const AppNotification(
+final List<CustomerNotificationCardData> kCustomerDummyNotifications = [
+  const CustomerNotificationCardData(
     type: NotificationType.delivered,
     avatarImage: 'assets/images/textile.jpg',
     itemName: 'Premium Cotton Fabric',
     partyLabel: 'from',
     partyName: 'Style Fabric House',
     orderId: 'OR03',
+    subOrderId: 'SUB03-1',
     timeAgo: 'Today',
     isNew: true,
   ),
-  const AppNotification(
+  const CustomerNotificationCardData(
+    type: NotificationType.confirmed,
+    avatarImage: 'assets/images/fab.jpg',
+    itemName: 'Salwar Kameez',
+    partyLabel: 'confirmed by',
+    partyName: 'Rahman Tailors',
+    orderId: 'OR01',
+    subOrderId: null,
+    timeAgo: '2 hours ago',
+    isNew: true,
+  ),
+  const CustomerNotificationCardData(
+    type: NotificationType.paymentDue,
+    avatarImage: 'assets/images/fab2.jpg',
+    itemName: 'Bridal Lehenga',
+    partyLabel: 'is due for',
+    partyName: 'Noor Fashion House',
+    orderId: 'OR02',
+    subOrderId: null,
+    timeAgo: '5 hours ago',
+    isNew: true,
+  ),
+  const CustomerNotificationCardData(
+    type: NotificationType.delivered,
+    avatarImage: 'assets/images/textile.jpg',
+    itemName: 'Premium Cotton Fabric',
+    partyLabel: 'from',
+    partyName: 'Style Fabric House',
+    orderId: 'OR03',
+    subOrderId: null,
+    timeAgo: 'Today',
+    isNew: true,
+  ),
+  const CustomerNotificationCardData(
     type: NotificationType.cancelled,
     avatarImage: 'assets/images/lace.jpg',
     itemName: 'Wedding Sherwani',
     partyLabel: 'from',
-    partyName: 'Elegant Shop',
+    partyName: 'Elegant Tailor',
     orderId: 'OR04',
+    subOrderId: null,
     timeAgo: 'Yesterday',
     cancelReason: 'The fabric you selected went out of stock before your order could be processed.',
   ),
-  const AppNotification(
+  const CustomerNotificationCardData(
     type: NotificationType.delivered,
     avatarImage: 'assets/images/silk.jpg',
     itemName: 'Casual Shirt',
     partyLabel: 'from',
     partyName: 'Modern Tailor House',
     orderId: 'OR06',
+    subOrderId: null,
     timeAgo: '5 days ago',
   ),
 ];
@@ -89,6 +108,7 @@ class RetailerNotification {
   final String customerName;
   final String itemName;
   final String orderId;
+  final String? subOrderId;
   final String timeAgo;
   final bool isNew;
   final String? colorName;
@@ -102,6 +122,7 @@ class RetailerNotification {
     required this.customerName,
     required this.itemName,
     required this.orderId,
+    this.subOrderId,
     required this.timeAgo,
     this.isNew = false,
     this.colorName,
@@ -162,6 +183,7 @@ class TailorNotification {
   final String customerName;
   final String itemName;
   final String orderId;
+  final String? subOrderId;
   final String timeAgo;
   final bool isNew;
   final String? reviewText;
@@ -175,6 +197,7 @@ class TailorNotification {
     required this.customerName,
     required this.itemName,
     required this.orderId,
+    this.subOrderId,
     required this.timeAgo,
     this.isNew = false,
     this.reviewText,
@@ -228,10 +251,12 @@ final List<TailorNotification> kTailorDummyNotifications = [
 // ============= UNIFIED NOTIFICATION SCREEN =============
 class UnifiedNotificationScreen extends StatefulWidget {
   final AppUserRole role;
+  final void Function(String orderId, String? subOrderId)? onNotificationTap;
 
   const UnifiedNotificationScreen({
     super.key,
     required this.role,
+    this.onNotificationTap,
   });
 
   @override
@@ -239,7 +264,7 @@ class UnifiedNotificationScreen extends StatefulWidget {
 }
 
 class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
-  late List<AppNotification> _customerNotifications;
+  late List<CustomerNotificationCardData> _customerNotifications;
   late List<RetailerNotification> _retailerNotifications;
   late List<TailorNotification> _tailorNotifications;
 
@@ -412,63 +437,70 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   }
 
   // ============= CUSTOMER CARD =============
-  Widget _buildCustomerCard(AppNotification n) {
+  Widget _buildCustomerCard(CustomerNotificationCardData n) {
     final style = _customerStyleFor(n.type);
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: style.background, borderRadius: BorderRadius.circular(20)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => widget.onNotificationTap?.call(n.orderId, n.subOrderId),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: style.background, borderRadius: BorderRadius.circular(20)),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(radius: 22, backgroundColor: Colors.white, backgroundImage: AssetImage(n.avatarImage)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(radius: 22, backgroundColor: Colors.white, backgroundImage: AssetImage(n.avatarImage)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(style.icon, size: 18, color: style.iconColor),
-                        const SizedBox(width: 6),
-                        Expanded(child: Text(style.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
-                        if (n.isNew) _buildNewBadge(),
+                        Row(
+                          children: [
+                            Icon(style.icon, size: 18, color: style.iconColor),
+                            const SizedBox(width: 6),
+                            Expanded(child: Text(style.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+                            if (n.isNew) _buildNewBadge(),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        RichText(
+                          text: TextSpan(
+                            style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
+                            children: [
+                              TextSpan(text: '${style.messagePrefix} '),
+                              TextSpan(text: n.itemName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                              TextSpan(text: ' ${n.partyLabel} '),
+                              TextSpan(text: n.partyName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                              if (style.messageSuffix.isNotEmpty) TextSpan(text: style.messageSuffix),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    RichText(
-                      text: TextSpan(
-                        style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
-                        children: [
-                          TextSpan(text: '${style.messagePrefix} '),
-                          TextSpan(text: n.itemName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-                          TextSpan(text: ' ${n.partyLabel} '),
-                          TextSpan(text: n.partyName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-                          if (style.messageSuffix.isNotEmpty) TextSpan(text: style.messageSuffix),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 12),
+              if (n.type == NotificationType.cancelled) _buildCustomerCancelRow(n) else _buildCustomerFooterRow(n),
+              if (n.type == NotificationType.delivered)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text('Please review from orders', style: TextStyle(fontSize: 12, color: Colors.blue.shade700, fontWeight: FontWeight.w500)),
+                ),
             ],
           ),
-          const SizedBox(height: 12),
-          if (n.type == NotificationType.cancelled) _buildCustomerCancelRow(n) else _buildCustomerFooterRow(n),
-          if (n.type == NotificationType.delivered)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text('Please review from orders', style: TextStyle(fontSize: 12, color: Colors.blue.shade700, fontWeight: FontWeight.w500)),
-            ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildCustomerCancelRow(AppNotification n) {
+  Widget _buildCustomerCancelRow(CustomerNotificationCardData n) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -497,7 +529,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     );
   }
 
-  Widget _buildCustomerFooterRow(AppNotification n) {
+  Widget _buildCustomerFooterRow(CustomerNotificationCardData n) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -513,13 +545,13 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     );
   }
 
-  void _showCustomerCancelReason(AppNotification n) {
+  void _showCustomerCancelReason(CustomerNotificationCardData n) {
     showDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) => Dialog(
-        alignment: Alignment.topCenter,
-        insetPadding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
+        alignment: Alignment.center,
+        insetPadding: const EdgeInsets.all(20),
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.all(24),
@@ -582,58 +614,65 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   Widget _buildRetailerCard(RetailerNotification n) {
     final style = _retailerStyleFor(n.type);
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: style.background, borderRadius: BorderRadius.circular(20)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => widget.onNotificationTap?.call(n.orderId, n.subOrderId),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: style.background, borderRadius: BorderRadius.circular(20)),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(radius: 22, backgroundColor: Colors.white, backgroundImage: AssetImage(n.avatarImage)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(radius: 22, backgroundColor: Colors.white, backgroundImage: AssetImage(n.avatarImage)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(style.icon, size: 18, color: style.iconColor),
-                        const SizedBox(width: 6),
-                        Expanded(child: Text(style.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
-                        if (n.isNew) _buildNewBadge(),
+                        Row(
+                          children: [
+                            Icon(style.icon, size: 18, color: style.iconColor),
+                            const SizedBox(width: 6),
+                            Expanded(child: Text(style.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+                            if (n.isNew) _buildNewBadge(),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        RichText(
+                          text: TextSpan(
+                            style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
+                            children: [
+                              TextSpan(text: style.messagePrefix),
+                              TextSpan(text: n.customerName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                              TextSpan(text: style.messageMiddle),
+                              if (n.colorName != null) ...[
+                                TextSpan(text: ' (Color: '),
+                                TextSpan(text: n.colorName!, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                                TextSpan(text: ')'),
+                              ],
+                              if (style.messageSuffix.isNotEmpty) TextSpan(text: style.messageSuffix),
+                              if (n.type == RetailerNotificationType.orderPlaced) ...[
+                                TextSpan(text: ' ',),
+                                TextSpan(text: 'View Order Details', style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
+                              ],
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    RichText(
-                      text: TextSpan(
-                        style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
-                        children: [
-                          TextSpan(text: style.messagePrefix),
-                          TextSpan(text: n.customerName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-                          TextSpan(text: style.messageMiddle),
-                          if (n.colorName != null) ...[
-                            TextSpan(text: ' (Color: '),
-                            TextSpan(text: n.colorName!, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-                            TextSpan(text: ')'),
-                          ],
-                          if (style.messageSuffix.isNotEmpty) TextSpan(text: style.messageSuffix),
-                          if (n.type == RetailerNotificationType.orderPlaced) ...[
-                            TextSpan(text: ' ',),
-                            TextSpan(text: 'View Order Details', style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 12),
+              _buildRetailerFooter(n),
             ],
           ),
-          const SizedBox(height: 12),
-          _buildRetailerFooter(n),
-        ],
+        ),
       ),
     );
   }
@@ -776,60 +815,67 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   Widget _buildTailorCard(TailorNotification n) {
     final style = _tailorStyleFor(n.type);
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: style.background, borderRadius: BorderRadius.circular(20)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => widget.onNotificationTap?.call(n.orderId, n.subOrderId),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: style.background, borderRadius: BorderRadius.circular(20)),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(radius: 22, backgroundColor: Colors.white, backgroundImage: AssetImage(n.avatarImage)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(radius: 22, backgroundColor: Colors.white, backgroundImage: AssetImage(n.avatarImage)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(style.icon, size: 18, color: style.iconColor),
-                        const SizedBox(width: 6),
-                        Expanded(child: Text(style.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
-                        if (n.isNew) _buildNewBadge(),
+                        Row(
+                          children: [
+                            Icon(style.icon, size: 18, color: style.iconColor),
+                            const SizedBox(width: 6),
+                            Expanded(child: Text(style.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+                            if (n.isNew) _buildNewBadge(),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        RichText(
+                          text: TextSpan(
+                            style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
+                            children: [
+                              TextSpan(text: style.messagePrefix),
+                              TextSpan(text: n.customerName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                              TextSpan(text: style.messageMiddle),
+                              if (style.messageSuffix.isNotEmpty) TextSpan(text: style.messageSuffix),
+                              if (n.type == TailorNotificationType.deliveryDeadline && n.deadlineDate != null) ...[
+                                TextSpan(text: ' Deadline: ${n.deadlineDate}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                              ],
+                              if (n.type == TailorNotificationType.newOrder) ...[
+                                TextSpan(text: ' ',),
+                                TextSpan(text: 'View Order', style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
+                              ],
+                              if (n.type == TailorNotificationType.orderConfirmationReminder) ...[
+                                TextSpan(text: ' ',),
+                                TextSpan(text: 'Confirm Now', style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
+                              ],
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    RichText(
-                      text: TextSpan(
-                        style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
-                        children: [
-                          TextSpan(text: style.messagePrefix),
-                          TextSpan(text: n.customerName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-                          TextSpan(text: style.messageMiddle),
-                          if (style.messageSuffix.isNotEmpty) TextSpan(text: style.messageSuffix),
-                          if (n.type == TailorNotificationType.deliveryDeadline && n.deadlineDate != null) ...[
-                            TextSpan(text: ' Deadline: ${n.deadlineDate}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-                          ],
-                          if (n.type == TailorNotificationType.newOrder) ...[
-                            TextSpan(text: ' ',),
-                            TextSpan(text: 'View Order', style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
-                          ],
-                          if (n.type == TailorNotificationType.orderConfirmationReminder) ...[
-                            TextSpan(text: ' ',),
-                            TextSpan(text: 'Confirm Now', style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 12),
+              _buildTailorFooter(n),
             ],
           ),
-          const SizedBox(height: 12),
-          _buildTailorFooter(n),
-        ],
+        ),
       ),
     );
   }

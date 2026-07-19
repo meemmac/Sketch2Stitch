@@ -8,7 +8,9 @@ import '../screens/customer/measurement_screen.dart';
 import '../models/measurement.dart';
 import '../screens/shared/welcome_screen.dart';
 import '../screens/shared/about_us_screen.dart';
-
+import '../screens/retailer/orders_screen.dart';
+import '../screens/tailor/portfolio_screen.dart';
+import '../screens/customer/cart_screen.dart';
 
 /// Enum representing the three user roles.
 enum AppUserRole {
@@ -546,21 +548,28 @@ class DrawerNavigationSection extends StatelessWidget {
                     ),
                   );
                 }
-              } else if (item['title'] == 'Inventory') {
+              } else if (item['title'] == 'Cart') {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const CartScreen(),
+    ),
+  );
+}else if (item['title'] == 'Inventory') {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => const InventoryScreen(),
                   ),
                 );
-              } else if (item['title'] == 'About') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const AboutUsScreen(),
-                  ),
-                );
-              } else {
+              } else if (item['title'] == 'Portfolio') {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const TailorPortfolioScreen(),
+    ),
+  );
+}else {
                 debugPrint("Navigation clicked: ${item['title']}");
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -589,14 +598,13 @@ class DrawerNavigationSection extends StatelessWidget {
       case AppUserRole.tailor:
         return [
           {'title': 'Orders', 'icon': Icons.receipt_long_rounded},
+           {'title': 'Portfolio', 'icon': Icons.design_services_outlined},
           {'title': 'Messages', 'icon': Icons.chat_bubble_outline_rounded},
-          {'title': 'About', 'icon': Icons.info_outline},
         ];
       case AppUserRole.retailer:
         return [
           {'title': 'Orders', 'icon': Icons.receipt_long_rounded},
           {'title': 'Inventory', 'icon': Icons.inventory_2_outlined},
-          {'title': 'About', 'icon': Icons.info_outline},
         ];
     }
   }
@@ -759,6 +767,9 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
     final bool isRetailer = widget.role == AppUserRole.retailer;
     final bool isCustomer = widget.role == AppUserRole.customer;
 
+    const fieldTextStyle = TextStyle(fontSize: 13);
+    const fieldLabelStyle = TextStyle(fontSize: 13);
+
     return AlertDialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
@@ -816,8 +827,10 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
             if (isRetailer) ...[
               TextField(
                 controller: _shopNameController,
+                style: fieldTextStyle,
                 decoration: const InputDecoration(
                   labelText: "Shop Name",
+                  labelStyle: fieldLabelStyle,
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.storefront_rounded),
                 ),
@@ -826,8 +839,10 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
             ] else ...[
               TextField(
                 controller: _nameController,
+                style: fieldTextStyle,
                 decoration: const InputDecoration(
                   labelText: "Name",
+                  labelStyle: fieldLabelStyle,
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.person_rounded),
                 ),
@@ -836,8 +851,10 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
             ],
             TextField(
               controller: _emailController,
+              style: fieldTextStyle,
               decoration: const InputDecoration(
                 labelText: "Email",
+                labelStyle: fieldLabelStyle,
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.email_outlined),
               ),
@@ -846,8 +863,10 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
             const SizedBox(height: 12),
             TextField(
               controller: _phoneController,
+              style: fieldTextStyle,
               decoration: const InputDecoration(
                 labelText: "Phone",
+                labelStyle: fieldLabelStyle,
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.phone_outlined),
               ),
@@ -856,8 +875,10 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
             const SizedBox(height: 12),
             TextField(
               controller: _addressController,
+              style: fieldTextStyle,
               decoration: const InputDecoration(
                 labelText: "Address",
+                labelStyle: fieldLabelStyle,
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.location_on_outlined),
               ),
@@ -867,8 +888,10 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
               const SizedBox(height: 12),
               TextField(
                 controller: _aboutController,
+                style: fieldTextStyle,
                 decoration: const InputDecoration(
                   labelText: "About / Biography",
+                  labelStyle: fieldLabelStyle,
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.info_outline),
                 ),

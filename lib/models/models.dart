@@ -1,3 +1,4 @@
+export 'user_role.dart';
 export 'customer.dart';
 export 'measurement.dart';
 export 'tailor.dart';

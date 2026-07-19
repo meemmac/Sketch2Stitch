@@ -5,6 +5,7 @@ import 'package:sketch2stitch/screens/customer/browsing/browse_tailors_screen.da
 import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
+import 'package:sketch2stitch/screens/customer/cart_screen.dart';
 import '../../../widgets/dashboard_drawer.dart';
 
 /// Shared shell for the three "Browse" tabs (Fabrics/Clothing, Tailors,
@@ -277,6 +278,26 @@ class _BrowseShellState extends State<BrowseShell> {
           Column(
             children: [
               _buildHeader(currentIndex),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF4F9F1), // Matches theme sage/pale colors
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300, width: 0.5),
+                  ),
+                  child: TextField(
+                    onChanged: (value) => _searchNotifier.value = value,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.search, size: 22, color: Colors.grey),
+                      hintText: _searchHints[currentIndex],
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      hintStyle: const TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                  ),
+                ),
+              ),
               _buildNavigationRow(),
               Expanded(
                 child: PageView(
@@ -336,36 +357,6 @@ class _BrowseShellState extends State<BrowseShell> {
                 ),
               ),
             ),
-
-          // Search Overlay
-          if (_showSearchOverlay)
-            GestureDetector(
-              onTap: _toggleSearchOverlay,
-              child: Container(
-                color: Colors.black.withValues(alpha: 0.3),
-                child: GestureDetector(
-                  onTap: () {},
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: Container(
-                      margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.15),
-                            blurRadius: 20,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: _buildSearchPanel(currentIndex),
-                    ),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -383,15 +374,6 @@ class _BrowseShellState extends State<BrowseShell> {
       ),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 24),
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
-          const SizedBox(width: 4),
           Builder(
             builder: (ctx) => IconButton(
               icon: const Icon(Icons.menu, color: kSage, size: 24),
@@ -400,7 +382,7 @@ class _BrowseShellState extends State<BrowseShell> {
               constraints: const BoxConstraints(),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           Image.asset(
             'assets/images/transparent_logo.png',
             height: 40,
@@ -426,17 +408,6 @@ class _BrowseShellState extends State<BrowseShell> {
             },
           ),
           const Spacer(),
-          IconButton(
-            onPressed: _toggleSearchOverlay,
-            icon: Icon(
-              Icons.search,
-              color: _showSearchOverlay ? kSage : Colors.black87,
-              size: 24,
-            ),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
-          const SizedBox(width: 8),
           Stack(
             children: [
               IconButton(
@@ -465,17 +436,31 @@ class _BrowseShellState extends State<BrowseShell> {
             ],
           ),
           const SizedBox(width: 8),
-          if (currentIndex == 0 || currentIndex == 1)
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(
-                Icons.shopping_cart_outlined,
-                color: Colors.black87,
-                size: 24,
-              ),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
+IconButton(
+  onPressed: () {
+
+    Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const CartScreen()),
+      );
+  },
+  icon: const Icon(
+    Icons.shopping_cart_outlined,
+    color: Colors.black87,
+    size: 24,
+  ),
+  padding: EdgeInsets.zero,
+  constraints: const BoxConstraints(),
+),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 24),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
         ],
       ),
     );

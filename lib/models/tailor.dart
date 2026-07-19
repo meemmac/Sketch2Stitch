@@ -14,7 +14,7 @@ class Tailor {
   
   // Relationships
   List<Portfolio>? portfolio;
-  List<Notifications>? notifications;  // Notifications for this tailor
+  List<AppNotification>? notifications;  // Notifications for this tailor
   List<TailorJob>? jobs;
 
   Tailor({
@@ -49,7 +49,7 @@ class Tailor {
     String? profilePicture,
     String? about,
     List<Portfolio>? portfolio,
-    List<Notifications>? notifications,
+    List<AppNotification>? notifications,
     List<TailorJob>? jobs,
   }) {
     return Tailor(

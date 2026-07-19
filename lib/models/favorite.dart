@@ -1,6 +1,7 @@
 enum FavoriteTargetRole {
-  retailer,
   tailor,
+  retailer,
+  product,
 }
 
 class Favorite {
@@ -34,7 +35,7 @@ class Favorite {
     'id': id,
     'customerId': customerId,
     'targetId': targetId,
-    'targetRole': targetRole.index,
+    'targetRole': targetRole.name,
   };
 
   factory Favorite.fromJson(Map<String, dynamic> json) {
@@ -42,7 +43,7 @@ class Favorite {
       id: json['id'] ?? '',
       customerId: json['customerId'] ?? '',
       targetId: json['targetId'] ?? '',
-      targetRole: FavoriteTargetRole.values[json['targetRole'] ?? 0],
+      targetRole: FavoriteTargetRole.values.byName(json['targetRole'] ?? 'tailor'),
     );
   }
 }

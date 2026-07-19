@@ -20,7 +20,7 @@ class Customer {
   List<Conversation>? conversations;
   List<Favorite>? favorites;
   List<Design>? designs;
-  List<Notifications>? notifications;
+  List<AppNotification>? notifications;
 
 
   Customer({
