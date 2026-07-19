@@ -10,6 +10,7 @@ import '../screens/shared/welcome_screen.dart';
 import '../screens/shared/about_us_screen.dart';
 import '../screens/retailer/orders_screen.dart';
 import '../screens/tailor/portfolio_screen.dart';
+import '../screens/customer/cart_screen.dart';
 
 /// Enum representing the three user roles.
 enum AppUserRole {
@@ -547,7 +548,14 @@ class DrawerNavigationSection extends StatelessWidget {
                     ),
                   );
                 }
-              } else if (item['title'] == 'Inventory') {
+              } else if (item['title'] == 'Cart') {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const CartScreen(),
+    ),
+  );
+}else if (item['title'] == 'Inventory') {
                 Navigator.push(
                   context,
                   MaterialPageRoute(

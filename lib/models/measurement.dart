@@ -19,23 +19,23 @@ class Measurement {
 
   
   Measurement({
-    required this.id,
-    required this.customerId,
-    required this.upperBustCircumference,
-    required this.roundShoulderCircumference,
-    required this.hipsCircumference,
-    required this.underBustCircumference,
-    required this.bustCircumference,
-    required this.waist,
-    required this.shoulderToKnee,
-    required this.shoulderToUnderBust,
-    required this.shoulderToBust,
-    required this.thigh,
-    required this.knee,
-    required this.ankle,
-    required this.waistToAnkle,
-    required this.shoulderToAnkle,
-  });
+  required this.id,
+  required this.customerId,
+  this.upperBustCircumference = 0,
+  this.roundShoulderCircumference = 0,
+  this.hipsCircumference = 0,
+  this.underBustCircumference = 0,
+  this.bustCircumference = 0,
+  this.waist = 0,
+  this.shoulderToKnee = 0,
+  this.shoulderToUnderBust = 0,
+  this.shoulderToBust = 0,
+  this.thigh = 0,
+  this.knee = 0,
+  this.ankle = 0,
+  this.waistToAnkle = 0,
+  this.shoulderToAnkle = 0,
+});
 
   Measurement copyWith({
     String? id,

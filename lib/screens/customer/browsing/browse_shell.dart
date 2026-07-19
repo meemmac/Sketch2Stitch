@@ -5,6 +5,7 @@ import 'package:sketch2stitch/screens/customer/browsing/browse_tailors_screen.da
 import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
+import 'package:sketch2stitch/screens/customer/cart_screen.dart';
 import '../../../widgets/dashboard_drawer.dart';
 
 /// Shared shell for the three "Browse" tabs (Fabrics/Clothing, Tailors,
@@ -436,7 +437,13 @@ class _BrowseShellState extends State<BrowseShell> {
           ),
           const SizedBox(width: 8),
 IconButton(
-  onPressed: () {},
+  onPressed: () {
+
+    Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const CartScreen()),
+      );
+  },
   icon: const Icon(
     Icons.shopping_cart_outlined,
     color: Colors.black87,
