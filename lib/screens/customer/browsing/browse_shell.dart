@@ -15,8 +15,8 @@ import '../../../widgets/dashboard_drawer.dart';
 class BrowseShell extends StatefulWidget {
   /// 0 = Fabrics/Clothing, 1 = Tailors, 2 = Retailers
   final int initialIndex;
-
-  const BrowseShell({super.key, this.initialIndex = 0});
+  final void Function(String tailorId)? onTailorSelected;
+    const BrowseShell({super.key, this.initialIndex = 0, this.onTailorSelected});
 
   @override
   State<BrowseShell> createState() => _BrowseShellState();
@@ -315,9 +315,10 @@ class _BrowseShellState extends State<BrowseShell> {
                       showFabrics: false,
                     ),
                     TailorsPageBody(
-                      searchQuery: _searchNotifier,
-                      filterData: tailorsFilterData,
-                    ),
+  searchQuery: _searchNotifier,
+  filterData: tailorsFilterData,
+  onTailorSelected: widget.onTailorSelected,
+),
                     RetailersPageBody(
                       searchQuery: _searchNotifier,
                       filterData: retailersFilterData,

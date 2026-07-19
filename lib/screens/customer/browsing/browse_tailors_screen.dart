@@ -100,11 +100,13 @@ final List<Tailor> kHardcodedTailors = [
 class TailorsPageBody extends StatefulWidget {
   final ValueNotifier<String> searchQuery;
   final TailorsFilterData filterData;
+  final void Function(String tailorId)? onTailorSelected;
 
   const TailorsPageBody({
     super.key,
     required this.searchQuery,
     required this.filterData,
+     this.onTailorSelected,
   });
 
   @override
@@ -305,14 +307,20 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
     String imageUrl = tailor.profilePicture ?? 'assets/images/fab.jpg';
 
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => TailorDetailScreen(tailor: tailor),
-          ),
-        );
-      },
+     onTap: () async {
+  final result = await Navigator.push<String>(
+    context,
+    MaterialPageRoute(
+      builder: (context) => TailorDetailScreen(
+        tailor: tailor,
+        onTailorSelected: widget.onTailorSelected,
+      ),
+    ),
+  );
+  if (result != null && widget.onTailorSelected != null) {
+    widget.onTailorSelected!(result);
+  }
+},
       child: Container(
         decoration: BoxDecoration(
           color: kCardBg,

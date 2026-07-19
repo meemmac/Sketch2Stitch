@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../models/measurement.dart';
 import 'package:sketch2stitch/screens/customer/checkout_screen.dart';
+import 'browsing/browse_shell.dart';
+import 'order_session.dart';
+import 'tailoring_setup_screen.dart';
+import 'tailoring_callbacks.dart';
 
 /// ─── Local Cart Models ──────────────────────────────────────────────────
 ///
@@ -163,89 +167,172 @@ class _CartScreenState extends State<CartScreen> {
     });
   }
 
+  void _addMore() {
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const BrowseShell()),
+  );
+}
+
   void _removeLine(CartLine line) {
     setState(() => _cartLines.remove(line));
   }
 
   void _checkout() {
+  final session = OrderSession.instance;
+
+  if (session.hasActiveOrder) {
+    // Already paid / in progress — skip straight to the tailoring flow.
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => CheckoutScreen(
-          cartLines: _cartLines,
-          retailers: _retailers,
-          grandTotal: _grandTotal,
-          measurement: _measurement,
-          onOrderPlaced: _clearCart,
+        builder: (_) => TailoringSetupScreen(
+          orderId: session.orderId!,
+          orderDate: session.orderDate!,
+          savedMeasurements: [_measurement],
+          callbacks: buildTailoringCallbacks(),
         ),
       ),
     );
+    return;
   }
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => CheckoutScreen(
+        cartLines: _cartLines,
+        retailers: _retailers,
+        grandTotal: _grandTotal,
+        measurement: _measurement,
+        onOrderPlaced: _clearCart,
+      ),
+    ),
+  );
+}
 
   @override
-  Widget build(BuildContext context) {
-    final grouped = _groupedByRetailer;
-    final retailerIds = grouped.keys.toList();
+Widget build(BuildContext context) {
+  final grouped = _groupedByRetailer;
+  final retailerIds = grouped.keys.toList();
+  final hasActiveOrder = OrderSession.instance.hasActiveOrder;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF9FBF9),
-      appBar: AppBar(
-        title: const Text(
-          "My Cart",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0,
-        foregroundColor: Colors.black,
+  return Scaffold(
+    backgroundColor: const Color(0xFFF9FBF9),
+    appBar: AppBar(
+      title: const Text(
+        "My Cart",
+        style: TextStyle(fontWeight: FontWeight.bold),
       ),
-      body: _cartLines.isEmpty
-          ? _buildEmptyState()
-          : Column(
-              children: [
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    itemCount: retailerIds.length,
-                    itemBuilder: (context, index) {
-                      final retailerId = retailerIds[index];
-                      final lines = grouped[retailerId]!;
-                      return _buildAnimatedRetailerSection(
-                        retailerId,
-                        lines,
-                        index,
-                      );
-                    },
+      centerTitle: true,
+      backgroundColor: Colors.white,
+      elevation: 0,
+      foregroundColor: Colors.black,
+    ),
+    body: hasActiveOrder
+        ? _buildActiveOrderState()
+        : (_cartLines.isEmpty
+            ? _buildEmptyState()
+            : Column(
+                children: [
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      itemCount: retailerIds.length,
+                      itemBuilder: (context, index) {
+                        final retailerId = retailerIds[index];
+                        final lines = grouped[retailerId]!;
+                        return _buildAnimatedRetailerSection(
+                          retailerId,
+                          lines,
+                          index,
+                        );
+                      },
+                    ),
                   ),
-                ),
-                _buildSummaryBar(),
-              ],
-            ),
-    );
-  }
+                  _buildSummaryBar(),
+                ],
+              )),
+  );
+}
+Widget _buildEmptyState() {
+  return Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.shopping_cart_outlined,
+          size: 56,
+          color: Colors.green.shade200,
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          "Your cart is empty",
+          style: TextStyle(
+            color: Colors.black54,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
-  Widget _buildEmptyState() {
-    return Center(
+  
+
+Widget _buildActiveOrderState() {
+  final session = OrderSession.instance;
+  return Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.shopping_cart_outlined,
-            size: 56,
-            color: Colors.green.shade200,
-          ),
+          Icon(Icons.local_shipping_outlined, size: 56, color: Colors.green.shade300),
           const SizedBox(height: 12),
           const Text(
-            "Your cart is empty",
-            style: TextStyle(
-              color: Colors.black54,
-              fontWeight: FontWeight.w500,
+            "You have an order in progress",
+            style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 15),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            "Order #${session.orderId}",
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            "Finish this order before adding a new one to your cart.",
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TailoringSetupScreen(
+                    orderId: session.orderId!,
+                    orderDate: session.orderDate!,
+                    savedMeasurements: [_measurement],
+                    callbacks: buildTailoringCallbacks(),
+                  ),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade800,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
             ),
+            child: const Text("Continue Your Order"),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildAnimatedRetailerSection(
     String retailerId,
@@ -517,74 +604,94 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Widget _buildSummaryBar() {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        14,
-        16,
-        MediaQuery.of(context).padding.bottom + 14,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, -3),
+  return Container(
+    padding: EdgeInsets.fromLTRB(16, 14, 16, MediaQuery.of(context).padding.bottom + 14),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      boxShadow: [
+        BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, -3)),
+      ],
+    ),
+    child: SafeArea(
+      top: false,
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      "$_totalItems ${_totalItems == 1 ? 'item' : 'items'}",
+                      style: const TextStyle(fontSize: 12, color: Colors.black45, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(width: 8),
+                    _addMoreChip(),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  "Tk ${_grandTotal.toStringAsFixed(0)}",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.green.shade900),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          ElevatedButton(
+            onPressed: _cartLines.isEmpty ? null : _checkout,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade800,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              elevation: 0,
+            ),
+            child: const Text("Checkout", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           ),
         ],
       ),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "$_totalItems ${_totalItems == 1 ? 'item' : 'items'}",
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.black45,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    "Tk ${_grandTotal.toStringAsFixed(0)}",
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.green.shade900,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 16),
-            ElevatedButton(
-              onPressed: _cartLines.isEmpty ? null : _checkout,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green.shade800,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 16,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                elevation: 0,
-              ),
-              child: const Text(
-                "Checkout",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-            ),
-          ],
+    ),
+  );
+}
+
+Widget _addMoreChip() {
+  return GestureDetector(
+    onTap: _addMore,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.green.shade700, Colors.green.shade900],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.shade800.withValues(alpha: 0.3),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-    );
-  }
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.add, size: 12, color: Colors.white),
+          SizedBox(width: 3),
+          Text(
+            "Add More",
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 }

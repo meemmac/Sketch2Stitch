@@ -7,10 +7,11 @@ import 'package:sketch2stitch/widgets/rating_stars.dart';
 
 class TailorDetailScreen extends StatefulWidget {
   final Tailor tailor;
-
+  final void Function(String tailorId)? onTailorSelected;
   const TailorDetailScreen({
     super.key,
     required this.tailor,
+    this.onTailorSelected,
   });
 
   @override
@@ -883,12 +884,17 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   }
 
   void _navigateToBooking() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Book appointment with ${widget.tailor.name}'),
-        backgroundColor: const Color(0xFF2C5C44),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+  if (widget.onTailorSelected != null) {
+    Navigator.pop(context, widget.tailor.id);
+    return;
   }
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text('Book appointment with ${widget.tailor.name}'),
+      backgroundColor: const Color(0xFF2C5C44),
+      duration: const Duration(seconds: 2),
+    ),
+  );
+}
 }
