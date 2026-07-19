@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../../models/measurement.dart';
 import 'package:sketch2stitch/screens/customer/checkout_screen.dart';
 import 'browsing/browse_shell.dart';
+import 'order_session.dart';
+import 'tailoring_setup_screen.dart';
+import 'tailoring_callbacks.dart';
 
 /// ─── Local Cart Models ──────────────────────────────────────────────────
 ///
@@ -176,19 +179,37 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void _checkout() {
+  final session = OrderSession.instance;
+
+  if (session.hasActiveOrder) {
+    // Already paid / in progress — skip straight to the tailoring flow.
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => CheckoutScreen(
-          cartLines: _cartLines,
-          retailers: _retailers,
-          grandTotal: _grandTotal,
-          measurement: _measurement,
-          onOrderPlaced: _clearCart,
+        builder: (_) => TailoringSetupScreen(
+          orderId: session.orderId!,
+          orderDate: session.orderDate!,
+          savedMeasurements: [_measurement],
+          callbacks: buildTailoringCallbacks(),
         ),
       ),
     );
+    return;
   }
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => CheckoutScreen(
+        cartLines: _cartLines,
+        retailers: _retailers,
+        grandTotal: _grandTotal,
+        measurement: _measurement,
+        onOrderPlaced: _clearCart,
+      ),
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {

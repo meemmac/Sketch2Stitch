@@ -15,6 +15,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/measurement.dart';
 import 'measurement_screen.dart';
 import 'browsing/browse_shell.dart';
+import 'order_session.dart';
+import 'track_order.dart';
+import '../../widgets/dashboard_drawer.dart'; // AppUserRole is defined here
 
 /// ─── Backend Sync Contract ──────────────────────────────────────────────
 ///
@@ -540,27 +543,30 @@ Future<void> _requestTailorJob({required String tailorId}) async {
 }
 
   void _onTailorConfirmed() {
-    if (_tailorJob == null) return;
-    setState(() {
-      _tailorJob = _tailorJob!.copyWith(
-        status: _JobStatus.confirmed,
-        quoteAmount: 4500, // TODO: real Tailor-jobs.quoteAmount
-        estimatedDeliveryDate:
-            DateTime.now().add(const Duration(days: 10)), // TODO: real value
-      );
-    });
-  }
+  if (_tailorJob == null) return;
+  final amount = 4500.0;
+  final delivery = DateTime.now().add(const Duration(days: 10));
+  OrderSession.instance.setTailorConfirmed(amount: amount, estimatedDelivery: delivery);
+  setState(() {
+    _tailorJob = _tailorJob!.copyWith(
+      status: _JobStatus.confirmed,
+      quoteAmount: amount,
+      estimatedDeliveryDate: delivery,
+    );
+  });
+}
 
-  void _onTailorRejected() {
-    if (_tailorJob == null) return;
-    setState(() {
-      _tailorJob = _tailorJob!.copyWith(
-        status: _JobStatus.rejected,
-        rejectionReason:
-            'The tailor is fully booked this week.', // TODO: real Tailor-jobs.rejectionReason
-      );
-    });
-  }
+void _onTailorRejected() {
+  if (_tailorJob == null) return;
+  const reason = 'The tailor is fully booked this week.';
+  OrderSession.instance.setTailorRejected(reason);
+  setState(() {
+    _tailorJob = _tailorJob!.copyWith(
+      status: _JobStatus.rejected,
+      rejectionReason: reason,
+    );
+  });
+}
 
   Future<void> _simulateDeadlineExpired() async {
     await _withLoading(() => widget.callbacks.onTailorSearchExpired());
@@ -631,11 +637,10 @@ Future<void> _requestTailorJob({required String tailorId}) async {
             foregroundColor: Colors.white,
           ),
           onPressed: () {
-            Navigator.pop(context);
-            // TODO: wire a real callback (e.g. onCancelTailorJob(job.jobId))
-            // to set Tailor-jobs.status = 'cancelled' on the backend.
-            setState(() => _tailorJob = null);
-          },
+  Navigator.pop(context);
+  OrderSession.instance.cancelTailorJob();
+  setState(() => _tailorJob = null);
+},
           child: const Text("Cancel Job"),
         ),
       ],
@@ -648,45 +653,52 @@ Future<void> _requestTailorJob({required String tailorId}) async {
   /// the order id and lets the customer jump straight to tracking instead
   /// of just flashing a snackbar and popping immediately.
   void _showOrderCompleteDialog(String message) {
-    _clearLocalProgress();
-    setState(() => _currentStep = 4);
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text("Order Confirmed"),
-        content: Text(
-          "$message\n\nOrder ID: ${widget.orderId}",
-          style: const TextStyle(height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // close dialog only
-              Navigator.of(context).pop(); // leave setup screen
-            },
-            child: const Text("Stay Here"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade800,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              Navigator.pop(context); // close dialog
-              Navigator.of(context).pop(); // leave setup screen
-              // TODO: route to your real track-order screen, e.g.
-              // Navigator.pushReplacement(context, MaterialPageRoute(
-              //   builder: (_) => TrackOrderScreen(orderId: widget.orderId),
-              // ));
-            },
-            child: const Text("Track Order"),
-          ),
-        ],
+  _clearLocalProgress();
+  setState(() => _currentStep = 4);
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      title: const Text("Order Confirmed"),
+      content: Text(
+        "$message\n\nOrder ID: ${widget.orderId}",
+        style: const TextStyle(height: 1.5),
       ),
-    );
-  }
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.pop(context); // close dialog only
+            OrderSession.instance.reset();
+            Navigator.of(context).pop(); // leave setup screen
+          },
+          child: const Text("Stay Here"),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green.shade800,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: () {
+            Navigator.pop(context); // close dialog
+            OrderSession.instance.reset();
+            Navigator.of(context).pop(); // leave setup screen
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => OrderTrackScreen(
+                  orderId: widget.orderId,
+                  userRole: AppUserRole.customer,
+                ),
+              ),
+            );
+          },
+          child: const Text("Track Order"),
+        ),
+      ],
+    ),
+  );
+}
 
   // ─── Build ─────────────────────────────────────────────────────────
 

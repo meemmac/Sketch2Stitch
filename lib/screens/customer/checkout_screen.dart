@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'cart_screen.dart';
 import 'tailoring_setup_screen.dart';
 import '../../models/measurement.dart';
+import 'order_session.dart';
+import 'tailoring_callbacks.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final List<CartLine> cartLines;
@@ -55,55 +57,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _continueToTailoring() {
-    widget.onOrderPlaced(); // clears the cart now that the order is sent
+  widget.onOrderPlaced(); // clears the cart
 
-    final orderId = 'ORDER_PLACEHOLDER'; // TODO: real Orders doc id
-    final orderDate = DateTime.now();    // TODO: real Orders.orderDate
+  OrderSession.instance.startOrder();
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => TailoringSetupScreen(
-          orderId: orderId,
-          orderDate: orderDate,
-          savedMeasurements: [widget.measurement], // one customer, one profile
-          callbacks: TailoringSetupCallbacks(
-            onSkipTailoring: () async {
-              // TODO: Orders.status = 'processing';
-              // every Sub-orders.deliveryDestination = 'customer'
-            },
-            onContinueToTailor: (deadline) async {
-              // TODO: Orders.status = 'awaiting_tailor_search';
-              // tailorSelectionDeadline = deadline
-            },
-            onCreateTailorJob: ({
-              required measurementId,
-              required designIds,
-              required tailorId,
-            }) async {
-              // TODO: create Tailor-jobs doc, set Orders.status =
-              // 'tailor_pending', Sub-orders.deliveryDestination = 'tailor'
-              return 'job_id_placeholder';
-            },
-            onPayTailor: (tailorJobId) async {
-              // TODO: Payments.targetType = 'tailor' write
-            },
-            onTailorSearchExpired: () async {
-              // TODO: every Sub-orders.deliveryDestination = 'customer'
-            },
-            onFetchResumeState: () async {
-              // TODO: read-only — look up Orders.tailorSelectionDeadline
-              // and the most recent Tailor-jobs doc where orderId ==
-              // this order, map onto OrderResumeState. Return null until
-              // there's a real order id to query (orderId is still a
-              // placeholder above).
-              return null;
-            },
-          ),
-        ),
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (_) => TailoringSetupScreen(
+        orderId: OrderSession.instance.orderId!,
+        orderDate: OrderSession.instance.orderDate!,
+        savedMeasurements: [widget.measurement],
+        callbacks: buildTailoringCallbacks(),
       ),
-    );
-  }
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
