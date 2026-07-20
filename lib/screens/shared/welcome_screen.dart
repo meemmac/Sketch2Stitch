@@ -6,7 +6,6 @@ import 'login_screen.dart';
 import 'register_screen.dart';
 import 'about_us_screen.dart';
 import 'firebase_test_screen.dart';
-import '../customer/browsing/browse_shell.dart';
 import '../test_cloudinary_screen.dart';
 
 void main() {
@@ -44,7 +43,6 @@ class WelcomeScreen extends StatefulWidget {
 class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateMixin {
   late AnimationController _auroraController;
   late AnimationController _logoController;
-  late AnimationController _floatController;
 
   int _taglineIndex = 0;
   final List<String> _taglines = [
@@ -55,6 +53,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
     "Custom Fashion Made Easy",
   ];
   Timer? _taglineTimer;
+
+  final List<String> _images = [
+    'crochet.jpg', 'embroidery.jpg', 'lace.jpg', 'silk.jpg',
+    'saree.jpg', 'textile.jpg', 'tassel.jpg', 'fab.jpg'
+  ];
 
   @override
   void initState() {
@@ -69,11 +72,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
       duration: const Duration(milliseconds: 800),
     )..forward();
 
-    _floatController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 4),
-    )..repeat(reverse: true);
-
     _taglineTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       if (mounted) {
         setState(() {
@@ -87,18 +85,18 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
   void dispose() {
     _auroraController.dispose();
     _logoController.dispose();
-    _floatController.dispose();
     _taglineTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6FCF6),
       body: Stack(
         children: [
-          // ─── Aurora Background ──────────────────────────────────────────
           _buildAuroraBackground(),
 
           SafeArea(
@@ -106,43 +104,38 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Column(
                 children: [
-                  // ─── Top Row ────────────────────────────────────────────────
                   _buildTopRow(),
 
                   const Spacer(flex: 1),
 
-                  // ─── Hero Section (Title + Tagline) ─────────────────────────
-                  _buildHeroSection(),
+                  _buildHeroSection(screenHeight),
 
-                  const SizedBox(height: 20),
+                  const Spacer(flex: 1),
 
-                  // ─── Fashion Collage ────────────────────────────────────────
-                  _buildFashionCollage(),
+                  _buildHorizontalGallery(screenHeight),
 
-                  const Spacer(flex: 2),
+                  const Spacer(flex: 1),
 
-                  // ─── Action Section ─────────────────────────────────────────
                   _buildActionButtons(),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
-                  // ─── Stakeholder Chips ──────────────────────────────────────
                   _buildStakeholderChips(),
 
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                 ],
               ),
             ),
           ),
 
-          // ─── Hidden Debug Icon ──────────────────────────────────────────
+          // Hidden Debug Icon
           Positioned(
             bottom: 10,
             left: 10,
             child: Opacity(
               opacity: 0.2,
               child: IconButton(
-                icon: const Icon(Icons.settings_input_component, size: 16),
+                icon: const Icon(Icons.settings_input_component, size: 14),
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const FirebaseTestScreen()),
@@ -177,14 +170,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                 math.sin(_auroraController.value * 2 * math.pi) * 80 + 300,
               ),
             ),
-            _buildAuroraBlob(
-              color: const Color(0xFF95D5B2).withAlpha(100),
-              size: 450,
-              offset: Offset(
-                math.sin(_auroraController.value * 2 * math.pi) * 100 + 200,
-                -100,
-              ),
-            ),
             BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
               child: Container(color: Colors.transparent),
@@ -204,9 +189,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [color, color.withAlpha(0)],
-          ),
+          gradient: RadialGradient(colors: [color, color.withAlpha(0)]),
         ),
       ),
     );
@@ -214,30 +197,15 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
 
   Widget _buildTopRow() {
     return Padding(
-      padding: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.only(top: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           ScaleTransition(
-            scale: CurvedAnimation(parent: _logoController, curve: Curves.elasticOut),
+            scale: CurvedAnimation(parent: _logoController, curve: Curves.easeOutBack),
             child: FadeTransition(
               opacity: _logoController,
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF40916C).withValues(alpha: 0.2),
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                    )
-                  ],
-                ),
-                child: Image.asset(
-                  'assets/images/transparent_logo.png',
-                  height: 50,
-                ),
-              ),
+              child: Image.asset('assets/images/transparent_logo.png', height: 42),
             ),
           ),
           _buildGlassIconButton(
@@ -252,44 +220,33 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
     );
   }
 
-  Widget _buildHeroSection() {
+  Widget _buildHeroSection(double screenHeight) {
     return Column(
       children: [
-        const Text(
+        Text(
           "Sketch2Stitch",
           style: TextStyle(
-            fontSize: 48,
+            fontSize: screenHeight < 700 ? 36 : 44,
             fontWeight: FontWeight.w900,
-            color: Color(0xFF1B4332),
-            letterSpacing: -2,
+            color: const Color(0xFF1B4332),
+            letterSpacing: -1.5,
             height: 1,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         SizedBox(
-          height: 24,
+          height: 22,
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 500),
-            transitionBuilder: (Widget child, Animation<double> animation) {
-              return FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0, 0.5),
-                    end: Offset.zero,
-                  ).animate(animation),
-                  child: child,
-                ),
-              );
-            },
             child: Text(
               _taglines[_taglineIndex],
               key: ValueKey<int>(_taglineIndex),
+              textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 color: Color(0xFF2D6A4F),
                 fontWeight: FontWeight.w500,
-                letterSpacing: 0.5,
+                letterSpacing: 0.2,
               ),
             ),
           ),
@@ -298,61 +255,38 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
     );
   }
 
-  Widget _buildFashionCollage() {
-    return SizedBox(
-      height: 320,
-      width: double.infinity,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          _buildCollageItem('crochet.jpg', -15, -100, -80, 0.9),
-          _buildCollageItem('embroidery.jpg', 10, 80, -100, 1.1),
-          _buildCollageItem('lace.jpg', -5, 120, 20, 1.0),
-          _buildCollageItem('silk.jpg', 8, -120, 60, 1.2),
-          _buildCollageItem('saree.jpg', -12, 40, 140, 0.8),
-          _buildCollageItem('textile.jpg', 5, -60, -160, 1.0),
-          _buildCollageItem('tassel.jpg', 15, 150, -180, 0.7),
-          // Main center image
-          _buildCollageItem('fab.jpg', 0, 0, 10, 1.4, isCenter: true),
-        ],
-      ),
-    );
-  }
+  Widget _buildHorizontalGallery(double screenHeight) {
+    double galleryHeight = screenHeight * 0.28;
+    if (galleryHeight > 240) galleryHeight = 240;
 
-  Widget _buildCollageItem(String asset, double rotation, double x, double y, double scale, {bool isCenter = false}) {
-    return AnimatedBuilder(
-      animation: _floatController,
-      builder: (context, child) {
-        double floatY = math.sin(_floatController.value * 2 * math.pi + (x.abs() * 0.01)) * 10;
-        return Transform.translate(
-          offset: Offset(x, y + floatY),
-          child: Transform.rotate(
-            angle: rotation * math.pi / 180,
-            child: Transform.scale(
-              scale: scale,
-              child: Container(
-                width: isCenter ? 140 : 100,
-                height: isCenter ? 180 : 120,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  image: DecorationImage(
-                    image: AssetImage('assets/images/$asset'),
-                    fit: BoxFit.cover,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.15),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    )
-                  ],
-                  border: Border.all(color: Colors.white.withAlpha(180), width: 2),
-                ),
+    return SizedBox(
+      height: galleryHeight,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        itemCount: _images.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 16),
+        itemBuilder: (context, index) {
+          return Container(
+            width: galleryHeight * 0.75,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              image: DecorationImage(
+                image: AssetImage('assets/images/${_images[index]}'),
+                fit: BoxFit.cover,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                )
+              ],
+              border: Border.all(color: Colors.white.withAlpha(180), width: 1.5),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -366,20 +300,17 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
               () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterScreen())),
           hasGlow: true,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         _buildGlassButton(
           "Login",
               () => Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen())),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 4),
         TextButton.icon(
           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AboutUsScreen())),
-          icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-          label: const Text(
-            "About Us",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          style: TextButton.styleFrom(foregroundColor: const Color(0xFF1B4332)),
+          icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+          label: const Text("About Us", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          style: TextButton.styleFrom(foregroundColor: const Color(0xFF1B4332), padding: EdgeInsets.zero),
         ),
       ],
     );
@@ -388,16 +319,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
   Widget _buildPrimaryButton(String text, Color bg, Color textColor, VoidCallback onTap, {bool hasGlow = false}) {
     return Container(
       width: double.infinity,
-      height: 64,
+      height: 56,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: hasGlow ? [
-          BoxShadow(
-            color: bg.withValues(alpha: 0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          )
-        ] : [],
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: hasGlow ? [BoxShadow(color: bg.withValues(alpha: 0.25), blurRadius: 12, offset: const Offset(0, 6))] : [],
       ),
       child: ElevatedButton(
         onPressed: onTap,
@@ -405,38 +330,30 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
           backgroundColor: bg,
           foregroundColor: textColor,
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         ),
-        child: Text(text, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 1)),
+        child: Text(text, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
       ),
     );
   }
 
   Widget _buildGlassButton(String text, VoidCallback onTap) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(18),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
         child: InkWell(
           onTap: onTap,
           child: Container(
             width: double.infinity,
-            height: 64,
+            height: 56,
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(100),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withAlpha(150), width: 1.5),
+              color: Colors.white.withAlpha(80),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.white.withAlpha(120), width: 1.2),
             ),
             alignment: Alignment.center,
-            child: Text(
-              text,
-              style: const TextStyle(
-                color: Color(0xFF1B4332),
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1,
-              ),
-            ),
+            child: Text(text, style: const TextStyle(color: Color(0xFF1B4332), fontSize: 17, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
           ),
         ),
       ),
@@ -456,29 +373,22 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
 
   Widget _buildStakeholderChip(String label, IconData icon) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(30),
+      borderRadius: BorderRadius.circular(25),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(120),
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: Colors.white.withAlpha(100), width: 1),
+            color: Colors.white.withAlpha(100),
+            borderRadius: BorderRadius.circular(25),
+            border: Border.all(color: Colors.white.withAlpha(80), width: 1),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 16, color: const Color(0xFF2D6A4F)),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1B4332),
-                ),
-              ),
+              Icon(icon, size: 14, color: const Color(0xFF2D6A4F)),
+              const SizedBox(width: 4),
+              Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1B4332))),
             ],
           ),
         ),
@@ -488,18 +398,19 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
 
   Widget _buildGlassIconButton({required IconData icon, required VoidCallback onPressed}) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(15),
+      borderRadius: BorderRadius.circular(12),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white.withAlpha(100),
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: Colors.white.withAlpha(150), width: 1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white.withAlpha(120), width: 1),
           ),
           child: IconButton(
-            icon: Icon(icon, color: const Color(0xFF2D6A4F)),
+            icon: Icon(icon, color: const Color(0xFF2D6A4F), size: 20),
             onPressed: onPressed,
+            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
           ),
         ),
       ),
