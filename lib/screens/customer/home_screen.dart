@@ -278,14 +278,14 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
             ],
           ),
           // Track Order icon - only for customer
-          if (_currentRole == AppUserRole.customer)
-            IconButton(
-              icon: const Icon(Icons.track_changes_rounded, color: Colors.black87),
-              iconSize: 28,
-              onPressed: () {
-                _openTrackOrder();
-              },
-            ),
+          // if (_currentRole == AppUserRole.customer)
+          //   IconButton(
+          //     icon: const Icon(Icons.track_changes_rounded, color: Colors.black87),
+          //     iconSize: 28,
+          //     onPressed: () {
+          //       _openTrackOrder();
+          //     },
+          //   ),
           // Show cart icon only for customer
           if (_currentRole == AppUserRole.customer)
             IconButton(
