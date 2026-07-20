@@ -16,6 +16,7 @@ import 'virtual_trial_screen.dart';
 import 'notification_screen.dart' ;
 import 'package:sketch2stitch/screens/retailer/inventory_screen.dart';
 import 'track_order.dart';
+import 'order_list_screen.dart';
 
 class UnifiedHomeScreen extends StatefulWidget {
   final AppUserRole initialRole;
@@ -86,23 +87,16 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     }
 
   }
-  void _openTrackOrder() {
-    // Navigate to Order Track Screen
+  void _openOrderList() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => OrderTrackScreen(
-          orderId: 'OR05',
-          status: 'Pending Retailer Confirmation',
-          estimatedDelivery: '25 Dec 2026',
-          lastUpdated: '22 Dec 2026',
-          deliveryAddress: 'The Shakespeare Centre, Henley Street, CV37 6QW Stratford-upon-Avon, UK.',
-          userRole: AppUserRole.customer,
+        builder: (context) => OrderListScreen(
+          userRole: _currentRole,
         ),
       ),
     );
   }
-
   void _openBrowseTab(int index) {
     Navigator.push(
       context,
@@ -277,16 +271,17 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                 ),
             ],
           ),
-          // Track Order icon - only for customer
-          // if (_currentRole == AppUserRole.customer)
-          //   IconButton(
-          //     icon: const Icon(Icons.track_changes_rounded, color: Colors.black87),
-          //     iconSize: 28,
-          //     onPressed: () {
-          //       _openTrackOrder();
-          //     },
-          //   ),
-          // Show cart icon only for customer
+        //  Track Order icon - only for customer
+          if (_currentRole == AppUserRole.customer)
+            IconButton(
+              icon: const Icon(Icons.local_shipping_rounded, color: Colors.black87),
+              iconSize: 28,
+              onPressed: () {
+                _openOrderList();
+              },
+                tooltip: 'My Orders',
+            ),
+        //  Show cart icon only for customer
           if (_currentRole == AppUserRole.customer)
             IconButton(
               icon: const Icon(Icons.shopping_cart_outlined, color: Colors.black87),

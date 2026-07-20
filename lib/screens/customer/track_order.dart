@@ -74,7 +74,8 @@ enum TrackEventType {
   shippingToTailor,
   shippingToCustomer,
   orderCompleted,
-  orderCancelled,
+  orderConfirmedRetailer,
+  orderConfirmedTailor, orderCancelled,
 }
 
 class TrackEvent {
@@ -212,6 +213,7 @@ class OrderTrackScreen extends StatelessWidget {
   }
 
   // ---------------- Top bar ----------------
+  // ---------------- Top bar ----------------
   Widget _buildTopBar(BuildContext context) {
     return Container(
       width: double.infinity,
@@ -236,17 +238,9 @@ class OrderTrackScreen extends StatelessWidget {
           const Text('Sketch2Stitch', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87)),
           const Spacer(),
           TextButton(
-            onPressed: (){
-              Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const UnifiedHomeScreen(
-                initialRole: AppUserRole.customer,
-              ),
-            ),
-                (route) => route.isFirst,
-          );
-    },
+            onPressed: () {
+              Navigator.pop(context); // Go back to Order List
+            },
             style: TextButton.styleFrom(
               backgroundColor: Colors.white.withOpacity(0.85),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -488,6 +482,16 @@ class OrderTrackScreen extends StatelessWidget {
           icon: Icons.cancel_rounded,
           verb: 'Order Cancelled',
         );
+      case TrackEventType.orderConfirmedRetailer:
+        return _TrackEventStyle(
+            color: Colors.blue.shade600,
+            icon: Icons.storefront_rounded,
+            verb: 'Order Confirmed from Retailer');
+      case TrackEventType.orderConfirmedTailor:
+        return _TrackEventStyle(
+            color: Colors.purple.shade600,
+            icon: Icons.design_services_rounded,
+            verb: 'Order Confirmed from Tailor');
     }
   }
 }
