@@ -43,6 +43,7 @@ class WelcomeScreen extends StatefulWidget {
 class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateMixin {
   late AnimationController _silkController;
   late AnimationController _logoController;
+  late PageController _pageController;
 
   int _taglineIndex = 0;
   final List<String> _taglines = [
@@ -53,6 +54,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
     "Custom Fashion Made Easy",
   ];
   Timer? _taglineTimer;
+  Timer? _slideshowTimer;
 
   final List<String> _images = [
     'crochet.jpg',
@@ -81,11 +83,22 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
       duration: const Duration(milliseconds: 800),
     )..forward();
 
-    _taglineTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+    _pageController = PageController(viewportFraction: 0.5, initialPage: 1000);
+
+    _taglineTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       if (mounted) {
         setState(() {
           _taglineIndex = (_taglineIndex + 1) % _taglines.length;
         });
+      }
+    });
+
+    _slideshowTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (mounted && _pageController.hasClients) {
+        _pageController.nextPage(
+          duration: const Duration(milliseconds: 1000),
+          curve: Curves.easeInOutCubic,
+        );
       }
     });
   }
@@ -94,7 +107,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
   void dispose() {
     _silkController.dispose();
     _logoController.dispose();
+    _pageController.dispose();
     _taglineTimer?.cancel();
+    _slideshowTimer?.cancel();
     super.dispose();
   }
 
@@ -106,7 +121,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
       backgroundColor: const Color(0xFFF6FCF6),
       body: Stack(
         children: [
-          // ─── Silk Background ───────────────────────────────────────────
           _buildSilkBackground(),
 
           SafeArea(
@@ -122,12 +136,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
 
                   const Spacer(flex: 1),
 
-                  // ─── Bended Image Scroll ────────────────────────────────
-                  _buildBendedImageScroll(),
+                  _buildBendedSlideshow(),
 
                   const Spacer(flex: 2),
 
-                  // ─── Action Section (Specular Style) ────────────────────
                   _buildActionButtons(),
 
                   const SizedBox(height: 16),
@@ -140,7 +152,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
             ),
           ),
 
-          // Hidden Debug Icon
           Positioned(
             bottom: 10,
             left: 10,
@@ -203,30 +214,46 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
   Widget _buildHeroSection(double screenHeight) {
     return Column(
       children: [
-        Text(
-          "Sketch2Stitch",
-          style: TextStyle(
-            fontSize: screenHeight < 700 ? 38 : 46,
-            fontWeight: FontWeight.w900,
-            color: const Color(0xFF1B4332),
-            letterSpacing: -1.8,
-            height: 1,
+        FadeTransition(
+          opacity: _logoController,
+          child: SlideTransition(
+            position: Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero)
+                .animate(CurvedAnimation(parent: _logoController, curve: Curves.easeOutCubic)),
+            child: Text(
+              "Sketch2Stitch",
+              style: TextStyle(
+                fontSize: screenHeight < 700 ? 38 : 46,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF1B4332),
+                letterSpacing: -1.8,
+                height: 1,
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         SizedBox(
-          height: 24,
+          height: 28,
           child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 500),
+            duration: const Duration(milliseconds: 600),
+            transitionBuilder: (Widget child, Animation<double> animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(begin: const Offset(0, 0.4), end: Offset.zero).animate(animation),
+                  child: child,
+                ),
+              );
+            },
             child: Text(
               _taglines[_taglineIndex],
               key: ValueKey<int>(_taglineIndex),
               textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 17,
+                fontSize: 18,
                 color: Color(0xFF2D6A4F),
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.3,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.2,
               ),
             ),
           ),
@@ -235,35 +262,50 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
     );
   }
 
-  Widget _buildBendedImageScroll() {
+  Widget _buildBendedSlideshow() {
     return SizedBox(
       height: 200,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          PageView.builder(
+            controller: _pageController,
             physics: const BouncingScrollPhysics(),
-            itemCount: _images.length,
             itemBuilder: (context, index) {
-              return Container(
-                width: 150,
-                margin: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  image: DecorationImage(
-                    image: AssetImage('assets/images/${_images[index]}'),
-                    fit: BoxFit.cover,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
+              final imgIndex = index % _images.length;
+              return AnimatedBuilder(
+                animation: _pageController,
+                builder: (context, child) {
+                  double value = 1.0;
+                  if (_pageController.position.haveDimensions) {
+                    value = _pageController.page! - index;
+                    value = (1 - (value.abs() * 0.2)).clamp(0.0, 1.0);
+                  }
+                  return Center(
+                    child: Transform.scale(
+                      scale: Curves.easeOut.transform(value),
+                      child: Container(
+                        width: 160,
+                        height: 180,
+                        margin: const EdgeInsets.symmetric(horizontal: 10),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(28),
+                          image: DecorationImage(
+                            image: AssetImage('assets/images/${_images[imgIndex]}'),
+                            fit: BoxFit.cover,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.15),
+                              blurRadius: 15,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ],
-                ),
+                  );
+                },
               );
             },
           ),
@@ -495,7 +537,6 @@ class SpecularPainter extends CustomPainter {
     final rect = Offset.zero & size;
     final RRect rrect = RRect.fromRectAndRadius(rect, const Radius.circular(18));
     
-    // Specular shine movement simulation
     final double pos = -1.0 + (animationValue * 3.0);
     
     final Paint shinePaint = Paint()
@@ -514,10 +555,8 @@ class SpecularPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
 
-    // Draw rim shine
     canvas.drawRRect(rrect, shinePaint);
     
-    // Gaussian-like soft glow behind the line
     final Paint glowPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment(pos - 0.4, -1.0),
@@ -547,10 +586,8 @@ class SilkPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Background layer
     canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFFF6FCF6));
 
-    // Multiple flowing "silk" paths
     for (int i = 0; i < 3; i++) {
       final path = Path();
       final double yBase = size.height * (0.3 + i * 0.25);
