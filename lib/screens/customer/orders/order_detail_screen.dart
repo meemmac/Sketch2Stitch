@@ -1,0 +1,656 @@
+import 'package:flutter/material.dart';
+
+class OrderItem {
+  final String name;
+  final int quantity;
+  final String imagePath;
+  final String color;
+  final String description;
+  final String? itemComment;
+  final bool canWash;
+  final bool canBleach;
+  final bool canDryClean;
+  final bool canTumbleDry;
+  final String ironLevel;
+  final double price;
+
+  const OrderItem({
+    required this.name,
+    required this.quantity,
+    required this.imagePath,
+    required this.color,
+    required this.price,
+    this.description = "Premium quality material with excellent durability and comfort.",
+    this.itemComment,
+    this.canWash = true,
+    this.canBleach = false,
+    this.canDryClean = true,
+    this.canTumbleDry = true,
+    this.ironLevel = "Medium",
+  });
+}
+
+class CustomerOrder {
+  final String id;
+  final String retailerName;
+  final List<OrderItem> items;
+  final double amount;
+  final DateTime orderDate;
+  DateTime? deliveryDate;
+  String status;
+  bool isDelivered;
+  final String? review;
+  final double? rating;
+  final String deliveryAddress;
+
+  CustomerOrder({
+    required this.id,
+    required this.retailerName,
+    required this.items,
+    required this.amount,
+    required this.orderDate,
+    required this.status,
+    required this.isDelivered,
+    required this.deliveryAddress,
+    this.deliveryDate,
+    this.review,
+    this.rating,
+  });
+
+  int get totalQuantity => items.fold(0, (sum, item) => sum + item.quantity);
+}
+
+enum OrderFilterPreset { last3Months, last6Months, custom }
+
+class OrderDetailScreen extends StatefulWidget {
+  const OrderDetailScreen({super.key});
+
+  @override
+  State<OrderDetailScreen> createState() => _OrderDetailScreenState();
+}
+
+class _OrderDetailScreenState extends State<OrderDetailScreen> {
+  OrderFilterPreset _filterPreset = OrderFilterPreset.last3Months;
+  DateTime? _customStartDate;
+  DateTime? _customEndDate;
+  bool _showOngoing = true;
+
+  final Color primaryGreen = const Color(0xFF4F7942);
+
+  late final List<CustomerOrder> _orders = <CustomerOrder>[
+    CustomerOrder(
+      id: "ORD-9921",
+      retailerName: "Zaroon Fabrics",
+      amount: 4500,
+      orderDate: DateTime.now().subtract(const Duration(days: 5)),
+      status: "Preparing",
+      isDelivered: false,
+      deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
+      items: [
+        const OrderItem(
+          name: "Premium Linen",
+          quantity: 3,
+          price: 3000,
+          imagePath: "assets/images/fabrics_rolled.jpg",
+          color: "Cream",
+          description: "High-quality linen fabric for summer wear.",
+        ),
+        const OrderItem(
+          name: "Cotton Thread Set",
+          quantity: 1,
+          price: 1500,
+          imagePath: "assets/images/denim.jpg",
+          color: "Mixed",
+        ),
+      ],
+    ),
+    CustomerOrder(
+      id: "ORD-9854",
+      retailerName: "Heritage Silk",
+      amount: 8200,
+      orderDate: DateTime.now().subtract(const Duration(days: 20)),
+      status: "Packed",
+      isDelivered: false,
+      deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
+      items: [
+        const OrderItem(
+          name: "Pure Rajshahi Silk",
+          quantity: 1,
+          price: 8200,
+          imagePath: "assets/images/silk.jpg",
+          color: "Deep Red",
+          description: "Traditional Rajshahi silk with gold border.",
+        ),
+      ],
+    ),
+    CustomerOrder(
+      id: "ORD-9712",
+      retailerName: "FabriCo",
+      amount: 3200,
+      orderDate: DateTime.now().subtract(const Duration(days: 45)),
+      deliveryDate: DateTime.now().subtract(const Duration(days: 38)),
+      status: "Delivered",
+      isDelivered: true,
+      deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
+      review: "Excellent quality and fast delivery. Very satisfied!",
+      rating: 5.0,
+      items: [
+        const OrderItem(
+          name: "Printed Voile",
+          quantity: 4,
+          price: 3200,
+          imagePath: "assets/images/gorgeous.jpg",
+          color: "Floral Blue",
+        ),
+      ],
+    ),
+  ];
+
+  DateTime get _startDate {
+    final today = DateTime.now();
+    switch (_filterPreset) {
+      case OrderFilterPreset.last3Months:
+        return DateTime(today.year, today.month - 3, today.day);
+      case OrderFilterPreset.last6Months:
+        return DateTime(today.year, today.month - 6, today.day);
+      case OrderFilterPreset.custom:
+        return _customStartDate ?? DateTime(today.year, today.month - 3, today.day);
+    }
+  }
+
+  DateTime get _endDate {
+    final today = DateTime.now();
+    if (_filterPreset == OrderFilterPreset.custom && _customEndDate != null) {
+      return _customEndDate!;
+    }
+    return DateTime(today.year, today.month, today.day, 23, 59, 59);
+  }
+
+  String get _filterLabel {
+    switch (_filterPreset) {
+      case OrderFilterPreset.last3Months:
+        return "Last 3 months";
+      case OrderFilterPreset.last6Months:
+        return "Last 6 months";
+      case OrderFilterPreset.custom:
+        if (_customStartDate == null || _customEndDate == null) return "Custom dates";
+        return "${_formatDate(_customStartDate!)} - ${_formatDate(_customEndDate!)}";
+    }
+  }
+
+  List<CustomerOrder> get _filteredOrders {
+    return _orders.where((order) {
+      final date = order.orderDate;
+      return !date.isBefore(_startDate) && !date.isAfter(_endDate);
+    }).toList();
+  }
+
+  List<CustomerOrder> get _ongoingOrders => _filteredOrders.where((o) => !o.isDelivered).toList();
+  List<CustomerOrder> get _deliveredOrders => _filteredOrders.where((o) => o.isDelivered).toList();
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final horizontalPadding = screenWidth > 600 ? screenWidth * 0.08 : 16.0;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF9FBF9),
+      body: SafeArea(
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(horizontalPadding, 18, horizontalPadding, 24),
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "My Orders",
+                    style: TextStyle(
+                      fontSize: screenWidth > 400 ? 30 : 24,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+                _filterButton(),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: _sectionToggle(
+                    label: "Ongoing",
+                    isSelected: _showOngoing,
+                    count: _ongoingOrders.length,
+                    onTap: () => setState(() => _showOngoing = true),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _sectionToggle(
+                    label: "Past Orders",
+                    isSelected: !_showOngoing,
+                    count: _deliveredOrders.length,
+                    onTap: () => setState(() => _showOngoing = false),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            if (_showOngoing)
+              _ordersSection(
+                title: "Ongoing Orders",
+                icon: Icons.local_shipping_outlined,
+                orders: _ongoingOrders,
+                emptyText: "You have no active orders",
+              )
+            else
+              _ordersSection(
+                title: "Delivered Orders",
+                icon: Icons.check_circle_outline,
+                orders: _deliveredOrders,
+                emptyText: "No past orders found",
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _filterButton() {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: _showFilterSheet,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.green.shade100),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.tune, color: primaryGreen, size: 20),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                _filterLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: primaryGreen,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showFilterSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 42, height: 4,
+                margin: const EdgeInsets.only(bottom: 18),
+                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const Text("Filter orders", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 14),
+            _filterOptionTile("Last 3 months", "Show recent purchases", OrderFilterPreset.last3Months),
+            _filterOptionTile("Last 6 months", "View older history", OrderFilterPreset.last6Months),
+            _filterOptionTile("Custom Range", "Pick specific dates", OrderFilterPreset.custom, isCustom: true),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _filterOptionTile(String title, String subtitle, OrderFilterPreset preset, {bool isCustom = false}) {
+    final bool selected = _filterPreset == preset;
+    return ListTile(
+      onTap: () {
+        Navigator.pop(context);
+        if (isCustom) {
+          _pickCustomDateRange();
+        } else {
+          setState(() => _filterPreset = preset);
+        }
+      },
+      leading: CircleAvatar(
+        backgroundColor: selected ? primaryGreen : Colors.green.shade50,
+        child: Icon(selected ? Icons.check : Icons.calendar_month, color: selected ? Colors.white : primaryGreen, size: 20),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+      subtitle: Text(subtitle),
+    );
+  }
+
+  Future<void> _pickCustomDateRange() async {
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(colorScheme: Theme.of(context).colorScheme.copyWith(primary: primaryGreen)),
+        child: child!,
+      ),
+    );
+    if (range != null) {
+      setState(() {
+        _filterPreset = OrderFilterPreset.custom;
+        _customStartDate = range.start;
+        _customEndDate = range.end.add(const Duration(hours: 23, minutes: 59));
+      });
+    }
+  }
+
+  Widget _sectionToggle({required String label, required bool isSelected, required int count, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected ? primaryGreen : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: isSelected ? primaryGreen : Colors.green.shade100, width: isSelected ? 1.5 : 1),
+          boxShadow: isSelected ? [BoxShadow(color: primaryGreen.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 6))] : [],
+        ),
+        child: Column(
+          children: [
+            Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.green.shade900, fontSize: 16, fontWeight: FontWeight.w900)),
+            Text("$count orders", style: TextStyle(color: isSelected ? Colors.white.withValues(alpha: 0.8) : Colors.green.shade700, fontSize: 12, fontWeight: FontWeight.w700)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _ordersSection({required String title, required IconData icon, required List<CustomerOrder> orders, required String emptyText}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: primaryGreen, size: 20),
+            const SizedBox(width: 8),
+            Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (orders.isEmpty)
+          _emptyOrdersCard(emptyText)
+        else
+          ...orders.map((o) => Padding(padding: const EdgeInsets.only(bottom: 12), child: _orderCard(o))),
+      ],
+    );
+  }
+
+  Widget _emptyOrdersCard(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 30),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
+      child: Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700)),
+    );
+  }
+
+  Widget _orderCard(CustomerOrder order) {
+    final statusColor = order.isDelivered ? primaryGreen : Colors.blueAccent;
+    final firstItem = order.items.first;
+
+    return GestureDetector(
+      onTap: () => _showOrderDetail(order),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Image.asset(
+                    firstItem.imagePath, width: 52, height: 52, fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(width: 52, height: 52, color: Colors.green.shade50, child: Icon(Icons.shopping_bag, color: primaryGreen)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(order.id, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+                      Text(order.retailerName, style: const TextStyle(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(999)),
+                  child: Text(order.status, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w900)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                _orderInfo(Icons.shopping_bag_outlined, "${order.totalQuantity} Items"),
+                const SizedBox(width: 10),
+                _orderInfo(Icons.calendar_today_outlined, _formatDate(order.orderDate)),
+                const Spacer(),
+                Text("Tk ${order.amount.toInt()}", style: TextStyle(color: Colors.green.shade900, fontSize: 16, fontWeight: FontWeight.w900)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _orderInfo(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: Colors.black45),
+        const SizedBox(width: 4),
+        Text(text, style: const TextStyle(color: Colors.black54, fontSize: 11, fontWeight: FontWeight.w700)),
+      ],
+    );
+  }
+
+  void _showOrderDetail(CustomerOrder order) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (_, scrollController) => Container(
+          decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+          padding: const EdgeInsets.all(24),
+          child: ListView(
+            controller: scrollController,
+            children: [
+              Center(child: Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 20), decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text("Order Details", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                    Text("ID: ${order.id}", style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+                  ]),
+                  _infoBadge(order.status, order.isDelivered ? primaryGreen.withValues(alpha: 0.1) : Colors.blueAccent.withValues(alpha: 0.1), order.isDelivered ? primaryGreen : Colors.blueAccent),
+                ],
+              ),
+              const SizedBox(height: 25),
+              const Text("Products", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              ...order.items.map((item) => _itemPreviewCard(item)),
+              const SizedBox(height: 30),
+              const Text("Order Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              _detailRow("Retailer", order.retailerName),
+              _detailRow("Total Items", "${order.totalQuantity} units"),
+              _detailRow("Order Date", _formatDate(order.orderDate)),
+              if (order.deliveryDate != null) _detailRow("Delivery Date", _formatDate(order.deliveryDate!)),
+              const SizedBox(height: 20),
+              const Text("Shipping Address", style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade200)),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Icon(Icons.location_on_outlined, size: 16, color: primaryGreen),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(order.deliveryAddress, style: const TextStyle(fontSize: 13, height: 1.4, fontWeight: FontWeight.w600))),
+                ]),
+              ),
+              const Divider(height: 48),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("Grand Total", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                  Text("Tk ${order.amount.toInt()}", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.green.shade800)),
+                ],
+              ),
+              if (order.isDelivered && order.review != null) ...[
+                const SizedBox(height: 35),
+                const Text("Your Review", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                _reviewCard(order),
+              ],
+              const SizedBox(height: 40),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _itemPreviewCard(OrderItem item) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade200)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.asset(
+                  item.imagePath, width: 60, height: 60, fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(width: 60, height: 60, color: Colors.green.shade50, child: Icon(Icons.shopping_bag, color: primaryGreen)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(item.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text("Qty: ${item.quantity} | Color: ${item.color}", style: const TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w600)),
+                ]),
+              ),
+              Text("Tk ${item.price.toInt()}", style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.w900)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text("Care Instructions", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              _careTag(Icons.wash, "Wash", item.canWash),
+              _careTag(Icons.biotech, "Bleach", item.canBleach),
+              _careTag(Icons.dry_cleaning, "Dry Clean", item.canDryClean),
+              _careTag(Icons.iron, "Iron: ${item.ironLevel}", true),
+            ]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _careTag(IconData icon, String label, bool isOk) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: isOk ? Colors.green.shade50 : Colors.grey.shade100, borderRadius: BorderRadius.circular(6)),
+      child: Row(children: [
+        Icon(icon, size: 12, color: isOk ? Colors.green.shade700 : Colors.grey),
+        const SizedBox(width: 4),
+        Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isOk ? Colors.green.shade800 : Colors.grey)),
+      ]),
+    );
+  }
+
+  Widget _infoBadge(String label, Color bg, Color text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+      child: Text(label, style: TextStyle(color: text, fontSize: 12, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Text(label, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
+      ]),
+    );
+  }
+
+  Widget _reviewCard(CustomerOrder order) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.blue.shade100)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          ...List.generate(5, (index) => Icon(index < (order.rating ?? 0).floor() ? Icons.star : Icons.star_border, color: Colors.blue.shade800, size: 20)),
+          const SizedBox(width: 8),
+          Text(order.rating?.toString() ?? "0.0", style: TextStyle(color: Colors.blue.shade900, fontWeight: FontWeight.w900, fontSize: 16)),
+        ]),
+        const SizedBox(height: 10),
+        Text("\"${order.review}\"", style: TextStyle(color: Colors.blue.shade900, fontSize: 14, fontStyle: FontStyle.italic, height: 1.4, fontWeight: FontWeight.w600)),
+      ]),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return "${date.day} ${months[date.month - 1]} ${date.year}";
+  }
+}
