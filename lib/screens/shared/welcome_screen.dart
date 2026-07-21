@@ -24,21 +24,21 @@ class AppleCardClipper extends CustomClipper<Path> {
     const double curveHeight = 35.0;
 
     path.moveTo(0, curveHeight);
-    
+
     // Top Arc
     path.quadraticBezierTo(
-      width / 2, -curveHeight / 2, 
-      width, curveHeight
+        width / 2, -curveHeight / 2,
+        width, curveHeight
     );
-    
+
     path.lineTo(width, height - curveHeight);
-    
+
     // Bottom Arc
     path.quadraticBezierTo(
-      width / 2, height + curveHeight / 2, 
-      0, height - curveHeight
+        width / 2, height + curveHeight / 2,
+        0, height - curveHeight
     );
-    
+
     path.close();
     return path;
   }
@@ -467,10 +467,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
               Icon(icon, size: 14, color: const Color(0xFF2D6A4F)),
               const SizedBox(width: 5),
               Text(
-                label, 
+                label,
                 style: const TextStyle(
-                  fontSize: 12, 
-                  fontWeight: FontWeight.bold, 
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
                   color: Color(0xFF1B4332),
                 ),
               ),
@@ -617,9 +617,9 @@ class SpecularPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
     final RRect rrect = RRect.fromRectAndRadius(rect, const Radius.circular(14));
-    
+
     final double pos = -1.0 + (animationValue * 3.0);
-    
+
     final Paint shinePaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment(pos - 0.2, -1.0),
@@ -637,7 +637,7 @@ class SpecularPainter extends CustomPainter {
       ..strokeWidth = 1.5;
 
     canvas.drawRRect(rrect, shinePaint);
-    
+
     final Paint glowPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment(pos - 0.4, -1.0),
@@ -651,7 +651,7 @@ class SpecularPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.0
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
-      
+
     canvas.drawRRect(rrect, glowPaint);
   }
 
@@ -676,7 +676,7 @@ class AuroraPainter extends CustomPainter {
 
     // We draw elongated "ribbons" instead of simple circles.
     // Each ribbon has its own animation and color profile.
-    
+
     // Ribbon 1: Emerald (Primary Aurora)
     _drawRibbon(
       canvas,
@@ -723,14 +723,14 @@ class AuroraPainter extends CustomPainter {
   }
 
   void _drawRibbon(
-    Canvas canvas,
-    Size size,
-    Color color,
-    Offset start,
-    Offset end,
-    double offset,
-    double blurSigma,
-  ) {
+      Canvas canvas,
+      Size size,
+      Color color,
+      Offset start,
+      Offset end,
+      double offset,
+      double blurSigma,
+      ) {
     final Paint paint = Paint()
       ..color = color
       ..strokeWidth = size.width * 0.4
