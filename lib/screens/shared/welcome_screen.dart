@@ -12,6 +12,41 @@ void main() {
   runApp(const Sketch2StitchApp());
 }
 
+class AppleCardClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    final width = size.width;
+    final height = size.height;
+
+    // We create a smooth arc at the top and bottom
+    // The curve starts from the sides and peaks in the middle
+    const double curveHeight = 35.0;
+
+    path.moveTo(0, curveHeight);
+    
+    // Top Arc
+    path.quadraticBezierTo(
+      width / 2, -curveHeight / 2, 
+      width, curveHeight
+    );
+    
+    path.lineTo(width, height - curveHeight);
+    
+    // Bottom Arc
+    path.quadraticBezierTo(
+      width / 2, height + curveHeight / 2, 
+      0, height - curveHeight
+    );
+    
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
+}
+
 class Sketch2StitchApp extends StatelessWidget {
   const Sketch2StitchApp({super.key});
 
@@ -250,8 +285,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 18,
-                  color: Color(0xFF2D6A4F),
-                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF0F2E20),
+                  fontWeight: FontWeight.w700,
                   letterSpacing: 0.2,
                 ),
               ),
@@ -265,89 +300,49 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
   Widget _buildBendedSlideshow() {
     return SizedBox(
       height: 200,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          PageView.builder(
-            controller: _pageController,
-            physics: const BouncingScrollPhysics(),
-            itemBuilder: (context, index) {
-              final imgIndex = index % _images.length;
-              return AnimatedBuilder(
-                animation: _pageController,
-                builder: (context, child) {
-                  double value = 1.0;
-                  if (_pageController.position.haveDimensions) {
-                    value = _pageController.page! - index;
-                    value = (1 - (value.abs() * 0.2)).clamp(0.0, 1.0);
-                  }
-                  return Center(
-                    child: Transform.scale(
-                      scale: Curves.easeOut.transform(value),
-                      child: Container(
-                        width: 160,
-                        height: 180,
-                        margin: const EdgeInsets.symmetric(horizontal: 10),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(28),
-                          image: DecorationImage(
-                            image: AssetImage('assets/images/${_images[imgIndex]}'),
-                            fit: BoxFit.cover,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.15),
-                              blurRadius: 15,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
+      child: ClipPath(
+        clipper: AppleCardClipper(),
+        child: PageView.builder(
+          controller: _pageController,
+          physics: const BouncingScrollPhysics(),
+          itemBuilder: (context, index) {
+            final imgIndex = index % _images.length;
+            return AnimatedBuilder(
+              animation: _pageController,
+              builder: (context, child) {
+                double value = 1.0;
+                if (_pageController.position.haveDimensions) {
+                  value = _pageController.page! - index;
+                  value = (1 - (value.abs() * 0.2)).clamp(0.0, 1.0);
+                }
+                return Center(
+                  child: Transform.scale(
+                    scale: Curves.easeOut.transform(value),
+                    child: Container(
+                      width: 160,
+                      height: 180,
+                      margin: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(28),
+                        image: DecorationImage(
+                          image: AssetImage('assets/images/${_images[imgIndex]}'),
+                          fit: BoxFit.cover,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.15),
+                            blurRadius: 15,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
                       ),
                     ),
-                  );
-                },
-              );
-            },
-          ),
-          Positioned(
-            top: -65,
-            left: -50,
-            right: -50,
-            child: IgnorePointer(
-              child: Container(
-                height: 100,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF6FCF6).withOpacity(0.9), // Slightly transparent just in case
-                  borderRadius: BorderRadius.vertical(
-                    bottom: Radius.elliptical(
-                      MediaQuery.of(context).size.width + 100,
-                      80,
-                    ),
                   ),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -65,
-            left: -50,
-            right: -50,
-            child: IgnorePointer(
-              child: Container(
-                height: 100,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF6FCF6).withOpacity(0.9),
-                  borderRadius: BorderRadius.vertical(
-                    top: Radius.elliptical(
-                      MediaQuery.of(context).size.width + 100,
-                      80,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -361,6 +356,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
           lineColor: Colors.white,
           textColor: Colors.white,
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterScreen())),
+          height: 50, // Match LoginScreen
         ),
         const SizedBox(height: 14),
         SpecularButton(
@@ -370,6 +366,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
           textColor: const Color(0xFF1B4332),
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen())),
           blur: 10,
+          height: 50, // Match LoginScreen
         ),
         const SizedBox(height: 14),
         SpecularButton(
@@ -378,7 +375,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
           lineColor: const Color(0xFF40916C),
           textColor: const Color(0xFF1B4332),
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AboutUsScreen())),
-          height: 48,
+          height: 50, // Match LoginScreen
         ),
       ],
     );
@@ -485,7 +482,7 @@ class _SpecularButtonState extends State<SpecularButton> with SingleTickerProvid
     return GestureDetector(
       onTap: widget.onTap,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14), // Match LoginScreen
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: widget.blur, sigmaY: widget.blur),
           child: Container(
@@ -493,7 +490,7 @@ class _SpecularButtonState extends State<SpecularButton> with SingleTickerProvid
             height: widget.height,
             decoration: BoxDecoration(
               color: widget.baseColor,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(14), // Match LoginScreen
               border: Border.all(color: Colors.white.withAlpha(40), width: 1),
             ),
             child: Stack(
@@ -515,8 +512,8 @@ class _SpecularButtonState extends State<SpecularButton> with SingleTickerProvid
                     widget.text,
                     style: TextStyle(
                       color: widget.textColor,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
+                      fontSize: 16, // Match LoginScreen
+                      fontWeight: FontWeight.w600, // Match LoginScreen
                       letterSpacing: 1,
                     ),
                   ),
@@ -539,7 +536,7 @@ class SpecularPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
-    final RRect rrect = RRect.fromRectAndRadius(rect, const Radius.circular(18));
+    final RRect rrect = RRect.fromRectAndRadius(rect, const Radius.circular(14)); // Match LoginScreen radius
     
     final double pos = -1.0 + (animationValue * 3.0);
     
