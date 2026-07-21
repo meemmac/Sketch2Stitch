@@ -76,16 +76,17 @@ class WelcomeScreen extends StatefulWidget {
 }
 
 class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateMixin {
-  late AnimationController _silkController;
+  late AnimationController _auroraController;
   late AnimationController _logoController;
   late PageController _pageController;
 
   int _taglineIndex = 0;
   final List<String> _taglines = [
     "Design Your Dream Outfit",
-    "Shop Premium Fabrics",
-    "AI Virtual Trial",
-    "Connect With Tailors",
+    "Shop Premium Fabrics And Elements",
+    "Preview Your Design With Virtual Trial",
+    "Connect With Skilled Tailors",
+    "Save Measurement in Our App",
     "Custom Fashion Made Easy",
   ];
   Timer? _taglineTimer;
@@ -108,19 +109,20 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
   @override
   void initState() {
     super.initState();
-    _silkController = AnimationController(
+    // Slow aurora animation: 20 seconds loop
+    _auroraController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 10),
+      duration: const Duration(seconds: 25),
     )..repeat();
 
     _logoController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 1000),
     )..forward();
 
     _pageController = PageController(viewportFraction: 0.5, initialPage: 1000);
 
-    _taglineTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+    _taglineTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (mounted) {
         setState(() {
           _taglineIndex = (_taglineIndex + 1) % _taglines.length;
@@ -140,7 +142,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
 
   @override
   void dispose() {
-    _silkController.dispose();
+    _auroraController.dispose();
     _logoController.dispose();
     _pageController.dispose();
     _taglineTimer?.cancel();
@@ -156,7 +158,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
       backgroundColor: const Color(0xFFF6FCF6),
       body: Stack(
         children: [
-          _buildSilkBackground(),
+          _buildAuroraBackground(),
 
           SafeArea(
             child: Padding(
@@ -206,14 +208,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
     );
   }
 
-  Widget _buildSilkBackground() {
+  Widget _buildAuroraBackground() {
     return AnimatedBuilder(
-      animation: _silkController,
+      animation: _auroraController,
       builder: (context, child) {
         return CustomPaint(
-          painter: SilkPainter(
-            animationValue: _silkController.value,
-            color: const Color(0xFFBAE0D4),
+          painter: AuroraPainter(
+            animationValue: _auroraController.value,
           ),
           size: Size.infinite,
         );
@@ -231,7 +232,19 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
             scale: CurvedAnimation(parent: _logoController, curve: Curves.easeOutBack),
             child: FadeTransition(
               opacity: _logoController,
-              child: Image.asset('assets/images/transparent_logo.png', height: 44),
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.white.withAlpha(80),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: Image.asset('assets/images/transparent_logo.png', height: 44),
+              ),
             ),
           ),
           _buildGlassIconButton(
@@ -254,15 +267,36 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
           SlideTransition(
             position: Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero)
                 .animate(CurvedAnimation(parent: _logoController, curve: Curves.easeOutCubic)),
-            child: Text(
-              "Sketch2Stitch",
-              style: TextStyle(
-                fontSize: screenHeight < 700 ? 38 : 46,
-                fontWeight: FontWeight.w900,
-                color: const Color(0xFF1B4332),
-                letterSpacing: -1.8,
-                height: 1,
-              ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Soft glow behind title
+                Container(
+                  width: 250,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFBAE0D4).withAlpha(40),
+                    borderRadius: BorderRadius.circular(50),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFBAE0D4).withAlpha(30),
+                        blurRadius: 60,
+                        spreadRadius: 10,
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  "Sketch2Stitch",
+                  style: TextStyle(
+                    fontSize: screenHeight < 700 ? 38 : 46,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF1B4332),
+                    letterSpacing: -1.8,
+                    height: 1,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 16),
@@ -323,18 +357,41 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                       height: 180,
                       margin: const EdgeInsets.symmetric(horizontal: 10),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(28),
+                        borderRadius: BorderRadius.circular(32), // Slightly larger radius
                         image: DecorationImage(
                           image: AssetImage('assets/images/${_images[imgIndex]}'),
                           fit: BoxFit.cover,
+                          colorFilter: ColorFilter.mode(
+                            Colors.black.withAlpha(10),
+                            BlendMode.darken,
+                          ),
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.15),
-                            blurRadius: 15,
-                            offset: const Offset(0, 8),
+                            color: Colors.black.withValues(alpha: 0.2), // Stronger soft shadow
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
                           ),
                         ],
+                        border: Border.all(
+                          color: Colors.white.withAlpha(40),
+                          width: 1,
+                        ),
+                      ),
+                      // Faint inner highlight
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(32),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Colors.white.withAlpha(20),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.4],
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -356,26 +413,26 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
           lineColor: Colors.white,
           textColor: Colors.white,
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterScreen())),
-          height: 50, // Match LoginScreen
+          height: 50,
         ),
         const SizedBox(height: 14),
         SpecularButton(
           text: "Login",
-          baseColor: Colors.white.withAlpha(100),
-          lineColor: const Color(0xFF2D6A4F),
+          baseColor: Colors.white.withAlpha(40), // More transparent glass
+          lineColor: Colors.white.withAlpha(180),
           textColor: const Color(0xFF1B4332),
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen())),
-          blur: 10,
-          height: 50, // Match LoginScreen
+          blur: 15, // Better blur
+          height: 50,
         ),
         const SizedBox(height: 14),
         SpecularButton(
           text: "About Us",
           baseColor: Colors.transparent,
-          lineColor: const Color(0xFF40916C),
+          lineColor: Colors.white.withAlpha(150),
           textColor: const Color(0xFF1B4332),
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AboutUsScreen())),
-          height: 50, // Match LoginScreen
+          height: 50,
         ),
       ],
     );
@@ -396,20 +453,27 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
     return ClipRRect(
       borderRadius: BorderRadius.circular(25),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10), // Realism
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(130),
+            color: Colors.white.withAlpha(80), // Premium transparency
             borderRadius: BorderRadius.circular(25),
-            border: Border.all(color: Colors.white.withAlpha(100), width: 1),
+            border: Border.all(color: Colors.white.withAlpha(60), width: 0.8), // Softer border
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon, size: 14, color: const Color(0xFF2D6A4F)),
               const SizedBox(width: 5),
-              Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1B4332))),
+              Text(
+                label, 
+                style: const TextStyle(
+                  fontSize: 12, 
+                  fontWeight: FontWeight.bold, 
+                  color: Color(0xFF1B4332),
+                ),
+              ),
             ],
           ),
         ),
@@ -421,12 +485,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
     return ClipRRect(
       borderRadius: BorderRadius.circular(15),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(100),
+            color: Colors.white.withAlpha(80),
             borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: Colors.white.withAlpha(150), width: 1),
+            border: Border.all(color: Colors.white.withAlpha(60), width: 0.8),
           ),
           child: IconButton(
             icon: Icon(icon, color: const Color(0xFF2D6A4F), size: 22),
@@ -482,7 +546,7 @@ class _SpecularButtonState extends State<SpecularButton> with SingleTickerProvid
     return GestureDetector(
       onTap: widget.onTap,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(14), // Match LoginScreen
+        borderRadius: BorderRadius.circular(14),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: widget.blur, sigmaY: widget.blur),
           child: Container(
@@ -490,11 +554,27 @@ class _SpecularButtonState extends State<SpecularButton> with SingleTickerProvid
             height: widget.height,
             decoration: BoxDecoration(
               color: widget.baseColor,
-              borderRadius: BorderRadius.circular(14), // Match LoginScreen
-              border: Border.all(color: Colors.white.withAlpha(40), width: 1),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white.withAlpha(30), width: 1), // Softer border
             ),
             child: Stack(
               children: [
+                // Faint inner highlight for glass buttons
+                if (widget.baseColor.alpha < 255)
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white.withAlpha(40),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.5],
+                      ),
+                    ),
+                  ),
                 AnimatedBuilder(
                   animation: _controller,
                   builder: (context, child) {
@@ -512,8 +592,8 @@ class _SpecularButtonState extends State<SpecularButton> with SingleTickerProvid
                     widget.text,
                     style: TextStyle(
                       color: widget.textColor,
-                      fontSize: 16, // Match LoginScreen
-                      fontWeight: FontWeight.w600, // Match LoginScreen
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                       letterSpacing: 1,
                     ),
                   ),
@@ -536,7 +616,7 @@ class SpecularPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
-    final RRect rrect = RRect.fromRectAndRadius(rect, const Radius.circular(14)); // Match LoginScreen radius
+    final RRect rrect = RRect.fromRectAndRadius(rect, const Radius.circular(14));
     
     final double pos = -1.0 + (animationValue * 3.0);
     
@@ -579,47 +659,95 @@ class SpecularPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
-class SilkPainter extends CustomPainter {
+class AuroraPainter extends CustomPainter {
   final double animationValue;
-  final Color color;
 
-  SilkPainter({required this.animationValue, required this.color});
+  AuroraPainter({required this.animationValue});
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFFF6FCF6));
+    final rect = Offset.zero & size;
+    final paint = Paint();
 
-    for (int i = 0; i < 3; i++) {
-      final path = Path();
-      final double yBase = size.height * (0.3 + i * 0.25);
-      
-      path.moveTo(0, yBase);
-      
-      for (double x = 0; x <= size.width; x += 10) {
-        final double relativeX = x / size.width;
-        final double wave = math.sin(relativeX * 2 * math.pi + animationValue * 2 * math.pi + i * math.pi / 2);
-        final double wave2 = math.cos(relativeX * 3 * math.pi - animationValue * math.pi);
-        path.lineTo(x, yBase + wave * 40 + wave2 * 20);
-      }
-      
-      path.lineTo(size.width, size.height);
-      path.lineTo(0, size.height);
-      path.close();
-      
-      canvas.drawPath(
-        path,
-        Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              color.withAlpha(50 + i * 40),
-              color.withAlpha(10),
-            ],
-          ).createShader(Offset.zero & size)
-          ..imageFilter = ImageFilter.blur(sigmaX: 50, sigmaY: 50),
-      );
-    }
+    // Subtle base background color
+    canvas.drawRect(rect, paint..color = const Color(0xFFF6FCF6));
+
+    final double time = animationValue * 2 * math.pi;
+
+    // We draw elongated "ribbons" instead of simple circles.
+    // Each ribbon has its own animation and color profile.
+    
+    // Ribbon 1: Emerald (Primary Aurora)
+    _drawRibbon(
+      canvas,
+      size,
+      const Color(0xFFBAE0D4).withAlpha(180),
+      Offset(size.width * 0.2, size.height * 0.3),
+      Offset(size.width * 0.8, size.height * 0.5),
+      math.sin(time) * 40,
+      120.0,
+    );
+
+    // Ribbon 2: Mint/Light Green
+    _drawRibbon(
+      canvas,
+      size,
+      const Color(0xFFD8F3DC).withAlpha(160),
+      Offset(size.width * 0.1, size.height * 0.6),
+      Offset(size.width * 0.9, size.height * 0.4),
+      math.cos(time * 0.7) * 50,
+      100.0,
+    );
+
+    // Ribbon 3: Teal Accent
+    _drawRibbon(
+      canvas,
+      size,
+      const Color(0xFF95D5B2).withAlpha(140),
+      Offset(size.width * 0.4, size.height * 0.1),
+      Offset(size.width * 0.6, size.height * 0.9),
+      math.sin(time * 0.5) * 60,
+      150.0,
+    );
+
+    // Ribbon 4: Soft Cyan
+    _drawRibbon(
+      canvas,
+      size,
+      const Color(0xFFA8E6CF).withAlpha(120),
+      Offset(size.width * 0.8, size.height * 0.2),
+      Offset(size.width * 0.2, size.height * 0.8),
+      math.cos(time * 0.3) * 30,
+      80.0,
+    );
+  }
+
+  void _drawRibbon(
+    Canvas canvas,
+    Size size,
+    Color color,
+    Offset start,
+    Offset end,
+    double offset,
+    double blurSigma,
+  ) {
+    final Paint paint = Paint()
+      ..color = color
+      ..strokeWidth = size.width * 0.4
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke
+      ..imageFilter = ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma);
+
+    final Path path = Path();
+    path.moveTo(start.dx + offset, start.dy);
+    path.quadraticBezierTo(
+      size.width / 2 + offset * 1.5,
+      size.height / 2 + offset,
+      end.dx + offset,
+      end.dy,
+    );
+
+    canvas.drawPath(path, paint);
   }
 
   @override
