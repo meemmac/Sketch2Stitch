@@ -85,7 +85,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
 
     _pageController = PageController(viewportFraction: 0.5, initialPage: 1000);
 
-    _taglineTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+    _taglineTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
       if (mounted) {
         setState(() {
           _taglineIndex = (_taglineIndex + 1) % _taglines.length;
@@ -212,11 +212,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
   }
 
   Widget _buildHeroSection(double screenHeight) {
-    return Column(
-      children: [
-        FadeTransition(
-          opacity: _logoController,
-          child: SlideTransition(
+    return FadeTransition(
+      opacity: _logoController,
+      child: Column(
+        children: [
+          SlideTransition(
             position: Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero)
                 .animate(CurvedAnimation(parent: _logoController, curve: Curves.easeOutCubic)),
             child: Text(
@@ -230,35 +230,35 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 28,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 600),
-            transitionBuilder: (Widget child, Animation<double> animation) {
-              return FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween<Offset>(begin: const Offset(0, 0.4), end: Offset.zero).animate(animation),
-                  child: child,
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 32,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 600),
+              transitionBuilder: (Widget child, Animation<double> animation) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(begin: const Offset(0, 0.4), end: Offset.zero).animate(animation),
+                    child: child,
+                  ),
+                );
+              },
+              child: Text(
+                _taglines[_taglineIndex],
+                key: ValueKey<int>(_taglineIndex),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 18,
+                  color: Color(0xFF2D6A4F),
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.2,
                 ),
-              );
-            },
-            child: Text(
-              _taglines[_taglineIndex],
-              key: ValueKey<int>(_taglineIndex),
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 18,
-                color: Color(0xFF2D6A4F),
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.2,
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -313,14 +313,16 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
             top: -65,
             left: -50,
             right: -50,
-            child: Container(
-              height: 100,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF6FCF6),
-                borderRadius: BorderRadius.vertical(
-                  bottom: Radius.elliptical(
-                    MediaQuery.of(context).size.width + 100,
-                    80,
+            child: IgnorePointer(
+              child: Container(
+                height: 100,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF6FCF6).withOpacity(0.9), // Slightly transparent just in case
+                  borderRadius: BorderRadius.vertical(
+                    bottom: Radius.elliptical(
+                      MediaQuery.of(context).size.width + 100,
+                      80,
+                    ),
                   ),
                 ),
               ),
@@ -330,14 +332,16 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
             bottom: -65,
             left: -50,
             right: -50,
-            child: Container(
-              height: 100,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF6FCF6),
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.elliptical(
-                    MediaQuery.of(context).size.width + 100,
-                    80,
+            child: IgnorePointer(
+              child: Container(
+                height: 100,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF6FCF6).withOpacity(0.9),
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.elliptical(
+                      MediaQuery.of(context).size.width + 100,
+                      80,
+                    ),
                   ),
                 ),
               ),
