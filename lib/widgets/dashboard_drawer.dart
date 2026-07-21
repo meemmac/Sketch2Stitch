@@ -8,9 +8,9 @@ import '../screens/customer/measurement_screen.dart';
 import '../models/measurement.dart';
 import '../screens/shared/welcome_screen.dart';
 import '../screens/shared/about_us_screen.dart';
-import '../screens/retailer/orders_screen.dart';
 import '../screens/tailor/portfolio_screen.dart';
 import '../screens/customer/cart_screen.dart';
+import '../screens/customer/orders/order_detail_screen.dart';
 
 /// Enum representing the three user roles.
 enum AppUserRole {
@@ -528,14 +528,22 @@ class DrawerNavigationSection extends StatelessWidget {
                     builder: (_) => const VirtualTrialScreen(),
                   ),
                 );
-              } else if (role == AppUserRole.retailer &&
-                  item['title'] == 'Orders') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const RetailerOrdersScreen(),
-                  ),
-                );
+              } else if (item['title'] == 'Orders') {
+                if (role == AppUserRole.retailer) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const RetailerOrdersScreen(),
+                    ),
+                  );
+                } else if (role == AppUserRole.customer) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const OrderDetailScreen(),
+                    ),
+                  );
+                }
               } else if (item['title'] == 'Measurements') {
                 if (measurement != null && onSave != null) {
                   Navigator.push(
