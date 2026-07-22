@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'reviews_screen.dart';
 
 class OrderItem {
   final String name;
@@ -629,6 +630,30 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 ),
               ),
             ),
+            if (title == "Delivered Orders") ...[
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const RetailerReviewsScreen(
+                        shopName: "Elegant Fabrics Ltd.",
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.star_outline, size: 16),
+                label: const Text("See Reviews"),
+                style: TextButton.styleFrom(
+                  foregroundColor: primaryGreen,
+                  textStyle: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
         const SizedBox(height: 12),
