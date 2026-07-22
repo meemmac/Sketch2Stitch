@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+enum OrderDeliveryDestination { retailer, tailor }
+
 class OrderItem {
   final String name;
   final int quantity;
@@ -14,6 +16,11 @@ class OrderItem {
   final String ironLevel;
   final double price;
 
+  // New fields for Tailor reference
+  final OrderDeliveryDestination destination;
+  final String? measurementRefImage;
+  final String? tailorInstructions;
+
   const OrderItem({
     required this.name,
     required this.quantity,
@@ -27,6 +34,9 @@ class OrderItem {
     this.canDryClean = true,
     this.canTumbleDry = true,
     this.ironLevel = "Medium",
+    this.destination = OrderDeliveryDestination.retailer,
+    this.measurementRefImage,
+    this.tailorInstructions,
   });
 }
 
@@ -94,6 +104,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           imagePath: "assets/images/fabrics_rolled.jpg",
           color: "Cream",
           description: "High-quality linen fabric for summer wear.",
+          destination: OrderDeliveryDestination.tailor,
+          measurementRefImage: "assets/images/ref1.jpg",
+          tailorInstructions: "Please use this linen for the main body of the Panjabi. Ensure the length is precisely 42 inches as per my saved measurements.",
         ),
         const OrderItem(
           name: "Cotton Thread Set",
@@ -120,6 +133,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           imagePath: "assets/images/silk.jpg",
           color: "Deep Red",
           description: "Traditional Rajshahi silk with gold border.",
+          destination: OrderDeliveryDestination.tailor,
+          measurementRefImage: "assets/images/ref2.jpg",
+          tailorInstructions: "Use this silk for a traditional Saree blouse. Reference the attached image for the back design.",
         ),
       ],
     ),
@@ -141,6 +157,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           price: 3200,
           imagePath: "assets/images/gorgeous.jpg",
           color: "Floral Blue",
+          destination: OrderDeliveryDestination.tailor,
+          measurementRefImage: "assets/images/ref3.jpg",
+          tailorInstructions: "Create a summer kurti. Use the printed patterns for the sleeves as shown in the guide.",
         ),
       ],
     ),
@@ -559,6 +578,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _itemPreviewCard(OrderItem item) {
+    final bool sentToTailor = item.destination == OrderDeliveryDestination.tailor;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -580,11 +601,89 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(item.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   Text("Qty: ${item.quantity} | Color: ${item.color}", style: const TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: sentToTailor ? Colors.orange.shade50 : Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      sentToTailor ? "Send to Tailor" : "Send to Customer",
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: sentToTailor ? Colors.orange.shade900 : Colors.blue.shade900,
+                      ),
+                    ),
+                  ),
                 ]),
               ),
               Text("Tk ${item.price.toInt()}", style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.w900)),
             ],
           ),
+          if (sentToTailor) ...[
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 8),
+            const Text(
+              "Tailor Customization Details",
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (item.measurementRefImage != null)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.asset(
+                      item.measurementRefImage!,
+                      width: 100,
+                      height: 120,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: 100,
+                        height: 120,
+                        color: Colors.grey.shade200,
+                        child: const Icon(Icons.image_not_supported, color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Instructions:",
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.black54),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        item.tailorInstructions ?? "No specific instructions provided.",
+                        style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.4),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: () {
+                          // View measurements logic
+                        },
+                        icon: const Icon(Icons.straighten, size: 14),
+                        label: const Text("View My Measurements", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          foregroundColor: primaryGreen,
+                          minimumSize: const Size(0, 0),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 12),
           const Text("Care Instructions", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
