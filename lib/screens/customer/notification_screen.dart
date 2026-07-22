@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
 
-// ============= CUSTOMER NOTIFICATION (UI mock, renamed to avoid
-// collision with the real Firestore-backed AppNotification model) =============
+// ============= CUSTOMER NOTIFICATION =============
 enum NotificationType { confirmed, delivered, cancelled, paymentDue }
 
 class CustomerNotificationCardData {
@@ -100,21 +99,18 @@ final List<CustomerNotificationCardData> kCustomerDummyNotifications = [
 ];
 
 // ============= RETAILER NOTIFICATION =============
-enum RetailerNotificationType { orderPlaced, stockOut, newReview }
+enum RetailerNotificationType { orderPlaced, stockOut }
 
 class RetailerNotification {
   final RetailerNotificationType type;
   final String avatarImage;
-  final String customerName;
+  final String customerName; // For orderPlaced: customer name, For stockOut: product name
   final String itemName;
   final String orderId;
   final String? subOrderId;
   final String timeAgo;
   final bool isNew;
   final String? colorName;
-  final String? reviewText;
-  final double? rating;
-  final String? customerImage;
 
   const RetailerNotification({
     required this.type,
@@ -126,9 +122,6 @@ class RetailerNotification {
     required this.timeAgo,
     this.isNew = false,
     this.colorName,
-    this.reviewText,
-    this.rating,
-    this.customerImage,
   });
 }
 
@@ -154,7 +147,7 @@ final List<RetailerNotification> kRetailerDummyNotifications = [
   const RetailerNotification(
     type: RetailerNotificationType.stockOut,
     avatarImage: 'assets/images/textile.jpg',
-    customerName: 'Premium Cotton Fabric',
+    customerName: 'Premium Cotton Fabric', // Product name
     itemName: 'Premium Cotton Fabric',
     orderId: 'PROD003',
     timeAgo: '5 hours ago',
@@ -162,20 +155,18 @@ final List<RetailerNotification> kRetailerDummyNotifications = [
     colorName: 'White',
   ),
   const RetailerNotification(
-    type: RetailerNotificationType.newReview,
-    avatarImage: 'assets/images/lace.jpg',
-    customerName: 'Aisha Rahman',
-    itemName: 'Wedding Sherwani',
-    orderId: 'OR005',
-    timeAgo: '2 days ago',
-    rating: 4.5,
-    reviewText: 'Excellent quality and timely delivery!',
-    customerImage: 'assets/images/fab.jpg',
+    type: RetailerNotificationType.stockOut,
+    avatarImage: 'assets/images/silk.jpg',
+    customerName: 'Silk Saree', // Product name
+    itemName: 'Silk Saree',
+    orderId: 'PROD004',
+    timeAgo: '1 day ago',
+    colorName: 'Red',
   ),
 ];
 
 // ============= TAILOR NOTIFICATION =============
-enum TailorNotificationType { newOrder, orderConfirmationReminder, deliveryDeadline, newReview }
+enum TailorNotificationType { newOrder, orderConfirmationReminder, deliveryDeadline }
 
 class TailorNotification {
   final TailorNotificationType type;
@@ -186,9 +177,6 @@ class TailorNotification {
   final String? subOrderId;
   final String timeAgo;
   final bool isNew;
-  final String? reviewText;
-  final double? rating;
-  final String? customerImage;
   final String? deadlineDate;
 
   const TailorNotification({
@@ -200,9 +188,6 @@ class TailorNotification {
     this.subOrderId,
     required this.timeAgo,
     this.isNew = false,
-    this.reviewText,
-    this.rating,
-    this.customerImage,
     this.deadlineDate,
   });
 }
@@ -234,17 +219,6 @@ final List<TailorNotification> kTailorDummyNotifications = [
     timeAgo: '5 hours ago',
     isNew: true,
     deadlineDate: '2026-07-20',
-  ),
-  const TailorNotification(
-    type: TailorNotificationType.newReview,
-    avatarImage: 'assets/images/fab.jpg',
-    customerName: 'Hassan Raza',
-    itemName: 'Traditional Kurta',
-    orderId: 'OR007',
-    timeAgo: '3 days ago',
-    rating: 4.5,
-    reviewText: 'Excellent stitching and timely delivery!',
-    customerImage: 'assets/images/fab.jpg',
   ),
 ];
 
@@ -614,6 +588,10 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   Widget _buildRetailerCard(RetailerNotification n) {
     final style = _retailerStyleFor(n.type);
 
+    // For stockOut, show product icon. For orderPlaced, show first letter of customer name
+    bool isStockOut = n.type == RetailerNotificationType.stockOut;
+    String firstLetter = isStockOut ? '📦' : (n.customerName.isNotEmpty ? n.customerName[0].toUpperCase() : '?');
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -628,7 +606,21 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(radius: 22, backgroundColor: Colors.white, backgroundImage: AssetImage(n.avatarImage)),
+                  // Avatar - shows product emoji for stockOut, first letter for customer
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: isStockOut ? Colors.red.shade100 : style.iconColor.withOpacity(0.2),
+                    child: isStockOut
+                        ? const Icon(Icons.inventory_2_rounded, color: Colors.red, size: 22)
+                        : Text(
+                      firstLetter,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: style.iconColor,
+                      ),
+                    ),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -647,16 +639,21 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                           text: TextSpan(
                             style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
                             children: [
-                              TextSpan(text: style.messagePrefix),
-                              TextSpan(text: n.customerName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-                              TextSpan(text: style.messageMiddle),
-                              if (n.colorName != null) ...[
-                                TextSpan(text: ' (Color: '),
-                                TextSpan(text: n.colorName!, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-                                TextSpan(text: ')'),
-                              ],
-                              if (style.messageSuffix.isNotEmpty) TextSpan(text: style.messageSuffix),
-                              if (n.type == RetailerNotificationType.orderPlaced) ...[
+                              if (isStockOut) ...[
+                                TextSpan(text: '${n.customerName} '), // Product name
+                                TextSpan(text: style.messageMiddle),
+                                if (n.colorName != null) ...[
+                                  TextSpan(text: ' (Color: '),
+                                  TextSpan(text: n.colorName!, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                                  TextSpan(text: ')'),
+                                ],
+                                TextSpan(text: style.messageSuffix),
+                              ] else ...[
+                                TextSpan(text: style.messagePrefix),
+                                TextSpan(text: n.customerName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                                TextSpan(text: style.messageMiddle),
+                                TextSpan(text: n.itemName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                                TextSpan(text: style.messageSuffix),
                                 TextSpan(text: ' ',),
                                 TextSpan(text: 'View Order Details', style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
                               ],
@@ -678,35 +675,6 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   }
 
   Widget _buildRetailerFooter(RetailerNotification n) {
-    if (n.type == RetailerNotificationType.newReview) {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text('Order ID: ${n.orderId}', style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
-          Row(
-            children: [
-              OutlinedButton(
-                onPressed: () => _showRetailerReviewDetails(n),
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  side: BorderSide(color: Colors.blue.shade300),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: Text('View Review', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.blue.shade700)),
-              ),
-              const SizedBox(width: 10),
-              Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withOpacity(0.45)),
-              const SizedBox(width: 4),
-              Text(n.timeAgo, style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
-            ],
-          ),
-        ],
-      );
-    }
-
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -722,98 +690,37 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     );
   }
 
-  void _showRetailerReviewDetails(RetailerNotification n) {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => Dialog(
-        alignment: Alignment.center,
-        insetPadding: const EdgeInsets.all(20),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Customer Review', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, size: 20)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  CircleAvatar(radius: 30, backgroundImage: AssetImage(n.customerImage ?? 'assets/images/fab.jpg')),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(n.customerName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: List.generate(5, (index) {
-                  int roundedRating = (n.rating ?? 0).round();
-                  return Icon(index < roundedRating ? Icons.star : Icons.star_border, color: Colors.amber, size: 28);
-                }),
-              ),
-              const SizedBox(height: 4),
-              Text('${n.rating?.toStringAsFixed(1) ?? '0'} / 5.0', style: TextStyle(fontSize: 14, color: Colors.black.withOpacity(0.6))),
-              if (n.reviewText != null && n.reviewText!.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 12),
-                Text('Feedback:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black.withOpacity(0.8))),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade200)),
-                  child: Text(n.reviewText!, style: TextStyle(fontSize: 14, height: 1.6, color: Colors.black.withOpacity(0.8))),
-                ),
-              ],
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 12)),
-                  child: const Text('Close', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   _RetailerNotificationStyle _retailerStyleFor(RetailerNotificationType type) {
     switch (type) {
       case RetailerNotificationType.orderPlaced:
-        return _RetailerNotificationStyle(background: const Color(0xFFCDEFD3), icon: Icons.shopping_cart_rounded, iconColor: Colors.green.shade800, title: 'New Order Placed', messagePrefix: '', messageMiddle: ' placed an order for ', messageSuffix: '. ');
+        return _RetailerNotificationStyle(
+          background: const Color(0xFFCDEFD3),
+          icon: Icons.shopping_cart_rounded,
+          iconColor: Colors.green.shade800,
+          title: 'New Order Placed',
+          messagePrefix: '',
+          messageMiddle: ' placed an order for ',
+          messageSuffix: '. ',
+        );
       case RetailerNotificationType.stockOut:
-        return _RetailerNotificationStyle(background: const Color(0xFFF7D6D6), icon: Icons.warning_rounded, iconColor: Colors.red.shade700, title: 'Stock Alert', messagePrefix: '', messageMiddle: ' is out of stock for ', messageSuffix: '.');
-      case RetailerNotificationType.newReview:
-        return _RetailerNotificationStyle(background: const Color(0xFFD3E9F7), icon: Icons.star_rate_rounded, iconColor: Colors.blue.shade800, title: 'New Review', messagePrefix: '', messageMiddle: ' left a new review. ', messageSuffix: '');
+        return _RetailerNotificationStyle(
+          background: const Color(0xFFF7D6D6),
+          icon: Icons.warning_rounded,
+          iconColor: Colors.red.shade700,
+          title: 'Stock Alert',
+          messagePrefix: '',
+          messageMiddle: ' is out of stock',
+          messageSuffix: '.',
+        );
     }
   }
 
   // ============= TAILOR CARD =============
   Widget _buildTailorCard(TailorNotification n) {
     final style = _tailorStyleFor(n.type);
+
+    // Get first letter of customer name for avatar
+    String firstLetter = n.customerName.isNotEmpty ? n.customerName[0].toUpperCase() : '?';
 
     return Material(
       color: Colors.transparent,
@@ -829,7 +736,19 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(radius: 22, backgroundColor: Colors.white, backgroundImage: AssetImage(n.avatarImage)),
+                  // Avatar with first letter of customer name
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: style.iconColor.withOpacity(0.2),
+                    child: Text(
+                      firstLetter,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: style.iconColor,
+                      ),
+                    ),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -851,6 +770,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                               TextSpan(text: style.messagePrefix),
                               TextSpan(text: n.customerName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
                               TextSpan(text: style.messageMiddle),
+                              TextSpan(text: n.itemName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
                               if (style.messageSuffix.isNotEmpty) TextSpan(text: style.messageSuffix),
                               if (n.type == TailorNotificationType.deliveryDeadline && n.deadlineDate != null) ...[
                                 TextSpan(text: ' Deadline: ${n.deadlineDate}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
@@ -881,35 +801,6 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   }
 
   Widget _buildTailorFooter(TailorNotification n) {
-    if (n.type == TailorNotificationType.newReview) {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text('Order ID: ${n.orderId}', style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
-          Row(
-            children: [
-              OutlinedButton(
-                onPressed: () => _showTailorReviewDetails(n),
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  side: BorderSide(color: Colors.blue.shade300),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: Text('View Review', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.blue.shade700)),
-              ),
-              const SizedBox(width: 10),
-              Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withOpacity(0.45)),
-              const SizedBox(width: 4),
-              Text(n.timeAgo, style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
-            ],
-          ),
-        ],
-      );
-    }
-
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -925,84 +816,6 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     );
   }
 
-  void _showTailorReviewDetails(TailorNotification n) {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => Dialog(
-        alignment: Alignment.center,
-        insetPadding: const EdgeInsets.all(20),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Customer Review', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, size: 20)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  CircleAvatar(radius: 30, backgroundImage: AssetImage(n.customerImage ?? 'assets/images/fab.jpg')),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(n.customerName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: List.generate(5, (index) {
-                  int roundedRating = (n.rating ?? 0).round();
-                  return Icon(index < roundedRating ? Icons.star : Icons.star_border, color: Colors.amber, size: 28);
-                }),
-              ),
-              const SizedBox(height: 4),
-              Text('${n.rating?.toStringAsFixed(1) ?? '0'} / 5.0', style: TextStyle(fontSize: 14, color: Colors.black.withOpacity(0.6))),
-              if (n.reviewText != null && n.reviewText!.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 12),
-                Text('Feedback:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black.withOpacity(0.8))),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade200)),
-                  child: Text(n.reviewText!, style: TextStyle(fontSize: 14, height: 1.6, color: Colors.black.withOpacity(0.8))),
-                ),
-              ],
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 12)),
-                  child: const Text('Close', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   _TailorNotificationStyle _tailorStyleFor(TailorNotificationType type) {
     switch (type) {
       case TailorNotificationType.newOrder:
@@ -1011,8 +824,6 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
         return _TailorNotificationStyle(background: const Color(0xFFF7D6D6), icon: Icons.warning_rounded, iconColor: Colors.red.shade700, title: 'Confirm Order', messagePrefix: '', messageMiddle: '\'s order for ', messageSuffix: ' will be cancelled if not confirmed.');
       case TailorNotificationType.deliveryDeadline:
         return _TailorNotificationStyle(background: const Color(0xFFFBE7C0), icon: Icons.timer_rounded, iconColor: Colors.orange.shade800, title: 'Delivery Deadline Approaching', messagePrefix: 'Order from ', messageMiddle: ' for ', messageSuffix: ' is approaching deadline.');
-      case TailorNotificationType.newReview:
-        return _TailorNotificationStyle(background: const Color(0xFFD3E9F7), icon: Icons.star_rate_rounded, iconColor: Colors.blue.shade700, title: 'New Review', messagePrefix: '', messageMiddle: ' left a new review. ', messageSuffix: '');
     }
   }
 }
