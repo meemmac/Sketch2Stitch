@@ -15,19 +15,39 @@ class ReviewProduct {
 class UserReview {
   final String userName;
   final double rating;
-  final String date;
+  final String dateLabel;
+  final DateTime createdAt;
   final String comment;
   final List<ReviewProduct> products;
   final int helpfulCount;
+  final bool isHelpful;
 
   const UserReview({
     required this.userName,
     required this.rating,
-    required this.date,
+    required this.dateLabel,
+    required this.createdAt,
     required this.comment,
     required this.products,
     required this.helpfulCount,
+    this.isHelpful = false,
   });
+
+  UserReview copyWith({
+    int? helpfulCount,
+    bool? isHelpful,
+  }) {
+    return UserReview(
+      userName: userName,
+      rating: rating,
+      dateLabel: dateLabel,
+      createdAt: createdAt,
+      comment: comment,
+      products: products,
+      helpfulCount: helpfulCount ?? this.helpfulCount,
+      isHelpful: isHelpful ?? this.isHelpful,
+    );
+  }
 }
 
 class RetailerReviewsScreen extends StatefulWidget {
@@ -43,39 +63,79 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
   String _selectedFilter = "Top reviews";
 
   final List<UserReview> _reviews = [
-    const UserReview(
-      userName: "MD",
+    UserReview(
+      userName: "Tasphia",
       rating: 4.0,
-      date: "2 months ago",
-      comment: "আমি তেল কম পছন্দ করি। আমার হিসাবে তেল বেশি হয়ে গিয়েছিল। তাছাড়া খাবার ভালো ছিল। যারা তেল খেতে পারে তাদের জন্য পরিমাণে কম হবে। আমার জন্য পরিমাণ ঠিক ছিল 😊",
+      dateLabel: "2 months ago",
+      createdAt: DateTime.now().subtract(const Duration(days: 60)),
+      comment: "Denim quality was good but a little too expensive.",
       helpfulCount: 3,
-      products: [
+      products: const [
         ReviewProduct(name: "Premium Egyptian Cotton", image: "assets/images/fabrics_rolled.jpg", price: 3250),
         ReviewProduct(name: "Denim Patchwork", image: "assets/images/denim.jpg", price: 1950),
       ],
     ),
-    const UserReview(
-      userName: "Asif",
+    UserReview(
+      userName: "Nishat",
       rating: 5.0,
-      date: "Today",
+      dateLabel: "Today",
+      createdAt: DateTime.now(),
       comment: "great",
       helpfulCount: 0,
-      products: [],
+      products: const [],
     ),
-    const UserReview(
-      userName: "Md",
+    UserReview(
+      userName: "Israt",
       rating: 4.5,
-      date: "2 days ago",
+      dateLabel: "2 days ago",
+      createdAt: DateTime.now().subtract(const Duration(days: 2)),
       comment: "Excellent quality and fast delivery. Very satisfied!",
       helpfulCount: 5,
-      products: [
+      products: const [
         ReviewProduct(name: "Golden Silk Blend", image: "assets/images/silk.jpg", price: 5400),
+      ],
+    ),
+    UserReview(
+      userName: "Riya",
+      rating: 2.0,
+      dateLabel: "1 week ago",
+      createdAt: DateTime.now().subtract(const Duration(days: 7)),
+      comment: "The color was slightly different than the photo.",
+      helpfulCount: 1,
+      products: const [
+        ReviewProduct(name: "Printed Scarf", image: "assets/images/gorgeous.jpg", price: 3000),
       ],
     ),
   ];
 
+  List<UserReview> get _filteredReviews {
+    List<UserReview> sortedList = List.from(_reviews);
+    switch (_selectedFilter) {
+      case "Top reviews":
+        // Sort by high rating first, then by helpful count
+        sortedList.sort((a, b) {
+          int ratingComp = b.rating.compareTo(a.rating);
+          if (ratingComp != 0) return ratingComp;
+          return b.helpfulCount.compareTo(a.helpfulCount);
+        });
+        break;
+      case "Newest":
+        sortedList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        break;
+      case "Highest rating":
+        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
+        break;
+      case "Lowest rating":
+        sortedList.sort((a, b) => a.rating.compareTo(b.rating));
+        break;
+    }
+    return sortedList;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final filtered = _filteredReviews;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FBF9),
       appBar: AppBar(
@@ -98,12 +158,6 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.info_outline, color: Colors.black87),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -123,9 +177,9 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _reviews.length,
+              itemCount: filtered.length,
               separatorBuilder: (context, index) => const SizedBox(height: 16),
-              itemBuilder: (context, index) => _buildReviewItem(_reviews[index]),
+              itemBuilder: (context, index) => _buildReviewItem(filtered[index]),
             ),
             const SizedBox(height: 32),
           ],
@@ -227,7 +281,11 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
             child: ChoiceChip(
               label: Text(filter),
               selected: isSelected,
-              onSelected: (val) => setState(() => _selectedFilter = filter),
+              onSelected: (val) {
+                if (val) {
+                  setState(() => _selectedFilter = filter);
+                }
+              },
               selectedColor: const Color(0xFF1E232C),
               labelStyle: TextStyle(
                 color: isSelected ? Colors.white : Colors.black87,
@@ -275,7 +333,7 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
               ),
               const SizedBox(width: 8),
               Text(
-                "• ${review.date}",
+                "• ${review.dateLabel}",
                 style: const TextStyle(color: Colors.grey, fontSize: 12),
               ),
             ],
@@ -303,15 +361,45 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
             ),
           ],
           const SizedBox(height: 16),
-          Row(
-            children: [
-              const Icon(Icons.thumb_up_alt_outlined, size: 16, color: Colors.grey),
-              const SizedBox(width: 8),
-              Text(
-                review.helpfulCount > 0 ? "Helpful ${review.helpfulCount}" : "Helpful",
-                style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-            ],
+          InkWell(
+            onTap: () {
+              setState(() {
+                final index = _reviews.indexWhere((r) => r.userName == review.userName && r.createdAt == review.createdAt);
+                if (index != -1) {
+                  final current = _reviews[index];
+                  if (current.isHelpful) {
+                    _reviews[index] = current.copyWith(
+                      helpfulCount: current.helpfulCount - 1,
+                      isHelpful: false,
+                    );
+                  } else {
+                    _reviews[index] = current.copyWith(
+                      helpfulCount: current.helpfulCount + 1,
+                      isHelpful: true,
+                    );
+                  }
+                }
+              });
+            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  review.isHelpful ? Icons.thumb_up_alt : Icons.thumb_up_alt_outlined,
+                  size: 16,
+                  color: review.isHelpful ? Colors.orange : Colors.grey,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  review.helpfulCount > 0 ? "Helpful ${review.helpfulCount}" : "Helpful",
+                  style: TextStyle(
+                    color: review.isHelpful ? Colors.orange : Colors.grey,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -358,7 +446,6 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
               ],
             ),
           ),
-          const Icon(Icons.add, size: 18, color: Colors.grey),
         ],
       ),
     );
