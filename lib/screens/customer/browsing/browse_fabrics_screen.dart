@@ -609,15 +609,36 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                           overflow: TextOverflow.ellipsis,
                         ),
                         SizedBox(height: isSmallScreen ? 4 : 6),
-                        Text(
-                          product.priceRange,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: kSageDark,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                product.priceRange,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: kSageDark,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
+                                const SizedBox(width: 2),
+                                Text(
+                                  'Tk 50',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                         SizedBox(height: isSmallScreen ? 6 : 8),
                         if (!outOfStock) ...[

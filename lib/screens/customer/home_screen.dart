@@ -958,9 +958,27 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                     style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    product.priceRange,
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kSageDark),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          product.priceRange,
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kSageDark),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
+                          const SizedBox(width: 2),
+                          Text(
+                            'Tk 50',
+                            style: TextStyle(fontSize: 10, color: Colors.grey[600], fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                   if (!outOfStock) ...[
                     const SizedBox(height: 6),

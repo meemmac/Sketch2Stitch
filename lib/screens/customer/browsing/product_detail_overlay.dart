@@ -126,7 +126,23 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                           color: Color(0xFF2C5C44),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.directions_bike, size: 18, color: Colors.grey[600]),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Tk 50 delivery',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
                       if (!_inStock)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
