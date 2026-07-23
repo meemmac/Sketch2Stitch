@@ -3,6 +3,7 @@ import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
+import '../../../widgets/video_preview_player.dart';
 
 /// Hardcoded sample fabrics with assets images (NO RATING)
 final List<Product> kHardcodedProducts = [
@@ -13,9 +14,9 @@ final List<Product> kHardcodedProducts = [
     category: 'Cotton',
     materialType: 'Cotton',
     colorOptions: [
-      ColorOption(optionId: 1, color: 'White', image: 'assets/images/fab.jpg', price: 650, stock: 40),
-      ColorOption(optionId: 2, color: 'Beige', image: 'assets/images/fab2.jpg', price: 650, stock: 25),
-      ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/fabric_waves.jpg', price: 700, stock: 15),
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/fab.jpg', video: 'assets/images/Videos/vid1.mp4', price: 650, stock: 40),
+      ColorOption(optionId: 2, color: 'Beige', image: 'assets/images/fab2.jpg', video: 'assets/images/Videos/vid2.mp4', price: 650, stock: 25),
+      ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/fabric_waves.jpg', video: 'assets/images/Videos/vid3.mp4', price: 700, stock: 15),
       ColorOption(optionId: 4, color: 'Black', image: 'assets/images/textile.jpg', price: 700, stock: 0),
     ],
     description:
@@ -176,7 +177,7 @@ final List<Product> kHardcodedElements = [
     category: 'Fasteners',
     materialType: 'Metal',
     colorOptions: [
-      ColorOption(optionId: 1, color: 'Silver', image: 'assets/images/zipper.jpg', price: 120, stock: 100),
+      ColorOption(optionId: 1, color: 'Silver', image: 'assets/images/zipper.jpg', video: 'assets/images/Videos/vid1.mp4', price: 120, stock: 100),
       ColorOption(optionId: 2, color: 'Gold', image: 'assets/images/zipper_gold.jpg', price: 150, stock: 50),
       ColorOption(optionId: 3, color: 'Black', image: 'assets/images/zipper.jpg', price: 130, stock: 75),
     ],

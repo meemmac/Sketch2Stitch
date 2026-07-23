@@ -12,6 +12,7 @@ import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dar
 import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
 import 'package:sketch2stitch/screens/customer/cart_screen.dart';
 import '../../widgets/dashboard_drawer.dart';
+import '../../widgets/video_preview_player.dart';
 import 'virtual_trial_screen.dart';
 import 'notification_screen.dart' ;
 import 'package:sketch2stitch/screens/retailer/inventory_screen.dart';

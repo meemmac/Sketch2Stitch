@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
+import '../../../widgets/video_preview_player.dart';
 
 class ProductDetailOverlay extends StatefulWidget {
   final Product product;
@@ -435,25 +436,45 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
 
 Widget _buildProductImage() {
   final imageUrl = _selectedOption?.image;
-  return ClipRRect(
-    borderRadius: BorderRadius.circular(16),
-    child: Container(
-      height: 250,
-      width: double.infinity,
-      color: Colors.grey[200],
-      child: imageUrl != null && imageUrl.isNotEmpty
-          ? imageUrl.startsWith('http')
-              ? Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => _imageFallback(),
-                )
-              : Image.asset(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => _imageFallback(),
-                )
-          : _imageFallback(),
+  final videoUrl = _selectedOption?.video;
+
+  return SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    child: Row(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            height: 250,
+            width: MediaQuery.of(context).size.width * 0.8,
+            color: Colors.grey[200],
+            child: imageUrl != null && imageUrl.isNotEmpty
+                ? imageUrl.startsWith('http')
+                    ? Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => _imageFallback(),
+                      )
+                    : Image.asset(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => _imageFallback(),
+                      )
+                : _imageFallback(),
+          ),
+        ),
+        if (videoUrl != null && videoUrl.isNotEmpty) ...[
+          const SizedBox(width: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: VideoPreviewPlayer(
+              videoPath: videoUrl,
+              height: 250,
+              width: MediaQuery.of(context).size.width * 0.8,
+            ),
+          ),
+        ],
+      ],
     ),
   );
 }

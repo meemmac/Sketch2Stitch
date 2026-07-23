@@ -6,6 +6,7 @@ class ColorOption {
   final int optionId;
   final String color;
   final String? image;
+  final String? video;
   final double price;
   final int stock;
 
@@ -13,6 +14,7 @@ class ColorOption {
     required this.optionId,
     required this.color,
     this.image,
+    this.video,
     required this.price,
     this.stock = 0,
   });
@@ -21,6 +23,7 @@ class ColorOption {
     int? optionId,
     String? color,
     String? image,
+    String? video,
     double? price,
     int? stock,
   }) {
@@ -28,6 +31,7 @@ class ColorOption {
       optionId: optionId ?? this.optionId,
       color: color ?? this.color,
       image: image ?? this.image,
+      video: video ?? this.video,
       price: price ?? this.price,
       stock: stock ?? this.stock,
     );
@@ -37,6 +41,7 @@ class ColorOption {
     'optionId': optionId,
     'color': color,
     if (image != null) 'image': image,
+    if (video != null) 'video': video,
     'price': price,
     'stock': stock,
   };
@@ -46,6 +51,7 @@ class ColorOption {
       optionId: json['optionId'] ?? 0,
       color: json['color'] ?? '',
       image: json['image'],
+      video: json['video'],
       price: (json['price'] ?? 0).toDouble(),
       stock: json['stock'] ?? 0,
     );
