@@ -568,7 +568,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Job Accepted Successfully!")));
             },
             style: ElevatedButton.styleFrom(backgroundColor: primaryGreen, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            child: const Text("Accept Job", style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text("Accept", style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ),
         const SizedBox(width: 12),
@@ -579,7 +579,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
               Navigator.pop(context);
             },
             style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.red), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            child: const Text("Decline Job", style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text("Decline", style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ),
       ],
@@ -617,7 +617,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
             const SizedBox(height: 16),
             const Divider(),
             const SizedBox(height: 8),
-            const Text("Set Your Quote", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
+            const Text("Set Price and Date", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
             const SizedBox(height: 12),
             Row(
               children: [
