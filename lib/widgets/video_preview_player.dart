@@ -46,6 +46,13 @@ class _VideoPreviewPlayerState extends State<VideoPreviewPlayer> {
         _controller.setVolume(0); // Mute by default for preview
         _controller.play();
       }
+    }).catchError((error) {
+      debugPrint("Video initialization failed: $error");
+      if (mounted) {
+        setState(() {
+          _isInitialized = false;
+        });
+      }
     });
   }
 
@@ -67,12 +74,47 @@ class _VideoPreviewPlayerState extends State<VideoPreviewPlayer> {
 
   @override
   Widget build(BuildContext context) {
+    if (_controller.value.hasError) {
+      return Container(
+        height: widget.height,
+        width: widget.width,
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, color: Colors.red[300], size: 40),
+            const SizedBox(height: 8),
+            Text(
+              "Error loading video",
+              style: TextStyle(color: Colors.red[300], fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (!_isInitialized) {
       return Container(
         height: widget.height,
         width: widget.width,
-        color: Colors.black12,
-        child: const Center(child: CircularProgressIndicator()),
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.video_collection_outlined, color: Colors.grey[400], size: 40),
+            const SizedBox(height: 8),
+            const Text(
+              "Video loading...",
+              style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+          ],
+        ),
       );
     }
 

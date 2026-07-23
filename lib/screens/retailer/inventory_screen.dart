@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../widgets/video_preview_player.dart';
 
 void main() => runApp(
   const MaterialApp(debugShowCheckedModeBanner: false, home: InventoryScreen()),
@@ -11,6 +12,7 @@ void main() => runApp(
 class ProductColorVariant {
   String colorName;
   String imagePath;
+  String? videoPath;
   bool isAsset;
   double price;
   int stock;
@@ -18,6 +20,7 @@ class ProductColorVariant {
   ProductColorVariant({
     required this.colorName,
     required this.imagePath,
+    this.videoPath,
     this.isAsset = false,
     this.price = 0,
     this.stock = 0,
@@ -26,6 +29,7 @@ class ProductColorVariant {
   Map<String, dynamic> toMap() => {
     'colorName': colorName,
     'imagePath': imagePath,
+    'videoPath': videoPath,
     'isAsset': isAsset,
     'price': price,
     'stock': stock,
@@ -35,6 +39,7 @@ class ProductColorVariant {
     return ProductColorVariant(
       colorName: map['colorName'] as String? ?? '',
       imagePath: map['imagePath'] as String? ?? '',
+      videoPath: map['videoPath'] as String?,
       isAsset: map['isAsset'] as bool? ?? false,
       price: (map['price'] as num?)?.toDouble() ?? 0,
       stock: (map['stock'] as num?)?.toInt() ?? 0,
@@ -233,6 +238,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           ProductColorVariant(
             colorName: "White",
             imagePath: 'assets/images/fab.jpg',
+            videoPath: 'assets/images/Videos/vid1.mp4',
             isAsset: true,
             price: 650,
             stock: 45,
@@ -240,6 +246,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           ProductColorVariant(
             colorName: "Beige",
             imagePath: 'assets/images/fab2.jpg',
+            videoPath: 'assets/images/Videos/vid2.mp4',
             isAsset: true,
             price: 680,
             stock: 30,
@@ -247,6 +254,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           ProductColorVariant(
             colorName: "Ivory",
             imagePath: 'assets/images/fab.jpg',
+            videoPath: 'assets/images/Videos/vid3.mp4',
             isAsset: true,
             price: 720,
             stock: 6,
@@ -612,21 +620,41 @@ class _InventoryScreenState extends State<InventoryScreen>
                         ),
                       ),
                     ),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: selectedVariant.isAsset
-                          ? Image.asset(
-                              selectedVariant.imagePath,
-                              height: 250,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                            )
-                          : Image.file(
-                              File(selectedVariant.imagePath),
-                              height: 250,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
+                    const SizedBox(height: 20),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: selectedVariant.isAsset
+                                ? Image.asset(
+                                    selectedVariant.imagePath,
+                                    height: 250,
+                                    width: MediaQuery.of(context).size.width * 0.7,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Image.file(
+                                    File(selectedVariant.imagePath),
+                                    height: 250,
+                                    width: MediaQuery.of(context).size.width * 0.7,
+                                    fit: BoxFit.cover,
+                                  ),
+                          ),
+                          if (selectedVariant.videoPath != null) ...[
+                            const SizedBox(width: 12),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: VideoPreviewPlayer(
+                                videoPath: selectedVariant.videoPath!,
+                                isAsset: selectedVariant.isAsset,
+                                height: 250,
+                                width: MediaQuery.of(context).size.width * 0.7,
+                              ),
                             ),
+                          ],
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 20),
                     Row(
@@ -1220,6 +1248,41 @@ class _InventoryScreenState extends State<InventoryScreen>
                                                     File(variant.imagePath),
                                                     fit: BoxFit.cover,
                                                   ),
+                                          ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                GestureDetector(
+                                  onTap: () async {
+                                    final XFile? video = await _picker
+                                        .pickVideo(source: ImageSource.gallery);
+                                    if (video != null) {
+                                      setM(() {
+                                        variant.videoPath = video.path;
+                                        variant.isAsset = false;
+                                      });
+                                    }
+                                  },
+                                  child: Container(
+                                    width: 60,
+                                    height: 60,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: Colors.green.shade100,
+                                      ),
+                                    ),
+                                    child: variant.videoPath == null
+                                        ? const Icon(
+                                            Icons.video_call,
+                                            size: 20,
+                                            color: Colors.green,
+                                          )
+                                        : const Icon(
+                                            Icons.videocam,
+                                            size: 20,
+                                            color: Colors.blue,
                                           ),
                                   ),
                                 ),
