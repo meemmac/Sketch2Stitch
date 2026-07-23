@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/measurement.dart';
+import '../browsing/browse_shell.dart';
 import 'reviews_screen.dart';
 
 enum OrderDeliveryDestination { retailer, tailor }
@@ -781,10 +782,83 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 Text("Tk ${order.amount.toInt()}", style: TextStyle(color: Colors.green.shade900, fontSize: 16, fontWeight: FontWeight.w900)),
               ],
             ),
+            if (!order.isDelivered && firstItem.tailorStatus != null)
+              _buildNoticeableNote(firstItem.tailorStatus!),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildNoticeableNote(TailorStatus status) {
+    if (status == TailorStatus.notAssigned || status == TailorStatus.cancelled) {
+      return Container(
+        margin: const EdgeInsets.only(top: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.orange.shade100),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.orange.shade900, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: RichText(
+                text: TextSpan(
+                  style: TextStyle(color: Colors.orange.shade900, fontSize: 11, fontWeight: FontWeight.w600),
+                  children: [
+                    const TextSpan(text: "If you want to assign tailor "),
+                    WidgetSpan(
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const BrowseShell(initialIndex: 2)),
+                          );
+                        },
+                        child: Text(
+                          "browse tailor",
+                          style: TextStyle(
+                            color: Colors.orange.shade900,
+                            fontWeight: FontWeight.w800,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (status == TailorStatus.pending) {
+      return Container(
+        margin: const EdgeInsets.only(top: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.blue.shade100),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.timer_outlined, color: Colors.blue.shade900, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                "Tailor will respond within 24 hours. You can cancel manually before that.",
+                style: TextStyle(color: Colors.blue.shade900, fontSize: 11, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 
   Widget _orderInfo(IconData icon, String text) {
@@ -927,6 +1001,100 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               Text("Tk ${item.price.toInt()}", style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.w900)),
             ],
           ),
+          if (item.tailorStatus != null) ...[
+            if (item.tailorStatus == TailorStatus.pending)
+              Container(
+                margin: const EdgeInsets.only(top: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.shade100),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.timer_outlined, color: Colors.blue.shade900, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            "Tailor will accept or reject your request within 24 hours. You can manually cancel the request before then.",
+                            style: TextStyle(color: Colors.blue.shade900, fontSize: 13, height: 1.4, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Tailor request cancelled successfully.")),
+                          );
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade50,
+                          foregroundColor: Colors.red.shade800,
+                          elevation: 0,
+                          side: BorderSide(color: Colors.red.shade100),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Text("Cancel Tailor Request", style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else if (item.tailorStatus == TailorStatus.notAssigned || item.tailorStatus == TailorStatus.cancelled)
+              Container(
+                margin: const EdgeInsets.only(top: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.orange.shade100),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.orange.shade900, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: RichText(
+                        text: TextSpan(
+                          style: TextStyle(color: Colors.orange.shade900, fontSize: 13, height: 1.4, fontWeight: FontWeight.w600),
+                          children: [
+                            const TextSpan(text: "If you want to assign tailor "),
+                            WidgetSpan(
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.pop(context); // Close modal
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const BrowseShell(initialIndex: 2)),
+                                  );
+                                },
+                                child: Text(
+                                  "browse tailor",
+                                  style: TextStyle(
+                                    color: Colors.orange.shade900,
+                                    fontWeight: FontWeight.w900,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
           if (sentToTailor) ...[
             const SizedBox(height: 16),
             const Divider(),
