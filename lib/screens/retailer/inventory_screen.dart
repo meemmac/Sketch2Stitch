@@ -662,33 +662,43 @@ class _InventoryScreenState extends State<InventoryScreen>
                       ),
                     ),
                     const SizedBox(height: 20),
+                    // Title
+                    Text(
+                      item.name,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Price and Delivery
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(
-                          child: Text(
-                            item.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        Text(
+                          "Tk ${selectedVariant.price.toInt()}",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green.shade800,
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Flexible(
-                          child: Text(
-                            "Tk ${selectedVariant.price.toInt()}",
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.right,
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.green.shade800,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.directions_bike,
+                                size: 18, color: Colors.grey[600]),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Tk 50 delivery',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
