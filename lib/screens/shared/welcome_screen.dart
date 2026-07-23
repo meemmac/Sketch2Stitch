@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
 import 'about_us_screen.dart';
-import 'firebase_test_screen.dart';
-import '../test_cloudinary_screen.dart';
+// import 'firebase_test_screen.dart';
+// import '../test_cloudinary_screen.dart';
 
 void main() {
   runApp(const Sketch2StitchApp());
@@ -189,7 +189,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
             ),
           ),
 
-          Positioned(
+          /* Positioned(
             bottom: 10,
             left: 10,
             child: Opacity(
@@ -202,7 +202,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                 ),
               ),
             ),
-          ),
+          ), */
         ],
       ),
     );
@@ -247,13 +247,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
               ),
             ),
           ),
-          _buildGlassIconButton(
+          /* _buildGlassIconButton(
             icon: Icons.cloud_upload_outlined,
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const TestCloudinaryScreen()),
             ),
-          ),
+          ), */
         ],
       ),
     );
