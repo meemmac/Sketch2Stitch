@@ -31,9 +31,9 @@ final List<Product> kHardcodedProducts = [
     category: 'Silk',
     materialType: 'Silk',
     colorOptions: [
-      ColorOption(optionId: 1, color: 'Gold', image: 'assets/images/silk.jpg', price: 1800, stock: 10),
-      ColorOption(optionId: 2, color: 'Pink', image: 'assets/images/saree.jpg', price: 1750, stock: 8),
-      ColorOption(optionId: 3, color: 'Green', image: 'assets/images/gorgeous.jpg', price: 1750, stock: 5),
+      ColorOption(optionId: 1, color: 'Gold', image: 'assets/images/silk.jpg', video: 'assets/images/Videos/vid2.mp4', price: 1800, stock: 10),
+      ColorOption(optionId: 2, color: 'Pink', image: 'assets/images/saree.jpg', video: 'assets/images/Videos/vid3.mp4', price: 1750, stock: 8),
+      ColorOption(optionId: 3, color: 'Green', image: 'assets/images/gorgeous.jpg', video: 'assets/images/Videos/vid1.mp4', price: 1750, stock: 5),
       ColorOption(optionId: 4, color: 'White', image: 'assets/images/gorgette.jpg', price: 1700, stock: 12),
     ],
     description:
@@ -48,8 +48,8 @@ final List<Product> kHardcodedProducts = [
     category: 'Wool',
     materialType: 'Wool',
     colorOptions: [
-      ColorOption(optionId: 1, color: 'Brown', image: 'assets/images/drawing_fabric.jpg', price: 950, stock: 18),
-      ColorOption(optionId: 2, color: 'Black', image: 'assets/images/textile.jpg', price: 950, stock: 20),
+      ColorOption(optionId: 1, color: 'Brown', image: 'assets/images/drawing_fabric.jpg', video: 'assets/images/Videos/vid3.mp4', price: 950, stock: 18),
+      ColorOption(optionId: 2, color: 'Black', image: 'assets/images/textile.jpg', video: 'assets/images/Videos/vid2.mp4', price: 950, stock: 20),
       ColorOption(optionId: 3, color: 'Beige', image: 'assets/images/fabric_waves.jpg', price: 900, stock: 0),
     ],
     description:
@@ -64,8 +64,8 @@ final List<Product> kHardcodedProducts = [
     category: 'Linen',
     materialType: 'Linen',
     colorOptions: [
-      ColorOption(optionId: 1, color: 'White', image: 'assets/images/fabrics_rolled.jpg', price: 780, stock: 30),
-      ColorOption(optionId: 2, color: 'Beige', image: 'assets/images/fab.jpg', price: 780, stock: 22),
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/fabrics_rolled.jpg', video: 'assets/images/Videos/vid1.mp4', price: 780, stock: 30),
+      ColorOption(optionId: 2, color: 'Beige', image: 'assets/images/fab.jpg', video: 'assets/images/Videos/vid2.mp4', price: 780, stock: 22),
       ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/fabric_waves.jpg', price: 820, stock: 14),
     ],
     description:
@@ -177,7 +177,7 @@ final List<Product> kHardcodedElements = [
     category: 'Fasteners',
     materialType: 'Metal',
     colorOptions: [
-      ColorOption(optionId: 1, color: 'Silver', image: 'assets/images/zipper.jpg', video: 'assets/images/Videos/vid1.mp4', price: 120, stock: 100),
+      ColorOption(optionId: 1, color: 'Silver', image: 'assets/images/zipper.jpg', price: 120, stock: 100),
       ColorOption(optionId: 2, color: 'Gold', image: 'assets/images/zipper_gold.jpg', price: 150, stock: 50),
       ColorOption(optionId: 3, color: 'Black', image: 'assets/images/zipper.jpg', price: 130, stock: 75),
     ],

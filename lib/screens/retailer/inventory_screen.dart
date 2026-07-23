@@ -280,6 +280,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           ProductColorVariant(
             colorName: "Gold",
             imagePath: 'assets/images/silk.jpg',
+            videoPath: 'assets/images/Videos/vid2.mp4',
             isAsset: true,
             price: 1800,
             stock: 12,
@@ -287,6 +288,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           ProductColorVariant(
             colorName: "Pink",
             imagePath: 'assets/images/saree.jpg',
+            videoPath: 'assets/images/Videos/vid3.mp4',
             isAsset: true,
             price: 1750,
             stock: 8,
@@ -294,6 +296,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           ProductColorVariant(
             colorName: "Emerald",
             imagePath: 'assets/images/gorgeous.jpg',
+            videoPath: 'assets/images/Videos/vid1.mp4',
             isAsset: true,
             price: 1950,
             stock: 5,
@@ -349,6 +352,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           ProductColorVariant(
             colorName: "Natural",
             imagePath: 'assets/images/fab2.jpg',
+            videoPath: 'assets/images/Videos/vid1.mp4',
             isAsset: true,
             price: 1120,
             stock: 18,
@@ -356,6 +360,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           ProductColorVariant(
             colorName: "Sage",
             imagePath: 'assets/images/fabrics_rolled.jpg',
+            videoPath: 'assets/images/Videos/vid2.mp4',
             isAsset: true,
             price: 1180,
             stock: 9,
