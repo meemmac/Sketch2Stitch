@@ -11,9 +11,10 @@ class TailorOrderItem {
   final String color;
   final String? measurementRefImage;
   final String? tailorInstructions;
-  final double servicePrice;
+  double servicePrice;
+  DateTime? estimatedDeliveryDate;
 
-  const TailorOrderItem({
+  TailorOrderItem({
     required this.name,
     required this.quantity,
     required this.imagePath,
@@ -21,6 +22,7 @@ class TailorOrderItem {
     required this.servicePrice,
     this.measurementRefImage,
     this.tailorInstructions,
+    this.estimatedDeliveryDate,
   });
 }
 
@@ -100,7 +102,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
       isCompleted: false,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
       items: [
-        const TailorOrderItem(
+        TailorOrderItem(
           name: "Premium Linen Kurti",
           quantity: 1,
           imagePath: "assets/images/fabrics_rolled.jpg",
@@ -120,7 +122,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
       isCompleted: false,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
       items: [
-        const TailorOrderItem(
+        TailorOrderItem(
           name: "Printed Voile Summer Dress",
           quantity: 2,
           imagePath: "assets/images/gorgeous.jpg",
@@ -143,7 +145,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
       customerReview: "Best tailor experience ever. The fit is top-notch.",
       customerRating: 5.0,
       items: [
-        const TailorOrderItem(
+        TailorOrderItem(
           name: "Banarasi Silk Lehenga Blouse",
           quantity: 1,
           imagePath: "assets/images/silk.jpg",
@@ -513,7 +515,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
               const SizedBox(height: 20),
               const Text("Customer Requirements", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
-              ...order.items.map((item) => _itemPreviewCard(item)),
+              ...order.items.map((item) => _itemPreviewCard(order, item)),
               const SizedBox(height: 30),
               const Text("Job Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
@@ -584,7 +586,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     );
   }
 
-  Widget _itemPreviewCard(TailorOrderItem item) {
+  Widget _itemPreviewCard(TailorOrder order, TailorOrderItem item) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -611,6 +613,83 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
               Text("Tk ${item.servicePrice.toInt()}", style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.w900)),
             ],
           ),
+          if (order.status == TailorOrderStatus.pending) ...[
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 8),
+            const Text("Set Your Quote", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("Stitching Price (Tk)", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: "e.g. 1500",
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          isDense: true,
+                        ),
+                        onChanged: (val) {
+                          setState(() {
+                            item.servicePrice = double.tryParse(val) ?? item.servicePrice;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("Est. Delivery Date", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
+                      const SizedBox(height: 6),
+                      InkWell(
+                        onTap: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime.now().add(const Duration(days: 7)),
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (date != null) {
+                            setState(() {
+                              item.estimatedDeliveryDate = date;
+                            });
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade400),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.calendar_today, size: 14, color: primaryGreen),
+                              const SizedBox(width: 8),
+                              Text(
+                                item.estimatedDeliveryDate != null ? _formatDate(item.estimatedDeliveryDate!) : "Select Date",
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 16),
           const Divider(),
           const SizedBox(height: 8),
