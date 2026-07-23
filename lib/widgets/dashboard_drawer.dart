@@ -9,6 +9,7 @@ import '../models/measurement.dart';
 import '../screens/shared/welcome_screen.dart';
 import '../screens/shared/about_us_screen.dart';
 import '../screens/tailor/portfolio_screen.dart';
+import '../screens/tailor/orders_screen.dart';
 import '../screens/customer/cart_screen.dart';
 import '../screens/customer/orders/order_detail_screen.dart';
 
@@ -541,6 +542,13 @@ class DrawerNavigationSection extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (_) => const OrderDetailScreen(),
+                    ),
+                  );
+                } else if (role == AppUserRole.tailor) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const TailorOrdersScreen(),
                     ),
                   );
                 }

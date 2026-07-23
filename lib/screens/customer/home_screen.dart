@@ -15,6 +15,7 @@ import '../../widgets/dashboard_drawer.dart';
 import 'virtual_trial_screen.dart';
 import 'notification_screen.dart' ;
 import 'package:sketch2stitch/screens/retailer/inventory_screen.dart';
+import 'package:sketch2stitch/screens/tailor/orders_screen.dart';
 import 'track_order.dart';
 
 class UnifiedHomeScreen extends StatefulWidget {
@@ -761,7 +762,10 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              // TODO: Navigate to orders
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TailorOrdersScreen()),
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.teal.shade700,
