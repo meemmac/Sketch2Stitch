@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../models/measurement.dart';
 
 enum OrderDeliveryDestination { retailer, tailor }
 
@@ -86,6 +87,124 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   bool _showOngoing = true;
 
   final Color primaryGreen = const Color(0xFF4F7942);
+
+  final Measurement _mockMeasurement = Measurement(
+    id: "meas_123",
+    customerId: "cust_456",
+    upperBustCircumference: 34.5,
+    roundShoulderCircumference: 40.0,
+    hipsCircumference: 38.0,
+    underBustCircumference: 32.0,
+    bustCircumference: 36.0,
+    waist: 28.5,
+    shoulderToKnee: 37.0,
+    shoulderToUnderBust: 13.0,
+    shoulderToBust: 10.5,
+    thigh: 22.0,
+    knee: 15.0,
+    ankle: 9.5,
+    waistToAnkle: 40.0,
+    shoulderToAnkle: 55.0,
+  );
+
+  void _showMeasurements() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const Text(
+              "My Measurements",
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              "Current body measurements used for this order.",
+              style: TextStyle(color: Colors.black54, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: ListView(
+                children: [
+                  _measurementTile("Upper Bust", _mockMeasurement.upperBustCircumference),
+                  _measurementTile("Bust", _mockMeasurement.bustCircumference),
+                  _measurementTile("Under Bust", _mockMeasurement.underBustCircumference),
+                  _measurementTile("Round Shoulder", _mockMeasurement.roundShoulderCircumference),
+                  _measurementTile("Waist", _mockMeasurement.waist),
+                  _measurementTile("Hips", _mockMeasurement.hipsCircumference),
+                  _measurementTile("Shoulder to Bust", _mockMeasurement.shoulderToBust),
+                  _measurementTile("Shoulder to Under Bust", _mockMeasurement.shoulderToUnderBust),
+                  _measurementTile("Shoulder to Knee", _mockMeasurement.shoulderToKnee),
+                  _measurementTile("Shoulder to Ankle", _mockMeasurement.shoulderToAnkle),
+                  _measurementTile("Waist to Ankle", _mockMeasurement.waistToAnkle),
+                  _measurementTile("Thigh", _mockMeasurement.thigh),
+                  _measurementTile("Knee", _mockMeasurement.knee),
+                  _measurementTile("Ankle", _mockMeasurement.ankle),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryGreen,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text("Close", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _measurementTile(String label, double value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.green.shade100),
+            ),
+            child: Text(
+              "$value in",
+              style: TextStyle(color: primaryGreen, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   late final List<CustomerOrder> _orders = <CustomerOrder>[
     CustomerOrder(
@@ -666,9 +785,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ),
                       const SizedBox(height: 8),
                       TextButton.icon(
-                        onPressed: () {
-                          // View measurements logic
-                        },
+                        onPressed: _showMeasurements,
                         icon: const Icon(Icons.straighten, size: 14),
                         label: const Text("View My Measurements", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                         style: TextButton.styleFrom(
