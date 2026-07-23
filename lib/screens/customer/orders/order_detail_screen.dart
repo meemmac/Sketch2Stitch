@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../../models/measurement.dart';
+import 'reviews_screen.dart';
 
 enum OrderDeliveryDestination { retailer, tailor }
+
+enum TailorStatus { notAssigned, pending, cancelled, confirmed }
 
 class OrderItem {
   final String name;
@@ -21,6 +24,7 @@ class OrderItem {
   final OrderDeliveryDestination destination;
   final String? measurementRefImage;
   final String? tailorInstructions;
+  final TailorStatus? tailorStatus;
 
   const OrderItem({
     required this.name,
@@ -38,6 +42,7 @@ class OrderItem {
     this.destination = OrderDeliveryDestination.retailer,
     this.measurementRefImage,
     this.tailorInstructions,
+    this.tailorStatus,
   });
 }
 
@@ -52,6 +57,8 @@ class CustomerOrder {
   bool isDelivered;
   final String? review;
   final double? rating;
+  final String? tailorReview;
+  final double? tailorRating;
   final String deliveryAddress;
 
   CustomerOrder({
@@ -66,6 +73,8 @@ class CustomerOrder {
     this.deliveryDate,
     this.review,
     this.rating,
+    this.tailorReview,
+    this.tailorRating,
   });
 
   int get totalQuantity => items.fold(0, (sum, item) => sum + item.quantity);
@@ -206,7 +215,95 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
+  String _getTailorStatusText(TailorStatus status) {
+    switch (status) {
+      case TailorStatus.notAssigned:
+        return "Tailor not assigned";
+      case TailorStatus.pending:
+        return "Not yet confirmed by tailor";
+      case TailorStatus.cancelled:
+        return "Cancelled by tailor";
+      case TailorStatus.confirmed:
+        return "Confirmed";
+    }
+  }
+
+  Color _getTailorStatusColor(TailorStatus status) {
+    switch (status) {
+      case TailorStatus.notAssigned:
+        return Colors.grey.shade600;
+      case TailorStatus.pending:
+        return Colors.orange.shade800;
+      case TailorStatus.cancelled:
+        return Colors.red.shade800;
+      case TailorStatus.confirmed:
+        return primaryGreen;
+    }
+  }
+
+  Widget _tailorStatusBadge(TailorStatus status) {
+    final color = _getTailorStatusColor(status);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        _getTailorStatusText(status),
+        style: TextStyle(
+          color: color,
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
   late final List<CustomerOrder> _orders = <CustomerOrder>[
+    CustomerOrder(
+      id: "ORD-9654",
+      retailerName: "Zaroon Fabrics",
+      amount: 4500,
+      orderDate: DateTime.now().subtract(const Duration(days: 2)),
+      status: "On Hold",
+      isDelivered: false,
+      deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
+      items: [
+        const OrderItem(
+          name: "Embroidered Lawn",
+          quantity: 2,
+          price: 4500,
+          imagePath: "assets/images/fabrics_rolled.jpg",
+          color: "Emerald Green",
+          destination: OrderDeliveryDestination.tailor,
+          tailorStatus: TailorStatus.cancelled,
+          measurementRefImage: "assets/images/ref4.jpg",
+          tailorInstructions: "The gher of the kameez should be just like the reference picture give.",
+        ),
+      ],
+    ),
+    CustomerOrder(
+      id: "ORD-9543",
+      retailerName: "Silk & Cotton",
+      amount: 3200,
+      orderDate: DateTime.now().subtract(const Duration(days: 1)),
+      status: "Processing",
+      isDelivered: false,
+      deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
+      items: [
+        const OrderItem(
+          name: "Premium Cotton",
+          quantity: 2,
+          price: 3200,
+          imagePath: "assets/images/denim.jpg",
+          color: "Navy Blue",
+          destination: OrderDeliveryDestination.retailer,
+          tailorStatus: TailorStatus.confirmed,
+        ),
+      ],
+    ),
     CustomerOrder(
       id: "ORD-9921",
       retailerName: "Zaroon Fabrics",
@@ -224,6 +321,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           color: "Cream",
           description: "High-quality linen fabric for summer wear.",
           destination: OrderDeliveryDestination.tailor,
+          tailorStatus: TailorStatus.pending,
           measurementRefImage: "assets/images/ref1.jpg",
           tailorInstructions: "Please use this linen for the pants. Ensure the length is precisely 42 inches as per my saved measurements and just like the reference picture.",
         ),
@@ -253,6 +351,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           color: "Deep Red",
           description: "Traditional Rajshahi silk with gold border.",
           destination: OrderDeliveryDestination.tailor,
+          tailorStatus: TailorStatus.notAssigned,
           measurementRefImage: "assets/images/ref3.jpg",
           tailorInstructions: "Use this silk for a traditional Saree blouse. Reference the attached image for the back design.",
         ),
@@ -269,6 +368,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
       review: "Excellent quality and fast delivery. Very satisfied!",
       rating: 5.0,
+      tailorReview: "The stitching is perfect and fits me exactly as I wanted. Highly recommended!",
+      tailorRating: 4.8,
       items: [
         const OrderItem(
           name: "Printed Voile",
@@ -277,8 +378,58 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           imagePath: "assets/images/gorgeous.jpg",
           color: "Floral Blue",
           destination: OrderDeliveryDestination.tailor,
+          tailorStatus: TailorStatus.confirmed,
           measurementRefImage: "assets/images/ref2.jpg",
           tailorInstructions: "Create a summer kurti. Use the printed patterns for the sleeves as shown in the reference picture.",
+        ),
+      ],
+    ),
+    CustomerOrder(
+      id: "ORD-9421",
+      retailerName: "Bismillah Fabrics",
+      amount: 2800,
+      orderDate: DateTime.now().subtract(const Duration(days: 60)),
+      deliveryDate: DateTime.now().subtract(const Duration(days: 52)),
+      status: "Delivered",
+      isDelivered: true,
+      deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
+      review: "Good quality fabric, but shipping took a bit longer than expected.",
+      rating: 4.0,
+      items: [
+        const OrderItem(
+          name: "Soft Georgette",
+          quantity: 3,
+          price: 2800,
+          imagePath: "assets/images/fabrics_rolled.jpg",
+          color: "Peach",
+          destination: OrderDeliveryDestination.retailer,
+        ),
+      ],
+    ),
+    CustomerOrder(
+      id: "ORD-9310",
+      retailerName: "Style Hub",
+      amount: 6500,
+      orderDate: DateTime.now().subtract(const Duration(days: 90)),
+      deliveryDate: DateTime.now().subtract(const Duration(days: 82)),
+      status: "Delivered",
+      isDelivered: true,
+      deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
+      review: "The silk is absolutely stunning. Worth every penny!",
+      rating: 5.0,
+      tailorReview: "Best tailor experience ever. The fit is top-notch.",
+      tailorRating: 5.0,
+      items: [
+        const OrderItem(
+          name: "Banarasi Silk",
+          quantity: 1,
+          price: 6500,
+          imagePath: "assets/images/silk.jpg",
+          color: "Magenta",
+          destination: OrderDeliveryDestination.tailor,
+          tailorStatus: TailorStatus.confirmed,
+          measurementRefImage: "assets/images/ref1.jpg",
+          tailorInstructions: "Please make a classic lehenga blouse with a high neck.",
         ),
       ],
     ),
@@ -537,6 +688,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             Icon(icon, color: primaryGreen, size: 20),
             const SizedBox(width: 8),
             Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+            if (!_showOngoing) ...[
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CustomerReviewsScreen()),
+                  );
+                },
+                icon: const Icon(Icons.star_outline, size: 16),
+                label: const Text("See Reviews"),
+                style: TextButton.styleFrom(
+                  foregroundColor: primaryGreen,
+                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
           ],
         ),
         const SizedBox(height: 12),
@@ -589,6 +757,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     children: [
                       Text(order.id, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
                       Text(order.retailerName, style: const TextStyle(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.w600)),
+                      if (!order.isDelivered && firstItem.tailorStatus != null) ...[
+                        const SizedBox(height: 6),
+                        _tailorStatusBadge(firstItem.tailorStatus!),
+                      ],
                     ],
                   ),
                 ),
@@ -682,11 +854,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   Text("Tk ${order.amount.toInt()}", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.green.shade800)),
                 ],
               ),
-              if (order.isDelivered && order.review != null) ...[
+              if (order.isDelivered && (order.review != null || order.tailorReview != null)) ...[
                 const SizedBox(height: 35),
-                const Text("Your Review", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text("Your Reviews", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
-                _reviewCard(order),
+                if (order.review != null) ...[
+                  _reviewCard("Retailer Review", order.review!, order.rating ?? 0.0, Colors.blue),
+                  const SizedBox(height: 12),
+                ],
+                if (order.tailorReview != null) ...[
+                  _reviewCard("Tailor Review", order.tailorReview!, order.tailorRating ?? 0.0, Colors.orange),
+                ],
               ],
               const SizedBox(height: 40),
             ],
@@ -720,21 +898,29 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(item.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   Text("Qty: ${item.quantity} | Color: ${item.color}", style: const TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: sentToTailor ? Colors.orange.shade50 : Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      sentToTailor ? "Send to Tailor" : "Send to Customer",
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: sentToTailor ? Colors.orange.shade900 : Colors.blue.shade900,
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: sentToTailor ? Colors.orange.shade50 : Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          sentToTailor ? "Send to Tailor" : "Send to Retailer",
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: sentToTailor ? Colors.orange.shade900 : Colors.blue.shade900,
+                          ),
+                        ),
                       ),
-                    ),
+                      if (item.tailorStatus != null)
+                        _tailorStatusBadge(item.tailorStatus!),
+                    ],
                   ),
                 ]),
               ),
@@ -849,19 +1035,49 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  Widget _reviewCard(CustomerOrder order) {
+  Widget _reviewCard(String title, String review, double rating, Color themeColor) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.blue.shade100)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          ...List.generate(5, (index) => Icon(index < (order.rating ?? 0).floor() ? Icons.star : Icons.star_border, color: Colors.blue.shade800, size: 20)),
-          const SizedBox(width: 8),
-          Text(order.rating?.toString() ?? "0.0", style: TextStyle(color: Colors.blue.shade900, fontWeight: FontWeight.w900, fontSize: 16)),
-        ]),
-        const SizedBox(height: 10),
-        Text("\"${order.review}\"", style: TextStyle(color: Colors.blue.shade900, fontSize: 14, fontStyle: FontStyle.italic, height: 1.4, fontWeight: FontWeight.w600)),
-      ]),
+      decoration: BoxDecoration(
+        color: themeColor.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: themeColor.withValues(alpha: 0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: TextStyle(color: themeColor.withValues(alpha: 0.8), fontSize: 13, fontWeight: FontWeight.w800),
+              ),
+              Row(
+                children: [
+                  Icon(Icons.star, color: themeColor.withValues(alpha: 0.8), size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    rating.toString(),
+                    style: TextStyle(color: themeColor.withValues(alpha: 0.9), fontWeight: FontWeight.w900, fontSize: 14),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            "\"$review\"",
+            style: TextStyle(
+              color: Colors.black87,
+              fontSize: 14,
+              fontStyle: FontStyle.italic,
+              height: 1.4,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
