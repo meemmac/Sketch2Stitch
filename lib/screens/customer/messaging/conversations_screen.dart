@@ -259,6 +259,44 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     }
   }
 
+  int _getUnreadCount(Conversation conversation) {
+    if (conversation.messages == null || conversation.messages!.isEmpty) {
+      return 0;
+    }
+    return conversation.messages!.where((m) => 
+      m.senderId != widget.customerId
+    ).length;
+  }
+
+  void _markConversationAsRead(Conversation conversation) {
+    setState(() {
+      // Find the conversation and mark all messages as read
+      final index = _conversations.indexWhere((c) => c.id == conversation.id);
+      if (index != -1) {
+        final updatedMessages = _conversations[index].messages?.map((m) {
+          if (m.senderId != widget.customerId) {
+            // Mark as read by creating a new message with the same properties
+            return Message(
+              id: m.id,
+              conversationId: m.conversationId,
+              senderId: m.senderId,
+              senderRole: m.senderRole,
+              msgText: m.msgText,
+              attachment: m.attachment,
+              sentAt: m.sentAt,
+            );
+          }
+          return m;
+        }).toList();
+        
+        _conversations[index] = _conversations[index].copyWith(
+          messages: updatedMessages,
+        );
+      }
+      _applyFilter();
+    });
+  }
+
   void _showNewConversationDialog() {
     final List<Map<String, dynamic>> contacts = [
       {'id': 't3', 'name': 'Fatima Noor', 'role': UserRole.tailor, 'avatar': 'assets/images/lace.jpg'},
@@ -437,6 +475,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         getLastMessage: _getLastMessage,
         customerId: widget.customerId,
         onConversationTap: (conversation) {
+          _markConversationAsRead(conversation);
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -606,12 +645,12 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     final lastMessage = _getLastMessage(conversation);
     final lastTime = _getLastMessageTime(conversation);
     
-    final unreadCount = conversation.messages?.where((m) => 
-      m.senderId != widget.customerId
-    ).length ?? 0;
+    final unreadCount = _getUnreadCount(conversation);
 
     return GestureDetector(
       onTap: () {
+        // Mark as read before navigating
+        _markConversationAsRead(conversation);
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -634,7 +673,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: unreadCount > 0 ? const Color(0xFFE8F0FE) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
@@ -690,14 +729,36 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          otherName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        child: Row(
+                          children: [
+                            Text(
+                              otherName,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (unreadCount > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF075E54),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  unreadCount.toString(),
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                       Text(
@@ -705,6 +766,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[500],
+                          fontWeight: unreadCount > 0 ? FontWeight.w600 : FontWeight.normal,
                         ),
                       ),
                     ],
@@ -729,31 +791,13 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                           lastMessage,
                           style: TextStyle(
                             fontSize: 13,
-                            color: Colors.grey[600],
+                            color: unreadCount > 0 ? Colors.black87 : Colors.grey[600],
+                            fontWeight: unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (unreadCount > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF075E54),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            unreadCount.toString(),
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
                     ],
                   ),
                 ],
@@ -915,6 +959,7 @@ class _ConversationSearchDelegate extends SearchDelegate {
         icon: const Icon(Icons.clear, color: Colors.white),
         onPressed: () {
           query = '';
+          showSuggestions(context);
         },
       ),
     ];
@@ -985,7 +1030,7 @@ class _ConversationSearchDelegate extends SearchDelegate {
             margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: unreadCount > 0 ? const Color(0xFFE8F0FE) : Colors.white,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
@@ -1038,14 +1083,36 @@ class _ConversationSearchDelegate extends SearchDelegate {
                       Row(
                         children: [
                           Expanded(
-                            child: Text(
-                              otherName,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            child: Row(
+                              children: [
+                                Text(
+                                  otherName,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (unreadCount > 0) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF075E54),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      unreadCount.toString(),
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
                           Text(
@@ -1053,6 +1120,7 @@ class _ConversationSearchDelegate extends SearchDelegate {
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey[500],
+                              fontWeight: unreadCount > 0 ? FontWeight.w600 : FontWeight.normal,
                             ),
                           ),
                         ],
@@ -1077,31 +1145,13 @@ class _ConversationSearchDelegate extends SearchDelegate {
                               lastMessage,
                               style: TextStyle(
                                 fontSize: 13,
-                                color: Colors.grey[600],
+                                color: unreadCount > 0 ? Colors.black87 : Colors.grey[600],
+                                fontWeight: unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          if (unreadCount > 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF075E54),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Text(
-                                unreadCount.toString(),
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
                         ],
                       ),
                     ],

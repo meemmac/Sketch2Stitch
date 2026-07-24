@@ -43,6 +43,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   String? _replyingToMessageText;
   Message? _selectedMessage;
   bool _isMuted = false;
+  int _muteDurationHours = 8; // Default 8 hours
   late AnimationController _typingAnimationController;
   late Animation<double> _typingAnimation;
 
@@ -260,25 +261,35 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _pickDocument() async {
-    // Show document picker dialog
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text('Select Document'),
-          content: const Text('Document picker will be available soon.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
+    final XFile? document = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 80,
     );
+    
+    if (document != null) {
+      final newMessage = Message(
+        id: 'm${_messages.length + 1}',
+        conversationId: widget.conversationId,
+        senderId: widget.customerId,
+        senderRole: UserRole.customer,
+        msgText: '📄 Document shared',
+        attachment: document.path,
+        sentAt: DateTime.now(),
+      );
+
+      setState(() {
+        _messages.add(newMessage);
+      });
+      _scrollToBottom();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Document shared!'),
+          backgroundColor: Color(0xFF075E54),
+        ),
+      );
+    }
   }
 
   void _showAttachmentOptions() {
@@ -341,88 +352,12 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                         _pickDocument();
                       },
                     ),
-                    _buildAttachmentOption(
-                      icon: Icons.location_on,
-                      label: 'Location',
-                      color: Colors.red,
-                      onTap: () {
-                        Navigator.pop(context);
-                        _shareLocation();
-                      },
-                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
               ],
             ),
           ),
-        );
-      },
-    );
-  }
-
-  void _shareLocation() {
-    // Show a dialog with sample location
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text('Share Location'),
-          content: const Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.location_on, size: 48, color: Color(0xFF075E54)),
-              SizedBox(height: 8),
-              Text('Your current location: Dhaka, Bangladesh'),
-              SizedBox(height: 4),
-              Text(
-                'Latitude: 23.8103° N',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              Text(
-                'Longitude: 90.4125° E',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                // Send location message
-                final newMessage = Message(
-                  id: 'm${_messages.length + 1}',
-                  conversationId: widget.conversationId,
-                  senderId: widget.customerId,
-                  senderRole: UserRole.customer,
-                  msgText: '📍 My location: Dhaka, Bangladesh',
-                  sentAt: DateTime.now(),
-                );
-                setState(() {
-                  _messages.add(newMessage);
-                });
-                _scrollToBottom();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Location shared!'),
-                    backgroundColor: Color(0xFF075E54),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF075E54),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Share'),
-            ),
-          ],
         );
       },
     );
@@ -586,7 +521,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   }
 
   void _copyMessage(Message message) {
-    // In real app, use Clipboard.setData
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Message copied to clipboard'),
@@ -694,169 +628,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     );
   }
 
-  void _showInfo() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Row(
-            children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: Colors.grey[300],
-                backgroundImage: widget.otherUserAvatar != null
-                    ? AssetImage(widget.otherUserAvatar!)
-                    : null,
-                child: widget.otherUserAvatar == null
-                    ? Text(
-                        widget.otherUserName.isNotEmpty ? widget.otherUserName[0] : '?',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2C5C44),
-                        ),
-                      )
-                    : null,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.otherUserName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Text(
-                      'Online',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (widget.orderId != null)
-                ListTile(
-                  leading: const Icon(Icons.receipt, color: Color(0xFF075E54)),
-                  title: const Text('Order #'),
-                  subtitle: Text(widget.orderId!),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Viewing order details'),
-                        backgroundColor: Color(0xFF075E54),
-                      ),
-                    );
-                  },
-                ),
-              ListTile(
-                leading: const Icon(Icons.phone, color: Color(0xFF075E54)),
-                title: const Text('Call'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.pop(context);
-                  // Show call options
-                  showDialog(
-                    context: context,
-                    builder: (context) {
-                      return AlertDialog(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        title: const Text('Call Options'),
-                        content: const Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ListTile(
-                              leading: Icon(Icons.phone, color: Colors.green),
-                              title: Text('Voice Call'),
-                            ),
-                            ListTile(
-                              leading: Icon(Icons.videocam, color: Colors.blue),
-                              title: Text('Video Call'),
-                            ),
-                          ],
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel'),
-                          ),
-                        ],
-                      );
-                    },
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.videocam, color: Color(0xFF075E54)),
-                title: const Text('Video Call'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Starting video call...'),
-                      backgroundColor: Color(0xFF075E54),
-                    ),
-                  );
-                },
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.share, color: Color(0xFF075E54)),
-                title: const Text('Share Contact'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Contact shared!'),
-                      backgroundColor: Color(0xFF075E54),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.block, color: Colors.red),
-                title: const Text(
-                  'Block',
-                  style: TextStyle(color: Colors.red),
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showBlockConfirmation();
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   void _showBlockConfirmation() {
     showDialog(
       context: context,
@@ -933,6 +704,83 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     );
   }
 
+  void _showMuteOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const Text(
+                  'Mute Notifications',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildMuteOption('1 hour', 1, 'Mute for 1 hour'),
+                _buildMuteOption('2 hours', 2, 'Mute for 2 hours'),
+                _buildMuteOption('4 hours', 4, 'Mute for 4 hours'),
+                _buildMuteOption('8 hours', 8, 'Mute for 8 hours'),
+                _buildMuteOption('24 hours', 24, 'Mute for 24 hours'),
+                _buildMuteOption('7 days', 168, 'Mute for 7 days'),
+                if (_isMuted)
+                  ListTile(
+                    leading: const Icon(Icons.notifications, color: Colors.green),
+                    title: const Text('Unmute'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _toggleMuteNotifications();
+                    },
+                  ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMuteOption(String label, int hours, String subtitle) {
+    return ListTile(
+      leading: const Icon(Icons.notifications_off, color: Colors.grey),
+      title: Text(label),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () {
+        Navigator.pop(context);
+        _muteDurationHours = hours;
+        setState(() {
+          _isMuted = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Notifications muted for $label'),
+            backgroundColor: const Color(0xFF075E54),
+          ),
+        );
+      },
+    );
+  }
+
   void _toggleMuteNotifications() {
     setState(() {
       _isMuted = !_isMuted;
@@ -965,15 +813,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.info_outline, color: Color(0xFF075E54)),
-                title: const Text('Contact Info'),
-                trailing: const Icon(Icons.chevron_right, size: 16),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showInfo();
-                },
-              ),
-              ListTile(
                 leading: Icon(
                   _isMuted ? Icons.notifications_off : Icons.notifications,
                   color: const Color(0xFF075E54),
@@ -982,7 +821,11 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                 trailing: const Icon(Icons.chevron_right, size: 16),
                 onTap: () {
                   Navigator.pop(context);
-                  _toggleMuteNotifications();
+                  if (_isMuted) {
+                    _toggleMuteNotifications();
+                  } else {
+                    _showMuteOptions();
+                  }
                 },
               ),
               const Divider(),
@@ -1058,6 +901,10 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     return Scaffold(
       backgroundColor: const Color(0xFFECE5DD),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Row(
           children: [
             CircleAvatar(
@@ -1082,24 +929,15 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        widget.otherUserName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        roleEmoji,
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                    ],
+                  Text(
+                    widget.otherUserName,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const Text(
                     'Online',
@@ -1115,10 +953,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
         ),
         backgroundColor: const Color(0xFF075E54),
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
         actions: [
           IconButton(
             icon: Icon(
@@ -1194,6 +1028,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     final isReplying = _replyingToMessageId == message.id;
     final hasImage = message.attachment != null && message.attachment!.isNotEmpty;
     final hasText = message.msgText.isNotEmpty;
+    final isDocument = hasImage && message.msgText.contains('📄');
     
     return GestureDetector(
       onLongPress: () => _showMessageOptions(message),
@@ -1267,7 +1102,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (hasImage)
+                    if (hasImage && !isDocument)
                       Container(
                         margin: EdgeInsets.only(bottom: hasText ? 4 : 0),
                         width: 200,
@@ -1284,6 +1119,43 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                               child: const Icon(Icons.image, size: 40, color: Colors.grey),
                             ),
                           ),
+                        ),
+                      ),
+                    if (isDocument)
+                      Container(
+                        margin: EdgeInsets.only(bottom: hasText ? 4 : 0),
+                        width: 200,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.insert_drive_file, size: 32, color: Colors.grey),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Document',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Shared file',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     if (hasText)
