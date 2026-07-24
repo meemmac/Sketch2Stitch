@@ -1067,8 +1067,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (modalContext) => StatefulBuilder(
-        builder: (context, setModalState) {
-          final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+        builder: (stfContext, setModalState) {
+          final bottomInset = MediaQuery.of(stfContext).viewInsets.bottom;
+          final currentOrder = _orders.firstWhere((o) => o.id == order.id);
+
           return DraggableScrollableSheet(
             initialChildSize: 0.9,
             minChildSize: 0.5,
@@ -1100,28 +1102,28 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text("Order Details", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                        Text("ID: ${order.id}", style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+                        Text("ID: ${currentOrder.id}", style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
                       ],
                     ),
                     _infoBadge(
-                      order.status,
-                      order.isDelivered ? primaryGreen.withValues(alpha: 0.1) : Colors.blueAccent.withValues(alpha: 0.1),
-                      order.isDelivered ? primaryGreen : Colors.blueAccent,
+                      currentOrder.status,
+                      currentOrder.isDelivered ? primaryGreen.withValues(alpha: 0.1) : Colors.blueAccent.withValues(alpha: 0.1),
+                      currentOrder.isDelivered ? primaryGreen : Colors.blueAccent,
                     ),
                   ],
                 ),
                 const SizedBox(height: 25),
                 const Text("Products", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
-                ...order.items.map((item) => _itemPreviewCard(item)),
+                ...currentOrder.items.map((item) => _itemPreviewCard(item)),
                 const SizedBox(height: 30),
                 const Text("Order Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
-                _detailRow("Retailer", order.retailerName),
-                if (order.tailorName != null) _buildTailorSummaryRow(order),
-                _detailRow("Total Items", "${order.totalQuantity} units"),
-                _detailRow("Order Date", _formatDate(order.orderDate)),
-                if (order.deliveryDate != null) _detailRow("Delivery Date", _formatDate(order.deliveryDate!)),
+                _detailRow("Retailer", currentOrder.retailerName),
+                if (currentOrder.tailorName != null) _buildTailorSummaryRow(currentOrder),
+                _detailRow("Total Items", "${currentOrder.totalQuantity} units"),
+                _detailRow("Order Date", _formatDate(currentOrder.orderDate)),
+                if (currentOrder.deliveryDate != null) _detailRow("Delivery Date", _formatDate(currentOrder.deliveryDate!)),
                 const SizedBox(height: 20),
                 const Text("Shipping Address", style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
@@ -1133,7 +1135,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     children: [
                       Icon(Icons.location_on_outlined, size: 16, color: primaryGreen),
                       const SizedBox(width: 8),
-                      Expanded(child: Text(order.deliveryAddress, style: const TextStyle(fontSize: 13, height: 1.4, fontWeight: FontWeight.w600))),
+                      Expanded(child: Text(currentOrder.deliveryAddress, style: const TextStyle(fontSize: 13, height: 1.4, fontWeight: FontWeight.w600))),
                     ],
                   ),
                 ),
@@ -1142,21 +1144,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text("Grand Total", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                    Text("Tk ${order.amount.toInt()}", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.green.shade800)),
+                    Text("Tk ${currentOrder.amount.toInt()}", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.green.shade800)),
                   ],
                 ),
-                if (order.isDelivered && (order.review != null || order.tailorReview != null)) ...[
+                if (currentOrder.isDelivered && (currentOrder.review != null || currentOrder.tailorReview != null)) ...[
                   const SizedBox(height: 35),
                   const Text("Your Reviews", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  if (order.review != null) ...[
-                    _reviewCard("Retailer Review", order.review!, order.rating ?? 0.0, Colors.blue),
+                  if (currentOrder.review != null) ...[
+                    _reviewCard("Retailer Review", currentOrder.review!, currentOrder.rating ?? 0.0, Colors.blue),
                     const SizedBox(height: 12),
                   ],
-                  if (order.tailorReview != null) ...[
-                    _reviewCard("Tailor Review", order.tailorReview!, order.tailorRating ?? 0.0, Colors.orange),
+                  if (currentOrder.tailorReview != null) ...[
+                    _reviewCard("Tailor Review", currentOrder.tailorReview!, currentOrder.tailorRating ?? 0.0, Colors.orange),
                   ],
-                ] else if (order.isDelivered) ...[
+                ] else if (currentOrder.isDelivered) ...[
                   const SizedBox(height: 35),
                   const Text("Leave a Review", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
@@ -1168,37 +1170,36 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     onRatingChanged: (r) => setModalState(() => tempRetailerRating = r),
                     onSubmit: () {
                       if (tempRetailerRating == 0) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a rating")));
+                        ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text("Please select a rating")));
                         return;
                       }
-                      final messenger = ScaffoldMessenger.of(modalContext);
                       setState(() {
-                        final idx = _orders.indexWhere((o) => o.id == order.id);
+                        final idx = _orders.indexWhere((o) => o.id == currentOrder.id);
                         if (idx != -1) {
                           _orders[idx] = CustomerOrder(
-                            id: order.id,
-                            retailerName: order.retailerName,
-                            tailorName: order.tailorName,
-                            items: order.items,
-                            amount: order.amount,
-                            orderDate: order.orderDate,
-                            status: order.status,
-                            isDelivered: order.isDelivered,
-                            deliveryAddress: order.deliveryAddress,
-                            deliveryDate: order.deliveryDate,
+                            id: currentOrder.id,
+                            retailerName: currentOrder.retailerName,
+                            tailorName: currentOrder.tailorName,
+                            items: currentOrder.items,
+                            amount: currentOrder.amount,
+                            orderDate: currentOrder.orderDate,
+                            status: currentOrder.status,
+                            isDelivered: currentOrder.isDelivered,
+                            deliveryAddress: currentOrder.deliveryAddress,
+                            deliveryDate: currentOrder.deliveryDate,
                             review: retailerController.text,
                             rating: tempRetailerRating,
-                            tailorReview: order.tailorReview,
-                            tailorRating: order.tailorRating,
+                            tailorReview: currentOrder.tailorReview,
+                            tailorRating: currentOrder.tailorRating,
                           );
                         }
                       });
                       Navigator.pop(modalContext);
-                      messenger.showSnackBar(const SnackBar(content: Text("Review submitted successfully!")));
+                      ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text("Review submitted successfully!")));
                     },
                   ),
                   const SizedBox(height: 12),
-                  if (order.items.any((i) => i.destination == OrderDeliveryDestination.tailor))
+                  if (currentOrder.items.any((i) => i.destination == OrderDeliveryDestination.tailor))
                     _buildLeaveReviewCard(
                       title: "Rate Tailor",
                       themeColor: Colors.orange,
@@ -1207,33 +1208,32 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       onRatingChanged: (r) => setModalState(() => tempTailorRating = r),
                       onSubmit: () {
                         if (tempTailorRating == 0) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a rating")));
+                          ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text("Please select a rating")));
                           return;
                         }
-                        final messenger = ScaffoldMessenger.of(modalContext);
                         setState(() {
-                          final idx = _orders.indexWhere((o) => o.id == order.id);
+                          final idx = _orders.indexWhere((o) => o.id == currentOrder.id);
                           if (idx != -1) {
                             _orders[idx] = CustomerOrder(
-                              id: order.id,
-                              retailerName: order.retailerName,
-                              tailorName: order.tailorName,
-                              items: order.items,
-                              amount: order.amount,
-                              orderDate: order.orderDate,
-                              status: order.status,
-                              isDelivered: order.isDelivered,
-                              deliveryAddress: order.deliveryAddress,
-                              deliveryDate: order.deliveryDate,
-                              review: order.review,
-                              rating: order.rating,
+                              id: currentOrder.id,
+                              retailerName: currentOrder.retailerName,
+                              tailorName: currentOrder.tailorName,
+                              items: currentOrder.items,
+                              amount: currentOrder.amount,
+                              orderDate: currentOrder.orderDate,
+                              status: currentOrder.status,
+                              isDelivered: currentOrder.isDelivered,
+                              deliveryAddress: currentOrder.deliveryAddress,
+                              deliveryDate: currentOrder.deliveryDate,
+                              review: currentOrder.review,
+                              rating: currentOrder.rating,
                               tailorReview: tailorController.text,
                               tailorRating: tempTailorRating,
                             );
                           }
                         });
                         Navigator.pop(modalContext);
-                        messenger.showSnackBar(const SnackBar(content: Text("Tailor review submitted!")));
+                        ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text("Tailor review submitted!")));
                       },
                     ),
                 ],

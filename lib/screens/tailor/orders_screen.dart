@@ -271,9 +271,9 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     }).toList();
   }
 
-  List<TailorOrder> get _pendingOrders => _filteredOrders.where((o) => o.status == TailorOrderStatus.pending).toList();
-  List<TailorOrder> get _currentWorkOrders => _filteredOrders.where((o) => !o.isCompleted && o.status != TailorOrderStatus.pending).toList();
-  List<TailorOrder> get _completedOrders => _filteredOrders.where((o) => o.isCompleted).toList();
+  List<TailorOrder> get _pendingOrders => _filteredOrders.where((o) => o.status == TailorOrderStatus.pending || o.status == TailorOrderStatus.confirmed).toList();
+  List<TailorOrder> get _currentWorkOrders => _filteredOrders.where((o) => o.status == TailorOrderStatus.inProgress).toList();
+  List<TailorOrder> get _completedOrders => _filteredOrders.where((o) => o.isCompleted || o.status == TailorOrderStatus.completed).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -670,7 +670,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                       decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(999)),
                       child: Text(_getStatusText(order.status), style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w900)),
                     ),
-                    if (!order.isCompleted)
+                    if (!order.isCompleted && order.status != TailorOrderStatus.confirmed)
                       TextButton(
                         onPressed: () => _showStatusUpdateSheet(order),
                         style: TextButton.styleFrom(
@@ -726,7 +726,27 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-              if (order.status == TailorOrderStatus.pending)
+              if (order.status == TailorOrderStatus.pending) ...[
+                _statusOptionTile(
+                  "Accept Request",
+                  Icons.check_circle_outline,
+                  primaryGreen,
+                  () {
+                    setState(() => order.status = TailorOrderStatus.confirmed);
+                    Navigator.pop(context);
+                  },
+                ),
+                _statusOptionTile(
+                  "Decline Request",
+                  Icons.cancel_outlined,
+                  Colors.red,
+                  () {
+                    setState(() => order.status = TailorOrderStatus.cancelled);
+                    Navigator.pop(context);
+                  },
+                ),
+              ],
+              if (order.status == TailorOrderStatus.confirmed)
                 _statusOptionTile(
                   "Start Stitching",
                   Icons.play_arrow_outlined,
@@ -1204,7 +1224,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
   String _getStatusText(TailorOrderStatus status) {
     switch (status) {
       case TailorOrderStatus.pending: return "New Request";
-      case TailorOrderStatus.confirmed: return "Accepted";
+      case TailorOrderStatus.confirmed: return "Pending Customer";
       case TailorOrderStatus.inProgress: return "Stitching";
       case TailorOrderStatus.ready: return "Ready";
       case TailorOrderStatus.completed: return "Finished";

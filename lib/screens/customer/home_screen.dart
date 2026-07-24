@@ -958,16 +958,10 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                     style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          product.priceRange,
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kSageDark),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    product.priceRange,
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kSageDark),
+                    overflow: TextOverflow.ellipsis,
                   ),
                   if (!outOfStock) ...[
                     const SizedBox(height: 6),
