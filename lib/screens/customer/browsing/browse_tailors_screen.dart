@@ -552,19 +552,6 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                         ),
                       ],
                     ),
-                    // Show portfolio count
-                    if (tailor.portfolio != null && tailor.portfolio!.isNotEmpty)
-                      Padding(
-                        padding: EdgeInsets.only(top: isSmall ? 2 : 4),
-                        child: Text(
-                          '${tailor.portfolio!.length} works',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: kSage,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),

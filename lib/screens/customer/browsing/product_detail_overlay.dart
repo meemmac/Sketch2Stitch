@@ -157,7 +157,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                         ],
                       ),
                       const Spacer(),
-                      // Stock Status Badge - Shows for all states
                       if (!_inStock)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -553,6 +552,22 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                 width: imageWidth,
                 color: Colors.grey[200],
                 child: imageUrl.startsWith('http')
+Widget _buildProductImage() {
+  final imageUrl = _selectedOption?.image;
+  final videoUrl = _selectedOption?.video;
+
+  return SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    child: Row(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            height: 250,
+            width: MediaQuery.of(context).size.width * 0.8,
+            color: Colors.grey[200],
+            child: imageUrl != null && imageUrl.isNotEmpty
+                ? imageUrl.startsWith('http')
                     ? Image.network(
                         imageUrl,
                         fit: BoxFit.cover,
@@ -628,6 +643,26 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
   }
 
   Widget _imageFallback() {
+                      )
+                : _imageFallback(),
+          ),
+        ),
+        if (videoUrl != null && videoUrl.isNotEmpty) ...[
+          const SizedBox(width: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: VideoPreviewPlayer(
+              videoPath: videoUrl,
+              height: 250,
+              width: MediaQuery.of(context).size.width * 0.8,
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+      Widget _imageFallback() {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [

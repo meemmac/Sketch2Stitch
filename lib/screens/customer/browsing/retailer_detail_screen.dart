@@ -352,14 +352,43 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                       Icon(Icons.location_on, size: isSmallScreen ? 14 : 16, color: Colors.white70),
                       const SizedBox(width: 4),
                       Expanded(
-                        child: Text(
-                          widget.retailer.address,
-                          style: TextStyle(
-                            fontSize: isSmallScreen ? 11.0 : 13.0,
-                            color: Colors.white70,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                widget.retailer.address,
+                                style: TextStyle(
+                                  fontSize: isSmallScreen ? 11.0 : 13.0,
+                                  color: Colors.white70,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withValues(alpha: 0.3),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.directions_bike, size: 10, color: Colors.white),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '2.5 km • Tk 50',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -624,13 +653,35 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                         ],
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        'Tk ${product.minPrice.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          fontSize: isSmallScreen ? 12.0 : 14.0,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF2C5C44),
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Tk ${product.minPrice.toStringAsFixed(0)}',
+                              style: TextStyle(
+                                fontSize: isSmallScreen ? 12.0 : 14.0,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF2C5C44),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
+                              const SizedBox(width: 2),
+                              Text(
+                                'Tk 50',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ],
                   ),
