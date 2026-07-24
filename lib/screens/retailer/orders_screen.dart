@@ -35,6 +35,7 @@ class OrderItem {
 class RetailerOrder {
   final String id;
   final String customerName;
+  final String? tailorName;
   final List<OrderItem> items;
   final double amount;
   final DateTime orderDate;
@@ -49,6 +50,7 @@ class RetailerOrder {
   RetailerOrder({
     required this.id,
     required this.customerName,
+    this.tailorName,
     required this.items,
     required this.amount,
     required this.orderDate,
@@ -88,6 +90,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     RetailerOrder(
       id: "ORD-1087",
       customerName: "Nazia Tasphia",
+      tailorName: "Master Stitch",
       amount: 5200,
       orderDate: DateTime.now().subtract(const Duration(days: 12)),
       status: "Preparing",
@@ -175,6 +178,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     RetailerOrder(
       id: "ORD-1051",
       customerName: "Farzana Yasmin",
+      tailorName: "Royal Stitch",
       amount: 4560,
       orderDate: DateTime.now().subtract(const Duration(days: 96)),
       deliveryDate: DateTime.now().subtract(const Duration(days: 89)),
@@ -1161,6 +1165,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
               ),
               const SizedBox(height: 12),
               _detailRow("Customer", order.customerName),
+              if (order.tailorName != null) _detailRow("Tailor", order.tailorName!),
               _detailRow("Total Quantity", "${order.totalQuantity} units"),
               _detailRow("Order Date", _formatDate(order.orderDate)),
               if (order.deliveryDate != null)

@@ -50,6 +50,7 @@ class OrderItem {
 class CustomerOrder {
   final String id;
   final String retailerName;
+  final String? tailorName;
   final List<OrderItem> items;
   final double amount;
   final DateTime orderDate;
@@ -65,6 +66,7 @@ class CustomerOrder {
   CustomerOrder({
     required this.id,
     required this.retailerName,
+    this.tailorName,
     required this.items,
     required this.amount,
     required this.orderDate,
@@ -268,6 +270,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     CustomerOrder(
       id: "ORD-9654",
       retailerName: "Zaroon Fabrics",
+      tailorName: "Master Stitch",
       amount: 4500,
       orderDate: DateTime.now().subtract(const Duration(days: 2)),
       status: "On Hold",
@@ -310,6 +313,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     CustomerOrder(
       id: "ORD-9921",
       retailerName: "Zaroon Fabrics",
+      tailorName: "Fine Cut Tailors",
       amount: 4500,
       orderDate: DateTime.now().subtract(const Duration(days: 5)),
       status: "Preparing",
@@ -340,6 +344,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     CustomerOrder(
       id: "ORD-9854",
       retailerName: "Heritage Silk",
+      tailorName: "Royal Stitch",
       amount: 8200,
       orderDate: DateTime.now().subtract(const Duration(days: 20)),
       status: "Packed",
@@ -363,6 +368,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     CustomerOrder(
       id: "ORD-9712",
       retailerName: "FabriCo",
+      tailorName: "Master Stitch",
       amount: 3200,
       orderDate: DateTime.now().subtract(const Duration(days: 45)),
       deliveryDate: DateTime.now().subtract(const Duration(days: 38)),
@@ -410,6 +416,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     CustomerOrder(
       id: "ORD-9310",
       retailerName: "Style Hub",
+      tailorName: "Fine Cut Tailors",
       amount: 6500,
       orderDate: DateTime.now().subtract(const Duration(days: 90)),
       deliveryDate: DateTime.now().subtract(const Duration(days: 82)),
@@ -1068,6 +1075,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               const Text("Order Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               _detailRow("Retailer", order.retailerName),
+              if (order.tailorName != null) _detailRow("Tailor", order.tailorName!),
               _detailRow("Total Items", "${order.totalQuantity} units"),
               _detailRow("Order Date", _formatDate(order.orderDate)),
               if (order.deliveryDate != null) _detailRow("Delivery Date", _formatDate(order.deliveryDate!)),
