@@ -172,6 +172,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           measurementRefImages: ["assets/images/ref2.jpg"],
           tailorInstructions: "Use the printed patterns for the sleeves as shown in the reference picture.",
           canBleach: true,
+          estimatedDeliveryDate: DateTime.now().add(const Duration(days: 5)),
         ),
       ],
     ),
@@ -192,6 +193,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           servicePrice: 1800,
           measurementRefImages: ["assets/images/ref4.jpg"],
           tailorInstructions: "Follow standard measurement. Add piping to the neckline.",
+          estimatedDeliveryDate: DateTime.now().add(const Duration(days: 3)),
         ),
       ],
     ),
@@ -218,6 +220,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           canWash: false,
           canDryClean: true,
           ironLevel: "Low",
+          estimatedDeliveryDate: DateTime.now().subtract(const Duration(days: 60)),
         ),
       ],
     ),
@@ -638,7 +641,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5))],
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -667,10 +670,10 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                      decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(999)),
+                      decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(999)),
                       child: Text(_getStatusText(order.status), style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w900)),
                     ),
-                    if (!order.isCompleted && order.status != TailorOrderStatus.confirmed)
+                    if (order.status == TailorOrderStatus.inProgress)
                       TextButton(
                         onPressed: () => _showStatusUpdateSheet(order),
                         style: TextButton.styleFrom(
@@ -802,79 +805,130 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (_, scrollController) => Container(
-          decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
-          padding: const EdgeInsets.all(24),
-          child: ListView(
-            controller: scrollController,
-            children: [
-              Center(child: Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 20), decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text("Stitching Details", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                    Text("ID: ${order.id}", style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
-                  ]),
-                  _infoBadge(_getStatusText(order.status), _getStatusColor(order.status).withValues(alpha: 0.1), _getStatusColor(order.status)),
-                ],
-              ),
-              const SizedBox(height: 25),
-              if (order.status == TailorOrderStatus.pending)
-                _buildActionButtons(order),
-              const SizedBox(height: 20),
-              const Text("Customer Requirements", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              ...order.items.map((item) => _itemPreviewCard(order, item)),
-              const SizedBox(height: 30),
-              const Text("Job Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              _detailRow("Customer", order.customerName),
-              _detailRow("Items to Stitch", "${order.totalQuantity} units"),
-              _detailRow("Request Date", _formatDate(order.orderDate)),
-              if (order.completionDate != null) _detailRow("Completed On", _formatDate(order.completionDate!)),
-              const SizedBox(height: 20),
-              const Text("Customer Location", style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade200)),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Icon(Icons.location_on_outlined, size: 16, color: primaryGreen),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(order.deliveryAddress, style: const TextStyle(fontSize: 13, height: 1.4, fontWeight: FontWeight.w600))),
-                ]),
-              ),
-              if (order.isCompleted && order.customerReview != null) ...[
-                const SizedBox(height: 35),
-                const Text("Customer Feedback", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      builder: (modalContext) => StatefulBuilder(
+        builder: (stfContext, setModalState) => DraggableScrollableSheet(
+          initialChildSize: 0.9,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (_, scrollController) => Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+            ),
+            padding: const EdgeInsets.all(24),
+            child: ListView(
+              controller: scrollController,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text("Stitching Details", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                        Text("ID: ${order.id}", style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                    _infoBadge(
+                      _getStatusText(order.status),
+                      _getStatusColor(order.status).withOpacity(0.1),
+                      _getStatusColor(order.status),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 25),
+                if (order.status == TailorOrderStatus.pending) _buildActionButtons(order, setModalState, modalContext),
+                const SizedBox(height: 20),
+                const Text("Customer Requirements", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
-                _reviewCard(order),
+                ...order.items.map((item) => _itemPreviewCard(order, item, setModalState)),
+                const SizedBox(height: 30),
+                const Text("Job Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                _detailRow("Customer", order.customerName),
+                if (order.status != TailorOrderStatus.pending) ...[
+                  _detailRow("Stitching Earnings", "Tk ${order.totalAmount.toInt()}"),
+                  _detailRow(
+                    "Expected Delivery",
+                    order.items.first.estimatedDeliveryDate != null ? _formatDate(order.items.first.estimatedDeliveryDate!) : "TBD",
+                  ),
+                ],
+                _detailRow("Items to Stitch", "${order.totalQuantity} units"),
+                _detailRow("Request Date", _formatDate(order.orderDate)),
+                if (order.completionDate != null) _detailRow("Completed On", _formatDate(order.completionDate!)),
+                const SizedBox(height: 20),
+                const Text("Customer Location", style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.location_on_outlined, size: 16, color: primaryGreen),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          order.deliveryAddress,
+                          style: const TextStyle(fontSize: 13, height: 1.4, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (order.isCompleted && order.customerReview != null) ...[
+                  const SizedBox(height: 35),
+                  const Text("Customer Feedback", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  _reviewCard(order),
+                ],
+                const SizedBox(height: 40),
               ],
-              const SizedBox(height: 40),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildActionButtons(TailorOrder order) {
+  Widget _buildActionButtons(TailorOrder order, StateSetter setModalState, BuildContext modalContext) {
+    final bool canAccept = order.items.every((i) => i.servicePrice > 0 && i.estimatedDeliveryDate != null);
+
     return Row(
       children: [
         Expanded(
           child: ElevatedButton(
-            onPressed: () {
+            onPressed: canAccept ? () {
               setState(() => order.status = TailorOrderStatus.confirmed);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Job Accepted Successfully!")));
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: primaryGreen, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            child: const Text("Accept", style: TextStyle(fontWeight: FontWeight.bold)),
+              Navigator.pop(modalContext);
+              ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text("Job Accepted Successfully!")));
+            } : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryGreen,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.grey.shade300,
+              disabledForegroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Opacity(
+              opacity: canAccept ? 1.0 : 0.5,
+              child: const Text("Accept", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
           ),
         ),
         const SizedBox(width: 12),
@@ -882,7 +936,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           child: OutlinedButton(
             onPressed: () {
               setState(() => order.status = TailorOrderStatus.cancelled);
-              Navigator.pop(context);
+              Navigator.pop(modalContext);
             },
             style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.red), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             child: const Text("Decline", style: TextStyle(fontWeight: FontWeight.bold)),
@@ -892,7 +946,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     );
   }
 
-  Widget _itemPreviewCard(TailorOrder order, TailorOrderItem item) {
+  Widget _itemPreviewCard(TailorOrder order, TailorOrderItem item, StateSetter setModalState) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -955,9 +1009,10 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                           isDense: true,
                         ),
                         onChanged: (val) {
-                          setState(() {
+                          setModalState(() {
                             item.servicePrice = double.tryParse(val) ?? item.servicePrice;
                           });
+                          setState(() {});
                         },
                       ),
                     ],
@@ -979,9 +1034,10 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                             lastDate: DateTime.now().add(const Duration(days: 365)),
                           );
                           if (date != null) {
-                            setState(() {
+                            setModalState(() {
                               item.estimatedDeliveryDate = date;
                             });
+                            setState(() {});
                           }
                         },
                         child: Container(
@@ -1004,6 +1060,34 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                       ),
                     ],
                   ),
+                ),
+              ],
+            ),
+          ] else ...[
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Price", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
+                    const SizedBox(height: 2),
+                    Text("Tk ${item.servicePrice.toInt()}", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text("Est. Delivery Date", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
+                    const SizedBox(height: 2),
+                    Text(
+                      item.estimatedDeliveryDate != null ? _formatDate(item.estimatedDeliveryDate!) : "Not set",
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                  ],
                 ),
               ],
             ),
