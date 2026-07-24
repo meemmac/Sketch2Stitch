@@ -276,7 +276,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     CustomerOrder(
       id: "ORD-9654",
       retailerName: "Zaroon Fabrics",
-      tailorName: "Master Stitch",
       amount: 4500,
       orderDate: DateTime.now().subtract(const Duration(days: 2)),
       status: "On Hold",
@@ -350,7 +349,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     CustomerOrder(
       id: "ORD-9854",
       retailerName: "Heritage Silk",
-      tailorName: "Royal Stitch",
       amount: 8200,
       orderDate: DateTime.now().subtract(const Duration(days: 20)),
       status: "Packed",
@@ -1081,7 +1079,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               const Text("Order Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               _detailRow("Retailer", order.retailerName),
-              if (order.tailorName != null) _detailRow("Tailor", order.tailorName!),
+              if (order.tailorName != null) _buildTailorSummaryRow(order),
               _detailRow("Total Items", "${order.totalQuantity} units"),
               _detailRow("Order Date", _formatDate(order.orderDate)),
               if (order.deliveryDate != null) _detailRow("Delivery Date", _formatDate(order.deliveryDate!)),
@@ -1434,6 +1432,27 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
       ]),
     );
+  }
+
+  Widget _buildTailorSummaryRow(CustomerOrder order) {
+    if (order.tailorName == null) return const SizedBox.shrink();
+
+    final statuses = order.items.map((i) => i.tailorStatus).toSet();
+
+    if (statuses.contains(TailorStatus.cancelled) || statuses.contains(TailorStatus.notAssigned)) {
+      // Per instructions, remove tailor name if cancelled or not assigned
+      // (Unless there are other items that ARE confirmed/pending, but mock data is simpler)
+      if (!statuses.contains(TailorStatus.confirmed) && !statuses.contains(TailorStatus.pending)) {
+        return const SizedBox.shrink();
+      }
+    }
+
+    String displayText = order.tailorName!;
+    if (statuses.contains(TailorStatus.pending) && !statuses.contains(TailorStatus.confirmed)) {
+      displayText = "$displayText (pending)";
+    }
+
+    return _detailRow("Tailor", displayText);
   }
 
   Widget _buildLeaveReviewCard(String title, Color themeColor) {
