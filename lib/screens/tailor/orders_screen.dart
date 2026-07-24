@@ -922,20 +922,22 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(item.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   Text("Qty: ${item.quantity} | Color: ${item.color}", style: const TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(children: [
-                      _careTag(Icons.wash, "Wash", item.canWash),
-                      _careTag(Icons.biotech, "Bleach", item.canBleach),
-                      _careTag(Icons.dry_cleaning, "Dry Clean", item.canDryClean),
-                      _careTag(Icons.iron, "Iron: ${item.ironLevel}", true),
-                    ]),
-                  ),
                 ]),
               ),
               Text("Tk ${item.servicePrice.toInt()}", style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.w900)),
             ],
+          ),
+          const SizedBox(height: 16),
+          const Text("Care Instructions", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              _careTag(Icons.wash, "Wash", item.canWash),
+              _careTag(Icons.biotech, "Bleach", item.canBleach),
+              _careTag(Icons.dry_cleaning, "Dry Clean", item.canDryClean),
+              _careTag(Icons.iron, "Iron: ${item.ironLevel}", true),
+            ]),
           ),
           if (order.status == TailorOrderStatus.pending) ...[
             const SizedBox(height: 16),

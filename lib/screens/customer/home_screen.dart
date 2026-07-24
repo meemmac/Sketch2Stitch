@@ -1151,6 +1151,18 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                           style: TextStyle(fontSize: 10.5, color: Colors.grey[600]),
                         ),
                       ),
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '1.8 km',
+                          style: TextStyle(fontSize: 9, color: Colors.green.shade800, fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -1270,6 +1282,18 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(fontSize: 10.5, color: Colors.grey[600]),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '2.5 km',
+                          style: TextStyle(fontSize: 9, color: Colors.green.shade800, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],
