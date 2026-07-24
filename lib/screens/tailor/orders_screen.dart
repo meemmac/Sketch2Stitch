@@ -849,14 +849,6 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   Expanded(child: Text(order.deliveryAddress, style: const TextStyle(fontSize: 13, height: 1.4, fontWeight: FontWeight.w600))),
                 ]),
               ),
-              const Divider(height: 48),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("Service Earnings", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                  Text("Tk ${order.totalAmount.toInt()}", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.green.shade800)),
-                ],
-              ),
               if (order.isCompleted && order.customerReview != null) ...[
                 const SizedBox(height: 35),
                 const Text("Customer Feedback", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
