@@ -85,8 +85,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         _hasUnreadNotifications = false;
       });
     }
-
   }
+
   void _openOrderList() {
     Navigator.push(
       context,
@@ -97,6 +97,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
       ),
     );
   }
+
   void _openBrowseTab(int index) {
     Navigator.push(
       context,
@@ -188,8 +189,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: ValueKey(_currentRole), // Force rebuild when role changes
       backgroundColor: const Color(0xFFF4F9F1),
-      // Pass the current role to the drawer
       drawer: DashboardDrawer(
         initialRole: _currentRole,
         onRoleChanged: (role) {
@@ -224,7 +225,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     );
   }
 
-  // ---------------- Top bar ----------------
+  // ---------------- Top bar (Role dropdown removed) ----------------
   Widget _buildTopBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 20, 8),
@@ -271,71 +272,28 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                 ),
             ],
           ),
-        //  Track Order icon - only for customer
+          // Track Order icon - only for customer
           if (_currentRole == AppUserRole.customer)
             IconButton(
               icon: const Icon(Icons.local_shipping_rounded, color: Colors.black87),
               iconSize: 28,
-              onPressed: () {
-                _openOrderList();
-              },
-                tooltip: 'My Orders',
+              onPressed: _openOrderList,
+              tooltip: 'My Orders',
             ),
-        //  Show cart icon only for customer
+          // Show cart icon only for customer
           if (_currentRole == AppUserRole.customer)
             IconButton(
               icon: const Icon(Icons.shopping_cart_outlined, color: Colors.black87),
               iconSize: 28,
               onPressed: () {
                 Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const CartScreen()),
-      );
+                  context,
+                  MaterialPageRoute(builder: (_) => const CartScreen()),
+                );
               },
             ),
-          // Role dropdown for testing
-          _buildRoleDropdown(),
+          // Role dropdown removed - no longer needed in top bar
         ],
-      ),
-    );
-  }
-
-  Widget _buildRoleDropdown() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: DropdownButton<AppUserRole>(
-        value: _currentRole,
-        underline: const SizedBox(),
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF1E392A),
-        ),
-        items: const [
-          DropdownMenuItem(
-            value: AppUserRole.customer,
-            child: Text("Customer"),
-          ),
-          DropdownMenuItem(
-            value: AppUserRole.tailor,
-            child: Text("Tailor"),
-          ),
-          DropdownMenuItem(
-            value: AppUserRole.retailer,
-            child: Text("Retailer"),
-          ),
-        ],
-        onChanged: (role) {
-          if (role != null) {
-            setState(() {
-              _currentRole = role;
-            });
-          }
-        },
       ),
     );
   }

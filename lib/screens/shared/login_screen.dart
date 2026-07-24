@@ -5,6 +5,8 @@ import 'package:sketch2stitch/screens/shared/welcome_screen.dart'; // Add this i
 import 'package:sketch2stitch/screens/shared/forgot_password_screen.dart';
 import 'package:sketch2stitch/screens/customer/home_screen.dart';
 
+import '../../widgets/dashboard_drawer.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -39,6 +41,46 @@ class _LoginScreenState extends State<LoginScreen>
     _floatController.dispose();
     super.dispose();
   }
+
+  // ✅ Helper method to get AppUserRole from string
+  AppUserRole _getSelectedRole() {
+    switch (_selectedUserType) {
+      case 'Tailor':
+        return AppUserRole.tailor;
+      case 'Retailer':
+        return AppUserRole.retailer;
+      default:
+        return AppUserRole.customer;
+    }
+  }
+
+  void _login() {
+    // Validate user type
+    if (_selectedUserType == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a user type'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    // Get the role
+    AppUserRole role = _getSelectedRole();
+
+    // Navigate to home with selected role
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UnifiedHomeScreen(
+          initialRole: role, // ✅ Pass the selected role
+        ),
+      ),
+    );
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -286,16 +328,7 @@ class _LoginScreenState extends State<LoginScreen>
                                   width: double.infinity,
                                   height: 50,
                                   child: ElevatedButton(
-                                    onPressed: () {
-                                      // In a real app, you would verify credentials here.
-                                      // For now, we navigate to the Home screen based on the user type.
-                                      Navigator.pushReplacement(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => const UnifiedHomeScreen(),
-                                        ),
-                                      );
-                                    },
+                                    onPressed: _login, // Call _login method
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.black,
                                       shape: RoundedRectangleBorder(
