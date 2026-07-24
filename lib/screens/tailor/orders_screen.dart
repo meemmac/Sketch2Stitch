@@ -9,10 +9,14 @@ class TailorOrderItem {
   final int quantity;
   final String imagePath;
   final String color;
-  final String? measurementRefImage;
+  final List<String>? measurementRefImages;
   final String? tailorInstructions;
   double servicePrice;
   DateTime? estimatedDeliveryDate;
+  final bool canWash;
+  final bool canBleach;
+  final bool canDryClean;
+  final String ironLevel;
 
   TailorOrderItem({
     required this.name,
@@ -20,9 +24,13 @@ class TailorOrderItem {
     required this.imagePath,
     required this.color,
     required this.servicePrice,
-    this.measurementRefImage,
+    this.measurementRefImages,
     this.tailorInstructions,
     this.estimatedDeliveryDate,
+    this.canWash = true,
+    this.canBleach = false,
+    this.canDryClean = true,
+    this.ironLevel = "Medium",
   });
 }
 
@@ -66,10 +74,12 @@ class TailorOrdersScreen extends StatefulWidget {
 }
 
 class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = "";
   OrderFilterPreset _filterPreset = OrderFilterPreset.last3Months;
   DateTime? _customStartDate;
   DateTime? _customEndDate;
-  bool _showOngoing = true;
+  int _selectedTabIndex = 1; // 0: Pending, 1: Current, 2: Completed
 
   final Color primaryGreen = const Color(0xFF4F7942);
 
@@ -108,8 +118,10 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           imagePath: "assets/images/fabrics_rolled.jpg",
           color: "Cream",
           servicePrice: 1500,
-          measurementRefImage: "assets/images/ref1.jpg",
+          measurementRefImages: ["assets/images/ref1.jpg", "assets/images/ref2.jpg"],
           tailorInstructions: "Please ensure the length is precisely 42 inches. Follow the reference image for sleeve design.",
+          canWash: true,
+          ironLevel: "High",
         ),
       ],
     ),
@@ -128,8 +140,9 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           imagePath: "assets/images/gorgeous.jpg",
           color: "Floral Blue",
           servicePrice: 1600,
-          measurementRefImage: "assets/images/ref2.jpg",
+          measurementRefImages: ["assets/images/ref2.jpg"],
           tailorInstructions: "Use the printed patterns for the sleeves as shown in the reference picture.",
+          canBleach: true,
         ),
       ],
     ),
@@ -151,8 +164,11 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           imagePath: "assets/images/silk.jpg",
           color: "Magenta",
           servicePrice: 4000,
-          measurementRefImage: "assets/images/ref1.jpg",
+          measurementRefImages: ["assets/images/ref1.jpg", "assets/images/ref3.jpg", "assets/images/ref4.jpg"],
           tailorInstructions: "Please make a classic lehenga blouse with a high neck.",
+          canWash: false,
+          canDryClean: true,
+          ironLevel: "Low",
         ),
       ],
     ),
@@ -194,11 +210,19 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     return _orders.where((order) {
       final date = order.orderDate;
       return !date.isBefore(_startDate) && !date.isAfter(_endDate);
+    }).where((order) {
+      if (_searchQuery.isEmpty) return true;
+      final query = _searchQuery.toLowerCase();
+      final matchesId = order.id.toLowerCase().contains(query);
+      final matchesCustomer = order.customerName.toLowerCase().contains(query);
+      final matchesProduct = order.items.any((i) => i.name.toLowerCase().contains(query));
+      return matchesId || matchesCustomer || matchesProduct;
     }).toList();
   }
 
-  List<TailorOrder> get _ongoingOrders => _filteredOrders.where((o) => !o.isCompleted).toList();
-  List<TailorOrder> get _deliveredOrders => _filteredOrders.where((o) => o.isCompleted).toList();
+  List<TailorOrder> get _pendingOrders => _filteredOrders.where((o) => o.status == TailorOrderStatus.pending).toList();
+  List<TailorOrder> get _currentWorkOrders => _filteredOrders.where((o) => !o.isCompleted && o.status != TailorOrderStatus.pending).toList();
+  List<TailorOrder> get _completedOrders => _filteredOrders.where((o) => o.isCompleted).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -228,46 +252,166 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                     ),
                   ),
                 ),
-                _filterButton(),
+                IconButton(
+                  onPressed: _showDetailedFilterSheet,
+                  icon: Icon(Icons.filter_list, color: primaryGreen),
+                  tooltip: "Filter by names/IDs",
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
               ],
             ),
+            const SizedBox(height: 16),
+            _buildSearchAndFilter(),
             const SizedBox(height: 24),
             Row(
               children: [
                 Expanded(
                   child: _sectionToggle(
-                    label: "Current Work",
-                    isSelected: _showOngoing,
-                    count: _ongoingOrders.length,
-                    onTap: () => setState(() => _showOngoing = true),
+                    label: "Pending",
+                    isSelected: _selectedTabIndex == 0,
+                    count: _pendingOrders.length,
+                    onTap: () => setState(() => _selectedTabIndex = 0),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _sectionToggle(
+                    label: "Current Work",
+                    isSelected: _selectedTabIndex == 1,
+                    count: _currentWorkOrders.length,
+                    onTap: () => setState(() => _selectedTabIndex = 1),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: _sectionToggle(
                     label: "Completed",
-                    isSelected: !_showOngoing,
-                    count: _deliveredOrders.length,
-                    onTap: () => setState(() => _showOngoing = false),
+                    isSelected: _selectedTabIndex == 2,
+                    count: _completedOrders.length,
+                    onTap: () => setState(() => _selectedTabIndex = 2),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 24),
-            if (_showOngoing)
+            if (_selectedTabIndex == 0)
+              _ordersSection(
+                title: "New Requests",
+                icon: Icons.pending_actions,
+                orders: _pendingOrders,
+                emptyText: "No pending requests",
+              )
+            else if (_selectedTabIndex == 1)
               _ordersSection(
                 title: "Active Orders",
                 icon: Icons.assignment_outlined,
-                orders: _ongoingOrders,
+                orders: _currentWorkOrders,
                 emptyText: "No active tailoring requests",
               )
             else
               _ordersSection(
                 title: "Finished Work",
                 icon: Icons.task_alt,
-                orders: _deliveredOrders,
+                orders: _completedOrders,
                 emptyText: "No completed orders found",
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchAndFilter() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 45,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.green.shade100),
+            ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (val) => setState(() => _searchQuery = val),
+              decoration: const InputDecoration(
+                hintText: "Search order ID, product...",
+                hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
+                prefixIcon: Icon(Icons.search, size: 20, color: Colors.grey),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        _filterButton(),
+      ],
+    );
+  }
+
+  void _showDetailedFilterSheet() {
+    final TextEditingController filterController = TextEditingController(text: _searchQuery);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.fromLTRB(24, 12, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 42, height: 4,
+                margin: const EdgeInsets.only(bottom: 18),
+                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const Text("Detailed Filter", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            const Text(
+              "Filter by Order ID, Product Name, or Customer",
+              style: TextStyle(color: Colors.black54, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: filterController,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: "Enter keywords...",
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _searchQuery = filterController.text;
+                    _searchController.text = filterController.text;
+                  });
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryGreen,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text("Apply Filter", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ),
           ],
         ),
       ),
@@ -377,9 +521,16 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           children: [
             Icon(icon, color: primaryGreen, size: 20),
             const SizedBox(width: 8),
-            Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-            if (!_showOngoing) ...[
-              const Spacer(),
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (_selectedTabIndex == 2) ...[
               TextButton.icon(
                 onPressed: () {
                   Navigator.push(
@@ -391,6 +542,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 label: const Text("See Reviews"),
                 style: TextButton.styleFrom(
                   foregroundColor: primaryGreen,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
                 ),
               ),
@@ -608,6 +760,16 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(item.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   Text("Qty: ${item.quantity} | Color: ${item.color}", style: const TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(children: [
+                      _careTag(Icons.wash, "Wash", item.canWash),
+                      _careTag(Icons.biotech, "Bleach", item.canBleach),
+                      _careTag(Icons.dry_cleaning, "Dry Clean", item.canDryClean),
+                      _careTag(Icons.iron, "Iron: ${item.ironLevel}", true),
+                    ]),
+                  ),
                 ]),
               ),
               Text("Tk ${item.servicePrice.toInt()}", style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.w900)),
@@ -695,38 +857,96 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           const SizedBox(height: 8),
           const Text("Stitching Instructions & Ref", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
           const SizedBox(height: 12),
-          Row(
+          if (item.measurementRefImages != null && item.measurementRefImages!.isNotEmpty) ...[
+            const Text(
+              "Reference Images:",
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.black54),
+            ),
+            const SizedBox(height: 8),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 1,
+              ),
+              itemCount: item.measurementRefImages!.length,
+              itemBuilder: (context, index) {
+                final imgPath = item.measurementRefImages![index];
+                return GestureDetector(
+                  onTap: () => _showFullScreenImage(imgPath),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.asset(
+                      imgPath,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.grey.shade200,
+                        child: const Icon(Icons.image_not_supported, color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+          Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (item.measurementRefImage != null)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.asset(
-                    item.measurementRefImage!, width: 100, height: 120, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(width: 100, height: 120, color: Colors.grey.shade200, child: const Icon(Icons.image_not_supported, color: Colors.grey)),
-                  ),
-                ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text("Client Instructions:", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.black54)),
-                    const SizedBox(height: 4),
-                    Text(item.tailorInstructions ?? "No specific instructions provided.", style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.4)),
-                    const SizedBox(height: 8),
-                    TextButton.icon(
-                      onPressed: _showMeasurements,
-                      icon: const Icon(Icons.straighten, size: 14),
-                      label: const Text("View Customer Measurements", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                      style: TextButton.styleFrom(padding: EdgeInsets.zero, foregroundColor: primaryGreen, minimumSize: const Size(0, 0), tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                    ),
-                  ],
-                ),
+              const Text("Client Instructions:", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.black54)),
+              const SizedBox(height: 4),
+              Text(item.tailorInstructions ?? "No specific instructions provided.", style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.4)),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: _showMeasurements,
+                icon: const Icon(Icons.straighten, size: 14),
+                label: const Text("View Customer Measurements", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                style: TextButton.styleFrom(padding: EdgeInsets.zero, foregroundColor: primaryGreen, minimumSize: const Size(0, 0), tapTargetSize: MaterialTapTargetSize.shrinkWrap),
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  void _showFullScreenImage(String imagePath) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog.fullscreen(
+        backgroundColor: Colors.black,
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                child: Image.asset(imagePath, fit: BoxFit.contain),
+              ),
+            ),
+            Positioned(
+              top: 40,
+              left: 20,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            Positioned(
+              top: 40,
+              right: 20,
+              child: IconButton(
+                icon: const Icon(Icons.download, color: Colors.white, size: 30),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Reference image download started...")),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -804,6 +1024,19 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
         ]),
         const SizedBox(height: 10),
         Text("\"${order.customerReview}\"", style: TextStyle(color: Colors.blue.shade900, fontSize: 14, fontStyle: FontStyle.italic, height: 1.4, fontWeight: FontWeight.w600)),
+      ]),
+    );
+  }
+
+  Widget _careTag(IconData icon, String label, bool isOk) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: isOk ? Colors.green.shade50 : Colors.grey.shade100, borderRadius: BorderRadius.circular(6)),
+      child: Row(children: [
+        Icon(icon, size: 12, color: isOk ? Colors.green.shade700 : Colors.grey),
+        const SizedBox(width: 4),
+        Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isOk ? Colors.green.shade800 : Colors.grey)),
       ]),
     );
   }

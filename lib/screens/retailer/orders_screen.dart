@@ -74,6 +74,8 @@ class RetailerOrdersScreen extends StatefulWidget {
 }
 
 class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = "";
   OrderFilterPreset _filterPreset = OrderFilterPreset.last3Months;
   DateTime? _customStartDate;
   DateTime? _customEndDate;
@@ -238,6 +240,13 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     return _orders.where((order) {
       final date = order.orderDate;
       return !date.isBefore(_startDate) && !date.isAfter(_endDate);
+    }).where((order) {
+      if (_searchQuery.isEmpty) return true;
+      final query = _searchQuery.toLowerCase();
+      final matchesId = order.id.toLowerCase().contains(query);
+      final matchesCustomer = order.customerName.toLowerCase().contains(query);
+      final matchesProduct = order.items.any((i) => i.name.toLowerCase().contains(query));
+      return matchesId || matchesCustomer || matchesProduct;
     }).toList();
   }
 
@@ -441,49 +450,17 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                     ),
                   ),
                 ),
-                Tooltip(
-                  message: "Filter orders",
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: _showFilterSheet,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.green.shade100),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.tune,
-                            color: primaryGreen,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              _filterLabel,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: primaryGreen,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                IconButton(
+                  onPressed: _showDetailedFilterSheet,
+                  icon: Icon(Icons.filter_list, color: primaryGreen),
+                  tooltip: "Filter by names/IDs",
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            _buildSearchAndFilter(),
             const SizedBox(height: 24),
             Row(
               children: [
@@ -521,6 +498,143 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 orders: _deliveredOrders,
                 emptyText: "No delivered orders found",
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchAndFilter() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 45,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.green.shade100),
+            ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (val) => setState(() => _searchQuery = val),
+              decoration: const InputDecoration(
+                hintText: "Search order ID, product...",
+                hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
+                prefixIcon: Icon(Icons.search, size: 20, color: Colors.grey),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        _filterButton(),
+      ],
+    );
+  }
+
+  void _showDetailedFilterSheet() {
+    final TextEditingController filterController = TextEditingController(text: _searchQuery);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.fromLTRB(24, 12, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 42, height: 4,
+                margin: const EdgeInsets.only(bottom: 18),
+                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const Text("Detailed Filter", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            const Text(
+              "Filter by Order ID, Product Name, or Customer",
+              style: TextStyle(color: Colors.black54, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: filterController,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: "Enter keywords...",
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _searchQuery = filterController.text;
+                    _searchController.text = filterController.text;
+                  });
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryGreen,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text("Apply Filter", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _filterButton() {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: _showFilterSheet,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 10,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.green.shade100),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.tune,
+              color: primaryGreen,
+              size: 20,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                _filterLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: primaryGreen,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -610,9 +724,13 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
           children: [
             Icon(icon, color: primaryGreen, size: 20),
             const SizedBox(width: 8),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+              ),
             ),
             const SizedBox(width: 8),
             Container(
@@ -631,7 +749,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
               ),
             ),
             if (title == "Delivered Orders") ...[
-              const Spacer(),
+              const SizedBox(width: 4),
               TextButton.icon(
                 onPressed: () {
                   Navigator.push(
@@ -647,6 +765,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 label: const Text("See Reviews"),
                 style: TextButton.styleFrom(
                   foregroundColor: primaryGreen,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
                   textStyle: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,

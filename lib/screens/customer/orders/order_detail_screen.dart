@@ -23,7 +23,7 @@ class OrderItem {
 
   // New fields for Tailor reference
   final OrderDeliveryDestination destination;
-  final String? measurementRefImage;
+  final List<String>? measurementRefImages;
   final String? tailorInstructions;
   final TailorStatus? tailorStatus;
 
@@ -41,7 +41,7 @@ class OrderItem {
     this.canTumbleDry = true,
     this.ironLevel = "Medium",
     this.destination = OrderDeliveryDestination.retailer,
-    this.measurementRefImage,
+    this.measurementRefImages,
     this.tailorInstructions,
     this.tailorStatus,
   });
@@ -91,6 +91,8 @@ class OrderDetailScreen extends StatefulWidget {
 }
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = "";
   OrderFilterPreset _filterPreset = OrderFilterPreset.last3Months;
   DateTime? _customStartDate;
   DateTime? _customEndDate;
@@ -280,7 +282,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           color: "Emerald Green",
           destination: OrderDeliveryDestination.tailor,
           tailorStatus: TailorStatus.cancelled,
-          measurementRefImage: "assets/images/ref4.jpg",
+          measurementRefImages: ["assets/images/ref4.jpg", "assets/images/ref1.jpg"],
           tailorInstructions: "The gher of the kameez should be just like the reference picture give.",
         ),
       ],
@@ -323,7 +325,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           description: "High-quality linen fabric for summer wear.",
           destination: OrderDeliveryDestination.tailor,
           tailorStatus: TailorStatus.pending,
-          measurementRefImage: "assets/images/ref1.jpg",
+          measurementRefImages: ["assets/images/ref1.jpg", "assets/images/ref2.jpg", "assets/images/ref3.jpg"],
           tailorInstructions: "Please use this linen for the pants. Ensure the length is precisely 42 inches as per my saved measurements and just like the reference picture.",
         ),
         const OrderItem(
@@ -353,7 +355,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           description: "Traditional Rajshahi silk with gold border.",
           destination: OrderDeliveryDestination.tailor,
           tailorStatus: TailorStatus.notAssigned,
-          measurementRefImage: "assets/images/ref3.jpg",
+          measurementRefImages: ["assets/images/ref3.jpg"],
           tailorInstructions: "Use this silk for a traditional Saree blouse. Reference the attached image for the back design.",
         ),
       ],
@@ -380,7 +382,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           color: "Floral Blue",
           destination: OrderDeliveryDestination.tailor,
           tailorStatus: TailorStatus.confirmed,
-          measurementRefImage: "assets/images/ref2.jpg",
+          measurementRefImages: ["assets/images/ref2.jpg"],
           tailorInstructions: "Create a summer kurti. Use the printed patterns for the sleeves as shown in the reference picture.",
         ),
       ],
@@ -394,8 +396,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       status: "Delivered",
       isDelivered: true,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
-      review: "Good quality fabric, but shipping took a bit longer than expected.",
-      rating: 4.0,
       items: [
         const OrderItem(
           name: "Soft Georgette",
@@ -416,10 +416,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       status: "Delivered",
       isDelivered: true,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
-      review: "The silk is absolutely stunning. Worth every penny!",
-      rating: 5.0,
-      tailorReview: "Best tailor experience ever. The fit is top-notch.",
-      tailorRating: 5.0,
       items: [
         const OrderItem(
           name: "Banarasi Silk",
@@ -429,7 +425,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           color: "Magenta",
           destination: OrderDeliveryDestination.tailor,
           tailorStatus: TailorStatus.confirmed,
-          measurementRefImage: "assets/images/ref1.jpg",
+          measurementRefImages: ["assets/images/ref1.jpg"],
           tailorInstructions: "Please make a classic lehenga blouse with a high neck.",
         ),
       ],
@@ -472,6 +468,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return _orders.where((order) {
       final date = order.orderDate;
       return !date.isBefore(_startDate) && !date.isAfter(_endDate);
+    }).where((order) {
+      if (_searchQuery.isEmpty) return true;
+      final query = _searchQuery.toLowerCase();
+      final matchesId = order.id.toLowerCase().contains(query);
+      final matchesRetailer = order.retailerName.toLowerCase().contains(query);
+      final matchesProduct = order.items.any((i) => i.name.toLowerCase().contains(query));
+      return matchesId || matchesRetailer || matchesProduct;
     }).toList();
   }
 
@@ -506,9 +509,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ),
                   ),
                 ),
-                _filterButton(),
+                IconButton(
+                  onPressed: _showDetailedFilterSheet,
+                  icon: Icon(Icons.filter_list, color: primaryGreen),
+                  tooltip: "Filter by names/IDs",
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
               ],
             ),
+            const SizedBox(height: 16),
+            _buildSearchAndFilter(),
             const SizedBox(height: 24),
             Row(
               children: [
@@ -546,6 +557,102 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 orders: _deliveredOrders,
                 emptyText: "No past orders found",
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchAndFilter() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 45,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.green.shade100),
+            ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (val) => setState(() => _searchQuery = val),
+              decoration: const InputDecoration(
+                hintText: "Search order ID, product...",
+                hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
+                prefixIcon: Icon(Icons.search, size: 20, color: Colors.grey),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        _filterButton(),
+      ],
+    );
+  }
+
+  void _showDetailedFilterSheet() {
+    final TextEditingController filterController = TextEditingController(text: _searchQuery);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.fromLTRB(24, 12, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 42, height: 4,
+                margin: const EdgeInsets.only(bottom: 18),
+                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const Text("Detailed Filter", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            const Text(
+              "Filter by Order ID, Product Name, Retailer, or Tailor",
+              style: TextStyle(color: Colors.black54, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: filterController,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: "Enter keywords...",
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _searchQuery = filterController.text;
+                    _searchController.text = filterController.text;
+                  });
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryGreen,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text("Apply Filter", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ),
           ],
         ),
       ),
@@ -688,9 +795,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           children: [
             Icon(icon, color: primaryGreen, size: 20),
             const SizedBox(width: 8),
-            Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+              ),
+            ),
+            const SizedBox(width: 8),
             if (!_showOngoing) ...[
-              const Spacer(),
               TextButton.icon(
                 onPressed: () {
                   Navigator.push(
@@ -702,6 +816,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 label: const Text("See Reviews"),
                 style: TextButton.styleFrom(
                   foregroundColor: primaryGreen,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
                 ),
               ),
@@ -784,8 +899,56 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
             if (!order.isDelivered && firstItem.tailorStatus != null)
               _buildNoticeableNote(firstItem.tailorStatus!),
+            if (order.isDelivered) ...[
+              const SizedBox(height: 12),
+              if (order.review != null || order.tailorReview != null)
+                _buildCardReviewSummary(order)
+              else
+                _buildCardLeaveReviewPrompt(),
+            ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCardReviewSummary(CustomerOrder order) {
+    final rating = order.rating ?? order.tailorRating ?? 0.0;
+    final review = order.review ?? order.tailorReview ?? "";
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.star, color: Colors.blue.shade800, size: 14),
+          const SizedBox(width: 4),
+          Text(rating.toString(), style: TextStyle(color: Colors.blue.shade900, fontWeight: FontWeight.bold, fontSize: 12)),
+          const SizedBox(width: 8),
+          Expanded(child: Text(review, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.blue.shade800, fontSize: 11, fontStyle: FontStyle.italic))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardLeaveReviewPrompt() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.orange.shade100),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.rate_review_outlined, color: Colors.orange.shade800, size: 14),
+          const SizedBox(width: 6),
+          Text("Leave a review", style: TextStyle(color: Colors.orange.shade900, fontWeight: FontWeight.w800, fontSize: 12)),
+        ],
       ),
     );
   }
@@ -939,6 +1102,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 if (order.tailorReview != null) ...[
                   _reviewCard("Tailor Review", order.tailorReview!, order.tailorRating ?? 0.0, Colors.orange),
                 ],
+              ] else if (order.isDelivered) ...[
+                const SizedBox(height: 35),
+                const Text("Leave a Review", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                _buildLeaveReviewCard("Rate Retailer", Colors.blue),
+                const SizedBox(height: 12),
+                if (order.items.any((i) => i.destination == OrderDeliveryDestination.tailor))
+                  _buildLeaveReviewCard("Rate Tailor", Colors.orange),
               ],
               const SizedBox(height: 40),
             ],
@@ -972,7 +1143,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(item.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   Text("Qty: ${item.quantity} | Color: ${item.color}", style: const TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(children: [
+                      _careTag(Icons.wash, "Wash", item.canWash),
+                      _careTag(Icons.biotech, "Bleach", item.canBleach),
+                      _careTag(Icons.dry_cleaning, "Dry Clean", item.canDryClean),
+                      _careTag(Icons.iron, "Iron: ${item.ironLevel}", true),
+                    ]),
+                  ),
+                  const SizedBox(height: 8),
                   Wrap(
                     spacing: 6,
                     runSpacing: 4,
@@ -1104,70 +1285,108 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
             ),
             const SizedBox(height: 12),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (item.measurementRefImage != null)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.asset(
-                      item.measurementRefImage!,
-                      width: 100,
-                      height: 120,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        width: 100,
-                        height: 120,
-                        color: Colors.grey.shade200,
-                        child: const Icon(Icons.image_not_supported, color: Colors.grey),
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Instructions:",
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.black54),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        item.tailorInstructions ?? "No specific instructions provided.",
-                        style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.4),
-                      ),
-                      const SizedBox(height: 8),
-                      TextButton.icon(
-                        onPressed: _showMeasurements,
-                        icon: const Icon(Icons.straighten, size: 14),
-                        label: const Text("View My Measurements", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          foregroundColor: primaryGreen,
-                          minimumSize: const Size(0, 0),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            if (item.measurementRefImages != null && item.measurementRefImages!.isNotEmpty) ...[
+              const Text(
+                "Reference Images:",
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.black54),
+              ),
+              const SizedBox(height: 8),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  childAspectRatio: 1,
+                ),
+                itemCount: item.measurementRefImages!.length,
+                itemBuilder: (context, index) {
+                  final imgPath = item.measurementRefImages![index];
+                  return GestureDetector(
+                    onTap: () => _showFullScreenImage(imgPath),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.asset(
+                        imgPath,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: Colors.grey.shade200,
+                          child: const Icon(Icons.image_not_supported, color: Colors.grey),
                         ),
                       ),
-                    ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Instructions:",
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.black54),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.tailorInstructions ?? "No specific instructions provided.",
+                  style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.4),
+                ),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: _showMeasurements,
+                  icon: const Icon(Icons.straighten, size: 14),
+                  label: const Text("View My Measurements", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    foregroundColor: primaryGreen,
+                    minimumSize: const Size(0, 0),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
               ],
             ),
           ],
-          const SizedBox(height: 12),
-          const Text("Care Instructions", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: [
-              _careTag(Icons.wash, "Wash", item.canWash),
-              _careTag(Icons.biotech, "Bleach", item.canBleach),
-              _careTag(Icons.dry_cleaning, "Dry Clean", item.canDryClean),
-              _careTag(Icons.iron, "Iron: ${item.ironLevel}", true),
-            ]),
-          ),
         ],
+      ),
+    );
+  }
+
+  void _showFullScreenImage(String imagePath) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog.fullscreen(
+        backgroundColor: Colors.black,
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                child: Image.asset(imagePath, fit: BoxFit.contain),
+              ),
+            ),
+            Positioned(
+              top: 40,
+              left: 20,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            Positioned(
+              top: 40,
+              right: 20,
+              child: IconButton(
+                icon: const Icon(Icons.download, color: Colors.white, size: 30),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Reference image download started...")),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1200,6 +1419,52 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         Text(label, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
         Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
       ]),
+    );
+  }
+
+  Widget _buildLeaveReviewCard(String title, Color themeColor) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: themeColor.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: themeColor.withValues(alpha: 0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: TextStyle(color: themeColor.withValues(alpha: 0.8), fontSize: 13, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 12),
+          Row(
+            children: List.generate(5, (index) => Icon(Icons.star_outline, color: themeColor.withValues(alpha: 0.4), size: 28)),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            decoration: InputDecoration(
+              hintText: "Write your feedback...",
+              hintStyle: const TextStyle(fontSize: 13),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            ),
+            maxLines: 2,
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {},
+              style: ElevatedButton.styleFrom(
+                backgroundColor: themeColor,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text("Submit Review", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
