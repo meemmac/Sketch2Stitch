@@ -8,11 +8,12 @@ import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.d
 
 // ─── Sample Color Options ──────────────────────────────────────────────────
 
-ColorOption _createColorOption(int id, String color, String? image, double price, int stock) {
+ColorOption _createColorOption(int id, String color, String? image, double price, int stock, {String? video}) {
   return ColorOption(
     optionId: id,
     color: color,
     image: image,
+    video: video,
     price: price,
     stock: stock,
   );
@@ -29,9 +30,9 @@ final List<Product> _sampleProducts = [
     category: 'Cotton',
     materialType: 'Cotton',
     colorOptions: [
-      _createColorOption(1, 'Red', 'assets/images/fab.jpg', 1200, 10),
-      _createColorOption(2, 'Blue', 'assets/images/textile.jpg', 1300, 8),
-      _createColorOption(3, 'Green', 'assets/images/silk.jpg', 1100, 15),
+      _createColorOption(1, 'Red', 'assets/images/fab.jpg', 1200, 10, video: 'assets/images/Videos/vid1.mp4'),
+      _createColorOption(2, 'Blue', 'assets/images/textile.jpg', 1300, 8, video: 'assets/images/Videos/vid2.mp4'),
+      _createColorOption(3, 'Green', 'assets/images/silk.jpg', 1100, 15, video: 'assets/images/Videos/vid3.mp4'),
     ],
     description: 'High quality premium cotton fabric perfect for summer wear.',
     careSymbol: ['Machine Wash', 'Do Not Bleach'],
@@ -43,8 +44,8 @@ final List<Product> _sampleProducts = [
     category: 'Silk',
     materialType: 'Silk',
     colorOptions: [
-      _createColorOption(1, 'Gold', 'assets/images/silk.jpg', 2500, 5),
-      _createColorOption(2, 'Red', 'assets/images/fab2.jpg', 2800, 3),
+      _createColorOption(1, 'Gold', 'assets/images/silk.jpg', 2500, 5, video: 'assets/images/Videos/vid2.mp4'),
+      _createColorOption(2, 'Red', 'assets/images/fab2.jpg', 2800, 3, video: 'assets/images/Videos/vid1.mp4'),
     ],
     description: 'Beautiful silk blend saree with intricate embroidery.',
     careSymbol: ['Dry Clean Only'],
@@ -56,8 +57,8 @@ final List<Product> _sampleProducts = [
     category: 'Linen',
     materialType: 'Linen',
     colorOptions: [
-      _createColorOption(1, 'White', 'assets/images/fab.jpg', 800, 20),
-      _createColorOption(2, 'Beige', 'assets/images/textile.jpg', 850, 18),
+      _createColorOption(1, 'White', 'assets/images/fab.jpg', 800, 20, video: 'assets/images/Videos/vid3.mp4'),
+      _createColorOption(2, 'Beige', 'assets/images/textile.jpg', 850, 18, video: 'assets/images/Videos/vid2.mp4'),
     ],
     description: 'Premium linen fabric perfect for formal shirts.',
     careSymbol: ['Machine Wash', 'Iron Medium'],
@@ -69,8 +70,8 @@ final List<Product> _sampleProducts = [
     category: 'Cotton',
     materialType: 'Cotton',
     colorOptions: [
-      _createColorOption(1, 'Pink', 'assets/images/fab2.jpg', 950, 12),
-      _createColorOption(2, 'Purple', 'assets/images/fab.jpg', 1000, 10),
+      _createColorOption(1, 'Pink', 'assets/images/fab2.jpg', 950, 12, video: 'assets/images/Videos/vid1.mp4'),
+      _createColorOption(2, 'Purple', 'assets/images/fab.jpg', 1000, 10, video: 'assets/images/Videos/vid3.mp4'),
     ],
     description: 'Beautiful printed cotton fabric for dresses and tops.',
     careSymbol: ['Machine Wash', 'Do Not Bleach'],
@@ -84,8 +85,8 @@ final List<Product> _sampleProducts = [
     category: 'Cotton',
     materialType: 'Cotton',
     colorOptions: [
-      _createColorOption(1, 'White', 'assets/images/textile.jpg', 1500, 7),
-      _createColorOption(2, 'Cream', 'assets/images/fab2.jpg', 1600, 5),
+      _createColorOption(1, 'White', 'assets/images/textile.jpg', 1500, 7, video: 'assets/images/Videos/vid1.mp4'),
+      _createColorOption(2, 'Cream', 'assets/images/fab2.jpg', 1600, 5, video: 'assets/images/Videos/vid2.mp4'),
     ],
     description: 'Authentic Jamdani fabric with traditional patterns.',
     careSymbol: ['Hand Wash', 'Do Not Bleach'],
@@ -97,8 +98,8 @@ final List<Product> _sampleProducts = [
     category: 'Polyester',
     materialType: 'Polyester',
     colorOptions: [
-      _createColorOption(1, 'Pink', 'assets/images/fab2.jpg', 950, 12),
-      _createColorOption(2, 'Purple', 'assets/images/silk.jpg', 1000, 8),
+      _createColorOption(1, 'Pink', 'assets/images/fab2.jpg', 950, 12, video: 'assets/images/Videos/vid3.mp4'),
+      _createColorOption(2, 'Purple', 'assets/images/silk.jpg', 1000, 8, video: 'assets/images/Videos/vid1.mp4'),
     ],
     description: 'Light weight georgette chiffon for elegant drapes.',
     careSymbol: ['Dry Clean Only'],
@@ -112,8 +113,8 @@ final List<Product> _sampleProducts = [
     category: 'Silk',
     materialType: 'Silk',
     colorOptions: [
-      _createColorOption(1, 'Gold', 'assets/images/silk.jpg', 3200, 4),
-      _createColorOption(2, 'Silver', 'assets/images/lace.jpg', 3500, 3),
+      _createColorOption(1, 'Gold', 'assets/images/silk.jpg', 3200, 4, video: 'assets/images/Videos/vid2.mp4'),
+      _createColorOption(2, 'Silver', 'assets/images/lace.jpg', 3500, 3, video: 'assets/images/Videos/vid1.mp4'),
     ],
     description: 'Luxurious raw silk with a natural sheen.',
     careSymbol: ['Dry Clean Only'],
@@ -125,8 +126,8 @@ final List<Product> _sampleProducts = [
     category: 'Lace',
     materialType: 'Lace',
     colorOptions: [
-      _createColorOption(1, 'White', 'assets/images/lace.jpg', 1800, 6),
-      _createColorOption(2, 'Cream', 'assets/images/silk.jpg', 1900, 5),
+      _createColorOption(1, 'White', 'assets/images/lace.jpg', 1800, 6, video: 'assets/images/Videos/vid3.mp4'),
+      _createColorOption(2, 'Cream', 'assets/images/silk.jpg', 1900, 5, video: 'assets/images/Videos/vid2.mp4'),
     ],
     description: 'Beautiful lace fabric with intricate floral patterns.',
     careSymbol: ['Hand Wash', 'Do Not Wring'],
@@ -138,9 +139,9 @@ final List<Product> _sampleProducts = [
     category: 'Velvet',
     materialType: 'Velvet',
     colorOptions: [
-      _createColorOption(1, 'Red', 'assets/images/fab.jpg', 2200, 7),
-      _createColorOption(2, 'Blue', 'assets/images/textile.jpg', 2300, 5),
-      _createColorOption(3, 'Green', 'assets/images/silk.jpg', 2400, 4),
+      _createColorOption(1, 'Red', 'assets/images/fab.jpg', 2200, 7, video: 'assets/images/Videos/vid1.mp4'),
+      _createColorOption(2, 'Blue', 'assets/images/textile.jpg', 2300, 5, video: 'assets/images/Videos/vid2.mp4'),
+      _createColorOption(3, 'Green', 'assets/images/silk.jpg', 2400, 4, video: 'assets/images/Videos/vid3.mp4'),
     ],
     description: 'Luxurious velvet fabric for evening wear.',
     careSymbol: ['Dry Clean Only'],
@@ -154,8 +155,8 @@ final List<Product> _sampleProducts = [
     category: 'Cotton',
     materialType: 'Cotton',
     colorOptions: [
-      _createColorOption(1, 'Natural', 'assets/images/fab2.jpg', 700, 25),
-      _createColorOption(2, 'Brown', 'assets/images/fab.jpg', 750, 20),
+      _createColorOption(1, 'Natural', 'assets/images/fab2.jpg', 700, 25, video: 'assets/images/Videos/vid1.mp4'),
+      _createColorOption(2, 'Brown', 'assets/images/fab.jpg', 750, 20, video: 'assets/images/Videos/vid2.mp4'),
     ],
     description: 'Hand-spun khadi cotton fabric with a rustic feel.',
     careSymbol: ['Machine Wash'],
@@ -167,8 +168,8 @@ final List<Product> _sampleProducts = [
     category: 'Denim',
     materialType: 'Denim',
     colorOptions: [
-      _createColorOption(1, 'Blue', 'assets/images/textile.jpg', 850, 15),
-      _createColorOption(2, 'Black', 'assets/images/fab2.jpg', 900, 12),
+      _createColorOption(1, 'Blue', 'assets/images/textile.jpg', 850, 15, video: 'assets/images/Videos/vid3.mp4'),
+      _createColorOption(2, 'Black', 'assets/images/fab2.jpg', 900, 12, video: 'assets/images/Videos/vid1.mp4'),
     ],
     description: 'Premium denim fabric for jeans and jackets.',
     careSymbol: ['Machine Wash', 'Do Not Bleach'],
@@ -182,8 +183,8 @@ final List<Product> _sampleProducts = [
     category: 'Embroidery',
     materialType: 'Embroidery',
     colorOptions: [
-      _createColorOption(1, 'Green', 'assets/images/lace.jpg', 2100, 8),
-      _createColorOption(2, 'Gold', 'assets/images/silk.jpg', 2300, 6),
+      _createColorOption(1, 'Green', 'assets/images/lace.jpg', 2100, 8, video: 'assets/images/Videos/vid2.mp4'),
+      _createColorOption(2, 'Gold', 'assets/images/silk.jpg', 2300, 6, video: 'assets/images/Videos/vid3.mp4'),
     ],
     description: 'Hand-embroidered fabric with traditional motifs.',
     careSymbol: ['Dry Clean Only'],
@@ -195,8 +196,8 @@ final List<Product> _sampleProducts = [
     category: 'Silk',
     materialType: 'Silk',
     colorOptions: [
-      _createColorOption(1, 'Copper', 'assets/images/textile.jpg', 2800, 4),
-      _createColorOption(2, 'Gold', 'assets/images/silk.jpg', 3000, 3),
+      _createColorOption(1, 'Copper', 'assets/images/textile.jpg', 2800, 4, video: 'assets/images/Videos/vid1.mp4'),
+      _createColorOption(2, 'Gold', 'assets/images/silk.jpg', 3000, 3, video: 'assets/images/Videos/vid2.mp4'),
     ],
     description: 'Beautiful tussar silk with a textured finish.',
     careSymbol: ['Dry Clean Only'],
@@ -208,8 +209,8 @@ final List<Product> _sampleProducts = [
     category: 'Satin',
     materialType: 'Satin',
     colorOptions: [
-      _createColorOption(1, 'Pink', 'assets/images/fab.jpg', 1200, 10),
-      _createColorOption(2, 'White', 'assets/images/lace.jpg', 1300, 8),
+      _createColorOption(1, 'Pink', 'assets/images/fab.jpg', 1200, 10, video: 'assets/images/Videos/vid3.mp4'),
+      _createColorOption(2, 'White', 'assets/images/lace.jpg', 1300, 8, video: 'assets/images/Videos/vid1.mp4'),
     ],
     description: 'Smooth satin fabric for bridal and formal wear.',
     careSymbol: ['Dry Clean Only'],
@@ -614,6 +615,25 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.local_shipping_outlined,
+                          size: isSmall ? 12 : 14,
+                          color: kSage,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          "Tk ${retailer.deliveryCharge.toInt()}",
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: kSage,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],

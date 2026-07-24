@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
+import '../../../widgets/video_preview_player.dart';
 
 class ProductDetailOverlay extends StatefulWidget {
   final Product product;
@@ -129,7 +130,23 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                           color: Color(0xFF2C5C44),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.directions_bike, size: 18, color: Colors.grey[600]),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Tk 50 delivery',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
                       if (!_inStock)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -484,25 +501,45 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
 
 Widget _buildProductImage() {
   final imageUrl = _selectedOption?.image;
-  return ClipRRect(
-    borderRadius: BorderRadius.circular(16),
-    child: Container(
-      height: 250,
-      width: double.infinity,
-      color: Colors.grey[200],
-      child: imageUrl != null && imageUrl.isNotEmpty
-          ? imageUrl.startsWith('http')
-              ? Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => _imageFallback(),
-                )
-              : Image.asset(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => _imageFallback(),
-                )
-          : _imageFallback(),
+  final videoUrl = _selectedOption?.video;
+
+  return SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    child: Row(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            height: 250,
+            width: MediaQuery.of(context).size.width * 0.8,
+            color: Colors.grey[200],
+            child: imageUrl != null && imageUrl.isNotEmpty
+                ? imageUrl.startsWith('http')
+                    ? Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => _imageFallback(),
+                      )
+                    : Image.asset(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => _imageFallback(),
+                      )
+                : _imageFallback(),
+          ),
+        ),
+        if (videoUrl != null && videoUrl.isNotEmpty) ...[
+          const SizedBox(width: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: VideoPreviewPlayer(
+              videoPath: videoUrl,
+              height: 250,
+              width: MediaQuery.of(context).size.width * 0.8,
+            ),
+          ),
+        ],
+      ],
     ),
   );
 }

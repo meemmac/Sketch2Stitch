@@ -3,6 +3,7 @@ import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
+import '../../../widgets/video_preview_player.dart';
 
 /// Hardcoded sample fabrics with assets images (NO RATING)
 final List<Product> kHardcodedProducts = [
@@ -13,9 +14,9 @@ final List<Product> kHardcodedProducts = [
     category: 'Cotton',
     materialType: 'Cotton',
     colorOptions: [
-      ColorOption(optionId: 1, color: 'White', image: 'assets/images/fab.jpg', price: 650, stock: 40),
-      ColorOption(optionId: 2, color: 'Beige', image: 'assets/images/fab2.jpg', price: 650, stock: 25),
-      ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/fabric_waves.jpg', price: 700, stock: 15),
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/fab.jpg', video: 'assets/images/Videos/vid1.mp4', price: 650, stock: 40),
+      ColorOption(optionId: 2, color: 'Beige', image: 'assets/images/fab2.jpg', video: 'assets/images/Videos/vid2.mp4', price: 650, stock: 25),
+      ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/fabric_waves.jpg', video: 'assets/images/Videos/vid3.mp4', price: 700, stock: 15),
       ColorOption(optionId: 4, color: 'Black', image: 'assets/images/textile.jpg', price: 700, stock: 0),
     ],
     description:
@@ -30,9 +31,9 @@ final List<Product> kHardcodedProducts = [
     category: 'Silk',
     materialType: 'Silk',
     colorOptions: [
-      ColorOption(optionId: 1, color: 'Gold', image: 'assets/images/silk.jpg', price: 1800, stock: 10),
-      ColorOption(optionId: 2, color: 'Pink', image: 'assets/images/saree.jpg', price: 1750, stock: 8),
-      ColorOption(optionId: 3, color: 'Green', image: 'assets/images/gorgeous.jpg', price: 1750, stock: 5),
+      ColorOption(optionId: 1, color: 'Gold', image: 'assets/images/silk.jpg', video: 'assets/images/Videos/vid2.mp4', price: 1800, stock: 10),
+      ColorOption(optionId: 2, color: 'Pink', image: 'assets/images/saree.jpg', video: 'assets/images/Videos/vid3.mp4', price: 1750, stock: 8),
+      ColorOption(optionId: 3, color: 'Green', image: 'assets/images/gorgeous.jpg', video: 'assets/images/Videos/vid1.mp4', price: 1750, stock: 5),
       ColorOption(optionId: 4, color: 'White', image: 'assets/images/gorgette.jpg', price: 1700, stock: 12),
     ],
     description:
@@ -47,8 +48,8 @@ final List<Product> kHardcodedProducts = [
     category: 'Wool',
     materialType: 'Wool',
     colorOptions: [
-      ColorOption(optionId: 1, color: 'Brown', image: 'assets/images/drawing_fabric.jpg', price: 950, stock: 18),
-      ColorOption(optionId: 2, color: 'Black', image: 'assets/images/textile.jpg', price: 950, stock: 20),
+      ColorOption(optionId: 1, color: 'Brown', image: 'assets/images/drawing_fabric.jpg', video: 'assets/images/Videos/vid3.mp4', price: 950, stock: 18),
+      ColorOption(optionId: 2, color: 'Black', image: 'assets/images/textile.jpg', video: 'assets/images/Videos/vid2.mp4', price: 950, stock: 20),
       ColorOption(optionId: 3, color: 'Beige', image: 'assets/images/fabric_waves.jpg', price: 900, stock: 0),
     ],
     description:
@@ -63,8 +64,8 @@ final List<Product> kHardcodedProducts = [
     category: 'Linen',
     materialType: 'Linen',
     colorOptions: [
-      ColorOption(optionId: 1, color: 'White', image: 'assets/images/fabrics_rolled.jpg', price: 780, stock: 30),
-      ColorOption(optionId: 2, color: 'Beige', image: 'assets/images/fab.jpg', price: 780, stock: 22),
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/fabrics_rolled.jpg', video: 'assets/images/Videos/vid1.mp4', price: 780, stock: 30),
+      ColorOption(optionId: 2, color: 'Beige', image: 'assets/images/fab.jpg', video: 'assets/images/Videos/vid2.mp4', price: 780, stock: 22),
       ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/fabric_waves.jpg', price: 820, stock: 14),
     ],
     description:
@@ -608,15 +609,36 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                           overflow: TextOverflow.ellipsis,
                         ),
                         SizedBox(height: isSmallScreen ? 4 : 6),
-                        Text(
-                          product.priceRange,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: kSageDark,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                product.priceRange,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: kSageDark,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
+                                const SizedBox(width: 2),
+                                Text(
+                                  'Tk 50',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                         SizedBox(height: isSmallScreen ? 6 : 8),
                         if (!outOfStock) ...[

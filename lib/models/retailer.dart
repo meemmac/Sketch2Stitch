@@ -10,6 +10,7 @@ class Retailer {
   final double rating;
   final String? profilePicture;
   final String? about;
+  final double deliveryCharge;
   
   // Relationships
   List<Product>? products;
@@ -22,6 +23,7 @@ class Retailer {
     required this.phone,
     required this.address,
     required this.rating,
+    this.deliveryCharge = 50.0,
     this.profilePicture,
     this.about,
     this.products = const [],
@@ -43,6 +45,7 @@ class Retailer {
     String? phone,
     String? address,
     double? rating,
+    double? deliveryCharge,
     String? profilePicture,
     String? about,
     List<Product>? products,
@@ -55,6 +58,7 @@ class Retailer {
       phone: phone ?? this.phone,
       address: address ?? this.address,
       rating: rating ?? this.rating,
+      deliveryCharge: deliveryCharge ?? this.deliveryCharge,
       profilePicture: profilePicture ?? this.profilePicture,
       about: about ?? this.about,
       products: products ?? this.products,
@@ -69,6 +73,7 @@ class Retailer {
     'phone': phone,
     'address': address,
     'rating': rating,
+    'deliveryCharge': deliveryCharge,
     'profilePicture': profilePicture,
     'about': about,
   };
@@ -81,6 +86,7 @@ class Retailer {
       phone: json['phone'] ?? '',
       address: json['address'] ?? '',
       rating: (json['rating'] ?? 0).toDouble(),
+      deliveryCharge: (json['deliveryCharge'] ?? 50.0).toDouble(),
       profilePicture: json['profilePicture'],
       about: json['about'],
     );

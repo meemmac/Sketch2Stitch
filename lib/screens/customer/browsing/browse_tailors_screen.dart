@@ -469,6 +469,25 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                         ),
                       ],
                     ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.local_shipping_outlined,
+                          size: isSmall ? 12 : 14,
+                          color: kSage,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          "Tk ${tailor.deliveryCharge.toInt()}",
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: kSage,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),

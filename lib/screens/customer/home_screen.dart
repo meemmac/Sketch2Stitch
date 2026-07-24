@@ -12,9 +12,11 @@ import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dar
 import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
 import 'package:sketch2stitch/screens/customer/cart_screen.dart';
 import '../../widgets/dashboard_drawer.dart';
+import '../../widgets/video_preview_player.dart';
 import 'virtual_trial_screen.dart';
 import 'notification_screen.dart' ;
 import 'package:sketch2stitch/screens/retailer/inventory_screen.dart';
+import 'package:sketch2stitch/screens/tailor/orders_screen.dart';
 import 'track_order.dart';
 import 'order_list_screen.dart';
 import 'package:sketch2stitch/screens/retailer/orders_screen.dart';
@@ -716,12 +718,9 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              // TODO: Navigate to orders
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const RetailerOrdersScreen(),
-                ),
+                MaterialPageRoute(builder: (_) => const TailorOrdersScreen()),
               );
             },
             style: ElevatedButton.styleFrom(
@@ -917,17 +916,51 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                   Text(
                     product.priceRange,
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kSageDark),
+                    overflow: TextOverflow.ellipsis,
                   ),
                   if (!outOfStock) ...[
                     const SizedBox(height: 6),
                     Row(
-                      children: product.colorOptions
-                          .take(4)
-                          .map((o) => Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: _colorDot(o),
-                      ))
-                          .toList(),
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Row(
+                          children: product.colorOptions
+                              .take(4)
+                              .map((o) => Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: _colorDot(o),
+                          ))
+                              .toList(),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
+                            const SizedBox(width: 2),
+                            Text(
+                              'Tk 50',
+                              style: TextStyle(fontSize: 10, color: Colors.grey[600], fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
+                          const SizedBox(width: 2),
+                          Text(
+                            'Tk 50',
+                            style: TextStyle(fontSize: 10, color: Colors.grey[600], fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ],
@@ -1073,7 +1106,34 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                           style: TextStyle(fontSize: 10.5, color: Colors.grey[600]),
                         ),
                       ),
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '1.8 km',
+                          style: TextStyle(fontSize: 9, color: Colors.green.shade800, fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.bottomRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
+                        const SizedBox(width: 2),
+                        Text(
+                          'Tk 50',
+                          style: TextStyle(fontSize: 10, color: Colors.grey[600], fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -1179,7 +1239,34 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                           style: TextStyle(fontSize: 10.5, color: Colors.grey[600]),
                         ),
                       ),
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '2.5 km',
+                          style: TextStyle(fontSize: 9, color: Colors.green.shade800, fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.bottomRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
+                        const SizedBox(width: 2),
+                        Text(
+                          'Tk 50',
+                          style: TextStyle(fontSize: 10, color: Colors.grey[600], fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
