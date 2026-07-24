@@ -99,6 +99,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   DateTime? _customStartDate;
   DateTime? _customEndDate;
   bool _showOngoing = true;
+  String _selectedStatus = "All";
 
   final Color primaryGreen = const Color(0xFF4F7942);
 
@@ -478,7 +479,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   List<CustomerOrder> get _filteredOrders {
     return _orders.where((order) {
       final date = order.orderDate;
-      return !date.isBefore(_startDate) && !date.isAfter(_endDate);
+      final matchesDate = !date.isBefore(_startDate) && !date.isAfter(_endDate);
+      final matchesStatus = _selectedStatus == "All" || order.status == _selectedStatus;
+      return matchesDate && matchesStatus;
     }).where((order) {
       if (_searchQuery.isEmpty) return true;
       final query = _searchQuery.toLowerCase();
@@ -521,9 +524,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ),
                 ),
                 IconButton(
-                  onPressed: _showDetailedFilterSheet,
+                  onPressed: _showFilterSheet,
                   icon: Icon(Icons.filter_list, color: primaryGreen),
-                  tooltip: "Filter by names/IDs",
+                  tooltip: "Filter orders",
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
@@ -575,130 +578,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildSearchAndFilter() {
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 45,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.green.shade100),
-            ),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (val) => setState(() => _searchQuery = val),
-              decoration: const InputDecoration(
-                hintText: "Search order ID, product...",
-                hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
-                prefixIcon: Icon(Icons.search, size: 20, color: Colors.grey),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 10),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        _filterButton(),
-      ],
-    );
-  }
-
-  void _showDetailedFilterSheet() {
-    final TextEditingController filterController = TextEditingController(text: _searchQuery);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Material(
+    return Container(
+      height: 45,
+      decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        child: Container(
-          padding: EdgeInsets.fromLTRB(24, 12, 24, MediaQuery.of(context).viewInsets.bottom + 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 42, height: 4,
-                  margin: const EdgeInsets.only(bottom: 18),
-                  decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
-                ),
-              ),
-              const Text("Detailed Filter", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 8),
-              const Text(
-                "Filter by Order ID, Product Name, Retailer, or Tailor",
-                style: TextStyle(color: Colors.black54, fontSize: 13),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: filterController,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: "Enter keywords...",
-                  prefixIcon: const Icon(Icons.search),
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _searchQuery = filterController.text;
-                      _searchController.text = filterController.text;
-                    });
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryGreen,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text("Apply Filter", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
-        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.shade100),
       ),
-    );
-  }
-
-  Widget _filterButton() {
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: _showFilterSheet,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.green.shade100),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.tune, color: primaryGreen, size: 20),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                _filterLabel,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: primaryGreen,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
+      child: TextField(
+        controller: _searchController,
+        onChanged: (val) => setState(() => _searchQuery = val),
+        decoration: const InputDecoration(
+          hintText: "Search order ID, product...",
+          hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
+          prefixIcon: Icon(Icons.search, size: 20, color: Colors.grey),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(vertical: 10),
         ),
       ),
     );
@@ -707,30 +602,146 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   void _showFilterSheet() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Material(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 42, height: 4,
-                  margin: const EdgeInsets.only(bottom: 18),
-                  decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => Material(
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42, height: 4,
+                    margin: const EdgeInsets.only(bottom: 18),
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  ),
                 ),
-              ),
-              const Text("Filter orders", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 14),
-              _filterOptionTile("Last 3 months", "Show recent purchases", OrderFilterPreset.last3Months),
-              _filterOptionTile("Last 6 months", "View older history", OrderFilterPreset.last6Months),
-              _filterOptionTile("Custom Range", "Pick specific dates", OrderFilterPreset.custom, isCustom: true),
-            ],
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text("Filter orders", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _filterPreset = OrderFilterPreset.last3Months;
+                          _customStartDate = null;
+                          _customEndDate = null;
+                          _selectedStatus = "All";
+                        });
+                        Navigator.pop(context);
+                      },
+                      child: const Text("Reset All"),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Text("Date Range", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _filterChip("Last 3 months", _filterPreset == OrderFilterPreset.last3Months, () {
+                      setSheetState(() => _filterPreset = OrderFilterPreset.last3Months);
+                      setState(() => _filterPreset = OrderFilterPreset.last3Months);
+                    }),
+                    _filterChip("Last 6 months", _filterPreset == OrderFilterPreset.last6Months, () {
+                      setSheetState(() => _filterPreset = OrderFilterPreset.last6Months);
+                      setState(() => _filterPreset = OrderFilterPreset.last6Months);
+                    }),
+                    _filterChip(
+                      _filterPreset == OrderFilterPreset.custom && _customStartDate != null
+                          ? "${_formatDate(_customStartDate!)} - ${_formatDate(_customEndDate!)}"
+                          : "Custom Range",
+                      _filterPreset == OrderFilterPreset.custom,
+                      () async {
+                        final range = await showDateRangePicker(
+                          context: context,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now(),
+                        );
+                        if (range != null) {
+                          setSheetState(() {
+                            _filterPreset = OrderFilterPreset.custom;
+                            _customStartDate = range.start;
+                            _customEndDate = range.end.add(const Duration(hours: 23, minutes: 59));
+                          });
+                          setState(() {
+                            _filterPreset = OrderFilterPreset.custom;
+                            _customStartDate = range.start;
+                            _customEndDate = range.end.add(const Duration(hours: 23, minutes: 59));
+                          });
+                        }
+                      },
+                      icon: Icons.calendar_month,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                const Text("Status", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: ["All", "On Hold", "Processing", "Preparing", "Packed", "Delivered"].map((status) {
+                    return _filterChip(status, _selectedStatus == status, () {
+                      setSheetState(() => _selectedStatus = status);
+                      setState(() => _selectedStatus = status);
+                    });
+                  }).toList(),
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryGreen,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text("Apply Filters", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _filterChip(String label, bool isSelected, VoidCallback onTap, {IconData? icon}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? primaryGreen : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isSelected ? primaryGreen : Colors.grey.shade300),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16, color: isSelected ? Colors.white : Colors.grey.shade700),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.grey.shade700,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 13,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1046,90 +1057,198 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   void _showOrderDetail(CustomerOrder order) {
+    double tempRetailerRating = 0;
+    double tempTailorRating = 0;
+    final retailerController = TextEditingController();
+    final tailorController = TextEditingController();
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (_, scrollController) => Container(
-          decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
-          padding: const EdgeInsets.all(24),
-          child: ListView(
-            controller: scrollController,
-            children: [
-              Center(child: Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 20), decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      builder: (modalContext) => StatefulBuilder(
+        builder: (context, setModalState) {
+          final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+          return DraggableScrollableSheet(
+            initialChildSize: 0.9,
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
+            builder: (_, scrollController) => Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+              ),
+              padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottomInset),
+              child: ListView(
+                controller: scrollController,
                 children: [
-                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text("Order Details", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                    Text("ID: ${order.id}", style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
-                  ]),
-                  _infoBadge(order.status, order.isDelivered ? primaryGreen.withValues(alpha: 0.1) : Colors.blueAccent.withValues(alpha: 0.1), order.isDelivered ? primaryGreen : Colors.blueAccent),
-                ],
-              ),
-              const SizedBox(height: 25),
-              const Text("Products", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              ...order.items.map((item) => _itemPreviewCard(item)),
-              const SizedBox(height: 30),
-              const Text("Order Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              _detailRow("Retailer", order.retailerName),
-              if (order.tailorName != null) _buildTailorSummaryRow(order),
-              _detailRow("Total Items", "${order.totalQuantity} units"),
-              _detailRow("Order Date", _formatDate(order.orderDate)),
-              if (order.deliveryDate != null) _detailRow("Delivery Date", _formatDate(order.deliveryDate!)),
-              const SizedBox(height: 20),
-              const Text("Shipping Address", style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade200)),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Icon(Icons.location_on_outlined, size: 16, color: primaryGreen),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(order.deliveryAddress, style: const TextStyle(fontSize: 13, height: 1.4, fontWeight: FontWeight.w600))),
-                ]),
-              ),
-              const Divider(height: 48),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("Grand Total", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                  Text("Tk ${order.amount.toInt()}", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.green.shade800)),
-                ],
-              ),
-              if (order.isDelivered && (order.review != null || order.tailorReview != null)) ...[
-                const SizedBox(height: 35),
-                const Text("Your Reviews", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text("Order Details", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                        Text("ID: ${order.id}", style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                    _infoBadge(
+                      order.status,
+                      order.isDelivered ? primaryGreen.withValues(alpha: 0.1) : Colors.blueAccent.withValues(alpha: 0.1),
+                      order.isDelivered ? primaryGreen : Colors.blueAccent,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 25),
+                const Text("Products", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
-                if (order.review != null) ...[
-                  _reviewCard("Retailer Review", order.review!, order.rating ?? 0.0, Colors.blue),
+                ...order.items.map((item) => _itemPreviewCard(item)),
+                const SizedBox(height: 30),
+                const Text("Order Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                _detailRow("Retailer", order.retailerName),
+                if (order.tailorName != null) _buildTailorSummaryRow(order),
+                _detailRow("Total Items", "${order.totalQuantity} units"),
+                _detailRow("Order Date", _formatDate(order.orderDate)),
+                if (order.deliveryDate != null) _detailRow("Delivery Date", _formatDate(order.deliveryDate!)),
+                const SizedBox(height: 20),
+                const Text("Shipping Address", style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade200)),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.location_on_outlined, size: 16, color: primaryGreen),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(order.deliveryAddress, style: const TextStyle(fontSize: 13, height: 1.4, fontWeight: FontWeight.w600))),
+                    ],
+                  ),
+                ),
+                const Divider(height: 48),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text("Grand Total", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                    Text("Tk ${order.amount.toInt()}", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.green.shade800)),
+                  ],
+                ),
+                if (order.isDelivered && (order.review != null || order.tailorReview != null)) ...[
+                  const SizedBox(height: 35),
+                  const Text("Your Reviews", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
+                  if (order.review != null) ...[
+                    _reviewCard("Retailer Review", order.review!, order.rating ?? 0.0, Colors.blue),
+                    const SizedBox(height: 12),
+                  ],
+                  if (order.tailorReview != null) ...[
+                    _reviewCard("Tailor Review", order.tailorReview!, order.tailorRating ?? 0.0, Colors.orange),
+                  ],
+                ] else if (order.isDelivered) ...[
+                  const SizedBox(height: 35),
+                  const Text("Leave a Review", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  _buildLeaveReviewCard(
+                    title: "Rate Retailer",
+                    themeColor: Colors.blue,
+                    currentRating: tempRetailerRating,
+                    controller: retailerController,
+                    onRatingChanged: (r) => setModalState(() => tempRetailerRating = r),
+                    onSubmit: () {
+                      if (tempRetailerRating == 0) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a rating")));
+                        return;
+                      }
+                      final messenger = ScaffoldMessenger.of(modalContext);
+                      setState(() {
+                        final idx = _orders.indexWhere((o) => o.id == order.id);
+                        if (idx != -1) {
+                          _orders[idx] = CustomerOrder(
+                            id: order.id,
+                            retailerName: order.retailerName,
+                            tailorName: order.tailorName,
+                            items: order.items,
+                            amount: order.amount,
+                            orderDate: order.orderDate,
+                            status: order.status,
+                            isDelivered: order.isDelivered,
+                            deliveryAddress: order.deliveryAddress,
+                            deliveryDate: order.deliveryDate,
+                            review: retailerController.text,
+                            rating: tempRetailerRating,
+                            tailorReview: order.tailorReview,
+                            tailorRating: order.tailorRating,
+                          );
+                        }
+                      });
+                      Navigator.pop(modalContext);
+                      messenger.showSnackBar(const SnackBar(content: Text("Review submitted successfully!")));
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  if (order.items.any((i) => i.destination == OrderDeliveryDestination.tailor))
+                    _buildLeaveReviewCard(
+                      title: "Rate Tailor",
+                      themeColor: Colors.orange,
+                      currentRating: tempTailorRating,
+                      controller: tailorController,
+                      onRatingChanged: (r) => setModalState(() => tempTailorRating = r),
+                      onSubmit: () {
+                        if (tempTailorRating == 0) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a rating")));
+                          return;
+                        }
+                        final messenger = ScaffoldMessenger.of(modalContext);
+                        setState(() {
+                          final idx = _orders.indexWhere((o) => o.id == order.id);
+                          if (idx != -1) {
+                            _orders[idx] = CustomerOrder(
+                              id: order.id,
+                              retailerName: order.retailerName,
+                              tailorName: order.tailorName,
+                              items: order.items,
+                              amount: order.amount,
+                              orderDate: order.orderDate,
+                              status: order.status,
+                              isDelivered: order.isDelivered,
+                              deliveryAddress: order.deliveryAddress,
+                              deliveryDate: order.deliveryDate,
+                              review: order.review,
+                              rating: order.rating,
+                              tailorReview: tailorController.text,
+                              tailorRating: tempTailorRating,
+                            );
+                          }
+                        });
+                        Navigator.pop(modalContext);
+                        messenger.showSnackBar(const SnackBar(content: Text("Tailor review submitted!")));
+                      },
+                    ),
                 ],
-                if (order.tailorReview != null) ...[
-                  _reviewCard("Tailor Review", order.tailorReview!, order.tailorRating ?? 0.0, Colors.orange),
-                ],
-              ] else if (order.isDelivered) ...[
-                const SizedBox(height: 35),
-                const Text("Leave a Review", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                _buildLeaveReviewCard("Rate Retailer", Colors.blue),
-                const SizedBox(height: 12),
-                if (order.items.any((i) => i.destination == OrderDeliveryDestination.tailor))
-                  _buildLeaveReviewCard("Rate Tailor", Colors.orange),
+                const SizedBox(height: 40),
               ],
-              const SizedBox(height: 40),
-            ],
+            ),
           ),
-        ),
-      ),
-    );
-  }
+        );
+      },
+    ),
+  ).then((_) {
+    retailerController.dispose();
+    tailorController.dispose();
+  });
+}
 
   Widget _itemPreviewCard(OrderItem item) {
     final bool sentToTailor = item.destination == OrderDeliveryDestination.tailor;
@@ -1455,7 +1574,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return _detailRow("Tailor", displayText);
   }
 
-  Widget _buildLeaveReviewCard(String title, Color themeColor) {
+  Widget _buildLeaveReviewCard({
+    required String title,
+    required Color themeColor,
+    required double currentRating,
+    required TextEditingController controller,
+    required Function(double) onRatingChanged,
+    required VoidCallback onSubmit,
+  }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1469,10 +1595,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           Text(title, style: TextStyle(color: themeColor.withValues(alpha: 0.8), fontSize: 13, fontWeight: FontWeight.w800)),
           const SizedBox(height: 12),
           Row(
-            children: List.generate(5, (index) => Icon(Icons.star_outline, color: themeColor.withValues(alpha: 0.4), size: 28)),
+            children: List.generate(
+              5,
+              (index) => GestureDetector(
+                onTap: () => onRatingChanged(index + 1.0),
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Icon(
+                    index < currentRating ? Icons.star : Icons.star_outline,
+                    color: index < currentRating ? themeColor : themeColor.withValues(alpha: 0.4),
+                    size: 28,
+                  ),
+                ),
+              ),
+            ),
           ),
           const SizedBox(height: 16),
           TextField(
+            controller: controller,
             decoration: InputDecoration(
               hintText: "Write your feedback...",
               hintStyle: const TextStyle(fontSize: 13),
@@ -1486,7 +1626,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {},
+              onPressed: onSubmit,
               style: ElevatedButton.styleFrom(
                 backgroundColor: themeColor,
                 foregroundColor: Colors.white,

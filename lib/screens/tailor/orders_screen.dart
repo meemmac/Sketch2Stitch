@@ -80,6 +80,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
   DateTime? _customStartDate;
   DateTime? _customEndDate;
   int _selectedTabIndex = 1; // 0: Pending, 1: Current, 2: Completed
+  String _selectedStatus = "All";
 
   final Color primaryGreen = const Color(0xFF4F7942);
 
@@ -257,7 +258,9 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
   List<TailorOrder> get _filteredOrders {
     return _orders.where((order) {
       final date = order.orderDate;
-      return !date.isBefore(_startDate) && !date.isAfter(_endDate);
+      final matchesDate = !date.isBefore(_startDate) && !date.isAfter(_endDate);
+      final matchesStatus = _selectedStatus == "All" || _getStatusText(order.status) == _selectedStatus;
+      return matchesDate && matchesStatus;
     }).where((order) {
       if (_searchQuery.isEmpty) return true;
       final query = _searchQuery.toLowerCase();
@@ -301,9 +304,9 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   ),
                 ),
                 IconButton(
-                  onPressed: _showDetailedFilterSheet,
+                  onPressed: _showFilterSheet,
                   icon: Icon(Icons.filter_list, color: primaryGreen),
-                  tooltip: "Filter by names/IDs",
+                  tooltip: "Filter orders",
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
@@ -371,130 +374,22 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
   }
 
   Widget _buildSearchAndFilter() {
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 45,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.green.shade100),
-            ),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (val) => setState(() => _searchQuery = val),
-              decoration: const InputDecoration(
-                hintText: "Search order ID, product...",
-                hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
-                prefixIcon: Icon(Icons.search, size: 20, color: Colors.grey),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 10),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        _filterButton(),
-      ],
-    );
-  }
-
-  void _showDetailedFilterSheet() {
-    final TextEditingController filterController = TextEditingController(text: _searchQuery);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Material(
+    return Container(
+      height: 45,
+      decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        child: Container(
-          padding: EdgeInsets.fromLTRB(24, 12, 24, MediaQuery.of(context).viewInsets.bottom + 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 42, height: 4,
-                  margin: const EdgeInsets.only(bottom: 18),
-                  decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
-                ),
-              ),
-              const Text("Detailed Filter", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 8),
-              const Text(
-                "Filter by Order ID, Product Name, or Customer",
-                style: TextStyle(color: Colors.black54, fontSize: 13),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: filterController,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: "Enter keywords...",
-                  prefixIcon: const Icon(Icons.search),
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _searchQuery = filterController.text;
-                      _searchController.text = filterController.text;
-                    });
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryGreen,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text("Apply Filter", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
-        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.shade100),
       ),
-    );
-  }
-
-  Widget _filterButton() {
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: _showFilterSheet,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.green.shade100),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.tune, color: primaryGreen, size: 20),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                _filterLabel,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: primaryGreen,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
+      child: TextField(
+        controller: _searchController,
+        onChanged: (val) => setState(() => _searchQuery = val),
+        decoration: const InputDecoration(
+          hintText: "Search order ID, product...",
+          hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
+          prefixIcon: Icon(Icons.search, size: 20, color: Colors.grey),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(vertical: 10),
         ),
       ),
     );
@@ -503,29 +398,146 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
   void _showFilterSheet() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Material(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(child: Container(width: 42, height: 4, margin: const EdgeInsets.only(bottom: 18), decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
-              const Text("Filter by date", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 14),
-              _filterOptionTile("Last 3 months", _filterPreset == OrderFilterPreset.last3Months, () {
-                setState(() => _filterPreset = OrderFilterPreset.last3Months);
-                Navigator.pop(context);
-              }),
-              _filterOptionTile("Last 6 months", _filterPreset == OrderFilterPreset.last6Months, () {
-                setState(() => _filterPreset = OrderFilterPreset.last6Months);
-                Navigator.pop(context);
-              }),
-            ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => Material(
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42, height: 4,
+                    margin: const EdgeInsets.only(bottom: 18),
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text("Filter orders", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _filterPreset = OrderFilterPreset.last3Months;
+                          _customStartDate = null;
+                          _customEndDate = null;
+                          _selectedStatus = "All";
+                        });
+                        Navigator.pop(context);
+                      },
+                      child: const Text("Reset All"),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Text("Date Range", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _filterChip("Last 3 months", _filterPreset == OrderFilterPreset.last3Months, () {
+                      setSheetState(() => _filterPreset = OrderFilterPreset.last3Months);
+                      setState(() => _filterPreset = OrderFilterPreset.last3Months);
+                    }),
+                    _filterChip("Last 6 months", _filterPreset == OrderFilterPreset.last6Months, () {
+                      setSheetState(() => _filterPreset = OrderFilterPreset.last6Months);
+                      setState(() => _filterPreset = OrderFilterPreset.last6Months);
+                    }),
+                    _filterChip(
+                      _filterPreset == OrderFilterPreset.custom && _customStartDate != null
+                          ? "${_formatDate(_customStartDate!)} - ${_formatDate(_customEndDate!)}"
+                          : "Custom Range",
+                      _filterPreset == OrderFilterPreset.custom,
+                      () async {
+                        final range = await showDateRangePicker(
+                          context: context,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now(),
+                        );
+                        if (range != null) {
+                          setSheetState(() {
+                            _filterPreset = OrderFilterPreset.custom;
+                            _customStartDate = range.start;
+                            _customEndDate = range.end.add(const Duration(hours: 23, minutes: 59));
+                          });
+                          setState(() {
+                            _filterPreset = OrderFilterPreset.custom;
+                            _customStartDate = range.start;
+                            _customEndDate = range.end.add(const Duration(hours: 23, minutes: 59));
+                          });
+                        }
+                      },
+                      icon: Icons.calendar_month,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                const Text("Status", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: ["All", "New Request", "Accepted", "Stitching", "Ready", "Finished", "Declined"].map((status) {
+                    return _filterChip(status, _selectedStatus == status, () {
+                      setSheetState(() => _selectedStatus = status);
+                      setState(() => _selectedStatus = status);
+                    });
+                  }).toList(),
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryGreen,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text("Apply Filters", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _filterChip(String label, bool isSelected, VoidCallback onTap, {IconData? icon}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? primaryGreen : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isSelected ? primaryGreen : Colors.grey.shade300),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16, color: isSelected ? Colors.white : Colors.grey.shade700),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.grey.shade700,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 13,
+              ),
+            ),
+          ],
         ),
       ),
     );
