@@ -619,6 +619,25 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                         ),
                       ],
                     ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.local_shipping_outlined,
+                          size: isSmall ? 12 : 14,
+                          color: kSage,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          "Tk ${retailer.deliveryCharge.toInt()}",
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: kSage,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                     // Show product count if available
                     if (retailer.products != null && retailer.products!.isNotEmpty)
                       Padding(

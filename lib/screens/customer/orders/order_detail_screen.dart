@@ -20,6 +20,8 @@ class OrderItem {
   final bool canTumbleDry;
   final String ironLevel;
   final double price;
+  final double? tailorPrice;
+  final String? retailerName;
 
   // New fields for Tailor reference
   final OrderDeliveryDestination destination;
@@ -33,6 +35,8 @@ class OrderItem {
     required this.imagePath,
     required this.color,
     required this.price,
+    this.tailorPrice,
+    this.retailerName,
     this.description = "Premium quality material with excellent durability and comfort.",
     this.itemComment,
     this.canWash = true,
@@ -62,6 +66,7 @@ class CustomerOrder {
   final String? tailorReview;
   final double? tailorRating;
   final String deliveryAddress;
+  final Map<String, double> deliveryCharges;
 
   CustomerOrder({
     required this.id,
@@ -73,12 +78,37 @@ class CustomerOrder {
     required this.status,
     required this.isDelivered,
     required this.deliveryAddress,
+    required this.deliveryCharges,
     this.deliveryDate,
     this.review,
     this.rating,
     this.tailorReview,
     this.tailorRating,
   });
+
+  String get _allRetailerNames {
+    final names = items.map((i) => i.retailerName ?? retailerName).toSet().toList();
+    if (names.length <= 1) return names.first;
+    if (names.length == 2) return "${names[0]} & ${names[1]}";
+    return "${names[0]}, ${names[1]} & more";
+  }
+
+  double get totalGrandAmount {
+    double totalRetailer = amount;
+    double totalTailor = items.where((item) => item.destination == OrderDeliveryDestination.tailor).fold(0.0, (sum, item) => sum + (item.tailorPrice ?? 0.0));
+    double delivery = deliveryCharges.values.fold(0.0, (sum, val) => sum + val);
+    return totalRetailer + totalTailor + delivery;
+  }
+
+  double get totalOngoingAmount {
+    double totalRetailer = amount;
+    // Only include retailer delivery charges for ongoing orders
+    double delivery = 0;
+    deliveryCharges.forEach((key, value) {
+      if (key != tailorName) delivery += value;
+    });
+    return totalRetailer + delivery;
+  }
 
   int get totalQuantity => items.fold(0, (sum, item) => sum + item.quantity);
 }
@@ -282,11 +312,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       status: "On Hold",
       isDelivered: false,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
+      deliveryCharges: {"Zaroon Fabrics": 50.0},
       items: [
         const OrderItem(
           name: "Embroidered Lawn",
           quantity: 2,
           price: 4500,
+          tailorPrice: 1200,
           imagePath: "assets/images/fabrics_rolled.jpg",
           color: "Emerald Green",
           destination: OrderDeliveryDestination.tailor,
@@ -304,6 +336,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       status: "Processing",
       isDelivered: false,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
+      deliveryCharges: {"Silk & Cotton": 50.0},
       items: [
         const OrderItem(
           name: "Premium Cotton",
@@ -325,11 +358,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       status: "Preparing",
       isDelivered: false,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
+      deliveryCharges: {"Zaroon Fabrics": 45.0, "Thread & Co.": 45.0},
       items: [
         const OrderItem(
           name: "Premium Linen",
           quantity: 3,
           price: 3000,
+          tailorPrice: 1500,
+          retailerName: "Zaroon Fabrics",
           imagePath: "assets/images/fabrics_rolled.jpg",
           color: "Cream",
           description: "High-quality linen fabric for summer wear.",
@@ -342,6 +378,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           name: "Cotton Thread Set",
           quantity: 1,
           price: 1500,
+          retailerName: "Thread & Co.",
           imagePath: "assets/images/denim.jpg",
           color: "Mixed",
         ),
@@ -355,11 +392,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       status: "Packed",
       isDelivered: false,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
+      deliveryCharges: {"Heritage Silk": 50.0},
       items: [
         const OrderItem(
           name: "Pure Rajshahi Silk",
           quantity: 1,
           price: 8200,
+          tailorPrice: 2000,
           imagePath: "assets/images/silk.jpg",
           color: "Deep Red",
           description: "Traditional Rajshahi silk with gold border.",
@@ -380,6 +419,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       status: "Delivered",
       isDelivered: true,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
+      deliveryCharges: {"FabriCo": 50.0, "Master Stitch": 35.0},
       review: "Excellent quality and fast delivery. Very satisfied!",
       rating: 5.0,
       tailorReview: "The stitching is perfect and fits me exactly as I wanted. Highly recommended!",
@@ -389,6 +429,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           name: "Printed Voile",
           quantity: 4,
           price: 3200,
+          tailorPrice: 1800,
           imagePath: "assets/images/gorgeous.jpg",
           color: "Floral Blue",
           destination: OrderDeliveryDestination.tailor,
@@ -407,6 +448,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       status: "Delivered",
       isDelivered: true,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
+      deliveryCharges: {"Bismillah Fabrics": 50.0},
       items: [
         const OrderItem(
           name: "Soft Georgette",
@@ -428,11 +470,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       status: "Delivered",
       isDelivered: true,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
+      deliveryCharges: {"Style Hub": 50.0, "Fine Cut Tailors": 35.0},
       items: [
         const OrderItem(
           name: "Banarasi Silk",
           quantity: 1,
           price: 6500,
+          tailorPrice: 3500,
           imagePath: "assets/images/silk.jpg",
           color: "Magenta",
           destination: OrderDeliveryDestination.tailor,
@@ -885,7 +929,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(order.id, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
-                      Text(order.retailerName, style: const TextStyle(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.w600)),
+                      Text(order._allRetailerNames, style: const TextStyle(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
@@ -928,7 +972,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               children: [
                 _orderInfo(Icons.calendar_today_outlined, _formatDate(order.orderDate)),
                 const Spacer(),
-                Text("Total: Tk ${order.amount.toInt()}", style: TextStyle(color: Colors.green.shade900, fontSize: 15, fontWeight: FontWeight.w900)),
+                Text(
+                  "Total: Tk ${order.isDelivered ? order.totalGrandAmount.toInt() : order.totalOngoingAmount.toInt()}",
+                  style: TextStyle(color: Colors.green.shade900, fontSize: 15, fontWeight: FontWeight.w900),
+                ),
               ],
             ),
             if (order.isDelivered) ...[
@@ -1130,16 +1177,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   const SizedBox(height: 30),
                   const Text("Tailor Customization Details", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  ...currentOrder.items.where((i) => i.destination == OrderDeliveryDestination.tailor).map((item) => _tailorCustomizationCard(item)),
+                  ...currentOrder.items.where((i) => i.destination == OrderDeliveryDestination.tailor).map((item) => _tailorCustomizationCard(item, currentOrder.isDelivered)),
                 ],
                 const SizedBox(height: 30),
                 const Text("Order Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
-                _detailRow("Retailer", currentOrder.retailerName),
+                _detailRow("Retailer(s)", currentOrder._allRetailerNames),
                 if (currentOrder.tailorName != null) _buildTailorSummaryRow(currentOrder),
                 _detailRow("Total Items", "${currentOrder.totalQuantity} units"),
                 _detailRow("Order Date", _formatDate(currentOrder.orderDate)),
                 if (currentOrder.deliveryDate != null) _detailRow("Delivery Date", _formatDate(currentOrder.deliveryDate!)),
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 12),
+                ...currentOrder.deliveryCharges.entries.where((entry) {
+                  // Only show tailor delivery if it's delivered
+                  if (entry.key == currentOrder.tailorName && !currentOrder.isDelivered) return false;
+                  return true;
+                }).map((entry) => _detailRow("Delivery (${entry.key})", "Tk ${entry.value.toInt()}")),
                 const SizedBox(height: 20),
                 const Text("Shipping Address", style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
@@ -1160,7 +1215,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text("Grand Total", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                    Text("Tk ${currentOrder.amount.toInt()}", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.green.shade800)),
+                    Text(
+                      "Tk ${currentOrder.isDelivered ? currentOrder.totalGrandAmount.toInt() : currentOrder.totalOngoingAmount.toInt()}",
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.green.shade800),
+                    ),
                   ],
                 ),
                 if (currentOrder.isDelivered && (currentOrder.review != null || currentOrder.tailorReview != null)) ...[
@@ -1202,6 +1260,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             status: currentOrder.status,
                             isDelivered: currentOrder.isDelivered,
                             deliveryAddress: currentOrder.deliveryAddress,
+                            deliveryCharges: currentOrder.deliveryCharges,
                             deliveryDate: currentOrder.deliveryDate,
                             review: retailerController.text,
                             rating: tempRetailerRating,
@@ -1240,6 +1299,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               status: currentOrder.status,
                               isDelivered: currentOrder.isDelivered,
                               deliveryAddress: currentOrder.deliveryAddress,
+                              deliveryCharges: currentOrder.deliveryCharges,
                               deliveryDate: currentOrder.deliveryDate,
                               review: currentOrder.review,
                               rating: currentOrder.rating,
@@ -1291,22 +1351,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(item.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   Text("Qty: ${item.quantity} | Color: ${item.color}", style: const TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  if (item.destination == OrderDeliveryDestination.retailer)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        "Send to Retailer",
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.blue.shade900,
-                        ),
-                      ),
+                  if (item.retailerName != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text("Retailer: ${item.retailerName}", style: TextStyle(color: primaryGreen, fontSize: 11, fontWeight: FontWeight.bold)),
                     ),
                 ]),
               ),
@@ -1330,7 +1378,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  Widget _tailorCustomizationCard(OrderItem item) {
+  Widget _tailorCustomizationCard(OrderItem item, bool isDelivered) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -1346,7 +1394,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(item.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                    if (isDelivered && item.tailorPrice != null)
+                      Text("Stitching Price: Tk ${item.tailorPrice!.toInt()}", style: TextStyle(color: Colors.orange.shade900, fontSize: 12, fontWeight: FontWeight.w800)),
+                  ],
+                ),
               ),
               const SizedBox(width: 8),
               Wrap(

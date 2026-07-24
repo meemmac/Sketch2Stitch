@@ -37,6 +37,7 @@ class TailorOrderItem {
 class TailorOrder {
   final String id;
   final String customerName;
+  final String customerPhone;
   final List<TailorOrderItem> items;
   final double totalAmount;
   final DateTime orderDate;
@@ -50,6 +51,7 @@ class TailorOrder {
   TailorOrder({
     required this.id,
     required this.customerName,
+    required this.customerPhone,
     required this.items,
     required this.totalAmount,
     required this.orderDate,
@@ -113,6 +115,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     TailorOrder(
       id: "T-ORD-1122",
       customerName: "Maria Doe",
+      customerPhone: "+8801712345678",
       totalAmount: 1500,
       orderDate: DateTime.now().subtract(const Duration(days: 1)),
       status: TailorOrderStatus.pending,
@@ -135,6 +138,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     TailorOrder(
       id: "T-ORD-1125",
       customerName: "Zeaul Alam",
+      customerPhone: "+8801811223344",
       totalAmount: 2200,
       orderDate: DateTime.now().subtract(const Duration(hours: 5)),
       status: TailorOrderStatus.pending,
@@ -157,6 +161,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     TailorOrder(
       id: "T-ORD-1120",
       customerName: "Maria Doe",
+      customerPhone: "+8801712345678",
       totalAmount: 3200,
       orderDate: DateTime.now().subtract(const Duration(days: 3)),
       status: TailorOrderStatus.inProgress,
@@ -179,6 +184,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     TailorOrder(
       id: "T-ORD-1121",
       customerName: "Farhana Islam",
+      customerPhone: "+8801912345678",
       totalAmount: 1800,
       orderDate: DateTime.now().subtract(const Duration(days: 4)),
       status: TailorOrderStatus.inProgress,
@@ -200,6 +206,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     TailorOrder(
       id: "T-ORD-1090",
       customerName: "Nishat Tasnim",
+      customerPhone: "+8801512345678",
       totalAmount: 4000,
       orderDate: DateTime.now().subtract(const Duration(days: 65)),
       completionDate: DateTime.now().subtract(const Duration(days: 60)),
@@ -662,6 +669,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                     children: [
                       Text(order.id, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
                       Text("Customer: ${order.customerName}", style: const TextStyle(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.w600)),
+                      Text("Phone: ${order.customerPhone}", style: const TextStyle(color: Colors.black54, fontSize: 11, fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
@@ -1083,9 +1091,34 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   children: [
                     const Text("Est. Delivery Date", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
                     const SizedBox(height: 2),
-                    Text(
-                      item.estimatedDeliveryDate != null ? _formatDate(item.estimatedDeliveryDate!) : "Not set",
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          item.estimatedDeliveryDate != null ? _formatDate(item.estimatedDeliveryDate!) : "Not set",
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                        if (order.status == TailorOrderStatus.inProgress || order.status == TailorOrderStatus.confirmed) ...[
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () async {
+                              final date = await showDatePicker(
+                                context: context,
+                                initialDate: item.estimatedDeliveryDate ?? DateTime.now().add(const Duration(days: 7)),
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime.now().add(const Duration(days: 365)),
+                              );
+                              if (date != null) {
+                                setModalState(() {
+                                  item.estimatedDeliveryDate = date;
+                                });
+                                setState(() {});
+                              }
+                            },
+                            child: Icon(Icons.edit_calendar_outlined, size: 16, color: primaryGreen),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),
