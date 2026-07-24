@@ -865,7 +865,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Widget _orderCard(CustomerOrder order) {
     final statusColor = order.isDelivered ? primaryGreen : Colors.blueAccent;
-    final firstItem = order.items.first;
 
     return GestureDetector(
       onTap: () => _showOrderDetail(order),
@@ -881,24 +880,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           children: [
             Row(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: Image.asset(
-                    firstItem.imagePath, width: 52, height: 52, fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(width: 52, height: 52, color: Colors.green.shade50, child: Icon(Icons.shopping_bag, color: primaryGreen)),
-                  ),
-                ),
-                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(order.id, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
                       Text(order.retailerName, style: const TextStyle(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.w600)),
-                      if (!order.isDelivered && firstItem.tailorStatus != null) ...[
-                        const SizedBox(height: 6),
-                        _tailorStatusBadge(firstItem.tailorStatus!),
-                      ],
                     ],
                   ),
                 ),
@@ -910,17 +897,40 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ],
             ),
             const SizedBox(height: 14),
+            // Products Section
+            ...order.items.map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.asset(
+                      item.imagePath, width: 44, height: 44, fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(width: 44, height: 44, color: Colors.green.shade50, child: Icon(Icons.shopping_bag, color: primaryGreen, size: 20)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        Text("Qty: ${item.quantity} | ${item.color}", style: const TextStyle(color: Colors.black54, fontSize: 11, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                  Text("Tk ${item.price.toInt()}", style: TextStyle(color: Colors.green.shade900, fontSize: 13, fontWeight: FontWeight.w800)),
+                ],
+              ),
+            )),
+            const SizedBox(height: 4),
             Row(
               children: [
-                _orderInfo(Icons.shopping_bag_outlined, "${order.totalQuantity} Items"),
-                const SizedBox(width: 10),
                 _orderInfo(Icons.calendar_today_outlined, _formatDate(order.orderDate)),
                 const Spacer(),
-                Text("Tk ${order.amount.toInt()}", style: TextStyle(color: Colors.green.shade900, fontSize: 16, fontWeight: FontWeight.w900)),
+                Text("Total: Tk ${order.amount.toInt()}", style: TextStyle(color: Colors.green.shade900, fontSize: 15, fontWeight: FontWeight.w900)),
               ],
             ),
-            if (!order.isDelivered && firstItem.tailorStatus != null)
-              _buildNoticeableNote(firstItem.tailorStatus!),
             if (order.isDelivered) ...[
               const SizedBox(height: 12),
               if (order.review != null || order.tailorReview != null)
@@ -1116,6 +1126,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 const Text("Products", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 ...currentOrder.items.map((item) => _itemPreviewCard(item)),
+                if (currentOrder.items.any((i) => i.destination == OrderDeliveryDestination.tailor)) ...[
+                  const SizedBox(height: 30),
+                  const Text("Tailor Customization Details", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  ...currentOrder.items.where((i) => i.destination == OrderDeliveryDestination.tailor).map((item) => _tailorCustomizationCard(item)),
+                ],
                 const SizedBox(height: 30),
                 const Text("Order Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
@@ -1251,12 +1267,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 }
 
   Widget _itemPreviewCard(OrderItem item) {
-    final bool sentToTailor = item.destination == OrderDeliveryDestination.tailor;
-
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade200)),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade200)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1265,7 +1279,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Image.asset(
-                  item.imagePath, width: 60, height: 60, fit: BoxFit.cover,
+                  item.imagePath,
+                  width: 60,
+                  height: 60,
+                  fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Container(width: 60, height: 60, color: Colors.green.shade50, child: Icon(Icons.shopping_bag, color: primaryGreen)),
                 ),
               ),
@@ -1275,29 +1292,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   Text(item.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   Text("Qty: ${item.quantity} | Color: ${item.color}", style: const TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: sentToTailor ? Colors.orange.shade50 : Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          sentToTailor ? "Send to Tailor" : "Send to Retailer",
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: sentToTailor ? Colors.orange.shade900 : Colors.blue.shade900,
-                          ),
+                  if (item.destination == OrderDeliveryDestination.retailer)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        "Send to Retailer",
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.blue.shade900,
                         ),
                       ),
-                      if (item.tailorStatus != null)
-                        _tailorStatusBadge(item.tailorStatus!),
-                    ],
-                  ),
+                    ),
                 ]),
               ),
               Text("Tk ${item.price.toInt()}", style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.w900)),
@@ -1314,6 +1324,56 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               _careTag(Icons.dry_cleaning, "Dry Clean", item.canDryClean),
               _careTag(Icons.iron, "Iron: ${item.ironLevel}", true),
             ]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tailorCustomizationCard(OrderItem item) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.orange.shade100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(item.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(width: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                alignment: WrapAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      "Send to Tailor",
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.orange.shade900,
+                      ),
+                    ),
+                  ),
+                  if (item.tailorStatus != null)
+                    _tailorStatusBadge(item.tailorStatus!),
+                ],
+              ),
+            ],
           ),
           if (item.tailorStatus != null) ...[
             if (item.tailorStatus == TailorStatus.pending)
@@ -1409,78 +1469,71 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ),
               ),
           ],
-          if (sentToTailor) ...[
-            const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 8),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 8),
+          if (item.measurementRefImages != null && item.measurementRefImages!.isNotEmpty) ...[
             const Text(
-              "Tailor Customization Details",
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+              "Reference Images:",
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.black54),
             ),
-            const SizedBox(height: 12),
-            if (item.measurementRefImages != null && item.measurementRefImages!.isNotEmpty) ...[
-              const Text(
-                "Reference Images:",
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.black54),
+            const SizedBox(height: 8),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 1,
               ),
-              const SizedBox(height: 8),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                  childAspectRatio: 1,
-                ),
-                itemCount: item.measurementRefImages!.length,
-                itemBuilder: (context, index) {
-                  final imgPath = item.measurementRefImages![index];
-                  return GestureDetector(
-                    onTap: () => _showFullScreenImage(imgPath),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.asset(
-                        imgPath,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: Colors.grey.shade200,
-                          child: const Icon(Icons.image_not_supported, color: Colors.grey),
-                        ),
+              itemCount: item.measurementRefImages!.length,
+              itemBuilder: (context, index) {
+                final imgPath = item.measurementRefImages![index];
+                return GestureDetector(
+                  onTap: () => _showFullScreenImage(imgPath),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.asset(
+                      imgPath,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.grey.shade200,
+                        child: const Icon(Icons.image_not_supported, color: Colors.grey),
                       ),
                     ),
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
-            ],
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Instructions:",
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.black54),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  item.tailorInstructions ?? "No specific instructions provided.",
-                  style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.4),
-                ),
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: _showMeasurements,
-                  icon: const Icon(Icons.straighten, size: 14),
-                  label: const Text("View My Measurements", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    foregroundColor: primaryGreen,
-                    minimumSize: const Size(0, 0),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                ),
-              ],
+                );
+              },
             ),
+            const SizedBox(height: 16),
           ],
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Instructions:",
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.black54),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                item.tailorInstructions ?? "No specific instructions provided.",
+                style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.4),
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: _showMeasurements,
+                icon: const Icon(Icons.straighten, size: 14),
+                label: const Text("View My Measurements", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  foregroundColor: primaryGreen,
+                  minimumSize: const Size(0, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
