@@ -6,7 +6,6 @@ import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
 import 'package:sketch2stitch/screens/customer/cart_screen.dart';
-import '../../../widgets/dashboard_drawer.dart';
 
 /// Shared shell for the three "Browse" tabs (Fabrics/Clothing, Tailors,
 /// Retailers). Provides one header, one animated navigation row, and a
@@ -16,7 +15,7 @@ class BrowseShell extends StatefulWidget {
   /// 0 = Fabrics/Clothing, 1 = Tailors, 2 = Retailers
   final int initialIndex;
   final void Function(String tailorId)? onTailorSelected;
-    const BrowseShell({super.key, this.initialIndex = 0, this.onTailorSelected});
+  const BrowseShell({super.key, this.initialIndex = 0, this.onTailorSelected});
 
   @override
   State<BrowseShell> createState() => _BrowseShellState();
@@ -97,6 +96,9 @@ class _BrowseShellState extends State<BrowseShell> {
   final ValueNotifier<String> _searchNotifier = ValueNotifier('');
   double _page = 0;
 
+  // Focus node for search bar
+  final FocusNode _searchFocusNode = FocusNode();
+
   // ─── Tab-Specific Filter Values ──────────────────────────────────────
 
   // Fabrics Filters (Price, Color, Material Type) - NO RATING
@@ -146,6 +148,7 @@ class _BrowseShellState extends State<BrowseShell> {
     _pageController.removeListener(_onPageScroll);
     _pageController.dispose();
     _searchNotifier.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -158,6 +161,8 @@ class _BrowseShellState extends State<BrowseShell> {
   }
 
   void _toggleFilterOverlay() {
+    // Dismiss keyboard when opening filter
+    _searchFocusNode.unfocus();
     setState(() {
       _showFilterOverlay = !_showFilterOverlay;
     });
@@ -272,100 +277,106 @@ class _BrowseShellState extends State<BrowseShell> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      drawer: const DashboardDrawer(initialRole: AppUserRole.customer),
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              _buildHeader(currentIndex),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF4F9F1), // Matches theme sage/pale colors
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade300, width: 0.5),
-                  ),
-                  child: TextField(
-                    onChanged: (value) => _searchNotifier.value = value,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.search, size: 22, color: Colors.grey),
-                      hintText: _searchHints[currentIndex],
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                      hintStyle: const TextStyle(fontSize: 14, color: Colors.grey),
+      body: GestureDetector(
+        // Dismiss keyboard when tapping outside the search bar
+        onTap: () {
+          _searchFocusNode.unfocus();
+        },
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                _buildHeader(),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF4F9F1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade300, width: 0.5),
                     ),
-                  ),
-                ),
-              ),
-              _buildNavigationRow(),
-              Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  physics: const BouncingScrollPhysics(),
-                  children: [
-                    FabricsPageBody(
-                      searchQuery: _searchNotifier,
-                      filterData: fabricsFilterData,
-                      showFabrics: true,
-                    ),
-                    FabricsPageBody(
-                      searchQuery: _searchNotifier,
-                      filterData: elementsFilterData,
-                      showFabrics: false,
-                    ),
-                    TailorsPageBody(
-  searchQuery: _searchNotifier,
-  filterData: tailorsFilterData,
-  onTailorSelected: widget.onTailorSelected,
-),
-                    RetailersPageBody(
-                      searchQuery: _searchNotifier,
-                      filterData: retailersFilterData,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          // Filter Overlay
-          if (_showFilterOverlay)
-            GestureDetector(
-              onTap: _toggleFilterOverlay,
-              child: Container(
-                color: Colors.black.withValues(alpha: 0.3),
-                child: GestureDetector(
-                  onTap: () {},
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: Container(
-                      margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.15),
-                            blurRadius: 20,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                    child: TextField(
+                      focusNode: _searchFocusNode,
+                      onChanged: (value) => _searchNotifier.value = value,
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.search, size: 22, color: Colors.grey),
+                        hintText: _searchHints[currentIndex],
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        hintStyle: const TextStyle(fontSize: 14, color: Colors.grey),
                       ),
-                      child: _buildFilterPanel(currentIndex),
+                    ),
+                  ),
+                ),
+                _buildNavigationRow(),
+                Expanded(
+                  child: PageView(
+                    controller: _pageController,
+                    physics: const BouncingScrollPhysics(),
+                    children: [
+                      FabricsPageBody(
+                        searchQuery: _searchNotifier,
+                        filterData: fabricsFilterData,
+                        showFabrics: true,
+                      ),
+                      FabricsPageBody(
+                        searchQuery: _searchNotifier,
+                        filterData: elementsFilterData,
+                        showFabrics: false,
+                      ),
+                      TailorsPageBody(
+                        searchQuery: _searchNotifier,
+                        filterData: tailorsFilterData,
+                        onTailorSelected: widget.onTailorSelected,
+                      ),
+                      RetailersPageBody(
+                        searchQuery: _searchNotifier,
+                        filterData: retailersFilterData,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            // Filter Overlay
+            if (_showFilterOverlay)
+              GestureDetector(
+                onTap: _toggleFilterOverlay,
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  child: GestureDetector(
+                    onTap: () {}, // Prevents closing when tapping inside the filter panel
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: Container(
+                        margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.15),
+                              blurRadius: 20,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: _buildFilterPanel(currentIndex),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   // ─── Header ────────────────────────────────────────────────────────────
 
-  Widget _buildHeader(int currentIndex) {
+  Widget _buildHeader() {
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 8,
@@ -375,13 +386,14 @@ class _BrowseShellState extends State<BrowseShell> {
       ),
       child: Row(
         children: [
-          Builder(
-            builder: (ctx) => IconButton(
-              icon: const Icon(Icons.menu, color: kSage, size: 24),
-              onPressed: () => Scaffold.of(ctx).openDrawer(),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
+          // Back button instead of drawer menu
+          IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 24),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
           const SizedBox(width: 12),
           Image.asset(
@@ -437,28 +449,18 @@ class _BrowseShellState extends State<BrowseShell> {
             ],
           ),
           const SizedBox(width: 8),
-IconButton(
-  onPressed: () {
-
-    Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const CartScreen()),
-      );
-  },
-  icon: const Icon(
-    Icons.shopping_cart_outlined,
-    color: Colors.black87,
-    size: 24,
-  ),
-  padding: EdgeInsets.zero,
-  constraints: const BoxConstraints(),
-),
-          const SizedBox(width: 8),
           IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 24),
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CartScreen()),
+              );
             },
+            icon: const Icon(
+              Icons.shopping_cart_outlined,
+              color: Colors.black87,
+              size: 24,
+            ),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),

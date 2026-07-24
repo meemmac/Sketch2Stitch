@@ -6,6 +6,12 @@ import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
 import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
 
+// ─── Element Categories ───────────────────────────────────────────────────
+
+final List<String> _elementCategories = [
+  'Fasteners', 'Buttons', 'Threads', 'Embellishments', 'Trims', 'Ribbons'
+];
+
 // ─── Sample Color Options ──────────────────────────────────────────────────
 
 ColorOption _createColorOption(int id, String color, String? image, double price, int stock, {String? video}) {
@@ -19,9 +25,146 @@ ColorOption _createColorOption(int id, String color, String? image, double price
   );
 }
 
-// ─── Sample Products ───────────────────────────────────────────────────────
+// ─── Sample Element Products ─────────────────────────────────────────────
 
-final List<Product> _sampleProducts = [
+final List<Product> _sampleElementProducts = [
+  // Elements for Dhaka Fabric House (r1)
+  Product(
+    id: 'e1',
+    retailerId: 'r1',
+    productName: 'Premium Metal Zipper',
+    category: 'Fasteners',
+    materialType: 'Metal',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'Silver', image: 'assets/images/zipper.jpg', price: 120, stock: 100),
+      ColorOption(optionId: 2, color: 'Gold', image: 'assets/images/zipper_gold.jpg', price: 150, stock: 50),
+      ColorOption(optionId: 3, color: 'Black', image: 'assets/images/zipper.jpg', price: 130, stock: 75),
+    ],
+    description: 'High-quality metal zippers with smooth operation.',
+    careSymbol: ['Do not iron directly', 'Clean with damp cloth'],
+  ),
+  Product(
+    id: 'e2',
+    retailerId: 'r1',
+    productName: 'Decorative Buttons Set',
+    category: 'Buttons',
+    materialType: 'Plastic',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/buttons.jpg', price: 80, stock: 200),
+      ColorOption(optionId: 2, color: 'Black', image: 'assets/images/buttons.jpg', price: 80, stock: 150),
+      ColorOption(optionId: 3, color: 'Gold', image: 'assets/images/buttons.jpg', price: 100, stock: 100),
+    ],
+    description: 'Elegant button sets in various sizes and finishes.',
+    careSymbol: ['Hand wash', 'Do not bleach'],
+  ),
+  
+  // Elements for Chowdhury Textiles (r2)
+  Product(
+    id: 'e3',
+    retailerId: 'r2',
+    productName: 'Sewing Thread Collection',
+    category: 'Threads',
+    materialType: 'Cotton',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/thread.jpg', price: 45, stock: 300),
+      ColorOption(optionId: 2, color: 'Black', image: 'assets/images/thread.jpg', price: 45, stock: 250),
+      ColorOption(optionId: 3, color: 'Beige', image: 'assets/images/thread.jpg', price: 45, stock: 200),
+    ],
+    description: 'Premium quality sewing thread in essential colors.',
+    careSymbol: ['Store in cool dry place'],
+  ),
+  Product(
+    id: 'e4',
+    retailerId: 'r2',
+    productName: 'Pearl Embellishments',
+    category: 'Embellishments',
+    materialType: 'Glass',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/pearls.jpg', price: 200, stock: 80),
+      ColorOption(optionId: 2, color: 'Pink', image: 'assets/images/pearls.jpg', price: 220, stock: 60),
+    ],
+    description: 'Beautiful pearl embellishments for bridal and formal wear.',
+    careSymbol: ['Dry clean only', 'Handle with care'],
+  ),
+  
+  // Elements for Silk & Lace Emporium (r3)
+  Product(
+    id: 'e5',
+    retailerId: 'r3',
+    productName: 'Lace Trim',
+    category: 'Trims',
+    materialType: 'Lace',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/lace_trim.jpg', price: 180, stock: 40),
+      ColorOption(optionId: 2, color: 'Black', image: 'assets/images/lace_trim.jpg', price: 180, stock: 35),
+    ],
+    description: 'Fine lace trim with delicate patterns.',
+    careSymbol: ['Hand wash', 'Do not bleach'],
+  ),
+  Product(
+    id: 'e6',
+    retailerId: 'r3',
+    productName: 'Ribbon Collection',
+    category: 'Ribbons',
+    materialType: 'Satin',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/ribbon.jpg', price: 60, stock: 150),
+      ColorOption(optionId: 2, color: 'Gold', image: 'assets/images/ribbon.jpg', price: 70, stock: 120),
+      ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/ribbon.jpg', price: 65, stock: 100),
+    ],
+    description: 'Versatile satin ribbons in various colors and widths.',
+    careSymbol: ['Iron on low heat', 'Do not bleach'],
+  ),
+  
+  // Elements for Bengal Cotton Co. (r4)
+  Product(
+    id: 'e7',
+    retailerId: 'r4',
+    productName: 'Cotton Thread Set',
+    category: 'Threads',
+    materialType: 'Cotton',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'White', image: 'assets/images/thread.jpg', price: 35, stock: 200),
+      ColorOption(optionId: 2, color: 'Black', image: 'assets/images/thread.jpg', price: 35, stock: 180),
+      ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/thread.jpg', price: 40, stock: 150),
+    ],
+    description: 'Premium cotton thread for all your stitching needs.',
+    careSymbol: ['Store in cool dry place'],
+  ),
+  
+  // Elements for Heritage Weaves (r5)
+  Product(
+    id: 'e8',
+    retailerId: 'r5',
+    productName: 'Embellishment Set',
+    category: 'Embellishments',
+    materialType: 'Glass',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'Gold', image: 'assets/images/embroidery.jpg', price: 250, stock: 50),
+      ColorOption(optionId: 2, color: 'Silver', image: 'assets/images/embroidery.jpg', price: 250, stock: 45),
+    ],
+    description: 'Beautiful embellishments for traditional and formal wear.',
+    careSymbol: ['Dry clean only'],
+  ),
+  Product(
+    id: 'e9',
+    retailerId: 'r5',
+    productName: 'Satin Ribbon Set',
+    category: 'Ribbons',
+    materialType: 'Satin',
+    colorOptions: [
+      ColorOption(optionId: 1, color: 'Red', image: 'assets/images/ribbon.jpg', price: 55, stock: 120),
+      ColorOption(optionId: 2, color: 'Gold', image: 'assets/images/ribbon.jpg', price: 60, stock: 100),
+      ColorOption(optionId: 3, color: 'Green', image: 'assets/images/ribbon.jpg', price: 55, stock: 90),
+    ],
+    description: 'Luxurious satin ribbons for all your decoration needs.',
+    careSymbol: ['Iron on low heat'],
+  ),
+];
+
+// ─── Sample Fabric Products ──────────────────────────────────────────────
+
+final List<Product> _sampleFabricProducts = [
   // Products for Dhaka Fabric House (r1)
   Product(
     id: 'p1',
@@ -220,10 +363,12 @@ final List<Product> _sampleProducts = [
 // ─── Helper to get products by retailer ID ──────────────────────────────────
 
 List<Product> _getProductsForRetailer(String retailerId) {
-  return _sampleProducts.where((p) => p.retailerId == retailerId).toList();
+  final fabrics = _sampleFabricProducts.where((p) => p.retailerId == retailerId).toList();
+  final elements = _sampleElementProducts.where((p) => p.retailerId == retailerId).toList();
+  return [...fabrics, ...elements];
 }
 
-/// Hardcoded sample retailers with products.
+/// Hardcoded sample retailers with products (both fabrics and elements).
 final List<Retailer> kHardcodedRetailers = [
   Retailer(
     id: 'r1',
@@ -488,7 +633,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Image section with badges
+            // Image section with badges - UNCHANGED
             Flexible(
               flex: 5,
               child: Stack(
@@ -573,7 +718,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                 ],
               ),
             ),
-            // Content section
+            // Content section - UNCHANGED (No element chips shown here)
             Flexible(
               flex: 4,
               child: Padding(
