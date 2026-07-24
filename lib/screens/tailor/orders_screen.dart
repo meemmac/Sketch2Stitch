@@ -126,6 +126,28 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
       ],
     ),
     TailorOrder(
+      id: "T-ORD-1125",
+      customerName: "Zeaul Alam",
+      totalAmount: 2200,
+      orderDate: DateTime.now().subtract(const Duration(hours: 5)),
+      status: TailorOrderStatus.pending,
+      isCompleted: false,
+      deliveryAddress: "Gulshan 1, Dhaka",
+      items: [
+        TailorOrderItem(
+          name: "Designer Silk Suit",
+          quantity: 1,
+          imagePath: "assets/images/silk.jpg",
+          color: "Deep Blue",
+          servicePrice: 2200,
+          measurementRefImages: ["assets/images/ref3.jpg"],
+          tailorInstructions: "Slim fit cut with narrow trousers.",
+          canWash: false,
+          canDryClean: true,
+        ),
+      ],
+    ),
+    TailorOrder(
       id: "T-ORD-1120",
       customerName: "Maria Doe",
       totalAmount: 3200,
@@ -143,6 +165,26 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           measurementRefImages: ["assets/images/ref2.jpg"],
           tailorInstructions: "Use the printed patterns for the sleeves as shown in the reference picture.",
           canBleach: true,
+        ),
+      ],
+    ),
+    TailorOrder(
+      id: "T-ORD-1121",
+      customerName: "Farhana Islam",
+      totalAmount: 1800,
+      orderDate: DateTime.now().subtract(const Duration(days: 4)),
+      status: TailorOrderStatus.inProgress,
+      isCompleted: false,
+      deliveryAddress: "Uttara Sector 4, Dhaka",
+      items: [
+        TailorOrderItem(
+          name: "Cotton Salwar Set",
+          quantity: 1,
+          imagePath: "assets/images/fab.jpg",
+          color: "Light Pink",
+          servicePrice: 1800,
+          measurementRefImages: ["assets/images/ref4.jpg"],
+          tailorInstructions: "Follow standard measurement. Add piping to the neckline.",
         ),
       ],
     ),
@@ -602,10 +644,33 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                  decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(999)),
-                  child: Text(_getStatusText(order.status), style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w900)),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                      decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(999)),
+                      child: Text(_getStatusText(order.status), style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w900)),
+                    ),
+                    if (!order.isCompleted)
+                      TextButton(
+                        onPressed: () => _showStatusUpdateSheet(order),
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(0, 20),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          "Update Status",
+                          style: TextStyle(
+                            color: primaryGreen,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -622,6 +687,65 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showStatusUpdateSheet(TailorOrder order) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Update Work Progress",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            if (order.status == TailorOrderStatus.pending)
+              _statusOptionTile(
+                "Start Stitching",
+                Icons.play_arrow_outlined,
+                Colors.purple,
+                () {
+                  setState(() => order.status = TailorOrderStatus.inProgress);
+                  Navigator.pop(context);
+                },
+              ),
+            if (order.status == TailorOrderStatus.inProgress)
+              _statusOptionTile(
+                "Mark as Finished",
+                Icons.check_circle_outline,
+                primaryGreen,
+                () {
+                  setState(() {
+                    order.status = TailorOrderStatus.completed;
+                    order.isCompleted = true;
+                    order.completionDate = DateTime.now();
+                  });
+                  Navigator.pop(context);
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _statusOptionTile(String title, IconData icon, Color color, VoidCallback onTap) {
+    return ListTile(
+      onTap: onTap,
+      leading: Icon(icon, color: color),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+      trailing: const Icon(Icons.chevron_right),
     );
   }
 

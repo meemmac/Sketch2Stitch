@@ -967,7 +967,41 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      Row(
+                    ],
+                  ),
+                  if (!outOfStock) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Row(
+                          children: product.colorOptions
+                              .take(4)
+                              .map((o) => Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: _colorDot(o),
+                          ))
+                              .toList(),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
+                            const SizedBox(width: 2),
+                            Text(
+                              'Tk 50',
+                              style: TextStyle(fontSize: 10, color: Colors.grey[600], fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
@@ -978,18 +1012,6 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                  if (!outOfStock) ...[
-                    const SizedBox(height: 6),
-                    Row(
-                      children: product.colorOptions
-                          .take(4)
-                          .map((o) => Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: _colorDot(o),
-                      ))
-                          .toList(),
                     ),
                   ],
                 ],
@@ -1137,6 +1159,21 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.bottomRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
+                        const SizedBox(width: 2),
+                        Text(
+                          'Tk 50',
+                          style: TextStyle(fontSize: 10, color: Colors.grey[600], fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1242,6 +1279,21 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.bottomRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
+                        const SizedBox(width: 2),
+                        Text(
+                          'Tk 50',
+                          style: TextStyle(fontSize: 10, color: Colors.grey[600], fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
