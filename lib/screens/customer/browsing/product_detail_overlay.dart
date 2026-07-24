@@ -246,7 +246,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                     Row(
                       children: [
                         const Icon(
-                          Icons.blender,
+                          Icons.texture,
                           color: Color(0xFF2C5C44),
                           size: 18,
                         ),
@@ -416,7 +416,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Care Instructions - As Chips
+                  // Care Instructions - Like Inventory Page Style
                   if (widget.isFabric && widget.product.careSymbol.isNotEmpty) ...[
                     const Text(
                       'Care Instructions',
@@ -425,40 +425,56 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: widget.product.careSymbol.map((care) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEEF6F0),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                _getCareIcon(care),
-                                size: 14,
-                                color: const Color(0xFF2C5C44),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                care,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF2C5C44),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[200]!),
+                      ),
+                      child: Column(
+                        children: widget.product.careSymbol.map((care) {
+                          final careInfo = _getCareInfo(care);
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  careInfo['icon'],
+                                  size: 20,
+                                  color: careInfo['isPositive'] ? Colors.green : Colors.grey,
                                 ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    careInfo['label'],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: careInfo['isPositive'] ? Colors.black87 : Colors.grey,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Flexible(
+                                  child: Text(
+                                    careInfo['status'] ?? (careInfo['isPositive'] ? "Yes" : "No"),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.right,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: careInfo['isPositive'] ? Colors.green.shade800 : Colors.grey,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
                     ),
                     const SizedBox(height: 24),
                   ],
@@ -533,7 +549,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
     final imageWidth = screenWidth * 0.75;
     final imageHeight = 250.0;
 
-    // If there's both image and video, show them horizontally
     if (imageUrl != null && imageUrl.isNotEmpty && videoUrl != null && videoUrl.isNotEmpty) {
       return SizedBox(
         height: imageHeight,
@@ -541,7 +556,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),
           children: [
-            // Image
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: Container(
@@ -562,7 +576,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
               ),
             ),
             const SizedBox(width: 12),
-            // Video
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: VideoPreviewPlayer(
@@ -576,7 +589,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
       );
     }
     
-    // If only image exists
     if (imageUrl != null && imageUrl.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(16),
@@ -599,7 +611,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
       );
     }
     
-    // If only video exists
     if (videoUrl != null && videoUrl.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(16),
@@ -611,7 +622,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
       );
     }
     
-    // Fallback
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: Container(
@@ -644,30 +654,141 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
     );
   }
 
-  // ─── Care Icons Helper ───────────────────────────────────────────────
+  // ─── Care Info Helper for Inventory Style ─────────────────────────────
 
-  IconData _getCareIcon(String care) {
+  Map<String, dynamic> _getCareInfo(String care) {
     final careLower = care.toLowerCase();
-    if (careLower.contains('wash') || careLower.contains('hand wash') || careLower.contains('machine wash')) {
-      return Icons.local_laundry_service;
-    } else if (careLower.contains('dry clean')) {
-      return Icons.dry_cleaning;
-    } else if (careLower.contains('bleach')) {
-      return Icons.cleaning_services;
-    } else if (careLower.contains('iron')) {
-      return Icons.iron;
-    } else if (careLower.contains('tumble')) {
-      return Icons.tune;
-    } else if (careLower.contains('dry') || careLower.contains('wring')) {
-      return Icons.wb_sunny;
-    } else if (careLower.contains('store')) {
-      return Icons.inventory;
-    } else if (careLower.contains('cool')) {
-      return Icons.ac_unit;
-    } else if (careLower.contains('air')) {
-      return Icons.air;
-    } else {
-      return Icons.check_circle;
+    
+    // Define default values
+    String label = care;
+    IconData icon = Icons.check_circle;
+    bool isPositive = true;
+    String status = "Yes";
+    
+    // Machine Wash
+    if (careLower.contains('machine wash') || careLower.contains('hand wash')) {
+      icon = Icons.local_laundry_service;
+      if (careLower.contains('machine wash cold')) {
+        label = 'Machine Wash (Cold)';
+      } else if (careLower.contains('machine wash warm')) {
+        label = 'Machine Wash (Warm)';
+      } else if (careLower.contains('machine wash')) {
+        label = 'Machine Wash';
+      } else if (careLower.contains('hand wash')) {
+        label = 'Hand Wash';
+      } else {
+        label = 'Washable';
+      }
+      isPositive = true;
+      status = "Yes";
     }
+    // Dry Clean
+    else if (careLower.contains('dry clean')) {
+      icon = Icons.dry_cleaning;
+      label = 'Dry Clean';
+      isPositive = true;
+      status = "Yes";
+    }
+    // Bleach
+    else if (careLower.contains('bleach')) {
+      icon = Icons.cleaning_services;
+      if (careLower.contains('do not') || careLower.contains('no')) {
+        label = 'Do Not Bleach';
+        isPositive = false;
+        status = "No";
+      } else {
+        label = 'Bleach Allowed';
+        isPositive = true;
+        status = "Yes";
+      }
+    }
+    // Iron
+    else if (careLower.contains('iron')) {
+      icon = Icons.iron;
+      if (careLower.contains('do not') || careLower.contains('no')) {
+        label = 'Do Not Iron';
+        isPositive = false;
+        status = "No";
+      } else if (careLower.contains('low')) {
+        label = 'Iron (Low)';
+        isPositive = true;
+        status = "Yes";
+      } else if (careLower.contains('medium')) {
+        label = 'Iron (Medium)';
+        isPositive = true;
+        status = "Yes";
+      } else if (careLower.contains('high')) {
+        label = 'Iron (High)';
+        isPositive = true;
+        status = "Yes";
+      } else {
+        label = 'Iron';
+        isPositive = true;
+        status = "Yes";
+      }
+    }
+    // Tumble Dry
+    else if (careLower.contains('tumble dry')) {
+      icon = Icons.tune;
+      label = 'Tumble Dry';
+      isPositive = true;
+      status = "Yes";
+    }
+    // Dry Flat
+    else if (careLower.contains('dry flat')) {
+      icon = Icons.wb_sunny;
+      label = 'Dry Flat';
+      isPositive = true;
+      status = "Yes";
+    }
+    // Air Dry
+    else if (careLower.contains('air dry')) {
+      icon = Icons.air;
+      label = 'Air Dry';
+      isPositive = true;
+      status = "Yes";
+    }
+    // Do Not Wring
+    else if (careLower.contains('wring')) {
+      icon = Icons.loop;
+      label = 'Do Not Wring';
+      isPositive = false;
+      status = "No";
+    }
+    // Store in cool place
+    else if (careLower.contains('store') || careLower.contains('cool')) {
+      icon = Icons.ac_unit;
+      label = 'Store in Cool Place';
+      isPositive = true;
+      status = "Yes";
+    }
+    // Handle with care
+    else if (careLower.contains('handle with care')) {
+      icon = Icons.pan_tool_alt;
+      label = 'Handle with Care';
+      isPositive = true;
+      status = "Yes";
+    }
+    // Do not iron directly
+    else if (careLower.contains('do not iron directly')) {
+      icon = Icons.iron;
+      label = 'Do Not Iron Directly';
+      isPositive = false;
+      status = "No";
+    }
+    // Default
+    else {
+      icon = Icons.info_outline;
+      label = care;
+      isPositive = true;
+      status = "Yes";
+    }
+    
+    return {
+      'icon': icon,
+      'label': label,
+      'isPositive': isPositive,
+      'status': status,
+    };
   }
 }

@@ -426,107 +426,101 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
 
   // ─── Product Grid ──────────────────────────────────────────────────────
 
-  Widget _buildProductGrid(List<Product> products, String type) {
-    if (products.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.search_off_rounded,
-              size: 64,
-              color: Colors.grey[400],
+Widget _buildProductGrid(List<Product> products, String type) {
+  if (products.isEmpty) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search_off_rounded,
+            size: 64,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No $type found',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+              color: Colors.grey[600],
             ),
-            const SizedBox(height: 16),
-            Text(
-              'No $type found',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-                color: Colors.grey[600],
-              ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Try adjusting your filters or search terms',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey[500],
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Try adjusting your filters or search terms',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey[500],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    final isSmallScreen = screenWidth < 400;
-    final spacing = isSmallScreen ? 10.0 : 12.0;
-    final cardAspectRatio = screenHeight < 700 ? 0.72 : 0.78;
-
-    return GridView.builder(
-      padding: EdgeInsets.all(spacing),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: cardAspectRatio,
-        crossAxisSpacing: spacing,
-        mainAxisSpacing: spacing,
+          ),
+        ],
       ),
-      itemCount: products.length,
-      itemBuilder: (context, index) {
-        final product = products[index];
-        final coverImage = product.colorOptions.isNotEmpty
-            ? product.colorOptions.first.image
-            : null;
-        final bool outOfStock =
-            product.colorOptions.every((c) => c.stock <= 0);
+    );
+  }
 
-        return GestureDetector(
-          onTap: () => _showProductDetailOverlay(context, product),
-          child: Container(
-            decoration: BoxDecoration(
-              color: kCardBg,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: kBorder, width: 0.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Image section with category badge
-                Flexible(
-                  flex: 5,
-                  child: Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: double.infinity,
-                          child: coverImage != null
-                              ? Image.asset(
-                                  coverImage,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => Container(
-                                    color: kSage.withValues(alpha: 0.12),
-                                    child: Icon(
-                                      type == 'Fabrics' ? Icons.texture : Icons.category,
-                                      size: isSmallScreen ? 36 : 40,
-                                      color: kSageDark,
-                                    ),
-                                  ),
-                                )
-                              : Container(
+  final screenWidth = MediaQuery.of(context).size.width;
+  final screenHeight = MediaQuery.of(context).size.height;
+
+  final isSmallScreen = screenWidth < 400;
+  final spacing = isSmallScreen ? 10.0 : 12.0;
+  final cardAspectRatio = screenHeight < 700 ? 0.72 : 0.78;
+
+  return GridView.builder(
+    padding: EdgeInsets.all(spacing),
+    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 2,
+      childAspectRatio: cardAspectRatio,
+      crossAxisSpacing: spacing,
+      mainAxisSpacing: spacing,
+    ),
+    itemCount: products.length,
+    itemBuilder: (context, index) {
+      final product = products[index];
+      final coverImage = product.colorOptions.isNotEmpty
+          ? product.colorOptions.first.image
+          : null;
+      final bool outOfStock =
+          product.colorOptions.every((c) => c.stock <= 0);
+      
+      // Get retailer name
+      final retailerName = _getRetailerName(product.retailerId);
+
+      return GestureDetector(
+        onTap: () => _showProductDetailOverlay(context, product),
+        child: Container(
+          decoration: BoxDecoration(
+            color: kCardBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: kBorder, width: 0.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Image section with category badge
+              Flexible(
+                flex: 5,
+                child: Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: double.infinity,
+                        child: coverImage != null
+                            ? Image.asset(
+                                coverImage,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => Container(
                                   color: kSage.withValues(alpha: 0.12),
                                   child: Icon(
                                     type == 'Fabrics' ? Icons.texture : Icons.category,
@@ -534,19 +528,57 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                                     color: kSageDark,
                                   ),
                                 ),
+                              )
+                            : Container(
+                                color: kSage.withValues(alpha: 0.12),
+                                child: Icon(
+                                  type == 'Fabrics' ? Icons.texture : Icons.category,
+                                  size: isSmallScreen ? 36 : 40,
+                                  color: kSageDark,
+                                ),
+                              ),
+                      ),
+                    ),
+                    // Category Badge - Top Right
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 8 : 10, 
+                          vertical: isSmallScreen ? 4 : 5
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            width: 0.3,
+                          ),
+                        ),
+                        child: Text(
+                          product.category,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.3,
+                          ),
                         ),
                       ),
-                      // Category Badge - Top Right
+                    ),
+                    // Out of Stock Badge - Top Left
+                    if (outOfStock)
                       Positioned(
                         top: 8,
-                        right: 8,
+                        left: 8,
                         child: Container(
                           padding: EdgeInsets.symmetric(
                             horizontal: isSmallScreen ? 8 : 10, 
                             vertical: isSmallScreen ? 4 : 5
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.7),
+                            color: Colors.red.withValues(alpha: 0.85),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: Colors.white.withValues(alpha: 0.2),
@@ -554,128 +586,109 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                             ),
                           ),
                           child: Text(
-                            product.category,
+                            'Out of Stock',
                             style: TextStyle(
                               fontSize: 11,
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
-                              letterSpacing: 0.3,
                             ),
                           ),
                         ),
                       ),
-                      // Out of Stock Badge - Top Left
-                      if (outOfStock)
-                        Positioned(
-                          top: 8,
-                          left: 8,
-                          child: Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: isSmallScreen ? 8 : 10, 
-                              vertical: isSmallScreen ? 4 : 5
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.85),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                width: 0.3,
-                              ),
-                            ),
+                  ],
+                ),
+              ),
+              // Content section
+              Flexible(
+                flex: 4,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    isSmallScreen ? 10 : 12,
+                    isSmallScreen ? 8 : 10,
+                    isSmallScreen ? 10 : 12,
+                    isSmallScreen ? 10 : 12,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        product.productName,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          height: 1.2,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      // Retailer Name
+                      SizedBox(height: isSmallScreen ? 2 : 3),
+                      Text(
+                        retailerName,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      SizedBox(height: isSmallScreen ? 4 : 6),
+                      Row(
+                        children: [
+                          Expanded(
                             child: Text(
-                              'Out of Stock',
+                              product.priceRange,
                               style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: kSageDark,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
+                              const SizedBox(width: 2),
+                              Text(
+                                'Tk 50',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: isSmallScreen ? 6 : 8),
+                      if (!outOfStock) ...[
+                        Row(
+                          children: product.colorOptions
+                              .take(4)
+                              .map((option) => Padding(
+                                    padding: EdgeInsets.only(right: isSmallScreen ? 3 : 4),
+                                    child: _colorDot(option, isSmallScreen),
+                                  ))
+                              .toList(),
                         ),
+                      ],
                     ],
                   ),
                 ),
-                // Content section
-                Flexible(
-                  flex: 4,
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      isSmallScreen ? 10 : 12,
-                      isSmallScreen ? 8 : 10,
-                      isSmallScreen ? 10 : 12,
-                      isSmallScreen ? 10 : 12,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          product.productName,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            height: 1.2,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        SizedBox(height: isSmallScreen ? 4 : 6),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                product.priceRange,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: kSageDark,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
-                                const SizedBox(width: 2),
-                                Text(
-                                  'Tk 50',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey[600],
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: isSmallScreen ? 6 : 8),
-                        if (!outOfStock) ...[
-                          Row(
-                            children: product.colorOptions
-                                .take(4)
-                                .map((option) => Padding(
-                                      padding: EdgeInsets.only(right: isSmallScreen ? 3 : 4),
-                                      child: _colorDot(option, isSmallScreen),
-                                    ))
-                                .toList(),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        );
-      },
-    );
-  }
-
-  Widget _colorDot(ColorOption option, bool isSmall) {
+        ),
+      );
+    },
+  );
+}  Widget _colorDot(ColorOption option, bool isSmall) {
     final color = _resolveColor(option.color);
     final bool outOfStock = option.stock <= 0;
     final double size = isSmall ? 14 : 16;

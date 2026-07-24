@@ -443,7 +443,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      Icon(Icons.local_shipping, size: isSmallScreen ? 14 : 16, color: Colors.white70),
+                      Icon(Icons.directions_bike, size: isSmallScreen ? 14 : 16, color: Colors.white70),
                       const SizedBox(width: 4),
                       Text(
                         'Delivery: Tk ${widget.tailor.deliveryCharge.toInt()}',
@@ -606,25 +606,30 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                      child: SizedBox(
-                        width: double.infinity,
-                        height: isSmallScreen ? 100 : 120,
-                        child: portfolio.image != null && portfolio.image!.isNotEmpty
-                            ? Image.asset(
-                                portfolio.image!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => Container(
+                    // Image now expands to fill remaining card space,
+                    // eliminating the empty gap below the description.
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: double.infinity,
+                          child: portfolio.image != null && portfolio.image!.isNotEmpty
+                              ? Image.asset(
+                                  portfolio.image!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Container(
+                                    color: Colors.grey[200],
+                                    child: const Icon(Icons.image, size: 32, color: Colors.grey),
+                                  ),
+                                )
+                              : Container(
                                   color: Colors.grey[200],
                                   child: const Icon(Icons.image, size: 32, color: Colors.grey),
                                 ),
-                              )
-                            : Container(
-                                color: Colors.grey[200],
-                                child: const Icon(Icons.image, size: 32, color: Colors.grey),
-                              ),
+                        ),
                       ),
                     ),
                     if (portfolio.description != null && portfolio.description!.isNotEmpty)

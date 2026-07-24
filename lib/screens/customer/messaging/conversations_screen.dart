@@ -25,7 +25,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   bool _isLoading = true;
   String _searchQuery = "";
   late TabController _tabController;
-  String _selectedTab = "All"; // All, Unread, Tailors, Retailers
+  String _selectedTab = "All";
 
   @override
   void initState() {
@@ -169,7 +169,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     setState(() {
       List<Conversation> filtered = List.from(_conversations);
 
-      // Apply search filter
       if (_searchQuery.isNotEmpty) {
         filtered = filtered.where((conv) {
           final otherName = _getOtherUserName(conv).toLowerCase();
@@ -179,12 +178,10 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         }).toList();
       }
 
-      // Apply tab filter
       switch (_selectedTab) {
         case "Unread":
           filtered = filtered.where((conv) {
-            final unreadCount = conv.messages?.where((m) =>
-                m.senderId != widget.customerId).length ?? 0;
+            final unreadCount = _getUnreadCount(conv);
             return unreadCount > 0;
           }).toList();
           break;
@@ -196,7 +193,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           filtered = filtered.where((conv) =>
               conv.otherRole == UserRole.retailer).toList();
           break;
-        default: // "All"
+        default:
           break;
       }
 
@@ -270,23 +267,19 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
   void _markConversationAsRead(Conversation conversation) {
     setState(() {
-      // Find the conversation and mark all messages as read
       final index = _conversations.indexWhere((c) => c.id == conversation.id);
       if (index != -1) {
+        // Create a new list with all messages marked as read
         final updatedMessages = _conversations[index].messages?.map((m) {
-          if (m.senderId != widget.customerId) {
-            // Mark as read by creating a new message with the same properties
-            return Message(
-              id: m.id,
-              conversationId: m.conversationId,
-              senderId: m.senderId,
-              senderRole: m.senderRole,
-              msgText: m.msgText,
-              attachment: m.attachment,
-              sentAt: m.sentAt,
-            );
-          }
-          return m;
+          return Message(
+            id: m.id,
+            conversationId: m.conversationId,
+            senderId: m.senderId,
+            senderRole: m.senderRole,
+            msgText: m.msgText,
+            attachment: m.attachment,
+            sentAt: m.sentAt,
+          );
         }).toList();
         
         _conversations[index] = _conversations[index].copyWith(
@@ -418,7 +411,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                 trailing: const Icon(Icons.chevron_right, color: Colors.grey),
                                 onTap: () {
                                   Navigator.pop(context);
-                                  // Check if conversation already exists
                                   final existingConv = _conversations.firstWhere(
                                     (conv) => conv.otherId == contact['id'],
                                     orElse: () => Conversation(
@@ -498,7 +490,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFECE5DD),
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text(
           'Messages',
@@ -507,7 +499,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
             fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: const Color(0xFF075E54),
+        backgroundColor: const Color(0xFF2C5C44),
         elevation: 0,
         actions: [
           IconButton(
@@ -518,7 +510,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
           child: Container(
-            color: const Color(0xFF075E54),
+            color: const Color(0xFF2C5C44),
             child: TabBar(
               controller: _tabController,
               indicatorColor: Colors.white,
@@ -537,13 +529,13 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showNewConversationDialog,
-        backgroundColor: const Color(0xFF075E54),
+        backgroundColor: const Color(0xFF2C5C44),
         child: const Icon(Icons.chat, color: Colors.white),
       ),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(
-                color: Color(0xFF075E54),
+                color: Color(0xFF2C5C44),
               ),
             )
           : _conversations.isEmpty
@@ -594,7 +586,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
             icon: const Icon(Icons.chat),
             label: const Text('New Conversation'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF075E54),
+              backgroundColor: const Color(0xFF2C5C44),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
@@ -649,7 +641,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
     return GestureDetector(
       onTap: () {
-        // Mark as read before navigating
         _markConversationAsRead(conversation);
         Navigator.push(
           context,
@@ -685,7 +676,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         ),
         child: Row(
           children: [
-            // Avatar
             Stack(
               children: [
                 CircleAvatar(
@@ -702,7 +692,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                     ),
                   ),
                 ),
-                // Online status
                 Positioned(
                   bottom: 0,
                   right: 0,
@@ -721,7 +710,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
               ],
             ),
             const SizedBox(width: 12),
-            // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -745,7 +733,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF075E54),
+                                  color: const Color(0xFF2C5C44),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
@@ -839,7 +827,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Conversation archived'),
-                        backgroundColor: Color(0xFF075E54),
+                        backgroundColor: Color(0xFF2C5C44),
                       ),
                     );
                   },
@@ -852,7 +840,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Notifications muted'),
-                        backgroundColor: Color(0xFF075E54),
+                        backgroundColor: Color(0xFF2C5C44),
                       ),
                     );
                   },
@@ -903,7 +891,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Conversation deleted'),
-                    backgroundColor: Color(0xFF075E54),
+                    backgroundColor: Color(0xFF2C5C44),
                   ),
                 );
               },
@@ -943,7 +931,7 @@ class _ConversationSearchDelegate extends SearchDelegate {
   ThemeData appBarTheme(BuildContext context) {
     return ThemeData(
       appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF075E54),
+        backgroundColor: Color(0xFF2C5C44),
         foregroundColor: Colors.white,
       ),
       inputDecorationTheme: const InputDecorationTheme(
@@ -1099,7 +1087,7 @@ class _ConversationSearchDelegate extends SearchDelegate {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF075E54),
+                                      color: const Color(0xFF2C5C44),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Text(

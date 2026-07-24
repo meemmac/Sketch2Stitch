@@ -410,7 +410,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      Icon(Icons.local_shipping, size: isSmallScreen ? 14 : 16, color: Colors.white70),
+                      Icon(Icons.directions_bike, size: isSmallScreen ? 14 : 16, color: Colors.white70),
                       const SizedBox(width: 4),
                       Text(
                         'Delivery: Tk ${widget.retailer.deliveryCharge.toInt()}',

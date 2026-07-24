@@ -5,6 +5,8 @@ import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/models/conversation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:flutter/services.dart';
+import 'package:photo_view/photo_view.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -41,9 +43,11 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   bool _isTyping = false;
   String? _replyingToMessageId;
   String? _replyingToMessageText;
+  String? _replyingToSender;
   Message? _selectedMessage;
   bool _isMuted = false;
-  int _muteDurationHours = 8; // Default 8 hours
+  int _selectedMuteDuration = 0;
+  String? _selectedMessageId;
   late AnimationController _typingAnimationController;
   late Animation<double> _typingAnimation;
 
@@ -172,6 +176,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       _messageController.clear();
       _replyingToMessageId = null;
       _replyingToMessageText = null;
+      _replyingToSender = null;
     });
 
     _scrollToBottom();
@@ -261,6 +266,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _pickDocument() async {
+    // Using image_picker as fallback for document picking on Windows
     final XFile? document = await _imagePicker.pickImage(
       source: ImageSource.gallery,
       maxWidth: 1024,
@@ -269,12 +275,13 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     );
     
     if (document != null) {
+      final fileName = document.path.split('/').last;
       final newMessage = Message(
         id: 'm${_messages.length + 1}',
         conversationId: widget.conversationId,
         senderId: widget.customerId,
         senderRole: UserRole.customer,
-        msgText: '📄 Document shared',
+        msgText: '📄 $fileName',
         attachment: document.path,
         sentAt: DateTime.now(),
       );
@@ -283,12 +290,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
         _messages.add(newMessage);
       });
       _scrollToBottom();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Document shared!'),
-          backgroundColor: Color(0xFF075E54),
-        ),
-      );
+      _showCenteredNotification('Document shared!');
     }
   }
 
@@ -401,6 +403,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   void _showMessageOptions(Message message) {
     setState(() {
       _selectedMessage = message;
+      _selectedMessageId = message.id;
     });
     
     showModalBottomSheet(
@@ -467,7 +470,11 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
           ),
         );
       },
-    );
+    ).then((_) {
+      setState(() {
+        _selectedMessageId = null;
+      });
+    });
   }
 
   Widget _buildActionOption({
@@ -509,6 +516,8 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     setState(() {
       _replyingToMessageId = message.id;
       _replyingToMessageText = message.msgText;
+      _replyingToSender = message.senderId == widget.customerId ? 'You' : widget.otherUserName;
+      _selectedMessageId = null;
     });
     _focusNode.requestFocus();
   }
@@ -517,16 +526,42 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     setState(() {
       _replyingToMessageId = null;
       _replyingToMessageText = null;
+      _replyingToSender = null;
     });
   }
 
   void _copyMessage(Message message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Message copied to clipboard'),
-        backgroundColor: Color(0xFF075E54),
-        duration: Duration(seconds: 2),
-      ),
+    Clipboard.setData(ClipboardData(text: message.msgText));
+    _showCenteredNotification('Message copied to clipboard');
+    setState(() {
+      _selectedMessageId = null;
+    });
+  }
+
+  void _showCenteredNotification(String message) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.transparent,
+      barrierDismissible: true,
+      builder: (context) {
+        return Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey[800]?.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -570,15 +605,10 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Message forwarded!'),
-                    backgroundColor: Color(0xFF075E54),
-                  ),
-                );
+                _showCenteredNotification('Message forwarded!');
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF075E54),
+                backgroundColor: const Color(0xFF2C5C44),
                 foregroundColor: Colors.white,
               ),
               child: const Text('Forward'),
@@ -609,13 +639,9 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                 Navigator.pop(context);
                 setState(() {
                   _messages.removeWhere((m) => m.id == message.id);
+                  _selectedMessageId = null;
                 });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Message deleted'),
-                    backgroundColor: Color(0xFF075E54),
-                  ),
-                );
+                _showCenteredNotification('Message deleted');
               },
               child: const Text(
                 'Delete',
@@ -625,6 +651,32 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
           ],
         );
       },
+    );
+  }
+
+  void _showImageFullScreen(String imagePath) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.close, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          body: Center(
+            child: PhotoView(
+              imageProvider: FileImage(File(imagePath)),
+              minScale: PhotoViewComputedScale.contained,
+              maxScale: PhotoViewComputedScale.covered * 2,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -647,12 +699,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               onPressed: () {
                 Navigator.pop(context);
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${widget.otherUserName} has been blocked'),
-                    backgroundColor: Color(0xFF075E54),
-                  ),
-                );
+                _showCenteredNotification('${widget.otherUserName} has been blocked');
               },
               child: const Text(
                 'Block',
@@ -686,12 +733,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                 setState(() {
                   _messages.clear();
                 });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Chat cleared'),
-                    backgroundColor: Color(0xFF075E54),
-                  ),
-                );
+                _showCenteredNotification('Chat cleared');
               },
               child: const Text(
                 'Clear',
@@ -704,93 +746,136 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     );
   }
 
+  // ─── Centered Mute Notifications Dialog ───────────────────────────────
+
   void _showMuteOptions() {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      barrierDismissible: true,
       builder: (context) {
-        return SafeArea(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const Text(
-                  'Mute Notifications',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _buildMuteOption('1 hour', 1, 'Mute for 1 hour'),
-                _buildMuteOption('2 hours', 2, 'Mute for 2 hours'),
-                _buildMuteOption('4 hours', 4, 'Mute for 4 hours'),
-                _buildMuteOption('8 hours', 8, 'Mute for 8 hours'),
-                _buildMuteOption('24 hours', 24, 'Mute for 24 hours'),
-                _buildMuteOption('7 days', 168, 'Mute for 7 days'),
-                if (_isMuted)
-                  ListTile(
-                    leading: const Icon(Icons.notifications, color: Colors.green),
-                    title: const Text('Unmute'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _toggleMuteNotifications();
-                    },
-                  ),
-                const SizedBox(height: 16),
-              ],
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'Mute notifications',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
           ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildMuteOptionDialog('1 hour', 1),
+              _buildMuteOptionDialog('2 hours', 2),
+              _buildMuteOptionDialog('4 hours', 3),
+              _buildMuteOptionDialog('8 hours', 4),
+              _buildMuteOptionDialog('24 hours', 5),
+              _buildMuteOptionDialog('7 days', 6),
+              if (_isMuted)
+                _buildMuteOptionDialog('Unmute', 0, isUnmute: true),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
         );
       },
     );
   }
 
-  Widget _buildMuteOption(String label, int hours, String subtitle) {
-    return ListTile(
-      leading: const Icon(Icons.notifications_off, color: Colors.grey),
-      title: Text(label),
-      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-      trailing: const Icon(Icons.chevron_right),
+  Widget _buildMuteOptionDialog(String label, int duration, {bool isUnmute = false}) {
+    final isSelected = _selectedMuteDuration == duration;
+    
+    return GestureDetector(
       onTap: () {
         Navigator.pop(context);
-        _muteDurationHours = hours;
-        setState(() {
-          _isMuted = true;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Notifications muted for $label'),
-            backgroundColor: const Color(0xFF075E54),
-          ),
-        );
+        if (isUnmute) {
+          _toggleMuteNotifications();
+        } else {
+          _setMuteDuration(duration);
+        }
       },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: Colors.grey[100]!, width: 1),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isUnmute ? Icons.notifications : Icons.notifications_off,
+              color: isUnmute ? Colors.green : Colors.grey,
+              size: 24,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isUnmute ? Colors.green : Colors.black,
+                ),
+              ),
+            ),
+            if (isSelected)
+              const Icon(
+                Icons.check,
+                color: Color(0xFF2C5C44),
+                size: 20,
+              ),
+          ],
+        ),
+      ),
     );
+  }
+
+  void _setMuteDuration(int duration) {
+    _selectedMuteDuration = duration;
+    setState(() {
+      _isMuted = true;
+    });
+    
+    String label = '';
+    switch (duration) {
+      case 1:
+        label = '1 hour';
+        break;
+      case 2:
+        label = '2 hours';
+        break;
+      case 3:
+        label = '4 hours';
+        break;
+      case 4:
+        label = '8 hours';
+        break;
+      case 5:
+        label = '24 hours';
+        break;
+      case 6:
+        label = '7 days';
+        break;
+    }
+    
+    _showCenteredNotification('Notifications muted for $label');
   }
 
   void _toggleMuteNotifications() {
     setState(() {
       _isMuted = !_isMuted;
+      if (!_isMuted) {
+        _selectedMuteDuration = 0;
+      }
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_isMuted ? 'Notifications muted' : 'Notifications unmuted'),
-        backgroundColor: const Color(0xFF075E54),
-      ),
-    );
+    _showCenteredNotification(_isMuted ? 'Notifications muted' : 'Notifications unmuted');
   }
 
   void _showMoreOptions() {
@@ -815,7 +900,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               ListTile(
                 leading: Icon(
                   _isMuted ? Icons.notifications_off : Icons.notifications,
-                  color: const Color(0xFF075E54),
+                  color: const Color(0xFF2C5C44),
                 ),
                 title: Text(_isMuted ? 'Unmute Notifications' : 'Mute Notifications'),
                 trailing: const Icon(Icons.chevron_right, size: 16),
@@ -896,8 +981,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    final roleEmoji = _getRoleEmoji(widget.otherUserRole);
-
     return Scaffold(
       backgroundColor: const Color(0xFFECE5DD),
       appBar: AppBar(
@@ -951,7 +1034,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
             ),
           ],
         ),
-        backgroundColor: const Color(0xFF075E54),
+        backgroundColor: const Color(0xFF2C5C44),
         elevation: 0,
         actions: [
           IconButton(
@@ -969,7 +1052,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
             child: _isLoading
                 ? const Center(
                     child: CircularProgressIndicator(
-                      color: Color(0xFF075E54),
+                      color: Color(0xFF2C5C44),
                     ),
                   )
                 : ListView.builder(
@@ -1025,10 +1108,11 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildMessageBubble(Message message, bool isFromMe) {
-    final isReplying = _replyingToMessageId == message.id;
     final hasImage = message.attachment != null && message.attachment!.isNotEmpty;
     final hasText = message.msgText.isNotEmpty;
     final isDocument = hasImage && message.msgText.contains('📄');
+    final isSelected = _selectedMessageId == message.id;
+    final isReplying = _replyingToMessageId == message.id;
     
     return GestureDetector(
       onLongPress: () => _showMessageOptions(message),
@@ -1042,6 +1126,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
           child: Column(
             crossAxisAlignment: isFromMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
+              // Reply indicator inside the bubble (like WhatsApp)
               if (isReplying)
                 Container(
                   padding: const EdgeInsets.all(8),
@@ -1060,18 +1145,18 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'You replied to yourself',
+                        _replyingToSender ?? 'You',
                         style: TextStyle(
                           fontSize: 11,
                           color: isFromMe ? Colors.green : Colors.grey,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       Text(
                         _replyingToMessageText ?? '',
                         style: const TextStyle(
                           fontSize: 12,
-                          color: Colors.grey,
+                          color: Colors.black87,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1082,15 +1167,19 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: isFromMe
-                      ? const Color(0xFFDCF8C6)
-                      : Colors.white,
+                  color: isSelected 
+                      ? (isFromMe ? Colors.green[200] : Colors.blue[50])
+                      : (isFromMe ? const Color(0xFFDCF8C6) : Colors.white),
                   borderRadius: BorderRadius.only(
                     topLeft: const Radius.circular(16),
                     topRight: const Radius.circular(16),
                     bottomLeft: isFromMe ? const Radius.circular(16) : const Radius.circular(4),
                     bottomRight: isFromMe ? const Radius.circular(4) : const Radius.circular(16),
                   ),
+                  border: isSelected ? Border.all(
+                    color: isFromMe ? Colors.green : Colors.blue,
+                    width: 2,
+                  ) : null,
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.05),
@@ -1103,59 +1192,69 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (hasImage && !isDocument)
-                      Container(
-                        margin: EdgeInsets.only(bottom: hasText ? 4 : 0),
-                        width: 200,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.file(
-                            File(message.attachment!),
-                            height: 150,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Container(
+                      GestureDetector(
+                        onTap: () => _showImageFullScreen(message.attachment!),
+                        child: Container(
+                          margin: EdgeInsets.only(bottom: hasText ? 4 : 0),
+                          width: 200,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.file(
+                              File(message.attachment!),
                               height: 150,
-                              color: Colors.grey[200],
-                              child: const Icon(Icons.image, size: 40, color: Colors.grey),
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                height: 150,
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.image, size: 40, color: Colors.grey),
+                              ),
                             ),
                           ),
                         ),
                       ),
                     if (isDocument)
-                      Container(
-                        margin: EdgeInsets.only(bottom: hasText ? 4 : 0),
-                        width: 200,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.insert_drive_file, size: 32, color: Colors.grey),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Document',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
+                      GestureDetector(
+                        onTap: () {
+                          _showCenteredNotification('Opening document...');
+                        },
+                        child: Container(
+                          margin: EdgeInsets.only(bottom: hasText ? 4 : 0),
+                          width: 200,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.insert_drive_file, size: 32, color: Colors.grey),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Document',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
-                                  ),
-                                  Text(
-                                    'Shared file',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[600],
+                                    Text(
+                                      message.msgText.replaceAll('📄 ', ''),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     if (hasText)
@@ -1376,7 +1475,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
             icon: Container(
               padding: const EdgeInsets.all(8),
               decoration: const BoxDecoration(
-                color: Color(0xFF075E54),
+                color: Color(0xFF2C5C44),
                 shape: BoxShape.circle,
               ),
               child: const Icon(

@@ -537,7 +537,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                     Row(
                       children: [
                         Icon(
-                          Icons.local_shipping_outlined,
+                          Icons.directions_bike,
                           size: isSmall ? 12 : 14,
                           color: kSage,
                         ),

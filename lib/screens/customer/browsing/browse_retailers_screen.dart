@@ -768,7 +768,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                     Row(
                       children: [
                         Icon(
-                          Icons.local_shipping_outlined,
+                          Icons.directions_bike,
                           size: isSmall ? 12 : 14,
                           color: kSage,
                         ),
