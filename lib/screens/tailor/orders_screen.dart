@@ -83,6 +83,12 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
 
   final Color primaryGreen = const Color(0xFF4F7942);
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   final Measurement _mockMeasurement = Measurement(
     id: "meas_123",
     customerId: "cust_456",
@@ -400,61 +406,61 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: EdgeInsets.fromLTRB(24, 12, 24, MediaQuery.of(context).viewInsets.bottom + 24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 42, height: 4,
-                margin: const EdgeInsets.only(bottom: 18),
-                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
-              ),
-            ),
-            const Text("Detailed Filter", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
-            const Text(
-              "Filter by Order ID, Product Name, or Customer",
-              style: TextStyle(color: Colors.black54, fontSize: 13),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: filterController,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: "Enter keywords...",
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: Colors.grey.shade50,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    _searchQuery = filterController.text;
-                    _searchController.text = filterController.text;
-                  });
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryGreen,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      builder: (context) => Material(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: Container(
+          padding: EdgeInsets.fromLTRB(24, 12, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 42, height: 4,
+                  margin: const EdgeInsets.only(bottom: 18),
+                  decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
                 ),
-                child: const Text("Apply Filter", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
-            ),
-          ],
+              const Text("Detailed Filter", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              const Text(
+                "Filter by Order ID, Product Name, or Customer",
+                style: TextStyle(color: Colors.black54, fontSize: 13),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: filterController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: "Enter keywords...",
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = filterController.text;
+                      _searchController.text = filterController.text;
+                    });
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryGreen,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text("Apply Filter", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -498,28 +504,28 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(child: Container(width: 42, height: 4, margin: const EdgeInsets.only(bottom: 18), decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
-            const Text("Filter by date", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 14),
-            _filterOptionTile("Last 3 months", _filterPreset == OrderFilterPreset.last3Months, () {
-              setState(() => _filterPreset = OrderFilterPreset.last3Months);
-              Navigator.pop(context);
-            }),
-            _filterOptionTile("Last 6 months", _filterPreset == OrderFilterPreset.last6Months, () {
-              setState(() => _filterPreset = OrderFilterPreset.last6Months);
-              Navigator.pop(context);
-            }),
-          ],
+      builder: (context) => Material(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: Container(width: 42, height: 4, margin: const EdgeInsets.only(bottom: 18), decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
+              const Text("Filter by date", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 14),
+              _filterOptionTile("Last 3 months", _filterPreset == OrderFilterPreset.last3Months, () {
+                setState(() => _filterPreset = OrderFilterPreset.last3Months);
+                Navigator.pop(context);
+              }),
+              _filterOptionTile("Last 6 months", _filterPreset == OrderFilterPreset.last6Months, () {
+                setState(() => _filterPreset = OrderFilterPreset.last6Months);
+                Navigator.pop(context);
+              }),
+            ],
+          ),
         ),
       ),
     );
@@ -694,47 +700,47 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Update Work Progress",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            if (order.status == TailorOrderStatus.pending)
-              _statusOptionTile(
-                "Start Stitching",
-                Icons.play_arrow_outlined,
-                Colors.purple,
-                () {
-                  setState(() => order.status = TailorOrderStatus.inProgress);
-                  Navigator.pop(context);
-                },
+      builder: (context) => Material(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Update Work Progress",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-            if (order.status == TailorOrderStatus.inProgress)
-              _statusOptionTile(
-                "Mark as Finished",
-                Icons.check_circle_outline,
-                primaryGreen,
-                () {
-                  setState(() {
-                    order.status = TailorOrderStatus.completed;
-                    order.isCompleted = true;
-                    order.completionDate = DateTime.now();
-                  });
-                  Navigator.pop(context);
-                },
-              ),
-            const SizedBox(height: 8),
-          ],
+              const SizedBox(height: 16),
+              if (order.status == TailorOrderStatus.pending)
+                _statusOptionTile(
+                  "Start Stitching",
+                  Icons.play_arrow_outlined,
+                  Colors.purple,
+                  () {
+                    setState(() => order.status = TailorOrderStatus.inProgress);
+                    Navigator.pop(context);
+                  },
+                ),
+              if (order.status == TailorOrderStatus.inProgress)
+                _statusOptionTile(
+                  "Mark as Finished",
+                  Icons.check_circle_outline,
+                  primaryGreen,
+                  () {
+                    setState(() {
+                      order.status = TailorOrderStatus.completed;
+                      order.isCompleted = true;
+                      order.completionDate = DateTime.now();
+                    });
+                    Navigator.pop(context);
+                  },
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
