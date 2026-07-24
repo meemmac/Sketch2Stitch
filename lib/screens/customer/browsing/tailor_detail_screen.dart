@@ -220,15 +220,15 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                         onTap: () => _showReviewsOverlay(context),
                         child: Container(
                           padding: EdgeInsets.symmetric(
-                            horizontal: buttonPadding,
-                            vertical: isSmallScreen ? 3.0 : 4.0,
+                            horizontal: buttonPadding * 1.5,
+                            vertical: isSmallScreen ? 6.0 : 8.0,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.white.withValues(alpha: 0.25),
+                            borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.3),
-                              width: 0.5,
+                              color: Colors.white.withValues(alpha: 0.4),
+                              width: 1,
                             ),
                           ),
                           child: Row(
@@ -237,15 +237,15 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                               Icon(
                                 Icons.reviews,
                                 color: Colors.white,
-                                size: isSmallScreen ? 12 : 14,
+                                size: isSmallScreen ? 16 : 18,
                               ),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: 6),
                               Text(
-                                isSmallScreen ? 'Reviews' : 'See Reviews',
+                                'Reviews',
                                 style: TextStyle(
-                                  fontSize: isSmallScreen ? 10.0 : 12.0,
+                                  fontSize: isSmallScreen ? 13.0 : 15.0,
                                   color: Colors.white,
-                                  fontWeight: FontWeight.w500,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],
@@ -353,7 +353,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         Text(
           'About',
           style: TextStyle(
-            fontSize: isSmallScreen ? 16.0 : 18.0,
+            fontSize: isSmallScreen ? 18.0 : 20.0,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -361,7 +361,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         Text(
           description,
           style: TextStyle(
-            fontSize: isSmallScreen ? 13.0 : 14.0,
+            fontSize: isSmallScreen ? 14.0 : 15.0,
             color: Colors.grey,
             height: 1.6,
           ),
@@ -379,17 +379,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       return const SizedBox.shrink();
     }
 
-    int crossAxisCount = 2;
-    if (isSmallScreen) {
-      crossAxisCount = 2;
-    } else if (isMediumScreen) {
-      crossAxisCount = 2;
-    } else {
-      crossAxisCount = 3;
-    }
-
-    double aspectRatio = isSmallScreen ? 0.7 : 0.8;
-
     final displayItems = _showAllPortfolio 
         ? portfolioItems 
         : (portfolioItems.length > 4 ? portfolioItems.take(4).toList() : portfolioItems);
@@ -403,7 +392,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
             Text(
               'Portfolio',
               style: TextStyle(
-                fontSize: isSmallScreen ? 16.0 : 18.0,
+                fontSize: isSmallScreen ? 18.0 : 20.0,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -421,40 +410,73 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                 child: Text(
                   _showAllPortfolio ? 'Show Less' : 'See All',
                   style: TextStyle(
-                    fontSize: isSmallScreen ? 12.0 : 14.0,
+                    fontSize: isSmallScreen ? 13.0 : 15.0,
                   ),
                 ),
               ),
           ],
         ),
         const SizedBox(height: 12),
-        GridView.builder(
+        ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            crossAxisSpacing: isSmallScreen ? 8.0 : 12.0,
-            mainAxisSpacing: isSmallScreen ? 8.0 : 12.0,
-            childAspectRatio: aspectRatio,
-          ),
           itemCount: displayItems.length,
           itemBuilder: (context, index) {
             final portfolio = displayItems[index];
             return Container(
+              margin: EdgeInsets.only(bottom: isSmallScreen ? 10.0 : 12.0),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: Colors.grey[200]!),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.asset(
-                  portfolio.image ?? 'assets/images/fab.jpg',
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.image, color: Colors.grey),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
-                ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Image section
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: isSmallScreen ? 140 : 160,
+                      child: portfolio.image != null && portfolio.image!.isNotEmpty
+                          ? Image.asset(
+                              portfolio.image!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.image, size: 48, color: Colors.grey),
+                              ),
+                            )
+                          : Container(
+                              color: Colors.grey[200],
+                              child: const Icon(Icons.image, size: 48, color: Colors.grey),
+                            ),
+                    ),
+                  ),
+                  // Description section
+                  if (portfolio.description != null && portfolio.description!.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
+                      child: Text(
+                        portfolio.description!,
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 13.0 : 14.0,
+                          color: Colors.grey[700],
+                          height: 1.4,
+                        ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
               ),
             );
           },

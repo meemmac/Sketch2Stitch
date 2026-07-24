@@ -692,7 +692,26 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => ProductDetailOverlay(product: product),
+      builder: (context) => ProductDetailOverlay(
+        product: product,
+        isFabric: widget.showFabrics,
+        retailerName: _getRetailerName(product.retailerId),
+      ),
     );
+  }
+
+  String _getRetailerName(String retailerId) {
+    // TODO: Fetch actual retailer name from database
+    // For now, return a placeholder based on retailerId
+    switch (retailerId) {
+      case 'r1':
+        return 'Fabric World';
+      case 'r2':
+        return 'Style Hub';
+      case 'r3':
+        return 'Elegant Textiles';
+      default:
+        return 'Unknown Retailer';
+    }
   }
 }

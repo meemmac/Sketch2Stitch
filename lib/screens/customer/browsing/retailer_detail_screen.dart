@@ -219,15 +219,15 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                         onTap: () => _showReviewsOverlay(context),
                         child: Container(
                           padding: EdgeInsets.symmetric(
-                            horizontal: buttonPadding,
-                            vertical: isSmallScreen ? 3.0 : 4.0,
+                            horizontal: buttonPadding * 1.5,
+                            vertical: isSmallScreen ? 6.0 : 8.0,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.white.withValues(alpha: 0.25),
+                            borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.3),
-                              width: 0.5,
+                              color: Colors.white.withValues(alpha: 0.4),
+                              width: 1,
                             ),
                           ),
                           child: Row(
@@ -236,15 +236,15 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                               Icon(
                                 Icons.reviews,
                                 color: Colors.white,
-                                size: isSmallScreen ? 12 : 14,
+                                size: isSmallScreen ? 16 : 18,
                               ),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: 6),
                               Text(
-                                isSmallScreen ? 'Reviews' : 'See Reviews',
+                                'Reviews',
                                 style: TextStyle(
-                                  fontSize: isSmallScreen ? 10.0 : 12.0,
+                                  fontSize: isSmallScreen ? 13.0 : 15.0,
                                   color: Colors.white,
-                                  fontWeight: FontWeight.w500,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],
@@ -358,7 +358,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         Text(
           'About Shop',
           style: TextStyle(
-            fontSize: isSmallScreen ? 16.0 : 18.0,
+            fontSize: isSmallScreen ? 18.0 : 20.0,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -366,7 +366,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         Text(
           description,
           style: TextStyle(
-            fontSize: isSmallScreen ? 13.0 : 14.0,
+            fontSize: isSmallScreen ? 14.0 : 15.0,
             color: Colors.grey,
             height: 1.6,
           ),
@@ -393,7 +393,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
             Text(
               'Products',
               style: TextStyle(
-                fontSize: isSmallScreen ? 16.0 : 18.0,
+                fontSize: isSmallScreen ? 18.0 : 20.0,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -411,7 +411,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                 child: Text(
                   _showAllProducts ? 'Show Less' : 'See All',
                   style: TextStyle(
-                    fontSize: isSmallScreen ? 12.0 : 14.0,
+                    fontSize: isSmallScreen ? 13.0 : 15.0,
                   ),
                 ),
               ),
@@ -488,7 +488,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                       Text(
                         product.productName,
                         style: TextStyle(
-                          fontSize: isSmallScreen ? 11.0 : 13.0,
+                          fontSize: isSmallScreen ? 12.0 : 14.0,
                           fontWeight: FontWeight.w600,
                         ),
                         maxLines: 2,
@@ -498,7 +498,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                       Text(
                         product.category,
                         style: TextStyle(
-                          fontSize: isSmallScreen ? 9.0 : 11.0,
+                          fontSize: isSmallScreen ? 10.0 : 12.0,
                           color: Colors.grey,
                         ),
                         maxLines: 1,
@@ -516,7 +516,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                           Text(
                             '${product.colorOptions.length} colors',
                             style: TextStyle(
-                              fontSize: isSmallScreen ? 8.0 : 10.0,
+                              fontSize: isSmallScreen ? 9.0 : 11.0,
                               color: Colors.grey,
                             ),
                           ),
@@ -526,7 +526,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                       Text(
                         'Tk ${product.minPrice.toStringAsFixed(0)}',
                         style: TextStyle(
-                          fontSize: isSmallScreen ? 12.0 : 14.0,
+                          fontSize: isSmallScreen ? 13.0 : 15.0,
                           fontWeight: FontWeight.bold,
                           color: const Color(0xFF2C5C44),
                         ),
@@ -754,27 +754,61 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   // ─── Review Card ──────────────────────────────────────────────────────
 
   Widget _buildReviewCard(Review review, bool isSmallScreen) {
-    final Map<String, Map<String, String>> reviewDetails = {
-      'R001': {'name': 'Priya Sharma', 'product': 'Blue Cotton Kurti'},
-      'R002': {'name': 'Amina Rahman', 'product': 'Floral Dress'},
-      'R003': {'name': 'Nusrat Jahan', 'product': 'Linen Blazer'},
-      'R004': {'name': 'Tahsin Ahmed', 'product': 'Silk Saree'},
-      'R005': {'name': 'Farhana Islam', 'product': 'Cotton Shirt'},
+    final Map<String, Map<String, dynamic>> reviewDetails = {
+      'R001': {
+        'name': 'Priya Sharma',
+        'products': [
+          {'name': 'Blue Cotton Kurti', 'quantity': 2, 'price': 850},
+          {'name': 'Matching Thread', 'quantity': 1, 'price': 150},
+        ]
+      },
+      'R002': {
+        'name': 'Amina Rahman',
+        'products': [
+          {'name': 'Floral Dress', 'quantity': 1, 'price': 1200},
+        ]
+      },
+      'R003': {
+        'name': 'Nusrat Jahan',
+        'products': [
+          {'name': 'Linen Blazer', 'quantity': 1, 'price': 2500},
+          {'name': 'Buttons Set', 'quantity': 1, 'price': 200},
+        ]
+      },
+      'R004': {
+        'name': 'Tahsin Ahmed',
+        'products': [
+          {'name': 'Silk Saree', 'quantity': 1, 'price': 3500},
+        ]
+      },
+      'R005': {
+        'name': 'Farhana Islam',
+        'products': [
+          {'name': 'Cotton Shirt', 'quantity': 3, 'price': 1800},
+        ]
+      },
     };
 
-    final details = reviewDetails[review.id] ?? {'name': 'Anonymous', 'product': 'Product'};
-    final customerName = details['name']!;
-    final productName = details['product']!;
-    final avatarSize = isSmallScreen ? 16.0 : 20.0;
-    final nameSize = isSmallScreen ? 12.0 : 14.0;
-    final commentSize = isSmallScreen ? 12.0 : 14.0;
+    final details = reviewDetails[review.id] ?? {'name': 'Anonymous', 'products': []};
+    final customerName = details['name'] as String;
+    final products = details['products'] as List<Map<String, dynamic>>;
+    final avatarSize = isSmallScreen ? 18.0 : 22.0;
+    final nameSize = isSmallScreen ? 13.0 : 15.0;
+    final commentSize = isSmallScreen ? 13.0 : 15.0;
 
     return Container(
-      padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
+      padding: EdgeInsets.all(isSmallScreen ? 12.0 : 14.0),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -790,7 +824,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: const Color(0xFF2C5C44),
-                    fontSize: isSmallScreen ? 12.0 : 14.0,
+                    fontSize: isSmallScreen ? 13.0 : 15.0,
                   ),
                 ),
               ),
@@ -808,23 +842,29 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    const SizedBox(height: 2),
                     Row(
                       children: [
-                        const Icon(
-                          Icons.circle,
-                          size: 4,
-                          color: Colors.grey,
+                        Icon(
+                          Icons.star,
+                          color: Colors.amber,
+                          size: isSmallScreen ? 14.0 : 16.0,
                         ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            productName,
-                            style: TextStyle(
-                              fontSize: isSmallScreen ? 10.0 : 12.0,
-                              color: Colors.grey,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                        const SizedBox(width: 2),
+                        Text(
+                          review.rating.toStringAsFixed(1),
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 12.0 : 14.0,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          review.timeAgo,
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 11.0 : 12.0,
+                            color: Colors.grey[500],
                           ),
                         ),
                       ],
@@ -832,43 +872,100 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                   ],
                 ),
               ),
-              Row(
-                children: [
-                  Icon(
-                    Icons.star,
-                    color: Colors.amber,
-                    size: isSmallScreen ? 14.0 : 16.0,
-                  ),
-                  const SizedBox(width: 2),
-                  Text(
-                    review.rating.toStringAsFixed(1),
-                    style: TextStyle(
-                      fontSize: isSmallScreen ? 12.0 : 14.0,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
+          
+          // Ordered Products Section (like foodpanda)
+          Container(
+            padding: EdgeInsets.all(isSmallScreen ? 8.0 : 10.0),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.shopping_bag_outlined,
+                      size: isSmallScreen ? 14 : 16,
+                      color: const Color(0xFF2C5C44),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Ordered Items',
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 11.0 : 12.0,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ...products.map((product) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${product['quantity']}x ${product['name']}',
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 11.0 : 12.0,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Tk ${product['price']}',
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 11.0 : 12.0,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF2C5C44),
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+                const Divider(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total',
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 12.0 : 13.0,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    Text(
+                      'Tk ${products.fold<int>(0, (sum, p) => sum + (p['price'] as int))}',
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 12.0 : 13.0,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF2C5C44),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          
           Text(
             review.comment,
             style: TextStyle(
               fontSize: commentSize,
-              color: Colors.grey,
+              color: Colors.grey[700],
               height: 1.4,
             ),
-            maxLines: 3,
+            maxLines: 4,
             overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            review.timeAgo,
-            style: TextStyle(
-              fontSize: isSmallScreen ? 10.0 : 12.0,
-              color: Colors.grey,
-            ),
           ),
         ],
       ),

@@ -3,10 +3,14 @@ import 'package:sketch2stitch/models/product.dart';
 
 class ProductDetailOverlay extends StatefulWidget {
   final Product product;
+  final bool isFabric;
+  final String retailerName;
 
   const ProductDetailOverlay({
     super.key,
     required this.product,
+    this.isFabric = true,
+    this.retailerName = 'Unknown Retailer',
   });
 
   @override
@@ -154,6 +158,26 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 10),
 
+                  // Retailer Name
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.store,
+                        color: Color(0xFF2C5C44),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        widget.retailerName,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+
                   // Material Type (from database)
                   Row(
                     children: [
@@ -165,6 +189,26 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                       const SizedBox(width: 4),
                       Text(
                         widget.product.materialType,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+
+                  // Blend Option with Material Type
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.blender,
+                        color: Color(0xFF2C5C44),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '100% ${widget.product.materialType}',
                         style: const TextStyle(
                           fontSize: 14,
                           color: Colors.grey,
@@ -251,7 +295,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16,
-                              vertical: 8,
+                              vertical: 10,
                             ),
                             decoration: BoxDecoration(
                               color: isSelected
@@ -266,25 +310,45 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                             ),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      option.color,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: isSelected ? Colors.white : Colors.black87,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w600
+                                            : FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
                                 Text(
-                                  option.color,
+                                  '100% ${widget.product.materialType}',
                                   style: TextStyle(
-                                    color: isSelected ? Colors.white : Colors.black87,
-                                    fontWeight: isSelected
-                                        ? FontWeight.w600
-                                        : FontWeight.normal,
+                                    fontSize: 11,
+                                    color: isSelected
+                                        ? Colors.white.withValues(alpha: 0.9)
+                                        : Colors.grey[700],
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
+                                const SizedBox(height: 2),
                                 Text(
                                   isOutOfStock
                                       ? 'Out of stock'
                                       : 'Tk ${option.price.toStringAsFixed(0)}',
                                   style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 11,
                                     color: isSelected
                                         ? Colors.white.withValues(alpha: 0.85)
                                         : Colors.grey[600],
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ],
@@ -296,14 +360,24 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Care Instructions (from database)
-                  if (widget.product.careSymbol.isNotEmpty) ...[
-                    const Text(
-                      'Care Instructions',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  // Care Instructions (from database) - Only for fabrics
+                  if (widget.isFabric && widget.product.careSymbol.isNotEmpty) ...[
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.inventory_2,
+                          color: Color(0xFF2C5C44),
+                          size: 18,
+                        ),
+                        const SizedBox(width: 4),
+                        const Text(
+                          'Care Level',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Wrap(
@@ -319,12 +393,23 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                             color: const Color(0xFFEEF6F0),
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: Text(
-                            care,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF2C5C44),
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.check_circle,
+                                size: 14,
+                                color: Color(0xFF2C5C44),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                care,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF2C5C44),
+                                ),
+                              ),
+                            ],
                           ),
                         );
                       }).toList(),
@@ -351,75 +436,39 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Action Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: !_inStock
-                              ? null
-                              : () {
-                                  Navigator.pop(context);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Added to cart!'),
-                                      backgroundColor: Color(0xFF4E8B6F),
-                                      duration: Duration(seconds: 2),
-                                    ),
-                                  );
-                                },
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF2C5C44),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            side: const BorderSide(color: Color(0xFF2C5C44)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            'Add to Cart',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF2C5C44),
-                            ),
-                          ),
+                  // Action Buttons - Only Add to Cart
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: !_inStock
+                          ? null
+                          : () {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Added to cart!'),
+                                  backgroundColor: Color(0xFF4E8B6F),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF2C5C44),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: const BorderSide(color: Color(0xFF2C5C44)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: !_inStock
-                              ? null
-                              : () {
-                                  Navigator.pop(context);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Order placed successfully!'),
-                                      backgroundColor: Color(0xFF4E8B6F),
-                                      duration: Duration(seconds: 2),
-                                    ),
-                                  );
-                                },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2C5C44),
-                            disabledBackgroundColor: Colors.grey[300],
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            'Buy Now',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
+                      child: const Text(
+                        'Add to Cart',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2C5C44),
                         ),
                       ),
-                    ],
+                    ),
                   ),
                   const SizedBox(height: 30),
                 ],
