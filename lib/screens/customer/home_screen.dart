@@ -18,6 +18,8 @@ import 'notification_screen.dart' ;
 import 'package:sketch2stitch/screens/retailer/inventory_screen.dart';
 import 'package:sketch2stitch/screens/tailor/orders_screen.dart';
 import 'track_order.dart';
+import 'order_list_screen.dart';
+import 'package:sketch2stitch/screens/retailer/orders_screen.dart';
 
 class UnifiedHomeScreen extends StatefulWidget {
   final AppUserRole initialRole;
@@ -86,20 +88,14 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         _hasUnreadNotifications = false;
       });
     }
-
   }
-  void _openTrackOrder() {
-    // Navigate to Order Track Screen
+
+  void _openOrderList() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => OrderTrackScreen(
-          orderId: 'OR05',
-          status: 'Pending Retailer Confirmation',
-          estimatedDelivery: '25 Dec 2026',
-          lastUpdated: '22 Dec 2026',
-          deliveryAddress: 'The Shakespeare Centre, Henley Street, CV37 6QW Stratford-upon-Avon, UK.',
-          userRole: AppUserRole.customer,
+        builder: (context) => OrderListScreen(
+          userRole: _currentRole,
         ),
       ),
     );
@@ -196,8 +192,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: ValueKey(_currentRole), // Force rebuild when role changes
       backgroundColor: const Color(0xFFF4F9F1),
-      // Pass the current role to the drawer
       drawer: DashboardDrawer(
         initialRole: _currentRole,
         onRoleChanged: (role) {
@@ -232,11 +228,12 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     );
   }
 
-  // ---------------- Top bar ----------------
+  // ---------------- Top bar (Role dropdown removed) ----------------
   Widget _buildTopBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 20, 8),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween, // This spreads items
         children: [
           Builder(
             builder: (context) => IconButton(
@@ -282,11 +279,10 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           // Track Order icon - only for customer
           if (_currentRole == AppUserRole.customer)
             IconButton(
-              icon: const Icon(Icons.track_changes_rounded, color: Colors.black87),
+              icon: const Icon(Icons.local_shipping_outlined, color: Colors.black87),
               iconSize: 28,
-              onPressed: () {
-                _openTrackOrder();
-              },
+              onPressed: _openOrderList,
+              tooltip: 'My Orders',
             ),
           // Show cart icon only for customer
           if (_currentRole == AppUserRole.customer)
@@ -295,54 +291,13 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
               iconSize: 28,
               onPressed: () {
                 Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const CartScreen()),
-      );
+                  context,
+                  MaterialPageRoute(builder: (_) => const CartScreen()),
+                );
               },
             ),
-          // Role dropdown for testing
-          _buildRoleDropdown(),
+          // Role dropdown removed - no longer needed in top bar
         ],
-      ),
-    );
-  }
-
-  Widget _buildRoleDropdown() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: DropdownButton<AppUserRole>(
-        value: _currentRole,
-        underline: const SizedBox(),
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF1E392A),
-        ),
-        items: const [
-          DropdownMenuItem(
-            value: AppUserRole.customer,
-            child: Text("Customer"),
-          ),
-          DropdownMenuItem(
-            value: AppUserRole.tailor,
-            child: Text("Tailor"),
-          ),
-          DropdownMenuItem(
-            value: AppUserRole.retailer,
-            child: Text("Retailer"),
-          ),
-        ],
-        onChanged: (role) {
-          if (role != null) {
-            setState(() {
-              _currentRole = role;
-            });
-          }
-        },
       ),
     );
   }
@@ -454,7 +409,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                   const SizedBox(height: 18),
                   ElevatedButton(
                     onPressed: () {
-                      _scrollToSection(_exploreTailorsKey);
+                      _scrollToSection(_exploreFabricsKey);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.black,
@@ -1352,7 +1307,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         _buildCenteredHeading('Explore Elements'),
         const SizedBox(height: 14),
         _buildFabricRow(items),
-        _buildSeeAllButton(() => _openBrowseTab(0)),
+        _buildSeeAllButton(() => _openBrowseTab(1)),
       ],
     );
   }
@@ -1365,7 +1320,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         _buildCenteredHeading('Explore Retailers'),
         const SizedBox(height: 14),
         _buildRetailerRow(items),
-        _buildSeeAllButton(() => _openBrowseTab(2)),
+        _buildSeeAllButton(() => _openBrowseTab(3)),
       ],
     );
   }
@@ -1378,7 +1333,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         _buildCenteredHeading('Explore Tailors'),
         const SizedBox(height: 14),
         _buildTailorRow(items),
-        _buildSeeAllButton(() => _openBrowseTab(1)),
+        _buildSeeAllButton(() => _openBrowseTab(2)),
       ],
     );
   }

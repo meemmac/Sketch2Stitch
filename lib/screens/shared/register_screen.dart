@@ -184,7 +184,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
               // ever reaching it.
               Positioned(
                 top: 10,
-                right: 10,
+                left: 10,
                 child: TextButton(
                   onPressed: _goBack,
                   style: TextButton.styleFrom(
