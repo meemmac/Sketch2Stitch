@@ -74,7 +74,8 @@ enum TrackEventType {
   shippingToTailor,
   shippingToCustomer,
   orderCompleted,
-  orderCancelled,
+  orderConfirmedRetailer,
+  orderConfirmedTailor, orderCancelled,
 }
 
 class TrackEvent {
@@ -225,6 +226,14 @@ class OrderTrackScreen extends StatelessWidget {
       ),
       child: Row(
         children: [
+          // ✅ Back button with arrow icon (like track order page)
+      IconButton(
+      icon: const Icon(Icons.arrow_back, color: Colors.black87),
+      onPressed: () => Navigator.pop(context),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+          const SizedBox(width: 12),
           Image.asset(
             'assets/images/transparent_logo.png',
             height: 30,
@@ -235,25 +244,7 @@ class OrderTrackScreen extends StatelessWidget {
           const SizedBox(width: 8),
           const Text('Sketch2Stitch', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87)),
           const Spacer(),
-          TextButton(
-            onPressed: (){
-              Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const UnifiedHomeScreen(
-                initialRole: AppUserRole.customer,
-              ),
-            ),
-                (route) => route.isFirst,
-          );
-    },
-            style: TextButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.85),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            ),
-            child: const Text('Back', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 12.5)),
-          ),
+          // You can add any right-side icons here if needed
         ],
       ),
     );
@@ -488,6 +479,16 @@ class OrderTrackScreen extends StatelessWidget {
           icon: Icons.cancel_rounded,
           verb: 'Order Cancelled',
         );
+      case TrackEventType.orderConfirmedRetailer:
+        return _TrackEventStyle(
+            color: Colors.blue.shade600,
+            icon: Icons.storefront_rounded,
+            verb: 'Order Confirmed from Retailer');
+      case TrackEventType.orderConfirmedTailor:
+        return _TrackEventStyle(
+            color: Colors.purple.shade600,
+            icon: Icons.design_services_rounded,
+            verb: 'Order Confirmed from Tailor');
     }
   }
 }
