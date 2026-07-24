@@ -57,3 +57,24 @@ ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
 ios/Runner.xcworkspace/xcshareddata/swiftpm/
 macos/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
 macos/Runner.xcworkspace/xcshareddata/swiftpm/
+# Generated Flutter plugin registrants
+linux/flutter/generated_plugin_registrant.*
+linux/flutter/generated_plugins.cmake
+
+windows/flutter/generated_plugin_registrant.*
+windows/flutter/generated_plugins.cmake
+
+macos/Flutter/GeneratedPluginRegistrant.swift
+
+# Web-specific generated files
+lib/generated_plugin_registrant.dart
+android/build/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+macos/Flutter/Generated.xcconfig
+macos/Flutter/flutter_export_environment.sh
+
+# Local environment files
+.env
+.env.*
+!.env.example
