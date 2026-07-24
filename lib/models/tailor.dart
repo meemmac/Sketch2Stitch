@@ -11,6 +11,7 @@ class Tailor {
   final double rating;
   final String? profilePicture;
   final String? about;
+  final double deliveryCharge;
   
   // Relationships
   List<Portfolio>? portfolio;
@@ -24,6 +25,7 @@ class Tailor {
     required this.phone,
     required this.address,
     required this.rating,
+    this.deliveryCharge = 60.0,
     this.profilePicture,
     this.about,
     this.portfolio = const [],
@@ -46,6 +48,7 @@ class Tailor {
     String? phone,
     String? address,
     double? rating,
+    double? deliveryCharge,
     String? profilePicture,
     String? about,
     List<Portfolio>? portfolio,
@@ -59,6 +62,7 @@ class Tailor {
       phone: phone ?? this.phone,
       address: address ?? this.address,
       rating: rating ?? this.rating,
+      deliveryCharge: deliveryCharge ?? this.deliveryCharge,
       profilePicture: profilePicture ?? this.profilePicture,
       about: about ?? this.about,
       portfolio: portfolio ?? this.portfolio,
@@ -74,6 +78,7 @@ class Tailor {
     'phone': phone,
     'address': address,
     'rating': rating,
+    'deliveryCharge': deliveryCharge,
     'profilePicture': profilePicture,
     'about': about,
   };
@@ -86,6 +91,7 @@ class Tailor {
       phone: json['phone'] ?? '',
       address: json['address'] ?? '',
       rating: (json['rating'] ?? 0).toDouble(),
+      deliveryCharge: (json['deliveryCharge'] ?? 60.0).toDouble(),
       profilePicture: json['profilePicture'],
       about: json['about'],
     );

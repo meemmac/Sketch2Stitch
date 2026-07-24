@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'reviews_screen.dart';
 
 class OrderItem {
   final String name;
@@ -34,6 +35,8 @@ class OrderItem {
 class RetailerOrder {
   final String id;
   final String customerName;
+  final String customerPhone;
+  final String? tailorName;
   final List<OrderItem> items;
   final double amount;
   final DateTime orderDate;
@@ -48,6 +51,8 @@ class RetailerOrder {
   RetailerOrder({
     required this.id,
     required this.customerName,
+    required this.customerPhone,
+    this.tailorName,
     required this.items,
     required this.amount,
     required this.orderDate,
@@ -73,18 +78,29 @@ class RetailerOrdersScreen extends StatefulWidget {
 }
 
 class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = "";
   OrderFilterPreset _filterPreset = OrderFilterPreset.last3Months;
   DateTime? _customStartDate;
   DateTime? _customEndDate;
   bool _showOngoing = true;
+  String _selectedStatus = "All";
 
   // Primary color: #4F7942
   final Color primaryGreen = const Color(0xFF4F7942);
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   late final List<RetailerOrder> _orders = <RetailerOrder>[
     RetailerOrder(
       id: "ORD-1087",
       customerName: "Nazia Tasphia",
+      customerPhone: "+8801722334455",
+      tailorName: "Fine Cut Tailors",
       amount: 5200,
       orderDate: DateTime.now().subtract(const Duration(days: 12)),
       status: "Preparing",
@@ -116,6 +132,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     RetailerOrder(
       id: "ORD-1083",
       customerName: "Israt Jahan",
+      customerPhone: "+8801822334455",
       amount: 5400,
       orderDate: DateTime.now().subtract(const Duration(days: 28)),
       status: "Packed",
@@ -140,6 +157,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     RetailerOrder(
       id: "ORD-1076",
       customerName: "Nishat Tasnim",
+      customerPhone: "+8801922334455",
       amount: 8600,
       orderDate: DateTime.now().subtract(const Duration(days: 43)),
       deliveryDate: DateTime.now().subtract(const Duration(days: 35)),
@@ -172,6 +190,8 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     RetailerOrder(
       id: "ORD-1051",
       customerName: "Farzana Yasmin",
+      customerPhone: "+8801522334455",
+      tailorName: "Royal Stitch",
       amount: 4560,
       orderDate: DateTime.now().subtract(const Duration(days: 96)),
       deliveryDate: DateTime.now().subtract(const Duration(days: 89)),
@@ -236,7 +256,16 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
   List<RetailerOrder> get _filteredOrders {
     return _orders.where((order) {
       final date = order.orderDate;
-      return !date.isBefore(_startDate) && !date.isAfter(_endDate);
+      final matchesDate = !date.isBefore(_startDate) && !date.isAfter(_endDate);
+      final matchesStatus = _selectedStatus == "All" || order.status == _selectedStatus;
+      return matchesDate && matchesStatus;
+    }).where((order) {
+      if (_searchQuery.isEmpty) return true;
+      final query = _searchQuery.toLowerCase();
+      final matchesId = order.id.toLowerCase().contains(query);
+      final matchesCustomer = order.customerName.toLowerCase().contains(query);
+      final matchesProduct = order.items.any((i) => i.name.toLowerCase().contains(query));
+      return matchesId || matchesCustomer || matchesProduct;
     }).toList();
   }
 
@@ -306,101 +335,6 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     });
   }
 
-  void _showFilterSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 18),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const Text(
-                "Filter orders",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 14),
-              _filterOptionTile(
-                title: "Last 3 months",
-                subtitle: "Show recent retailer orders",
-                selected: _filterPreset == OrderFilterPreset.last3Months,
-                onTap: () {
-                  setState(() {
-                    _filterPreset = OrderFilterPreset.last3Months;
-                  });
-                  Navigator.pop(context);
-                },
-              ),
-              _filterOptionTile(
-                title: "Last 6 months",
-                subtitle: "Review a longer order period",
-                selected: _filterPreset == OrderFilterPreset.last6Months,
-                onTap: () {
-                  setState(() {
-                    _filterPreset = OrderFilterPreset.last6Months;
-                  });
-                  Navigator.pop(context);
-                },
-              ),
-              _filterOptionTile(
-                title: "Start to end date",
-                subtitle: _customStartDate == null || _customEndDate == null
-                    ? "Choose a custom date range"
-                    : "${_formatDate(_customStartDate!)} - ${_formatDate(_customEndDate!)}",
-                selected: _filterPreset == OrderFilterPreset.custom,
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickCustomDateRange();
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _filterOptionTile({
-    required String title,
-    required String subtitle,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 2),
-      leading: CircleAvatar(
-        backgroundColor: selected ? primaryGreen : Colors.green.shade50,
-        child: Icon(
-          selected ? Icons.check : Icons.calendar_month_outlined,
-          color: selected ? Colors.white : primaryGreen,
-          size: 20,
-        ),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.w800),
-      ),
-      subtitle: Text(subtitle),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -440,49 +374,17 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                     ),
                   ),
                 ),
-                Tooltip(
-                  message: "Filter orders",
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: _showFilterSheet,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.green.shade100),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.tune,
-                            color: primaryGreen,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              _filterLabel,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: primaryGreen,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                IconButton(
+                  onPressed: _showFilterSheet,
+                  icon: Icon(Icons.filter_list, color: primaryGreen),
+                  tooltip: "Filter orders",
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            _buildSearchAndFilter(),
             const SizedBox(height: 24),
             Row(
               children: [
@@ -520,6 +422,283 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 orders: _deliveredOrders,
                 emptyText: "No delivered orders found",
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchAndFilter() {
+    return Container(
+      height: 45,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.shade100),
+      ),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (val) => setState(() => _searchQuery = val),
+        decoration: const InputDecoration(
+          hintText: "Search order ID, product...",
+          hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
+          prefixIcon: Icon(Icons.search, size: 20, color: Colors.grey),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(vertical: 10),
+        ),
+      ),
+    );
+  }
+
+  void _showFilterSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => Material(
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42, height: 4,
+                    margin: const EdgeInsets.only(bottom: 18),
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text("Filter orders", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _filterPreset = OrderFilterPreset.last3Months;
+                          _customStartDate = null;
+                          _customEndDate = null;
+                          _selectedStatus = "All";
+                        });
+                        Navigator.pop(context);
+                      },
+                      child: const Text("Reset All"),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Text("Date Range", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _filterChip("Last 3 months", _filterPreset == OrderFilterPreset.last3Months, () {
+                      setSheetState(() => _filterPreset = OrderFilterPreset.last3Months);
+                      setState(() => _filterPreset = OrderFilterPreset.last3Months);
+                    }),
+                    _filterChip("Last 6 months", _filterPreset == OrderFilterPreset.last6Months, () {
+                      setSheetState(() => _filterPreset = OrderFilterPreset.last6Months);
+                      setState(() => _filterPreset = OrderFilterPreset.last6Months);
+                    }),
+                    _filterChip(
+                      _filterPreset == OrderFilterPreset.custom && _customStartDate != null
+                          ? "${_formatDate(_customStartDate!)} - ${_formatDate(_customEndDate!)}"
+                          : "Custom Range",
+                      _filterPreset == OrderFilterPreset.custom,
+                      () async {
+                        final range = await showDateRangePicker(
+                          context: context,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now(),
+                        );
+                        if (range != null) {
+                          setSheetState(() {
+                            _filterPreset = OrderFilterPreset.custom;
+                            _customStartDate = range.start;
+                            _customEndDate = range.end.add(const Duration(hours: 23, minutes: 59));
+                          });
+                          setState(() {
+                            _filterPreset = OrderFilterPreset.custom;
+                            _customStartDate = range.start;
+                            _customEndDate = range.end.add(const Duration(hours: 23, minutes: 59));
+                          });
+                        }
+                      },
+                      icon: Icons.calendar_month,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                const Text("Status", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: ["All", "Preparing", "Packed", "Delivered"].map((status) {
+                    return _filterChip(status, _selectedStatus == status, () {
+                      setSheetState(() => _selectedStatus = status);
+                      setState(() => _selectedStatus = status);
+                    });
+                  }).toList(),
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryGreen,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text("Apply Filters", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _filterChip(String label, bool isSelected, VoidCallback onTap, {IconData? icon}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? primaryGreen : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isSelected ? primaryGreen : Colors.grey.shade300),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16, color: isSelected ? Colors.white : Colors.grey.shade700),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.grey.shade700,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDetailedFilterSheet() {
+    final TextEditingController filterController = TextEditingController(text: _searchQuery);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Material(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: Container(
+          padding: EdgeInsets.fromLTRB(24, 12, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 42, height: 4,
+                  margin: const EdgeInsets.only(bottom: 18),
+                  decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const Text("Detailed Filter", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              const Text(
+                "Filter by Order ID, Product Name, or Customer",
+                style: TextStyle(color: Colors.black54, fontSize: 13),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: filterController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: "Enter keywords...",
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = filterController.text;
+                      _searchController.text = filterController.text;
+                    });
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryGreen,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text("Apply Filter", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _filterButton() {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: _showFilterSheet,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 10,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.green.shade100),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.tune,
+              color: primaryGreen,
+              size: 20,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                _filterLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: primaryGreen,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -609,9 +788,13 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
           children: [
             Icon(icon, color: primaryGreen, size: 20),
             const SizedBox(width: 8),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+              ),
             ),
             const SizedBox(width: 8),
             Container(
@@ -629,6 +812,31 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 ),
               ),
             ),
+            if (title == "Delivered Orders") ...[
+              const SizedBox(width: 4),
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const RetailerReviewsScreen(
+                        shopName: "Elegant Fabrics Ltd.",
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.star_outline, size: 16),
+                label: const Text("See Reviews"),
+                style: TextButton.styleFrom(
+                  foregroundColor: primaryGreen,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  textStyle: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
         const SizedBox(height: 12),
@@ -735,6 +943,14 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                         style: const TextStyle(
                           color: Colors.black54,
                           fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        "Phone: ${order.customerPhone}",
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -891,32 +1107,32 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Update Order Status",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            ...["Preparing", "Packed", "Delivered"].map((s) => ListTile(
-              title: Text(s),
-              onTap: () {
-                _updateOrderStatus(order, s);
-                Navigator.pop(context);
-              },
-              trailing: order.status == s
-                  ? Icon(Icons.check_circle, color: primaryGreen)
-                  : null,
-            )),
-          ],
+      builder: (context) => Material(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Update Order Status",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              ...["Preparing", "Packed", "Delivered"].map((s) => ListTile(
+                title: Text(s),
+                onTap: () {
+                  _updateOrderStatus(order, s);
+                  Navigator.pop(context);
+                },
+                trailing: order.status == s
+                    ? Icon(Icons.check_circle, color: primaryGreen)
+                    : null,
+              )),
+            ],
+          ),
         ),
       ),
     );
@@ -1017,6 +1233,8 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
               ),
               const SizedBox(height: 12),
               _detailRow("Customer", order.customerName),
+              _detailRow("Phone", order.customerPhone),
+              if (order.tailorName != null) _detailRow("Tailor", order.tailorName!),
               _detailRow("Total Quantity", "${order.totalQuantity} units"),
               _detailRow("Order Date", _formatDate(order.orderDate)),
               if (order.deliveryDate != null)

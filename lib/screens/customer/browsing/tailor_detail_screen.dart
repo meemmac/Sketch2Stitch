@@ -264,14 +264,43 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                       ),
                       const SizedBox(width: 4),
                       Expanded(
-                        child: Text(
-                          widget.tailor.address,
-                          style: TextStyle(
-                            fontSize: isSmallScreen ? 11.0 : 13.0,
-                            color: Colors.white70,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                widget.tailor.address,
+                                style: TextStyle(
+                                  fontSize: isSmallScreen ? 11.0 : 13.0,
+                                  color: Colors.white70,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withValues(alpha: 0.3),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.directions_bike, size: 10, color: Colors.white),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '1.8 km • Tk 40',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
