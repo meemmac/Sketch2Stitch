@@ -390,7 +390,7 @@ class _LoginScreenState extends State<LoginScreen>
               // Back button - Navigates to Welcome Screen
               Positioned(
                 top: 10,
-                right: 10,
+                left: 10,
                 child: TextButton(
                   onPressed: () {
                     // Navigate to Welcome Screen and clear the navigation stack

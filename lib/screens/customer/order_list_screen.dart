@@ -134,12 +134,12 @@ class _OrderListScreenState extends State<OrderListScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
         title: Row(
           children: [
-            Icon(Icons.inventory_2_rounded, color: Colors.green.shade700),
+            Icon(Icons.inventory_2_outlined, color: Colors.green.shade700),
             const SizedBox(width: 8),
             const Text(
               'My Orders',

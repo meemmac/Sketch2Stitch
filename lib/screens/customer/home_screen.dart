@@ -17,6 +17,7 @@ import 'notification_screen.dart' ;
 import 'package:sketch2stitch/screens/retailer/inventory_screen.dart';
 import 'track_order.dart';
 import 'order_list_screen.dart';
+import 'package:sketch2stitch/screens/retailer/orders_screen.dart';
 
 class UnifiedHomeScreen extends StatefulWidget {
   final AppUserRole initialRole;
@@ -230,6 +231,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 20, 8),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween, // This spreads items
         children: [
           Builder(
             builder: (context) => IconButton(
@@ -275,7 +277,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           // Track Order icon - only for customer
           if (_currentRole == AppUserRole.customer)
             IconButton(
-              icon: const Icon(Icons.local_shipping_rounded, color: Colors.black87),
+              icon: const Icon(Icons.local_shipping_outlined, color: Colors.black87),
               iconSize: 28,
               onPressed: _openOrderList,
               tooltip: 'My Orders',
@@ -405,7 +407,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                   const SizedBox(height: 18),
                   ElevatedButton(
                     onPressed: () {
-                      _scrollToSection(_exploreTailorsKey);
+                      _scrollToSection(_exploreFabricsKey);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.black,
@@ -715,6 +717,12 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           ElevatedButton(
             onPressed: () {
               // TODO: Navigate to orders
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const RetailerOrdersScreen(),
+                ),
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.teal.shade700,
@@ -1212,7 +1220,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         _buildCenteredHeading('Explore Elements'),
         const SizedBox(height: 14),
         _buildFabricRow(items),
-        _buildSeeAllButton(() => _openBrowseTab(0)),
+        _buildSeeAllButton(() => _openBrowseTab(1)),
       ],
     );
   }
@@ -1225,7 +1233,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         _buildCenteredHeading('Explore Retailers'),
         const SizedBox(height: 14),
         _buildRetailerRow(items),
-        _buildSeeAllButton(() => _openBrowseTab(2)),
+        _buildSeeAllButton(() => _openBrowseTab(3)),
       ],
     );
   }
@@ -1238,7 +1246,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         _buildCenteredHeading('Explore Tailors'),
         const SizedBox(height: 14),
         _buildTailorRow(items),
-        _buildSeeAllButton(() => _openBrowseTab(1)),
+        _buildSeeAllButton(() => _openBrowseTab(2)),
       ],
     );
   }

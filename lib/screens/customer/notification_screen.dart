@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
-
+import 'package:image_picker/image_picker.dart';
 // ============= CUSTOMER NOTIFICATION =============
 enum NotificationType { confirmed, delivered, cancelled, paymentDue }
 
@@ -315,10 +315,10 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
         title = 'Notifications';
         break;
       case AppUserRole.tailor:
-        title = 'Tailor Notifications';
+        title = 'Notifications';
         break;
       case AppUserRole.retailer:
-        title = 'Retailer Notifications';
+        title = 'Notifications';
         break;
     }
 
@@ -337,38 +337,34 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
         children: [
           Row(
             children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Icon(Icons.notifications_none_rounded, color: Colors.black87, size: 26),
-                    const SizedBox(width: 10),
-                    Text(title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87)),
-                  ],
+              // ✅ Back button with arrow icon (like track order page)
+              IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                onPressed: () => Navigator.pop(context),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.notifications_none_rounded, color: Colors.black87, size: 26),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
                 ),
               ),
+              const Spacer(),
+              // ✅ Clear all button
               TextButton(
-                onPressed: _goBack,
+                onPressed: _notificationCount == 0 ? null : _clearAll,
                 style: TextButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  backgroundColor: const Color(0xFF16332A),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                 ),
-                child: const Text('Back', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600)),
+                child: const Text('clear all', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12.5)),
               ),
             ],
-          ),
-          const SizedBox(height: 14),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: _notificationCount == 0 ? null : _clearAll,
-              style: TextButton.styleFrom(
-                backgroundColor: const Color(0xFF16332A),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-              ),
-              child: const Text('clear all', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12.5)),
-            ),
           ),
         ],
       ),
@@ -609,9 +605,9 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                   // Avatar - shows product emoji for stockOut, first letter for customer
                   CircleAvatar(
                     radius: 22,
-                    backgroundColor: isStockOut ? Colors.red.shade100 : style.iconColor.withOpacity(0.2),
+                    backgroundColor: isStockOut ? Colors.red.shade200 : style.iconColor.withOpacity(0.2),
                     child: isStockOut
-                        ? const Icon(Icons.inventory_2_rounded, color: Colors.red, size: 22)
+                        ? const Icon(Icons.inventory_2_outlined, color: Colors.red, size: 22)
                         : Text(
                       firstLetter,
                       style: TextStyle(
