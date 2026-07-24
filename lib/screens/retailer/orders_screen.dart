@@ -35,6 +35,7 @@ class OrderItem {
 class RetailerOrder {
   final String id;
   final String customerName;
+  final String customerPhone;
   final String? tailorName;
   final List<OrderItem> items;
   final double amount;
@@ -50,6 +51,7 @@ class RetailerOrder {
   RetailerOrder({
     required this.id,
     required this.customerName,
+    required this.customerPhone,
     this.tailorName,
     required this.items,
     required this.amount,
@@ -97,6 +99,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     RetailerOrder(
       id: "ORD-1087",
       customerName: "Nazia Tasphia",
+      customerPhone: "+8801722334455",
       tailorName: "Fine Cut Tailors",
       amount: 5200,
       orderDate: DateTime.now().subtract(const Duration(days: 12)),
@@ -129,6 +132,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     RetailerOrder(
       id: "ORD-1083",
       customerName: "Israt Jahan",
+      customerPhone: "+8801822334455",
       amount: 5400,
       orderDate: DateTime.now().subtract(const Duration(days: 28)),
       status: "Packed",
@@ -153,6 +157,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     RetailerOrder(
       id: "ORD-1076",
       customerName: "Nishat Tasnim",
+      customerPhone: "+8801922334455",
       amount: 8600,
       orderDate: DateTime.now().subtract(const Duration(days: 43)),
       deliveryDate: DateTime.now().subtract(const Duration(days: 35)),
@@ -185,6 +190,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     RetailerOrder(
       id: "ORD-1051",
       customerName: "Farzana Yasmin",
+      customerPhone: "+8801522334455",
       tailorName: "Royal Stitch",
       amount: 4560,
       orderDate: DateTime.now().subtract(const Duration(days: 96)),
@@ -940,6 +946,14 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+                      Text(
+                        "Phone: ${order.customerPhone}",
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       const SizedBox(height: 4),
                       // Deliver To Section
                       Row(
@@ -1219,6 +1233,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
               ),
               const SizedBox(height: 12),
               _detailRow("Customer", order.customerName),
+              _detailRow("Phone", order.customerPhone),
               if (order.tailorName != null) _detailRow("Tailor", order.tailorName!),
               _detailRow("Total Quantity", "${order.totalQuantity} units"),
               _detailRow("Order Date", _formatDate(order.orderDate)),
