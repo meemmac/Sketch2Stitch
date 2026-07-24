@@ -41,15 +41,20 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   List<Message> _messages = [];
   bool _isLoading = true;
   bool _isTyping = false;
+  
+  // Reply tracking (local only, not in model)
   String? _replyingToMessageId;
   String? _replyingToMessageText;
   String? _replyingToSender;
-  Message? _selectedMessage;
-  bool _isMuted = false;
-  int _selectedMuteDuration = 0;
+  
   String? _selectedMessageId;
   late AnimationController _typingAnimationController;
   late Animation<double> _typingAnimation;
+  bool _isMuted = false;
+  int _selectedMuteDuration = 0;
+
+  // Overlay notification
+  OverlayEntry? _notificationOverlay;
 
   @override
   void initState() {
@@ -72,7 +77,84 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     _scrollController.dispose();
     _focusNode.dispose();
     _typingAnimationController.dispose();
+    _removeNotificationOverlay();
     super.dispose();
+  }
+
+  // ─── Top Notification System ──────────────────────────────────────────
+
+  void _showTopNotification(String message, {bool isError = false}) {
+    _removeNotificationOverlay();
+    
+    final overlay = Overlay.of(context);
+    final entry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        child: SafeArea(
+          child: Material(
+            color: const Color.fromARGB(0, 132, 230, 112),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: isError ? Colors.red[700] : const Color(0xFF2C5C44),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    isError ? Icons.error_outline : Icons.check_circle,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _removeNotificationOverlay,
+                    child: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    
+    overlay.insert(entry);
+    _notificationOverlay = entry;
+    
+    // Auto dismiss after 3 seconds
+    Future.delayed(const Duration(seconds: 3), () {
+      _removeNotificationOverlay();
+    });
+  }
+
+  void _removeNotificationOverlay() {
+    _notificationOverlay?.remove();
+    _notificationOverlay = null;
   }
 
   Future<void> _loadMessages() async {
@@ -266,7 +348,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _pickDocument() async {
-    // Using image_picker as fallback for document picking on Windows
     final XFile? document = await _imagePicker.pickImage(
       source: ImageSource.gallery,
       maxWidth: 1024,
@@ -290,7 +371,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
         _messages.add(newMessage);
       });
       _scrollToBottom();
-      _showCenteredNotification('Document shared!');
+      _showTopNotification('Document shared!');
     }
   }
 
@@ -402,7 +483,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
   void _showMessageOptions(Message message) {
     setState(() {
-      _selectedMessage = message;
       _selectedMessageId = message.id;
     });
     
@@ -532,37 +612,10 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
   void _copyMessage(Message message) {
     Clipboard.setData(ClipboardData(text: message.msgText));
-    _showCenteredNotification('Message copied to clipboard');
+    _showTopNotification('Message copied to clipboard');
     setState(() {
       _selectedMessageId = null;
     });
-  }
-
-  void _showCenteredNotification(String message) {
-    showDialog(
-      context: context,
-      barrierColor: Colors.transparent,
-      barrierDismissible: true,
-      builder: (context) {
-        return Center(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.grey[800]?.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              message,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        );
-      },
-    );
   }
 
   void _forwardMessage(Message message) {
@@ -605,7 +658,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-                _showCenteredNotification('Message forwarded!');
+                _showTopNotification('Message forwarded!');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2C5C44),
@@ -641,7 +694,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                   _messages.removeWhere((m) => m.id == message.id);
                   _selectedMessageId = null;
                 });
-                _showCenteredNotification('Message deleted');
+                _showTopNotification('Message deleted');
               },
               child: const Text(
                 'Delete',
@@ -699,7 +752,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               onPressed: () {
                 Navigator.pop(context);
                 Navigator.pop(context);
-                _showCenteredNotification('${widget.otherUserName} has been blocked');
+                _showTopNotification('${widget.otherUserName} has been blocked');
               },
               child: const Text(
                 'Block',
@@ -733,7 +786,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                 setState(() {
                   _messages.clear();
                 });
-                _showCenteredNotification('Chat cleared');
+                _showTopNotification('Chat cleared');
               },
               child: const Text(
                 'Clear',
@@ -746,7 +799,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     );
   }
 
-  // ─── Centered Mute Notifications Dialog ───────────────────────────────
+  // ─── Mute Notifications ──────────────────────────────────────────────
 
   void _showMuteOptions() {
     showDialog(
@@ -865,7 +918,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
         break;
     }
     
-    _showCenteredNotification('Notifications muted for $label');
+    _showTopNotification('Notifications muted for $label');
   }
 
   void _toggleMuteNotifications() {
@@ -875,7 +928,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
         _selectedMuteDuration = 0;
       }
     });
-    _showCenteredNotification(_isMuted ? 'Notifications muted' : 'Notifications unmuted');
+    _showTopNotification(_isMuted ? 'Notifications muted' : 'Notifications unmuted');
   }
 
   void _showMoreOptions() {
@@ -965,17 +1018,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     } else {
       final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       return '${months[time.month - 1]} ${time.day}, ${time.year}';
-    }
-  }
-
-  String _getRoleEmoji(UserRole role) {
-    switch (role) {
-      case UserRole.tailor:
-        return '🧵';
-      case UserRole.retailer:
-        return '🏪';
-      case UserRole.customer:
-        return '👤';
     }
   }
 
@@ -1112,7 +1154,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     final hasText = message.msgText.isNotEmpty;
     final isDocument = hasImage && message.msgText.contains('📄');
     final isSelected = _selectedMessageId == message.id;
-    final isReplying = _replyingToMessageId == message.id;
     
     return GestureDetector(
       onLongPress: () => _showMessageOptions(message),
@@ -1123,175 +1164,134 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
           constraints: BoxConstraints(
             maxWidth: MediaQuery.of(context).size.width * 0.75,
           ),
-          child: Column(
-            crossAxisAlignment: isFromMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-            children: [
-              // Reply indicator inside the bubble (like WhatsApp)
-              if (isReplying)
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  margin: const EdgeInsets.only(bottom: 6),
-                  decoration: BoxDecoration(
-                    color: isFromMe ? Colors.green[50] : Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border(
-                      left: BorderSide(
-                        color: isFromMe ? Colors.green : Colors.grey,
-                        width: 4,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isSelected 
+                  ? (isFromMe ? Colors.green[200] : Colors.blue[50])
+                  : (isFromMe ? const Color(0xFFDCF8C6) : Colors.white),
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(16),
+                topRight: const Radius.circular(16),
+                bottomLeft: isFromMe ? const Radius.circular(16) : const Radius.circular(4),
+                bottomRight: isFromMe ? const Radius.circular(4) : const Radius.circular(16),
+              ),
+              border: isSelected ? Border.all(
+                color: isFromMe ? Colors.green : Colors.blue,
+                width: 2,
+              ) : null,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 2,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (hasImage && !isDocument)
+                  GestureDetector(
+                    onTap: () => _showImageFullScreen(message.attachment!),
+                    child: Container(
+                      margin: EdgeInsets.only(bottom: hasText ? 4 : 0),
+                      width: 200,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          File(message.attachment!),
+                          height: 150,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            height: 150,
+                            color: Colors.grey[200],
+                            child: const Icon(Icons.image, size: 40, color: Colors.grey),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _replyingToSender ?? 'You',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isFromMe ? Colors.green : Colors.grey,
-                          fontWeight: FontWeight.w600,
-                        ),
+                if (isDocument)
+                  GestureDetector(
+                    onTap: () {
+                      _showTopNotification('Opening document...');
+                    },
+                    child: Container(
+                      margin: EdgeInsets.only(bottom: hasText ? 4 : 0),
+                      width: 200,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      Text(
-                        _replyingToMessageText ?? '',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.black87,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isSelected 
-                      ? (isFromMe ? Colors.green[200] : Colors.blue[50])
-                      : (isFromMe ? const Color(0xFFDCF8C6) : Colors.white),
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(16),
-                    topRight: const Radius.circular(16),
-                    bottomLeft: isFromMe ? const Radius.circular(16) : const Radius.circular(4),
-                    bottomRight: isFromMe ? const Radius.circular(4) : const Radius.circular(16),
-                  ),
-                  border: isSelected ? Border.all(
-                    color: isFromMe ? Colors.green : Colors.blue,
-                    width: 2,
-                  ) : null,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 2,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (hasImage && !isDocument)
-                      GestureDetector(
-                        onTap: () => _showImageFullScreen(message.attachment!),
-                        child: Container(
-                          margin: EdgeInsets.only(bottom: hasText ? 4 : 0),
-                          width: 200,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.file(
-                              File(message.attachment!),
-                              height: 150,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                height: 150,
-                                color: Colors.grey[200],
-                                child: const Icon(Icons.image, size: 40, color: Colors.grey),
-                              ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.insert_drive_file, size: 32, color: Colors.grey),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Document',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  message.msgText.replaceAll('📄 ', ''),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                             ),
                           ),
-                        ),
-                      ),
-                    if (isDocument)
-                      GestureDetector(
-                        onTap: () {
-                          _showCenteredNotification('Opening document...');
-                        },
-                        child: Container(
-                          margin: EdgeInsets.only(bottom: hasText ? 4 : 0),
-                          width: 200,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.insert_drive_file, size: 32, color: Colors.grey),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Document',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    Text(
-                                      message.msgText.replaceAll('📄 ', ''),
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey[600],
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    if (hasText)
-                      Text(
-                        message.msgText,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.black87,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 2, left: 8, right: 8),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _formatTime(message.sentAt),
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: Colors.grey,
+                        ],
                       ),
                     ),
-                    if (isFromMe) ...[
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.done_all,
-                        size: 14,
-                        color: Colors.blue,
+                  ),
+                if (hasText)
+                  Text(
+                    message.msgText,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.black87,
+                    ),
+                  ),
+                // Time and read receipt inside the bubble
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: isFromMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+                    children: [
+                      Text(
+                        _formatTime(message.sentAt),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey,
+                        ),
                       ),
+                      if (isFromMe) ...[
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.done_all,
+                          size: 14,
+                          color: Colors.blue,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1389,20 +1389,35 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   Widget _buildReplyIndicator() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Colors.grey[100],
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        border: Border(
+          top: BorderSide(color: Colors.grey[300]!),
+        ),
+      ),
       child: Row(
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Replying to',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey,
-                    fontWeight: FontWeight.w500,
-                  ),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.reply,
+                      size: 14,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Replying to $_replyingToSender',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
                 Text(
                   _replyingToMessageText ?? '',
