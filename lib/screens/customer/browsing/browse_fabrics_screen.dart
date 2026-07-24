@@ -266,6 +266,17 @@ final List<Product> kHardcodedElements = [
   ),
 ];
 
+// ─── Retailer Name Mapping ─────────────────────────────────────────────
+
+/// Map of retailer IDs to their actual shop names (matching the retailers in browse_retailers_screen.dart)
+final Map<String, String> retailerNameMap = {
+  'r1': 'Dhaka Fabric House',
+  'r2': 'Chowdhury Textiles',
+  'r3': 'Silk & Lace Emporium',
+  'r4': 'Bengal Cotton Co.',
+  'r5': 'Heritage Weaves',
+};
+
 /// The actual fabrics/elements tab content, rendered as one page inside the
 /// shared [BrowseShell] PageView.
 class FabricsPageBody extends StatefulWidget {
@@ -723,17 +734,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
   }
 
   String _getRetailerName(String retailerId) {
-    // TODO: Fetch actual retailer name from database
-    // For now, return a placeholder based on retailerId
-    switch (retailerId) {
-      case 'r1':
-        return 'Fabric World';
-      case 'r2':
-        return 'Style Hub';
-      case 'r3':
-        return 'Elegant Textiles';
-      default:
-        return 'Unknown Retailer';
-    }
+    // Use the retailer name map to get the actual retailer name
+    return retailerNameMap[retailerId] ?? 'Unknown Retailer';
   }
 }

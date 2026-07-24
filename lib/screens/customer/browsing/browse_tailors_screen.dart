@@ -6,7 +6,7 @@ import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dar
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
 
-/// Hardcoded sample tailors with asset images.
+/// Hardcoded sample tailors with multiple portfolio images.
 final List<Tailor> kHardcodedTailors = [
   Tailor(
     id: 't1',
@@ -16,12 +16,26 @@ final List<Tailor> kHardcodedTailors = [
     address: '5 Banani Road, Banani, Dhaka',
     rating: 4.9,
     profilePicture: 'assets/images/fab.jpg',
+    deliveryCharge: 80,
+    about: 'Formal and informal wear specialist with 12 years experience.',
     portfolio: [
       Portfolio(
         id: 'pf1',
         tailorId: 't1',
         image: 'assets/images/fab.jpg',
-        description: 'Formal and informal wear specialist with 12 years experience.',
+        description: 'Premium formal suit with perfect fit',
+      ),
+      Portfolio(
+        id: 'pf2',
+        tailorId: 't1',
+        image: 'assets/images/silk.jpg',
+        description: 'Elegant wedding sherwani',
+      ),
+      Portfolio(
+        id: 'pf3',
+        tailorId: 't1',
+        image: 'assets/images/textile.jpg',
+        description: 'Casual blazer with modern cut',
       ),
     ],
   ),
@@ -33,12 +47,26 @@ final List<Tailor> kHardcodedTailors = [
     address: '22 Gulshan Avenue, Gulshan, Dhaka',
     rating: 4.7,
     profilePicture: 'assets/images/silk.jpg',
+    deliveryCharge: 60,
+    about: 'Traditional and ethnic wear specialist with 15 years experience.',
     portfolio: [
       Portfolio(
-        id: 'pf2',
+        id: 'pf4',
         tailorId: 't2',
         image: 'assets/images/silk.jpg',
-        description: 'Traditional and ethnic wear, saree blouses and lehengas.',
+        description: 'Designer silk saree with zari work',
+      ),
+      Portfolio(
+        id: 'pf5',
+        tailorId: 't2',
+        image: 'assets/images/saree.jpg',
+        description: 'Traditional lehenga for weddings',
+      ),
+      Portfolio(
+        id: 'pf6',
+        tailorId: 't2',
+        image: 'assets/images/gorgeous.jpg',
+        description: 'Hand-embroidered blouse design',
       ),
     ],
   ),
@@ -47,15 +75,23 @@ final List<Tailor> kHardcodedTailors = [
     name: 'Mohammed Rafiq',
     email: 'rafiq.tailors@example.com',
     phone: '01811000003',
-    address: ' Kotwali, Chittagong ',
+    address: 'Kotwali, Chittagong',
     rating: 4.4,
     profilePicture: 'assets/images/textile.jpg',
+    deliveryCharge: 50,
+    about: 'Casual and daily wear specialist with quick turnaround.',
     portfolio: [
       Portfolio(
-        id: 'pf3',
+        id: 'pf7',
         tailorId: 't3',
         image: 'assets/images/textile.jpg',
-        description: 'Casual and daily wear, quick turnaround alterations.',
+        description: 'Daily wear cotton kurta',
+      ),
+      Portfolio(
+        id: 'pf8',
+        tailorId: 't3',
+        image: 'assets/images/fabric_waves.jpg',
+        description: 'Casual shirt with modern fit',
       ),
     ],
   ),
@@ -67,12 +103,26 @@ final List<Tailor> kHardcodedTailors = [
     address: '3 Dhanmondi 27, Dhanmondi, Dhaka',
     rating: 4.8,
     profilePicture: 'assets/images/lace.jpg',
+    deliveryCharge: 100,
+    about: 'Bridal and formal wear specialist with custom embroidery.',
     portfolio: [
       Portfolio(
-        id: 'pf4',
+        id: 'pf9',
         tailorId: 't4',
         image: 'assets/images/lace.jpg',
-        description: 'Bridal and formal wear, custom embroidery finishing.',
+        description: 'Bridal gown with lace detailing',
+      ),
+      Portfolio(
+        id: 'pf10',
+        tailorId: 't4',
+        image: 'assets/images/embroidery.jpg',
+        description: 'Custom embroidered bridal blouse',
+      ),
+      Portfolio(
+        id: 'pf11',
+        tailorId: 't4',
+        image: 'assets/images/gorgeous.jpg',
+        description: 'Formal evening gown with embellishments',
       ),
     ],
   ),
@@ -84,12 +134,26 @@ final List<Tailor> kHardcodedTailors = [
     address: '15 Mirpur Road, Mirpur, Dhaka',
     rating: 4.6,
     profilePicture: 'assets/images/fab2.jpg',
+    deliveryCharge: 70,
+    about: 'Quick stitching and alterations for all types of garments.',
     portfolio: [
       Portfolio(
-        id: 'pf5',
+        id: 'pf12',
         tailorId: 't5',
         image: 'assets/images/fab2.jpg',
-        description: 'Quick stitching and alterations for all types of garments.',
+        description: 'School uniform stitching',
+      ),
+      Portfolio(
+        id: 'pf13',
+        tailorId: 't5',
+        image: 'assets/images/fab.jpg',
+        description: 'Office wear shirt and pant set',
+      ),
+      Portfolio(
+        id: 'pf14',
+        tailorId: 't5',
+        image: 'assets/images/textile.jpg',
+        description: 'Children\'s wear stitching',
       ),
     ],
   ),
@@ -106,7 +170,7 @@ class TailorsPageBody extends StatefulWidget {
     super.key,
     required this.searchQuery,
     required this.filterData,
-     this.onTailorSelected,
+    this.onTailorSelected,
   });
 
   @override
@@ -307,20 +371,20 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
     String imageUrl = tailor.profilePicture ?? 'assets/images/fab.jpg';
 
     return GestureDetector(
-     onTap: () async {
-  final result = await Navigator.push<String>(
-    context,
-    MaterialPageRoute(
-      builder: (context) => TailorDetailScreen(
-        tailor: tailor,
-        onTailorSelected: widget.onTailorSelected,
-      ),
-    ),
-  );
-  if (result != null && widget.onTailorSelected != null) {
-    widget.onTailorSelected!(result);
-  }
-},
+      onTap: () async {
+        final result = await Navigator.push<String>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TailorDetailScreen(
+              tailor: tailor,
+              onTailorSelected: widget.onTailorSelected,
+            ),
+          ),
+        );
+        if (result != null && widget.onTailorSelected != null) {
+          widget.onTailorSelected!(result);
+        }
+      },
       child: Container(
         decoration: BoxDecoration(
           color: kCardBg,
@@ -488,6 +552,19 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                         ),
                       ],
                     ),
+                    // Show portfolio count
+                    if (tailor.portfolio != null && tailor.portfolio!.isNotEmpty)
+                      Padding(
+                        padding: EdgeInsets.only(top: isSmall ? 2 : 4),
+                        child: Text(
+                          '${tailor.portfolio!.length} works',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: kSage,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
