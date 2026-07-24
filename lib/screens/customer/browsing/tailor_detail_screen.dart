@@ -1,10 +1,10 @@
 // lib/screens/customer/browsing/tailor_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/tailor.dart';
-import 'package:sketch2stitch/models/portfolio.dart';
 import 'package:sketch2stitch/models/review.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
-import 'package:sketch2stitch/screens/shared/messaging.dart';
+import 'package:sketch2stitch/screens/customer/messaging/conversations_screen.dart';
+import 'package:sketch2stitch/models/user_role.dart';
 
 class TailorDetailScreen extends StatefulWidget {
   final Tailor tailor;
@@ -107,6 +107,127 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   }
 
   String _getCustomerName(int index) => _customerNames[index % _customerNames.length];
+
+  // ─── Portfolio Overlay ─────────────────────────────────────────────────
+
+  void _showPortfolioOverlay(dynamic portfolioItem) {
+    final imagePath = portfolioItem.image ?? '';
+    final description = portfolioItem.description ?? 'No description available.';
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.85,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Handle bar
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Close button
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.grey),
+                onPressed: () => Navigator.pop(context),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Image
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 320,
+                        child: imagePath.isNotEmpty
+                            ? Image.asset(
+                                imagePath,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => Container(
+                                  color: Colors.green.shade50,
+                                  child: const Icon(
+                                    Icons.image_not_supported_outlined,
+                                    size: 48,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                color: Colors.green.shade50,
+                                child: const Icon(
+                                  Icons.image_not_supported_outlined,
+                                  size: 48,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Description Title
+                    const Text(
+                      "Description",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Description Text - Larger font size
+                    Text(
+                      description,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.black87,
+                        height: 1.8,
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Navigate to Conversations ─────────────────────────────────────────
+
+  void _startConversation() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ConversationsScreen(
+          customerId: 'current_customer_id',
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -427,64 +548,72 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        ListView.builder(
+        GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: isSmallScreen ? 8.0 : 12.0,
+            mainAxisSpacing: isSmallScreen ? 8.0 : 12.0,
+            childAspectRatio: isSmallScreen ? 0.7 : 0.75,
+          ),
           itemCount: displayItems.length,
           itemBuilder: (context, index) {
             final portfolio = displayItems[index];
-            return Container(
-              margin: EdgeInsets.only(bottom: isSmallScreen ? 10.0 : 12.0),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[200]!),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: isSmallScreen ? 140 : 160,
-                      child: portfolio.image != null && portfolio.image!.isNotEmpty
-                          ? Image.asset(
-                              portfolio.image!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                color: Colors.grey[200],
-                                child: const Icon(Icons.image, size: 48, color: Colors.grey),
-                              ),
-                            )
-                          : Container(
-                              color: Colors.grey[200],
-                              child: const Icon(Icons.image, size: 48, color: Colors.grey),
-                            ),
+            return GestureDetector(
+              onTap: () => _showPortfolioOverlay(portfolio),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[200]!),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
                     ),
-                  ),
-                  if (portfolio.description != null && portfolio.description!.isNotEmpty)
-                    Padding(
-                      padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
-                      child: Text(
-                        portfolio.description!,
-                        style: TextStyle(
-                          fontSize: isSmallScreen ? 13.0 : 14.0,
-                          color: Colors.grey[700],
-                          height: 1.4,
-                        ),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: isSmallScreen ? 100 : 120,
+                        child: portfolio.image != null && portfolio.image!.isNotEmpty
+                            ? Image.asset(
+                                portfolio.image!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => Container(
+                                  color: Colors.grey[200],
+                                  child: const Icon(Icons.image, size: 32, color: Colors.grey),
+                                ),
+                              )
+                            : Container(
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.image, size: 32, color: Colors.grey),
+                              ),
                       ),
                     ),
-                ],
+                    if (portfolio.description != null && portfolio.description!.isNotEmpty)
+                      Padding(
+                        padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
+                        child: Text(
+                          portfolio.description!,
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 11.0 : 12.0,
+                            color: Colors.grey[700],
+                            height: 1.3,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             );
           },
@@ -758,15 +887,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     final nameSize = isSmallScreen ? 14.0 : 16.0;
     final commentSize = isSmallScreen ? 13.0 : 14.0;
 
-    final Map<String, String> productNames = {
-      'R001': 'Three-Piece Suit',
-      'R002': 'Wedding Lehenga',
-      'R003': 'Business Blazer',
-      'R004': 'Evening Gown',
-      'R005': 'Kurta Set',
-    };
-    final productName = productNames[review.id] ?? 'Tailoring Service';
-
     return Container(
       padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
       decoration: BoxDecoration(
@@ -816,42 +936,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
               height: 1.5,
             ),
           ),
-          if (productName.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              'Liked products',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: isSmallScreen ? 12.0 : 13.0,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 8.0 : 12.0, vertical: isSmallScreen ? 6.0 : 8.0),
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[200]!),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle, size: 16, color: Color(0xFF2C5C44)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      productName,
-                      style: TextStyle(
-                        fontSize: isSmallScreen ? 12.0 : 13.0,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -933,22 +1017,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   }
 
   // ─── Navigation Methods ──────────────────────────────────────────────
-
-  void _startConversation() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => MessagingScreen(
-          conversationId: 'conv_${widget.tailor.id}',
-          otherUserId: widget.tailor.id,
-          otherUserName: widget.tailor.name,
-          otherUserRole: 'tailor',
-          otherUserAvatar: widget.tailor.profilePicture,
-          isOnline: true,
-        ),
-      ),
-    );
-  }
 
   void _navigateToBooking() {
     if (widget.onTailorSelected != null) {
