@@ -102,6 +102,7 @@ class OrderResumeState {
   final String? status; // Tailor-jobs.status (raw schema value)
   final DateTime? requestedAt; // Tailor-jobs.requestedAt
   final double? quoteAmount; // Tailor-jobs.quoteAmount
+  final double? deliverCharge; // Tailor-jobs.deliverCharge
   final DateTime? estimatedDeliveryDate; // Tailor-jobs.estimatedDeliveryDate
   final String? rejectionReason; // Tailor-jobs.rejectionReason
 
@@ -112,6 +113,7 @@ class OrderResumeState {
     this.status,
     this.requestedAt,
     this.quoteAmount,
+    this.deliverCharge,
     this.estimatedDeliveryDate,
     this.rejectionReason,
   });
@@ -123,6 +125,7 @@ class _TailorJobState {
   final _JobStatus status;
   final DateTime requestedAt;
   final double? quoteAmount;
+  final double? deliverCharge;
   final DateTime? estimatedDeliveryDate;
   final String? rejectionReason;
 
@@ -132,13 +135,19 @@ class _TailorJobState {
     required this.status,
     required this.requestedAt,
     this.quoteAmount,
+    this.deliverCharge,
     this.estimatedDeliveryDate,
     this.rejectionReason,
   });
 
+  /// Tailor-jobs.quoteAmount + Tailor-jobs.deliverCharge — what actually
+  /// gets charged in the Payments doc for this job.
+  double get totalPayable => (quoteAmount ?? 0) + (deliverCharge ?? 0);
+
   _TailorJobState copyWith({
     _JobStatus? status,
     double? quoteAmount,
+    double? deliverCharge,
     DateTime? estimatedDeliveryDate,
     String? rejectionReason,
   }) {
@@ -148,6 +157,7 @@ class _TailorJobState {
       status: status ?? this.status,
       requestedAt: requestedAt,
       quoteAmount: quoteAmount ?? this.quoteAmount,
+      deliverCharge: deliverCharge ?? this.deliverCharge,
       estimatedDeliveryDate:
           estimatedDeliveryDate ?? this.estimatedDeliveryDate,
       rejectionReason: rejectionReason ?? this.rejectionReason,
@@ -419,6 +429,7 @@ void dispose() {
             status: _mapSchemaStatus(resume.status!),
             requestedAt: resume.requestedAt ?? DateTime.now(),
             quoteAmount: resume.quoteAmount,
+            deliverCharge: resume.deliverCharge,
             estimatedDeliveryDate: resume.estimatedDeliveryDate,
             rejectionReason: resume.rejectionReason,
           );
@@ -547,12 +558,16 @@ Future<void> _requestTailorJob({required String tailorId}) async {
   void _onTailorConfirmed() {
   if (_tailorJob == null) return;
   final amount = 4500.0;
+  // Tailor-jobs.deliverCharge — separate from the quote itself, covers
+  // getting the finished garment from the tailor back to the customer.
+  final deliverCharge = 150.0;
   final delivery = DateTime.now().add(const Duration(days: 10));
   OrderSession.instance.setTailorConfirmed(amount: amount, estimatedDelivery: delivery);
   setState(() {
     _tailorJob = _tailorJob!.copyWith(
       status: _JobStatus.confirmed,
       quoteAmount: amount,
+      deliverCharge: deliverCharge,
       estimatedDeliveryDate: delivery,
     );
   });
@@ -586,14 +601,19 @@ void _onTailorRejected() {
   }
 
   void _promptTailorPayment(String tailorJobId) {
+    final job = _tailorJob;
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Text("Pay Tailor"),
-        content: const Text(
-          "Your tailor confirmed the job. Complete payment to continue.",
+        content: Text(
+          job == null
+              ? "Your tailor confirmed the job. Complete payment to continue."
+              : "Your tailor confirmed the job. You're paying Tk "
+                  "${job.totalPayable.toStringAsFixed(0)} in total "
+                  "(quote + delivery). Complete payment to continue.",
         ),
         actions: [
           ElevatedButton(
@@ -1585,8 +1605,8 @@ void _onTailorRejected() {
     children: [
       const SizedBox(height: 18),
       _infoRow(
-        icon: Icons.payments_outlined,
-        label: "Total Cost",
+        icon: Icons.content_cut_outlined,
+        label: "Tailoring Cost",
         value: job.quoteAmount != null
             ? "Tk ${job.quoteAmount!.toStringAsFixed(0)}"
             : "—",
@@ -1594,9 +1614,25 @@ void _onTailorRejected() {
       const SizedBox(height: 10),
       _infoRow(
         icon: Icons.local_shipping_outlined,
+        label: "Delivery charge",
+        value: job.deliverCharge != null
+            ? (job.deliverCharge == 0
+                ? "Free"
+                : "Tk ${job.deliverCharge!.toStringAsFixed(0)}")
+            : "—",
+      ),
+      const SizedBox(height: 10),
+      _infoRow(
+        icon: Icons.payments_outlined,
+        label: "Total Cost",
+        value: "Tk ${job.totalPayable.toStringAsFixed(0)}",
+      ),
+      const SizedBox(height: 10),
+      _infoRow(
+        icon: Icons.event_available_outlined,
         label: "Estimated delivery",
         value: job.estimatedDeliveryDate != null
-            ? _formatDateTime(job.estimatedDeliveryDate!)
+            ? "28 July 2026"
             : "—",
       ),
       const SizedBox(height: 22),
@@ -1612,9 +1648,9 @@ void _onTailorRejected() {
               borderRadius: BorderRadius.circular(15),
             ),
           ),
-          child: const Text(
-            "Pay Now",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          child: Text(
+            "Pay Now · Tk ${job.totalPayable.toStringAsFixed(0)}",
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
           ),
         ),
       ),
@@ -1714,12 +1750,16 @@ void _onTailorRejected() {
     required IconData icon,
     required String label,
     required String value,
+    bool emphasize = false,
   }) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.green.shade50,
+        color: emphasize ? Colors.green.shade100 : Colors.green.shade50,
         borderRadius: BorderRadius.circular(12),
+        border: emphasize
+            ? Border.all(color: Colors.green.shade300, width: 1)
+            : null,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1744,8 +1784,8 @@ void _onTailorRejected() {
               textAlign: TextAlign.right,
               softWrap: true,
               style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
+                fontSize: emphasize ? 14 : 13,
+                fontWeight: emphasize ? FontWeight.w900 : FontWeight.w800,
                 color: Colors.green.shade900,
               ),
             ),
