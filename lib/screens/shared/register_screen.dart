@@ -144,7 +144,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
               // reaching the Back button, and AnimatedPadding smoothly
               // lifts it above the keyboard when typing.
               Padding(
-                padding: const EdgeInsets.only(top: 80),
+                padding: const EdgeInsets.only(top: 60),
                 child: AnimatedPadding(
                   duration: const Duration(milliseconds: 150),
                   curve: Curves.easeOut,
@@ -201,8 +201,8 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                       borderRadius: BorderRadius.circular(20),
                     ),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 8,
+                      horizontal: 14,
+                      vertical: 6,
                     ),
                   ),
                   child: const Text(
@@ -299,7 +299,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         const SizedBox(height: 8),
         const Text(
           'Registration Form',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 14),
 
@@ -591,52 +591,56 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
 
   // ---------------- Shared small widgets ----------------
   Widget _buildFieldLabel(String text) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Text(
-        text,
-        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
+  return Align(
+    alignment: Alignment.centerLeft,
+    child: Text(
+      text,
+      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+    ),
+  );
+}
 
   Widget _buildTextField({
-    required TextEditingController controller,
-    required String hint,
-    IconData? icon,
-    TextInputType? keyboardType,
-  }) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(
-        hintText: hint,
-        suffixIcon: icon == null
-            ? null
-            : Container(
-                margin: const EdgeInsets.all(8),
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDFF2DF),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, size: 16, color: Colors.black87),
+  required TextEditingController controller,
+  required String hint,
+  IconData? icon,
+  TextInputType? keyboardType,
+}) {
+  return TextField(
+    controller: controller,
+    keyboardType: keyboardType,
+    style: const TextStyle(fontSize: 13),
+    decoration: InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(fontSize: 13),
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      suffixIcon: icon == null
+          ? null
+          : Container(
+              margin: const EdgeInsets.all(6),
+              width: 26,
+              height: 26,
+              decoration: BoxDecoration(
+                color: const Color(0xFFDFF2DF),
+                borderRadius: BorderRadius.circular(8),
               ),
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide.none,
-        ),
+              child: Icon(icon, size: 14, color: Colors.black87),
+            ),
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide.none,
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildNextButton({required VoidCallback onPressed}) {
     return SizedBox(
       width: double.infinity,
-      height: 50,
+      height: 46,
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(

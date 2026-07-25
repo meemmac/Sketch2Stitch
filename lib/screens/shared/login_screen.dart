@@ -80,8 +80,6 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -145,7 +143,7 @@ class _LoginScreenState extends State<LoginScreen>
               // reaching the Back button, and AnimatedPadding smoothly
               // lifts it above the keyboard when typing.
               Padding(
-                padding: const EdgeInsets.only(top: 80),
+                padding: const EdgeInsets.only(top: 56),
                 child: AnimatedPadding(
                   duration: const Duration(milliseconds: 150),
                   curve: Curves.easeOut,
@@ -160,7 +158,7 @@ class _LoginScreenState extends State<LoginScreen>
                         child: BackdropFilter(
                           filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                           child: Container(
-                            padding: const EdgeInsets.all(24),
+                            padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.55),
                               borderRadius: BorderRadius.circular(24),
@@ -175,36 +173,47 @@ class _LoginScreenState extends State<LoginScreen>
                                 // Logo — same asset used on the Welcome screen
                                 Image.asset(
                                   'assets/images/transparent_logo.png',
-                                  height: 55,
+                                  height: 48,
                                   fit: BoxFit.contain,
                                 ),
-                                const SizedBox(height: 24),
+                                const SizedBox(height: 16),
 
                                 const Align(
                                   alignment: Alignment.center,
                                   child: Text(
                                     'Sign in to your account',
                                     style: TextStyle(
-                                      fontSize: 22,
+                                      fontSize: 19,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 20),
+                                const SizedBox(height: 14),
 
                                 // Email field
                                 const Align(
                                   alignment: Alignment.centerLeft,
-                                  child: Text('Credential'),
+                                  child: Text(
+                                    'Credential',
+                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                                  ),
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 5),
                                 TextField(
                                   controller: _emailController,
                                   keyboardType: TextInputType.emailAddress,
+                                  style: const TextStyle(fontSize: 13),
                                   decoration: InputDecoration(
                                     hintText: 'Email or mobile number',
+                                    hintStyle: const TextStyle(fontSize: 13),
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 12,
+                                    ),
                                     prefixIcon: const Icon(
                                       Icons.person_outline,
+                                      size: 20,
                                     ),
                                     filled: true,
                                     fillColor: Colors.white,
@@ -214,25 +223,36 @@ class _LoginScreenState extends State<LoginScreen>
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 12),
 
                                 // Password field
                                 const Align(
                                   alignment: Alignment.centerLeft,
-                                  child: Text('Password'),
+                                  child: Text(
+                                    'Password',
+                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                                  ),
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 5),
                                 TextField(
                                   controller: _passwordController,
                                   obscureText: _obscurePassword,
+                                  style: const TextStyle(fontSize: 13),
                                   decoration: InputDecoration(
                                     hintText: 'Password',
-                                    prefixIcon: const Icon(Icons.lock_outline),
+                                    hintStyle: const TextStyle(fontSize: 13),
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 12,
+                                    ),
+                                    prefixIcon: const Icon(Icons.lock_outline, size: 20),
                                     suffixIcon: IconButton(
                                       icon: Icon(
                                         _obscurePassword
                                             ? Icons.visibility_off_outlined
                                             : Icons.visibility_outlined,
+                                        size: 18,
                                       ),
                                       onPressed: () {
                                         setState(() {
@@ -248,21 +268,25 @@ class _LoginScreenState extends State<LoginScreen>
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 12),
 
                                 // User type dropdown
                                 const Align(
                                   alignment: Alignment.centerLeft,
-                                  child: Text('User Type'),
+                                  child: Text(
+                                    'User Type',
+                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                                  ),
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 5),
                                 DropdownButtonFormField<String>(
                                   value: _selectedUserType,
                                   dropdownColor: const Color(0xFFDFF2DF),
-                                  hint: const Text('User Type'),
+                                  style: const TextStyle(fontSize: 13, color: Colors.black87),
+                                  hint: const Text('User Type', style: TextStyle(fontSize: 13)),
                                   icon: Container(
-                                    width: 22,
-                                    height: 22,
+                                    width: 20,
+                                    height: 20,
                                     margin: const EdgeInsets.only(right: 6),
                                     decoration: BoxDecoration(
                                       color: const Color(0xFFDFF2DF),
@@ -270,11 +294,16 @@ class _LoginScreenState extends State<LoginScreen>
                                     ),
                                     child: const Icon(
                                       Icons.keyboard_arrow_down,
-                                      size: 16,
+                                      size: 15,
                                       color: Colors.black87,
                                     ),
                                   ),
                                   decoration: InputDecoration(
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 12,
+                                    ),
                                     filled: true,
                                     fillColor: Colors.white,
                                     border: OutlineInputBorder(
@@ -285,7 +314,7 @@ class _LoginScreenState extends State<LoginScreen>
                                   items: _userTypes.map((type) {
                                     return DropdownMenuItem(
                                       value: type,
-                                      child: Text(type),
+                                      child: Text(type, style: const TextStyle(fontSize: 13)),
                                     );
                                   }).toList(),
                                   onChanged: (value) {
@@ -294,7 +323,7 @@ class _LoginScreenState extends State<LoginScreen>
                                     });
                                   },
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 6),
 
                                 // Forgot password
                                 Align(
@@ -316,17 +345,17 @@ class _LoginScreenState extends State<LoginScreen>
                                       'Forgot password ?',
                                       style: TextStyle(
                                         color: Colors.black54,
-                                        fontSize: 12.5,
+                                        fontSize: 12,
                                       ),
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 6),
 
                                 // Get Started button
                                 SizedBox(
                                   width: double.infinity,
-                                  height: 50,
+                                  height: 46,
                                   child: ElevatedButton(
                                     onPressed: _login, // Call _login method
                                     style: ElevatedButton.styleFrom(
@@ -340,19 +369,19 @@ class _LoginScreenState extends State<LoginScreen>
                                       'Get Started',
                                       style: TextStyle(
                                         color: Colors.white,
-                                        fontSize: 16,
+                                        fontSize: 15,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 12),
 
                                 // Register link
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const Text('Or '),
+                                    const Text('Or ', style: TextStyle(fontSize: 13)),
                                     TextButton(
                                       onPressed: () {
                                         Navigator.pushReplacement(
@@ -372,6 +401,7 @@ class _LoginScreenState extends State<LoginScreen>
                                         style: TextStyle(
                                           color: Colors.black87,
                                           fontWeight: FontWeight.bold,
+                                          fontSize: 13,
                                         ),
                                       ),
                                     ),
@@ -389,8 +419,8 @@ class _LoginScreenState extends State<LoginScreen>
 
               // Back button - Navigates to Welcome Screen
               Positioned(
-                top: 10,
-                left: 10,
+                top: 8,
+                left: 8,
                 child: TextButton(
                   onPressed: () {
                     // Navigate to Welcome Screen and clear the navigation stack
@@ -408,15 +438,18 @@ class _LoginScreenState extends State<LoginScreen>
                       borderRadius: BorderRadius.circular(20),
                     ),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 8,
+                      horizontal: 14,
+                      vertical: 6,
                     ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   child: const Text(
                     'Back',
                     style: TextStyle(
                       color: Colors.black87,
                       fontWeight: FontWeight.w600,
+                      fontSize: 13,
                     ),
                   ),
                 ),
