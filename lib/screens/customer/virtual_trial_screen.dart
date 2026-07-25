@@ -328,8 +328,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
           children: [
             _buildHeader(),
             const SizedBox(height: 20),
-            _buildStepsList(),
-            const SizedBox(height: 32),
             _buildDesignReferences(),
             const SizedBox(height: 28),
             _buildAppearanceProfile(),
@@ -354,46 +352,32 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   // ── AppBar ─────────────────────────────────────────────────────────────────
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      leading: Builder(builder: (ctx) => IconButton(
-        icon: const Icon(Icons.menu),
-        onPressed: () => Scaffold.of(ctx).openDrawer(),
-      )),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.black87),
+        tooltip: 'Back',
+        onPressed: () {
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const UnifiedHomeScreen()),
+            );
+          }
+        },
+      ),
       automaticallyImplyLeading: false,
-      title: Image.asset('assets/images/transparent_logo.png',
-          height: 36, fit: BoxFit.contain),
       backgroundColor: _sagePale,
       elevation: 0,
       scrolledUnderElevation: 0,
-      iconTheme: const IconThemeData(color: Colors.black87),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 12),
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _sage,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
-              elevation: 0,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            ),
-            onPressed: () {
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context);
-              } else {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const UnifiedHomeScreen()),
-                );
-              }
-            },
-            child: const Text('Back',
-                style:
-                    TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-          ),
+      title: const Text(
+        'AI Virtual Trial',
+        style: TextStyle(
+          color: Colors.black87,
+          fontWeight: FontWeight.w600,
+          fontSize: 18,
         ),
-      ],
+      ),
     );
   }
 
@@ -426,7 +410,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
               const SizedBox(width: 12),
               const Expanded(
                 child: Text(
-                  'AI Virtual Trial',
+                  'See your imagination come true',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 22,
@@ -439,7 +423,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
           ),
           const SizedBox(height: 12),
           Text(
-            'Design your perfect outfit on an AI-generated fashion model — no photo required.',
+            'Design your perfect outfit on an AI-generated fashion model , no photo required.',
             style: TextStyle(
               color: Colors.white.withAlpha(220),
               fontSize: 13,
@@ -447,83 +431,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // ── Steps list ─────────────────────────────────────────────────────────────
-  Widget _buildStepsList() {
-    final steps = [
-      (
-        'Upload design reference images (garments, fabrics, sketches…)',
-        _referenceImages.isNotEmpty
-      ),
-      (
-        'Configure your AI model appearance profile',
-        _profileConfigured,
-      ),
-      (
-        'Review body measurements if needed',
-        _measurementsReviewed,
-      ),
-      (
-        'Choose style preferences',
-        _selectedStyles.isNotEmpty
-      ),
-      (
-        'Generate AI Preview',
-        _generatedImageBytes != null
-      ),
-    ];
-
-    return _sectionCard(
-      title: 'Getting Started',
-      icon: Icons.checklist_rounded,
-      child: Column(
-        children: steps.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final (text, done) = entry.value;
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: done ? _sage : Colors.grey.shade200,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: done
-                        ? const Icon(Icons.check,
-                            size: 14, color: Colors.white)
-                        : Text(
-                            '${idx + 1}',
-                            style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black54),
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    text,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: done ? _ink : Colors.black54,
-                      fontWeight:
-                          done ? FontWeight.w600 : FontWeight.w400,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
       ),
     );
   }

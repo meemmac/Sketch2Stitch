@@ -32,7 +32,9 @@ class Payment {
   final String id;
   final String orderId;
   final PaymentMethod method;
-  final double amount;
+  final double amount; // total = itemsAmount + deliveryAmount
+  final double itemsAmount; // product cost (retailer) or tailoring cost (tailor)
+  final double deliveryAmount; // distance-based delivery charge
   final PaymentStatus status; // Uses PaymentStatus from order.dart
   final DateTime date;
   final String? transactionId;
@@ -44,6 +46,8 @@ class Payment {
     required this.orderId,
     required this.method,
     required this.amount,
+    this.itemsAmount = 0,
+    this.deliveryAmount = 0,
     required this.status,
     required this.date,
     this.transactionId,
@@ -89,6 +93,8 @@ class Payment {
     String? orderId,
     PaymentMethod? method,
     double? amount,
+    double? itemsAmount,
+    double? deliveryAmount,
     PaymentStatus? status,
     DateTime? date,
     String? transactionId,
@@ -100,6 +106,8 @@ class Payment {
       orderId: orderId ?? this.orderId,
       method: method ?? this.method,
       amount: amount ?? this.amount,
+      itemsAmount: itemsAmount ?? this.itemsAmount,
+      deliveryAmount: deliveryAmount ?? this.deliveryAmount,
       status: status ?? this.status,
       date: date ?? this.date,
       transactionId: transactionId ?? this.transactionId,
@@ -113,6 +121,8 @@ class Payment {
     'orderId': orderId,
     'method': method.toValue,
     'amount': amount,
+    'itemsAmount': itemsAmount,
+    'deliveryAmount': deliveryAmount,
     'status': status.toValue,
     'date': date.toIso8601String(),
     'transactionId': transactionId,
@@ -126,6 +136,8 @@ class Payment {
       orderId: json['orderId'] ?? '',
       method: PaymentMethod.fromValue(json['method'] ?? 'card'),
       amount: (json['amount'] ?? 0).toDouble(),
+      itemsAmount: (json['itemsAmount'] ?? 0).toDouble(),
+      deliveryAmount: (json['deliveryAmount'] ?? 0).toDouble(),
       status: PaymentStatus.fromValue(json['status'] ?? 'pending'),
       date: json['date'] != null
           ? DateTime.parse(json['date'])

@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'product.dart';
 import 'sub_order.dart';
 
@@ -10,8 +11,8 @@ class Retailer {
   final double rating;
   final String? profilePicture;
   final String? about;
-  final double deliveryCharge;
-  
+  final GeoPoint? location;
+
   // Relationships
   List<Product>? products;
   List<SubOrder>? suborders;
@@ -23,12 +24,15 @@ class Retailer {
     required this.phone,
     required this.address,
     required this.rating,
-    this.deliveryCharge = 50.0,
+    this.location,
     this.profilePicture,
     this.about,
     this.products = const [],
     this.suborders = const [],
   });
+
+  double? get locationLat => location?.latitude;
+  double? get locationLng => location?.longitude;
 
   String get generalArea {
     final parts = address.split(',');
@@ -45,7 +49,7 @@ class Retailer {
     String? phone,
     String? address,
     double? rating,
-    double? deliveryCharge,
+    GeoPoint? location,
     String? profilePicture,
     String? about,
     List<Product>? products,
@@ -58,7 +62,7 @@ class Retailer {
       phone: phone ?? this.phone,
       address: address ?? this.address,
       rating: rating ?? this.rating,
-      deliveryCharge: deliveryCharge ?? this.deliveryCharge,
+      location: location ?? this.location,
       profilePicture: profilePicture ?? this.profilePicture,
       about: about ?? this.about,
       products: products ?? this.products,
@@ -73,7 +77,7 @@ class Retailer {
     'phone': phone,
     'address': address,
     'rating': rating,
-    'deliveryCharge': deliveryCharge,
+    'location': location,
     'profilePicture': profilePicture,
     'about': about,
   };
@@ -86,7 +90,7 @@ class Retailer {
       phone: json['phone'] ?? '',
       address: json['address'] ?? '',
       rating: (json['rating'] ?? 0).toDouble(),
-      deliveryCharge: (json['deliveryCharge'] ?? 50.0).toDouble(),
+      location: json['location'] is GeoPoint ? json['location'] as GeoPoint : null,
       profilePicture: json['profilePicture'],
       about: json['about'],
     );

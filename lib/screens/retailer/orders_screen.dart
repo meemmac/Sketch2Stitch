@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'reviews_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class OrderItem {
   final String name;
@@ -22,7 +23,7 @@ class OrderItem {
     required this.color,
     required this.price,
     this.description =
-    "Premium quality material with excellent durability and comfort.",
+        "Premium quality material with excellent durability and comfort.",
     this.itemComment,
     this.canWash = true,
     this.canBleach = false,
@@ -115,7 +116,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
           imagePath: "assets/images/fabrics_rolled.jpg",
           color: "White",
           description:
-          "Soft, breathable Egyptian cotton perfect for high-end shirts.",
+              "Soft, breathable Egyptian cotton perfect for high-end shirts.",
           itemComment: "The cotton texture is incredibly smooth.",
           ironLevel: "High",
         ),
@@ -254,19 +255,28 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
   }
 
   List<RetailerOrder> get _filteredOrders {
-    return _orders.where((order) {
-      final date = order.orderDate;
-      final matchesDate = !date.isBefore(_startDate) && !date.isAfter(_endDate);
-      final matchesStatus = _selectedStatus == "All" || order.status == _selectedStatus;
-      return matchesDate && matchesStatus;
-    }).where((order) {
-      if (_searchQuery.isEmpty) return true;
-      final query = _searchQuery.toLowerCase();
-      final matchesId = order.id.toLowerCase().contains(query);
-      final matchesCustomer = order.customerName.toLowerCase().contains(query);
-      final matchesProduct = order.items.any((i) => i.name.toLowerCase().contains(query));
-      return matchesId || matchesCustomer || matchesProduct;
-    }).toList();
+    return _orders
+        .where((order) {
+          final date = order.orderDate;
+          final matchesDate =
+              !date.isBefore(_startDate) && !date.isAfter(_endDate);
+          final matchesStatus =
+              _selectedStatus == "All" || order.status == _selectedStatus;
+          return matchesDate && matchesStatus;
+        })
+        .where((order) {
+          if (_searchQuery.isEmpty) return true;
+          final query = _searchQuery.toLowerCase();
+          final matchesId = order.id.toLowerCase().contains(query);
+          final matchesCustomer = order.customerName.toLowerCase().contains(
+            query,
+          );
+          final matchesProduct = order.items.any(
+            (i) => i.name.toLowerCase().contains(query),
+          );
+          return matchesId || matchesCustomer || matchesProduct;
+        })
+        .toList();
   }
 
   List<RetailerOrder> get _ongoingOrders {
@@ -334,7 +344,6 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       );
     });
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -467,15 +476,25 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
               children: [
                 Center(
                   child: Container(
-                    width: 42, height: 4,
+                    width: 42,
+                    height: 4,
                     margin: const EdgeInsets.only(bottom: 18),
-                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text("Filter orders", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                    const Text(
+                      "Filter orders",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                     TextButton(
                       onPressed: () {
                         setState(() {
@@ -491,22 +510,42 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                const Text("Date Range", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const Text(
+                  "Date Range",
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _filterChip("Last 3 months", _filterPreset == OrderFilterPreset.last3Months, () {
-                      setSheetState(() => _filterPreset = OrderFilterPreset.last3Months);
-                      setState(() => _filterPreset = OrderFilterPreset.last3Months);
-                    }),
-                    _filterChip("Last 6 months", _filterPreset == OrderFilterPreset.last6Months, () {
-                      setSheetState(() => _filterPreset = OrderFilterPreset.last6Months);
-                      setState(() => _filterPreset = OrderFilterPreset.last6Months);
-                    }),
                     _filterChip(
-                      _filterPreset == OrderFilterPreset.custom && _customStartDate != null
+                      "Last 3 months",
+                      _filterPreset == OrderFilterPreset.last3Months,
+                      () {
+                        setSheetState(
+                          () => _filterPreset = OrderFilterPreset.last3Months,
+                        );
+                        setState(
+                          () => _filterPreset = OrderFilterPreset.last3Months,
+                        );
+                      },
+                    ),
+                    _filterChip(
+                      "Last 6 months",
+                      _filterPreset == OrderFilterPreset.last6Months,
+                      () {
+                        setSheetState(
+                          () => _filterPreset = OrderFilterPreset.last6Months,
+                        );
+                        setState(
+                          () => _filterPreset = OrderFilterPreset.last6Months,
+                        );
+                      },
+                    ),
+                    _filterChip(
+                      _filterPreset == OrderFilterPreset.custom &&
+                              _customStartDate != null
                           ? "${_formatDate(_customStartDate!)} - ${_formatDate(_customEndDate!)}"
                           : "Custom Range",
                       _filterPreset == OrderFilterPreset.custom,
@@ -520,12 +559,16 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                           setSheetState(() {
                             _filterPreset = OrderFilterPreset.custom;
                             _customStartDate = range.start;
-                            _customEndDate = range.end.add(const Duration(hours: 23, minutes: 59));
+                            _customEndDate = range.end.add(
+                              const Duration(hours: 23, minutes: 59),
+                            );
                           });
                           setState(() {
                             _filterPreset = OrderFilterPreset.custom;
                             _customStartDate = range.start;
-                            _customEndDate = range.end.add(const Duration(hours: 23, minutes: 59));
+                            _customEndDate = range.end.add(
+                              const Duration(hours: 23, minutes: 59),
+                            );
                           });
                         }
                       },
@@ -534,12 +577,17 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                const Text("Status", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const Text(
+                  "Status",
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: ["All", "Preparing", "Packed", "Delivered"].map((status) {
+                  children: ["All", "Preparing", "Packed", "Delivered"].map((
+                    status,
+                  ) {
                     return _filterChip(status, _selectedStatus == status, () {
                       setSheetState(() => _selectedStatus = status);
                       setState(() => _selectedStatus = status);
@@ -554,9 +602,17 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryGreen,
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    child: const Text("Apply Filters", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      "Apply Filters",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -567,7 +623,12 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     );
   }
 
-  Widget _filterChip(String label, bool isSelected, VoidCallback onTap, {IconData? icon}) {
+  Widget _filterChip(
+    String label,
+    bool isSelected,
+    VoidCallback onTap, {
+    IconData? icon,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -575,13 +636,19 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
         decoration: BoxDecoration(
           color: isSelected ? primaryGreen : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? primaryGreen : Colors.grey.shade300),
+          border: Border.all(
+            color: isSelected ? primaryGreen : Colors.grey.shade300,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 16, color: isSelected ? Colors.white : Colors.grey.shade700),
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? Colors.white : Colors.grey.shade700,
+              ),
               const SizedBox(width: 6),
             ],
             Text(
@@ -599,7 +666,9 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
   }
 
   void _showDetailedFilterSheet() {
-    final TextEditingController filterController = TextEditingController(text: _searchQuery);
+    final TextEditingController filterController = TextEditingController(
+      text: _searchQuery,
+    );
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -608,19 +677,31 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
         color: Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         child: Container(
-          padding: EdgeInsets.fromLTRB(24, 12, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+          padding: EdgeInsets.fromLTRB(
+            24,
+            12,
+            24,
+            MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Center(
                 child: Container(
-                  width: 42, height: 4,
+                  width: 42,
+                  height: 4,
                   margin: const EdgeInsets.only(bottom: 18),
-                  decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-              const Text("Detailed Filter", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              const Text(
+                "Detailed Filter",
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              ),
               const SizedBox(height: 8),
               const Text(
                 "Filter by Order ID, Product Name, or Customer",
@@ -635,7 +716,10 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                   prefixIcon: const Icon(Icons.search),
                   filled: true,
                   fillColor: Colors.grey.shade50,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -652,9 +736,17 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryGreen,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  child: const Text("Apply Filter", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    "Apply Filter",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -669,10 +761,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       borderRadius: BorderRadius.circular(14),
       onTap: _showFilterSheet,
       child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 10,
-          vertical: 10,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
@@ -681,11 +770,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.tune,
-              color: primaryGreen,
-              size: 20,
-            ),
+            Icon(Icons.tune, color: primaryGreen, size: 20),
             const SizedBox(width: 6),
             Flexible(
               child: Text(
@@ -728,24 +813,24 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
           ),
           boxShadow: isSelected
               ? [
-            BoxShadow(
-              color: primaryGreen.withValues(alpha: 0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 1,
-              offset: const Offset(0, 1),
-            ),
-          ]
+                  BoxShadow(
+                    color: primaryGreen.withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 1,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
               : [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
         child: Column(
           children: [
@@ -793,7 +878,10 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -844,7 +932,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
           _emptyOrdersCard(emptyText)
         else
           ...orders.map(
-                (order) => Padding(
+            (order) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: _orderCard(order),
             ),
@@ -874,8 +962,9 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
   }
 
   Widget _orderCard(RetailerOrder order) {
-    final Color statusColor =
-    order.isDelivered ? primaryGreen : Colors.blueAccent;
+    final Color statusColor = order.isDelivered
+        ? primaryGreen
+        : Colors.blueAccent;
 
     final firstItem = order.items.first;
 
@@ -959,7 +1048,9 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                       Row(
                         children: [
                           Text(
-                            order.isDelivered ? "Delivered to: " : "Deliver to: ",
+                            order.isDelivered
+                                ? "Delivered to: "
+                                : "Deliver to: ",
                             style: const TextStyle(
                               color: Colors.black45,
                               fontSize: 11,
@@ -969,7 +1060,9 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                           Text(
                             deliverToText,
                             style: TextStyle(
-                              color: order.recipientType == "Tailor" && !order.isDelivered
+                              color:
+                                  order.recipientType == "Tailor" &&
+                                      !order.isDelivered
                                   ? Colors.orange.shade800
                                   : primaryGreen,
                               fontSize: 11,
@@ -1121,16 +1214,18 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-              ...["Preparing", "Packed", "Delivered"].map((s) => ListTile(
-                title: Text(s),
-                onTap: () {
-                  _updateOrderStatus(order, s);
-                  Navigator.pop(context);
-                },
-                trailing: order.status == s
-                    ? Icon(Icons.check_circle, color: primaryGreen)
-                    : null,
-              )),
+              ...["Preparing", "Packed", "Delivered"].map(
+                (s) => ListTile(
+                  title: Text(s),
+                  onTap: () {
+                    _updateOrderStatus(order, s);
+                    Navigator.pop(context);
+                  },
+                  trailing: order.status == s
+                      ? Icon(Icons.check_circle, color: primaryGreen)
+                      : null,
+                ),
+              ),
             ],
           ),
         ),
@@ -1211,12 +1306,15 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                     _showStatusPicker(order);
                   },
                   icon: const Icon(Icons.edit, size: 16, color: Colors.white),
-                  label: const Text("Change Status",
-                      style: TextStyle(color: Colors.white)),
+                  label: const Text(
+                    "Change Status",
+                    style: TextStyle(color: Colors.white),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryGreen,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               const SizedBox(height: 25),
@@ -1234,7 +1332,8 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
               const SizedBox(height: 12),
               _detailRow("Customer", order.customerName),
               _detailRow("Phone", order.customerPhone),
-              if (order.tailorName != null) _detailRow("Tailor", order.tailorName!),
+              if (order.tailorName != null)
+                _detailRow("Tailor", order.tailorName!),
               _detailRow("Total Quantity", "${order.totalQuantity} units"),
               _detailRow("Order Date", _formatDate(order.orderDate)),
               if (order.deliveryDate != null)
@@ -1242,7 +1341,10 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
               const SizedBox(height: 8),
               const Text(
                 "Delivery Address",
-                style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: Colors.black54,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 4),
               Container(
@@ -1253,19 +1355,58 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.grey.shade200),
                 ),
-                child: Row(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.location_on_outlined, size: 16, color: primaryGreen),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        order.deliveryAddress,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          height: 1.4,
-                          fontWeight: FontWeight.w600,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.location_on_outlined,
+                          size: 16,
+                          color: primaryGreen,
                         ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            order.deliveryAddress,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              height: 1.4,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () => launchUrl(
+                        Uri.parse(
+                          'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(order.deliveryAddress)}',
+                        ),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.map_outlined,
+                            size: 15,
+                            color: primaryGreen,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Open in Maps',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: primaryGreen,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -1310,7 +1451,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                         children: [
                           ...List.generate(
                             5,
-                                (index) => Icon(
+                            (index) => Icon(
                               index < (order.rating ?? 0).floor()
                                   ? Icons.star
                                   : Icons.star_border,
@@ -1429,7 +1570,10 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 _careTag(Icons.biotech, "Bleach", item.canBleach),
                 _careTag(Icons.dry_cleaning, "Dry Clean", item.canDryClean),
                 _careTag(
-                    Icons.settings_input_component, "Tumble", item.canTumbleDry),
+                  Icons.settings_input_component,
+                  "Tumble",
+                  item.canTumbleDry,
+                ),
                 _careTag(Icons.iron, "Iron: ${item.ironLevel}", true),
               ],
             ),
@@ -1450,8 +1594,11 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon,
-              size: 12, color: isOk ? Colors.green.shade700 : Colors.grey),
+          Icon(
+            icon,
+            size: 12,
+            color: isOk ? Colors.green.shade700 : Colors.grey,
+          ),
           const SizedBox(width: 4),
           Text(
             label,
@@ -1475,7 +1622,11 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       ),
       child: Text(
         label,
-        style: TextStyle(color: text, fontSize: 12, fontWeight: FontWeight.bold),
+        style: TextStyle(
+          color: text,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
@@ -1486,9 +1637,13 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style:
-              const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.black54,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
         ],
       ),

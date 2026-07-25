@@ -37,6 +37,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return grouped;
   }
 
+  double _deliveryChargeFor(String retailerId) =>
+      widget.retailers[retailerId]?.deliveryCharge ?? 0;
+
+  double _payableFor(String retailerId, List<CartLine> lines) {
+    final subtotal = lines.fold<double>(0, (sum, l) => sum + l.lineTotal);
+    return subtotal + _deliveryChargeFor(retailerId);
+  }
+
   bool get _allPaid {
     final ids = _groupedByRetailer.keys;
     if (ids.isEmpty) return false;
@@ -47,6 +55,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     setState(() => _payingRetailerId = retailerId);
 
     // TODO: real Payments write, targetType = 'retailer', targetId = retailerId
+    // amount should be itemsAmount + deliveryAmount (see
+    // Payments.itemsAmount / Payments.deliveryAmount in the schema) —
+    // itemsAmount = subtotal, deliveryAmount = _deliveryChargeFor(retailerId).
     await Future.delayed(const Duration(seconds: 1));
 
     if (!mounted) return;
@@ -113,6 +124,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final shopName = retailer?.shopName ?? "Unknown Retailer";
     final itemCount = lines.fold<int>(0, (sum, l) => sum + l.quantity);
     final subtotal = lines.fold<double>(0, (sum, l) => sum + l.lineTotal);
+    final deliveryCharge = _deliveryChargeFor(retailerId);
+    final payable = subtotal + deliveryCharge;
     final isPaid = _paidRetailers.contains(retailerId);
     final isPaying = _payingRetailerId == retailerId;
 
@@ -163,12 +176,44 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ],
           ),
           const SizedBox(height: 14),
+          // Subtotal / delivery / payable breakdown so the per-retailer
+          // "Pay" amount isn't a mystery number.
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: [
+                _breakdownRow("Items subtotal", "Tk ${subtotal.toStringAsFixed(0)}"),
+                const SizedBox(height: 4),
+                _breakdownRow(
+                  "Delivery charge",
+                  deliveryCharge == 0
+                      ? "Free"
+                      : "Tk ${deliveryCharge.toStringAsFixed(0)}",
+                  icon: Icons.local_shipping_outlined,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                "Tk ${subtotal.toStringAsFixed(0)}",
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.green.shade900),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Payable",
+                    style: TextStyle(fontSize: 11, color: Colors.black45, fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    "Tk ${payable.toStringAsFixed(0)}",
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.green.shade900),
+                  ),
+                ],
               ),
               SizedBox(
                 width: 130,
@@ -201,6 +246,30 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  Widget _breakdownRow(String label, String value, {IconData? icon}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 13, color: Colors.grey.shade500),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: TextStyle(fontSize: 12.5, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 12.5, color: Colors.black87, fontWeight: FontWeight.w700),
+        ),
+      ],
+    );
+  }
+
   Widget _buildBottomBar() {
     return Container(
       padding: EdgeInsets.fromLTRB(20, 14, 20, MediaQuery.of(context).padding.bottom + 14),
@@ -218,7 +287,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Total", style: TextStyle(fontSize: 12, color: Colors.black45, fontWeight: FontWeight.w600)),
+                  const Text("Total (incl. delivery)", style: TextStyle(fontSize: 12, color: Colors.black45, fontWeight: FontWeight.w600)),
                   Text(
                     "Tk ${widget.grandTotal.toStringAsFixed(0)}",
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.green.shade900),

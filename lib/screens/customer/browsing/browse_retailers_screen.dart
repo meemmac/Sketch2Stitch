@@ -774,7 +774,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          "Tk ${retailer.deliveryCharge.toInt()}",
+                          "Tk 50",
                           style: TextStyle(
                             fontSize: 11,
                             color: const Color.fromARGB(255, 107, 106, 106),

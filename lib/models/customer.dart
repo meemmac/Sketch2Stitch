@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'measurement.dart';
 import 'design.dart';
 import 'order.dart';
@@ -12,7 +13,8 @@ class Customer {
   final String email;
   final String phone;
   final String address;
-  
+  final GeoPoint? location;
+
   // Relationships
   List<Measurement>? measurements;
   List<Order>? orders;
@@ -22,13 +24,13 @@ class Customer {
   List<Design>? designs;
   List<AppNotification>? notifications;
 
-
   Customer({
     required this.id,
     required this.name,
     required this.email,
     required this.phone,
     required this.address,
+    this.location,
     this.measurements,
     this.designs,
     this.orders,
@@ -38,12 +40,16 @@ class Customer {
     this.notifications,
   });
 
+  double? get locationLat => location?.latitude;
+  double? get locationLng => location?.longitude;
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
     'email': email,
     'phone': phone,
     'address': address,
+    'location': location,
   };
 
   factory Customer.fromJson(Map<String, dynamic> json) {
@@ -53,6 +59,7 @@ class Customer {
       email: json['email'] ?? '',
       phone: json['phone'] ?? '',
       address: json['address'] ?? '',
+      location: json['location'] is GeoPoint ? json['location'] as GeoPoint : null,
     );
   }
 }

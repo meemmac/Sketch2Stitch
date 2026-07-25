@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../screens/customer/virtual_trial_screen.dart';
@@ -8,17 +9,14 @@ import '../screens/customer/measurement_screen.dart';
 import '../models/measurement.dart';
 import '../screens/shared/welcome_screen.dart';
 import '../screens/shared/about_us_screen.dart';
+import '../screens/shared/location_picker_screen.dart';
 import '../screens/tailor/portfolio_screen.dart';
 import '../screens/tailor/orders_screen.dart';
 import '../screens/customer/cart_screen.dart';
 import '../screens/customer/orders/order_detail_screen.dart';
 
 /// Enum representing the three user roles.
-enum AppUserRole {
-  customer,
-  tailor,
-  retailer,
-}
+enum AppUserRole { customer, tailor, retailer }
 
 /// Model class representing the profile information for the drawer.
 class DrawerProfileData {
@@ -30,6 +28,8 @@ class DrawerProfileData {
   final double rating; // For Tailor and Retailer
   final String? profilePicture;
   final String? about;
+  final GeoPoint?
+  location; // Pinned lat/lng — doubles as delivery location for customers
 
   const DrawerProfileData({
     required this.name,
@@ -40,7 +40,11 @@ class DrawerProfileData {
     this.rating = 0.0,
     this.profilePicture,
     this.about = '',
+    this.location,
   });
+
+  double? get locationLat => location?.latitude;
+  double? get locationLng => location?.longitude;
 
   DrawerProfileData copyWith({
     String? name,
@@ -51,6 +55,7 @@ class DrawerProfileData {
     double? rating,
     String? profilePicture,
     String? about,
+    GeoPoint? location,
   }) {
     return DrawerProfileData(
       name: name ?? this.name,
@@ -61,20 +66,20 @@ class DrawerProfileData {
       rating: rating ?? this.rating,
       profilePicture: profilePicture ?? this.profilePicture,
       about: about ?? this.about,
+      location: location ?? this.location,
     );
   }
 }
 
 /// The main reusable Dashboard Drawer widget.
+///
+/// The role shown here is decided once, upstream — by whatever tells
+/// `UnifiedHomeScreen` who's logged in (real auth once that's wired up).
+/// This widget just renders that role; it no longer owns a role switcher.
 class DashboardDrawer extends StatefulWidget {
   final AppUserRole initialRole;
-  final ValueChanged<AppUserRole>? onRoleChanged;
 
-  const DashboardDrawer({
-    super.key,
-    this.initialRole = AppUserRole.customer,
-    this.onRoleChanged,
-  });
+  const DashboardDrawer({super.key, this.initialRole = AppUserRole.customer});
 
   @override
   State<DashboardDrawer> createState() => _DashboardDrawerState();
@@ -127,7 +132,8 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       phone: "+880 1234567890",
       address: "Suite 4B, Concord Tower, Dhaka",
       rating: 4.8,
-      about: "Bespoke traditional and modern wear expert with over 15 years of experience in custom tailoring.",
+      about:
+          "Bespoke traditional and modern wear expert with over 15 years of experience in custom tailoring.",
     );
 
     _retailerProfile = const DrawerProfileData(
@@ -137,7 +143,8 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       phone: "+880 1234567890",
       address: "Shop 12, Banani Super Market, Dhaka",
       rating: 4.6,
-      about: "Premium local and imported fabric supplier specializing in silk, cotton, and wedding collections.",
+      about:
+          "Premium local and imported fabric supplier specializing in silk, cotton, and wedding collections.",
     );
   }
 
@@ -171,7 +178,9 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
 
   @override
   Widget build(BuildContext context) {
-    const themeColor = Color(0xFF6C9985); // Sage theme color matching AI Test Screen
+    const themeColor = Color(
+      0xFF6C9985,
+    ); // Sage theme color matching AI Test Screen
 
     return Drawer(
       shape: const RoundedRectangleBorder(
@@ -183,10 +192,6 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       child: SafeArea(
         child: Column(
           children: [
-            // Optional role toggle for testability
-            _buildRoleToggle(),
-            const Divider(height: 1),
-
             // Profile Section
             Expanded(
               child: CustomScrollView(
@@ -196,7 +201,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                       role: _currentRole,
                       profile: _activeProfile,
                       themeColor: themeColor,
-                      onEditPressed: () => _showEditDialog(context),
+                      onEditPressed: () => _openEditScreen(context),
                     ),
                   ),
                   const SliverToBoxAdapter(
@@ -218,7 +223,9 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                             themeColor: themeColor,
                             measurement: _customerMeasurement,
                             onSave: (updated) async {
-                              await Future.delayed(const Duration(milliseconds: 500));
+                              await Future.delayed(
+                                const Duration(milliseconds: 500),
+                              );
                               if (!mounted) return;
                               setState(() {
                                 _customerMeasurement = updated;
@@ -233,11 +240,15 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                           onLogoutPressed: () {
                             debugPrint("Logout pressed");
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Logged out successfully!")),
+                              const SnackBar(
+                                content: Text("Logged out successfully!"),
+                              ),
                             );
                             Navigator.pushAndRemoveUntil(
                               context,
-                              MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+                              MaterialPageRoute(
+                                builder: (_) => const WelcomeScreen(),
+                              ),
                               (route) => false,
                             );
                           },
@@ -254,71 +265,24 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
     );
   }
 
-  Widget _buildRoleToggle() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text(
-            "Demo Role:",
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
-            ),
-          ),
-          DropdownButton<AppUserRole>(
-            value: _currentRole,
-            underline: const SizedBox(),
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1E392A),
-            ),
-            items: const [
-              DropdownMenuItem(
-                value: AppUserRole.customer,
-                child: Text("Customer"),
-              ),
-              DropdownMenuItem(
-                value: AppUserRole.tailor,
-                child: Text("Tailor"),
-              ),
-              DropdownMenuItem(
-                value: AppUserRole.retailer,
-                child: Text("Retailer"),
-              ),
-            ],
-            onChanged: (role) {
-              if (role != null) {
-                setState(() {
-                  _currentRole = role;
-                });
-                if (widget.onRoleChanged != null) {
-                  widget.onRoleChanged!(role);
-                }
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
+  Future<void> _openEditScreen(BuildContext context) async {
+    // Close the drawer first so we're not pushing a full-screen route
+    // on top of an open Drawer overlay.
+    Navigator.pop(context);
 
-  void _showEditDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return ProfileEditDialog(
+    final updatedProfile = await Navigator.push<DrawerProfileData>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditProfileScreen(
           role: _currentRole,
           initialProfile: _activeProfile,
-          onSave: (updatedProfile) {
-            _updateProfile(updatedProfile);
-          },
-        );
-      },
+        ),
+      ),
     );
+
+    if (updatedProfile != null) {
+      _updateProfile(updatedProfile);
+    }
   }
 }
 
@@ -353,20 +317,22 @@ class DrawerProfileSection extends StatelessWidget {
               CircleAvatar(
                 radius: 28,
                 backgroundColor: themeColor.withValues(alpha: 0.15),
-                backgroundImage: profile.profilePicture != null && profile.profilePicture!.isNotEmpty
-                    ? FileImage(File(profile.profilePicture!))
+                backgroundImage: isCustomer
+                    ? (profile.profilePicture != null &&
+                              profile.profilePicture!.isNotEmpty
+                          ? FileImage(File(profile.profilePicture!))
+                          : null)
+                    : (profile.profilePicture != null &&
+                              profile.profilePicture!.isNotEmpty
+                          ? FileImage(File(profile.profilePicture!))
+                                as ImageProvider
+                          : const AssetImage('assets/images/fab.jpg')),
+                child:
+                    isCustomer &&
+                        (profile.profilePicture == null ||
+                            profile.profilePicture!.isEmpty)
+                    ? Icon(Icons.person_rounded, color: themeColor, size: 32)
                     : null,
-                child: profile.profilePicture != null && profile.profilePicture!.isNotEmpty
-                    ? null
-                    : Icon(
-                        isCustomer
-                            ? Icons.person_rounded
-                            : (role == AppUserRole.tailor
-                                ? Icons.design_services_rounded
-                                : Icons.storefront_rounded),
-                        color: themeColor,
-                        size: 32,
-                      ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -374,7 +340,9 @@ class DrawerProfileSection extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      role == AppUserRole.retailer ? profile.shopName : profile.name,
+                      role == AppUserRole.retailer
+                          ? profile.shopName
+                          : profile.name,
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -385,7 +353,10 @@ class DrawerProfileSection extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: themeColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
@@ -426,7 +397,10 @@ class DrawerProfileSection extends StatelessWidget {
               TextButton.icon(
                 style: TextButton.styleFrom(
                   foregroundColor: themeColor,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
                 ),
                 onPressed: onEditPressed,
                 icon: const Icon(Icons.edit_rounded, size: 16),
@@ -445,7 +419,18 @@ class DrawerProfileSection extends StatelessWidget {
           _buildInfoRow(Icons.phone_outlined, profile.phone),
           const SizedBox(height: 8),
           _buildInfoRow(Icons.location_on_outlined, profile.address),
-          if (!isCustomer && profile.about != null && profile.about!.isNotEmpty) ...[
+          if (profile.location != null) ...[
+            const SizedBox(height: 8),
+            _buildInfoRow(
+              Icons.pin_drop_outlined,
+              '${profile.location!.latitude.toStringAsFixed(5)}, '
+              '${profile.location!.longitude.toStringAsFixed(5)}'
+              '${isCustomer ? '  (delivery location)' : ''}',
+            ),
+          ],
+          if (!isCustomer &&
+              profile.about != null &&
+              profile.about!.isNotEmpty) ...[
             const SizedBox(height: 12),
             const Divider(),
             const SizedBox(height: 8),
@@ -525,9 +510,7 @@ class DrawerNavigationSection extends StatelessWidget {
               if (item['title'] == 'Virtual Trial') {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const VirtualTrialScreen(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const VirtualTrialScreen()),
                 );
               } else if (item['title'] == 'Orders') {
                 if (role == AppUserRole.retailer) {
@@ -565,27 +548,23 @@ class DrawerNavigationSection extends StatelessWidget {
                   );
                 }
               } else if (item['title'] == 'Cart') {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const CartScreen(),
-    ),
-  );
-}else if (item['title'] == 'Inventory') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CartScreen()),
+                );
+              } else if (item['title'] == 'Inventory') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const InventoryScreen()),
+                );
+              } else if (item['title'] == 'Portfolio') {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const InventoryScreen(),
+                    builder: (_) => const TailorPortfolioScreen(),
                   ),
                 );
-              } else if (item['title'] == 'Portfolio') {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const TailorPortfolioScreen(),
-    ),
-  );
-}else {
+              } else {
                 debugPrint("Navigation clicked: ${item['title']}");
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -614,7 +593,7 @@ class DrawerNavigationSection extends StatelessWidget {
       case AppUserRole.tailor:
         return [
           {'title': 'Orders', 'icon': Icons.receipt_long_rounded},
-           {'title': 'Portfolio', 'icon': Icons.design_services_outlined},
+          {'title': 'Portfolio', 'icon': Icons.design_services_outlined},
           {'title': 'Messages', 'icon': Icons.chat_bubble_outline_rounded},
         ];
       case AppUserRole.retailer:
@@ -650,9 +629,7 @@ class NavigationDrawerDestination extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
           child: Row(
             children: [
               Icon(icon, color: Colors.black54, size: 22),
@@ -666,7 +643,11 @@ class NavigationDrawerDestination extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              const Icon(Icons.chevron_right_rounded, color: Colors.black26, size: 18),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.black26,
+                size: 18,
+              ),
             ],
           ),
         ),
@@ -679,10 +660,7 @@ class NavigationDrawerDestination extends StatelessWidget {
 class DrawerLogoutButton extends StatelessWidget {
   final VoidCallback onLogoutPressed;
 
-  const DrawerLogoutButton({
-    super.key,
-    required this.onLogoutPressed,
-  });
+  const DrawerLogoutButton({super.key, required this.onLogoutPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -703,10 +681,7 @@ class DrawerLogoutButton extends StatelessWidget {
           icon: const Icon(Icons.logout_rounded, size: 18),
           label: const Text(
             "Logout",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-            ),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
           ),
         ),
       ),
@@ -714,24 +689,29 @@ class DrawerLogoutButton extends StatelessWidget {
   }
 }
 
-/// Dialog widget for editing profile info.
-class ProfileEditDialog extends StatefulWidget {
+/// Full-screen profile editor, shared across all three roles.
+///
+/// Replaces the old `ProfileEditDialog` (AlertDialog). A full screen gives
+/// the form room to breathe and makes pushing the map picker a normal
+/// screen -> screen navigation instead of a route stacked on a modal.
+///
+/// Returns the updated `DrawerProfileData` via `Navigator.pop(context, data)`
+/// when saved, or `null` if the user backs out without saving.
+class EditProfileScreen extends StatefulWidget {
   final AppUserRole role;
   final DrawerProfileData initialProfile;
-  final ValueChanged<DrawerProfileData> onSave;
 
-  const ProfileEditDialog({
+  const EditProfileScreen({
     super.key,
     required this.role,
     required this.initialProfile,
-    required this.onSave,
   });
 
   @override
-  State<ProfileEditDialog> createState() => _ProfileEditDialogState();
+  State<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
-class _ProfileEditDialogState extends State<ProfileEditDialog> {
+class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _shopNameController;
   late TextEditingController _emailController;
@@ -740,17 +720,29 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
   late TextEditingController _aboutController;
 
   String? _profilePicturePath;
+  GeoPoint? _selectedLocation;
+  bool _locationError =
+      false; // true once the user has tried to save without pinning
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.initialProfile.name);
-    _shopNameController = TextEditingController(text: widget.initialProfile.shopName);
+    _shopNameController = TextEditingController(
+      text: widget.initialProfile.shopName,
+    );
     _emailController = TextEditingController(text: widget.initialProfile.email);
     _phoneController = TextEditingController(text: widget.initialProfile.phone);
-    _addressController = TextEditingController(text: widget.initialProfile.address);
-    _aboutController = TextEditingController(text: widget.initialProfile.about ?? '');
+    _addressController = TextEditingController(
+      text: widget.initialProfile.address,
+    );
+    _aboutController = TextEditingController(
+      text: widget.initialProfile.about ?? '',
+    );
     _profilePicturePath = widget.initialProfile.profilePicture;
+    _selectedLocation =
+        widget.initialProfile.location ??
+        const GeoPoint(23.8103, 90.4125); // dummy Dhaka coordinates for now
   }
 
   Future<void> _pickImage() async {
@@ -765,6 +757,48 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
     } catch (e) {
       debugPrint("Error picking profile image: $e");
     }
+  }
+
+  Future<void> _pickLocation() async {
+    final result = await Navigator.push<GeoPoint>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            LocationPickerScreen(initialLocation: _selectedLocation),
+      ),
+    );
+    if (result != null) {
+      setState(() {
+        _selectedLocation = result;
+        _locationError = false;
+      });
+    }
+  }
+
+  void _save() {
+    if (_selectedLocation == null) {
+      setState(() => _locationError = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please pin your location before saving.'),
+        ),
+      );
+      return;
+    }
+
+    final updated = widget.initialProfile.copyWith(
+      name: _nameController.text,
+      shopName: widget.role == AppUserRole.retailer
+          ? _shopNameController.text
+          : null,
+      email: _emailController.text,
+      phone: _phoneController.text,
+      address: _addressController.text,
+      about: _aboutController.text,
+      profilePicture: _profilePicturePath,
+      location: _selectedLocation,
+    );
+    Navigator.pop(context, updated);
   }
 
   @override
@@ -782,170 +816,274 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
   Widget build(BuildContext context) {
     final bool isRetailer = widget.role == AppUserRole.retailer;
     final bool isCustomer = widget.role == AppUserRole.customer;
+    const themeColor = Color(0xFF6C9985);
 
-    const fieldTextStyle = TextStyle(fontSize: 13);
-    const fieldLabelStyle = TextStyle(fontSize: 13);
+    const fieldTextStyle = TextStyle(fontSize: 14);
+    const fieldLabelStyle = TextStyle(fontSize: 14);
 
-    return AlertDialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      title: Text(
-        isRetailer ? "Edit Shop Profile" : "Edit Profile",
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          color: Color(0xFF1E392A),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7FBF7),
+      appBar: AppBar(
+        title: Text(
+          isRetailer ? "Edit Shop Profile" : "Edit Profile",
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1E392A),
+          ),
         ),
+        backgroundColor: const Color(0xFFF7FBF7),
+        foregroundColor: const Color(0xFF1E392A),
+        elevation: 0,
       ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!isCustomer) ...[
-              Center(
-                child: Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: 40,
-                      backgroundColor: Colors.grey.shade200,
-                      backgroundImage: _profilePicturePath != null && _profilePicturePath!.isNotEmpty
-                          ? FileImage(File(_profilePicturePath!))
-                          : null,
-                      child: _profilePicturePath == null || _profilePicturePath!.isEmpty
-                          ? Icon(
-                              isRetailer ? Icons.storefront_rounded : Icons.design_services_rounded,
-                              size: 40,
-                              color: Colors.grey.shade600,
-                            )
-                          : null,
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: GestureDetector(
-                        onTap: _pickImage,
-                        child: CircleAvatar(
-                          radius: 14,
-                          backgroundColor: const Color(0xFF6C9985),
-                          child: const Icon(
-                            Icons.camera_alt,
-                            size: 14,
-                            color: Colors.white,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!isCustomer) ...[
+                Center(
+                  child: Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 48,
+                        backgroundColor: Colors.grey.shade200,
+                        backgroundImage:
+                            _profilePicturePath != null &&
+                                _profilePicturePath!.isNotEmpty
+                            ? FileImage(File(_profilePicturePath!))
+                                  as ImageProvider
+                            : const AssetImage(
+                                'assets/images/fab.jpg',
+                              ),
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: GestureDetector(
+                          onTap: _pickImage,
+                          child: const CircleAvatar(
+                            radius: 16,
+                            backgroundColor: themeColor,
+                            child: Icon(
+                              Icons.camera_alt,
+                              size: 16,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+              if (isRetailer) ...[
+                TextField(
+                  controller: _shopNameController,
+                  style: fieldTextStyle,
+                  decoration: const InputDecoration(
+                    labelText: "Shop Name",
+                    labelStyle: fieldLabelStyle,
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.storefront_rounded),
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ] else ...[
+                TextField(
+                  controller: _nameController,
+                  style: fieldTextStyle,
+                  decoration: const InputDecoration(
+                    labelText: "Name",
+                    labelStyle: fieldLabelStyle,
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person_rounded),
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
+              TextField(
+                controller: _emailController,
+                style: fieldTextStyle,
+                decoration: const InputDecoration(
+                  labelText: "Email",
+                  labelStyle: fieldLabelStyle,
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.email_outlined),
+                ),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _phoneController,
+                style: fieldTextStyle,
+                decoration: const InputDecoration(
+                  labelText: "Phone",
+                  labelStyle: fieldLabelStyle,
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.phone_outlined),
+                ),
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _addressController,
+                style: fieldTextStyle,
+                decoration: const InputDecoration(
+                  labelText: "Address",
+                  labelStyle: fieldLabelStyle,
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.location_on_outlined),
+                ),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 14),
+              // Location pinpoint — shown for ALL roles, and REQUIRED.
+              // For customers this doubles as their delivery location
+              // (used later for rule-based delivery charge calc), so it
+              // cannot be left unset.
+              Row(
+                children: [
+                  Text(
+                    isCustomer
+                        ? 'Delivery location'
+                        : 'Shop / workspace location',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
                     ),
-                  ],
+                  ),
+                  const SizedBox(width: 4),
+                  const Text(
+                    '*',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              InkWell(
+                onTap: _pickLocation,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: _locationError ? Colors.red : Colors.black26,
+                      width: _locationError ? 1.4 : 1.0,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    color: _locationError
+                        ? Colors.red.withOpacity(0.03)
+                        : Colors.white,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.pin_drop_outlined,
+                        color: _locationError ? Colors.red : themeColor,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _selectedLocation != null
+                              ? 'Pinned: ${_selectedLocation!.latitude.toStringAsFixed(5)}, '
+                                    '${_selectedLocation!.longitude.toStringAsFixed(5)}'
+                              : (isCustomer
+                                    ? 'Tap to pin your delivery location'
+                                    : 'Tap to pin your shop/workspace location'),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: _selectedLocation != null
+                                ? Colors.black87
+                                : (_locationError
+                                      ? Colors.red.shade700
+                                      : Colors.black45),
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: _locationError
+                            ? Colors.red.shade200
+                            : Colors.black26,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
+              if (_locationError) ...[
+                const SizedBox(height: 6),
+                const Text(
+                  'This field is required — please pin a location.',
+                  style: TextStyle(fontSize: 12, color: Colors.red),
+                ),
+              ],
+              if (!isCustomer) ...[
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _aboutController,
+                  style: fieldTextStyle,
+                  decoration: const InputDecoration(
+                    labelText: "About / Biography",
+                    labelStyle: fieldLabelStyle,
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.info_outline),
+                  ),
+                  maxLines: 3,
+                ),
+              ],
             ],
-            if (isRetailer) ...[
-              TextField(
-                controller: _shopNameController,
-                style: fieldTextStyle,
-                decoration: const InputDecoration(
-                  labelText: "Shop Name",
-                  labelStyle: fieldLabelStyle,
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.storefront_rounded),
-                ),
-              ),
-              const SizedBox(height: 12),
-            ] else ...[
-              TextField(
-                controller: _nameController,
-                style: fieldTextStyle,
-                decoration: const InputDecoration(
-                  labelText: "Name",
-                  labelStyle: fieldLabelStyle,
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person_rounded),
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-            TextField(
-              controller: _emailController,
-              style: fieldTextStyle,
-              decoration: const InputDecoration(
-                labelText: "Email",
-                labelStyle: fieldLabelStyle,
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.email_outlined),
-              ),
-              keyboardType: TextInputType.emailAddress,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _phoneController,
-              style: fieldTextStyle,
-              decoration: const InputDecoration(
-                labelText: "Phone",
-                labelStyle: fieldLabelStyle,
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.phone_outlined),
-              ),
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _addressController,
-              style: fieldTextStyle,
-              decoration: const InputDecoration(
-                labelText: "Address",
-                labelStyle: fieldLabelStyle,
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-              maxLines: 2,
-            ),
-            if (!isCustomer) ...[
-              const SizedBox(height: 12),
-              TextField(
-                controller: _aboutController,
-                style: fieldTextStyle,
-                decoration: const InputDecoration(
-                  labelText: "About / Biography",
-                  labelStyle: fieldLabelStyle,
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.info_outline),
-                ),
-                maxLines: 3,
-              ),
-            ],
-          ],
+          ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text("Cancel"),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF6C9985),
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text("Cancel"),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: _save,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: themeColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    "Save Changes",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
           ),
-          onPressed: () {
-            final updated = widget.initialProfile.copyWith(
-              name: _nameController.text,
-              shopName: isRetailer ? _shopNameController.text : null,
-              email: _emailController.text,
-              phone: _phoneController.text,
-              address: _addressController.text,
-              about: _aboutController.text,
-              profilePicture: _profilePicturePath,
-            );
-            widget.onSave(updated);
-            Navigator.pop(context);
-          },
-          child: const Text("Save"),
         ),
-      ],
+      ),
     );
   }
 }

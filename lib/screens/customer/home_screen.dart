@@ -241,11 +241,6 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
       backgroundColor: const Color(0xFFF4F9F1),
       drawer: DashboardDrawer(
         initialRole: _currentRole,
-        onRoleChanged: (role) {
-          setState(() {
-            _currentRole = role;
-          });
-        },
       ),
       body: SafeArea(
         child: Column(
