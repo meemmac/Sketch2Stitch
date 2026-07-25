@@ -144,7 +144,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
               // reaching the Back button, and AnimatedPadding smoothly
               // lifts it above the keyboard when typing.
               Padding(
-                padding: const EdgeInsets.only(top: 60),
+                padding: const EdgeInsets.only(top: 56),
                 child: AnimatedPadding(
                   duration: const Duration(milliseconds: 150),
                   curve: Curves.easeOut,
@@ -154,10 +154,10 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       return SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                         child: ConstrainedBox(
                           constraints: BoxConstraints(
-                            minHeight: constraints.maxHeight - 48,
+                            minHeight: constraints.maxHeight - 32,
                           ),
                           child: Center(
                             child: ClipRRect(
@@ -165,7 +165,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                               child: BackdropFilter(
                                 filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                                 child: Container(
-                                  padding: const EdgeInsets.all(24),
+                                  padding: const EdgeInsets.all(18),
                                   constraints: const BoxConstraints(maxWidth: 340),
                                   decoration: BoxDecoration(
                                     color: Colors.white.withValues(alpha: 0.55),
@@ -191,8 +191,8 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
               // and the reserved top padding above keeps the card from
               // ever reaching it.
               Positioned(
-                top: 10,
-                left: 10,
+                top: 8,
+                left: 8,
                 child: TextButton(
                   onPressed: _goBack,
                   style: TextButton.styleFrom(
@@ -204,12 +204,15 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                       horizontal: 14,
                       vertical: 6,
                     ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   child: const Text(
                     'Back',
                     style: TextStyle(
                       color: Colors.black87,
                       fontWeight: FontWeight.w600,
+                      fontSize: 13,
                     ),
                   ),
                 ),
@@ -237,7 +240,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
   Widget _buildLogo() {
     return Image.asset(
       'assets/images/transparent_logo.png',
-      height: 55,
+      height: 46,
       fit: BoxFit.contain,
     );
   }
@@ -248,18 +251,18 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
       mainAxisSize: MainAxisSize.min,
       children: [
         _buildLogo(),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         const Text(
           'Register As',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 18),
         _buildRoleButton('Customer'),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         _buildRoleButton('Retailer'),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         _buildRoleButton('Tailor'),
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
         _buildSignInRow(),
       ],
     );
@@ -268,7 +271,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
   Widget _buildRoleButton(String role) {
     return SizedBox(
       width: double.infinity,
-      height: 48,
+      height: 44,
       child: ElevatedButton(
         onPressed: () => _selectRole(role),
         style: ElevatedButton.styleFrom(
@@ -282,7 +285,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
           role,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -296,54 +299,54 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
       mainAxisSize: MainAxisSize.min,
       children: [
         _buildLogo(),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         const Text(
           'Registration Form',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
 
         _buildFieldLabel('Full name'),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         _buildTextField(
           controller: _customerFullNameController,
           hint: 'Full name',
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 7),
 
         _buildFieldLabel('Email address'),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         _buildTextField(
           controller: _customerEmailController,
           hint: 'Email address',
           icon: Icons.mail_outline,
           keyboardType: TextInputType.emailAddress,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 7),
 
         _buildFieldLabel('Phone number'),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         _buildTextField(
           controller: _customerPhoneController,
           hint: 'Phone number',
           icon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 7),
 
         _buildFieldLabel('Address'),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
        _buildTextField(
           controller: _cusomerAddressController,
           hint: 'Address',
           icon: Icons.storefront_outlined,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 7),
         _buildLocationField(
           location: _customerLocation,
           onTap: () => _pickLocation(_customerLocation, (loc) => _customerLocation = loc),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
 
         _buildNextButton(onPressed: () {
           if (_customerLocation == null) {
@@ -365,7 +368,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             MaterialPageRoute(builder: (context) => const LoginScreen()),
           );
         }),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         _buildSignInRow(),
       ],
     );
@@ -377,54 +380,54 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
        mainAxisSize: MainAxisSize.min,
       children: [
         _buildLogo(),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         const Text(
           'Registration Form',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
 
         _buildFieldLabel('Shop name'),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         _buildTextField(
           controller: _tailorFullNameController,
           hint: 'Shop name',
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 7),
 
         _buildFieldLabel('Email address'),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         _buildTextField(
           controller: _tailorEmailController,
           hint: 'Email address',
           icon: Icons.mail_outline,
           keyboardType: TextInputType.emailAddress,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 7),
 
         _buildFieldLabel('Phone number'),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         _buildTextField(
           controller: _tailorPhoneController,
           hint: 'Phone number',
           icon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 7),
 
         _buildFieldLabel('Shop address'),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         _buildTextField(
           controller: _tailorAddressController,
           hint: 'Shop address',
           icon: Icons.storefront_outlined,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 7),
         _buildLocationField(
           location: _tailorLocation,
           onTap: () => _pickLocation(_tailorLocation, (loc) => _tailorLocation = loc),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         _buildNextButton(onPressed: () {
           if (_tailorLocation == null) {
             setState(() => _locationError = true);
@@ -445,7 +448,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             MaterialPageRoute(builder: (context) => const LoginScreen()),
           );
         }),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         _buildSignInRow(),
       ],
     );
@@ -457,54 +460,54 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
       mainAxisSize: MainAxisSize.min,
       children: [
         _buildLogo(),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         const Text(
           'Registration Form',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
 
         _buildFieldLabel('Shop name'),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         _buildTextField(
           controller: _shopNameController,
           hint: 'Shop name',
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 7),
 
         _buildFieldLabel('Organizational email'),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         _buildTextField(
           controller: _orgEmailController,
           hint: 'Organizational email',
           icon: Icons.mail_outline,
           keyboardType: TextInputType.emailAddress,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 7),
 
         _buildFieldLabel('Phone number'),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         _buildTextField(
           controller: _retailerPhoneController,
           hint: 'Phone number',
           icon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 7),
 
         _buildFieldLabel('Shop address'),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         _buildTextField(
           controller: _shopAddressController,
           hint: 'Shop address',
           icon: Icons.storefront_outlined,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 7),
         _buildLocationField(
           location: _retailerLocation,
           onTap: () => _pickLocation(_retailerLocation, (loc) => _retailerLocation = loc),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
 
         _buildNextButton(onPressed: () {
           if (_retailerLocation == null) {
@@ -527,7 +530,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             MaterialPageRoute(builder: (context) => const LoginScreen()),
           );
         }),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         _buildSignInRow(),
       ],
     );
@@ -551,13 +554,12 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildFieldLabel('Pin your location'),
-        const SizedBox(height: 4),
-        const SizedBox(height: 6),
+        const SizedBox(height: 3),
         InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(10),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(10),
@@ -565,25 +567,25 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             ),
             child: Row(
               children: [
-                Icon(Icons.pin_drop_outlined, size: 18, color: _locationError ? Colors.red : Colors.black87),
+                Icon(Icons.pin_drop_outlined, size: 17, color: _locationError ? Colors.red : Colors.black87),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     location != null
                         ? 'Pinned: ${location.latitude.toStringAsFixed(5)}, ${location.longitude.toStringAsFixed(5)}'
                         : 'Tap to pin on map',
-                    style: TextStyle(fontSize: 13, color: location != null ? Colors.black87 : Colors.black45),
+                    style: TextStyle(fontSize: 12.5, color: location != null ? Colors.black87 : Colors.black45),
                   ),
                 ),
-                const Icon(Icons.chevron_right_rounded, size: 18, color: Colors.black26),
+                const Icon(Icons.chevron_right_rounded, size: 17, color: Colors.black26),
               ],
             ),
           ),
         ),
         if (_locationError)
           const Padding(
-            padding: EdgeInsets.only(top: 4),
-            child: Text('Please pin a location before continuing.', style: TextStyle(fontSize: 11.5, color: Colors.red)),
+            padding: EdgeInsets.only(top: 3),
+            child: Text('Please pin a location before continuing.', style: TextStyle(fontSize: 11, color: Colors.red)),
           ),
       ],
     );
@@ -591,56 +593,56 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
 
   // ---------------- Shared small widgets ----------------
   Widget _buildFieldLabel(String text) {
-  return Align(
-    alignment: Alignment.centerLeft,
-    child: Text(
-      text,
-      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-    ),
-  );
-}
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
 
   Widget _buildTextField({
-  required TextEditingController controller,
-  required String hint,
-  IconData? icon,
-  TextInputType? keyboardType,
-}) {
-  return TextField(
-    controller: controller,
-    keyboardType: keyboardType,
-    style: const TextStyle(fontSize: 13),
-    decoration: InputDecoration(
-      hintText: hint,
-      hintStyle: const TextStyle(fontSize: 13),
-      isDense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      suffixIcon: icon == null
-          ? null
-          : Container(
-              margin: const EdgeInsets.all(6),
-              width: 26,
-              height: 26,
-              decoration: BoxDecoration(
-                color: const Color(0xFFDFF2DF),
-                borderRadius: BorderRadius.circular(8),
+    required TextEditingController controller,
+    required String hint,
+    IconData? icon,
+    TextInputType? keyboardType,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      style: const TextStyle(fontSize: 12.5),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(fontSize: 12.5),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        suffixIcon: icon == null
+            ? null
+            : Container(
+                margin: const EdgeInsets.all(5),
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDFF2DF),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 14, color: Colors.black87),
               ),
-              child: Icon(icon, size: 14, color: Colors.black87),
-            ),
-      filled: true,
-      fillColor: Colors.white,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide.none,
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildNextButton({required VoidCallback onPressed}) {
     return SizedBox(
       width: double.infinity,
-      height: 46,
+      height: 42,
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
@@ -655,7 +657,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
           children: const [
             Text(
               'Submit',
-              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+              style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
             ),
             SizedBox(width: 8),
           ],
@@ -667,8 +669,8 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
   Widget _buildSignInRow() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-        const Text('Or '),
+      children: [
+        const Text('Or ', style: TextStyle(fontSize: 14)),
         TextButton(
           onPressed: () {
             Navigator.pushReplacement(
@@ -682,7 +684,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
           ),
           child: const Text(
             'Sign in',
-            style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+            style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
           ),
         ),
       ],

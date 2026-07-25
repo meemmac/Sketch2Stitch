@@ -202,10 +202,10 @@ class _LoginScreenState extends State<LoginScreen>
                                 TextField(
                                   controller: _emailController,
                                   keyboardType: TextInputType.emailAddress,
-                                  style: const TextStyle(fontSize: 13),
+                                  style: const TextStyle(fontSize: 14),
                                   decoration: InputDecoration(
                                     hintText: 'Email or mobile number',
-                                    hintStyle: const TextStyle(fontSize: 13),
+                                    hintStyle: const TextStyle(fontSize: 14),
                                     isDense: true,
                                     contentPadding: const EdgeInsets.symmetric(
                                       horizontal: 12,
@@ -237,10 +237,10 @@ class _LoginScreenState extends State<LoginScreen>
                                 TextField(
                                   controller: _passwordController,
                                   obscureText: _obscurePassword,
-                                  style: const TextStyle(fontSize: 13),
+                                  style: const TextStyle(fontSize: 14),
                                   decoration: InputDecoration(
                                     hintText: 'Password',
-                                    hintStyle: const TextStyle(fontSize: 13),
+                                    hintStyle: const TextStyle(fontSize: 14),
                                     isDense: true,
                                     contentPadding: const EdgeInsets.symmetric(
                                       horizontal: 12,
@@ -282,8 +282,8 @@ class _LoginScreenState extends State<LoginScreen>
                                 DropdownButtonFormField<String>(
                                   value: _selectedUserType,
                                   dropdownColor: const Color(0xFFDFF2DF),
-                                  style: const TextStyle(fontSize: 13, color: Colors.black87),
-                                  hint: const Text('User Type', style: TextStyle(fontSize: 13)),
+                                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                                  hint: const Text('User Type', style: TextStyle(fontSize: 14)),
                                   icon: Container(
                                     width: 20,
                                     height: 20,
@@ -314,7 +314,7 @@ class _LoginScreenState extends State<LoginScreen>
                                   items: _userTypes.map((type) {
                                     return DropdownMenuItem(
                                       value: type,
-                                      child: Text(type, style: const TextStyle(fontSize: 13)),
+                                      child: Text(type, style: const TextStyle(fontSize: 14)),
                                     );
                                   }).toList(),
                                   onChanged: (value) {
@@ -381,7 +381,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const Text('Or ', style: TextStyle(fontSize: 13)),
+                                    const Text('Or ', style: TextStyle(fontSize: 14)),
                                     TextButton(
                                       onPressed: () {
                                         Navigator.pushReplacement(
@@ -401,7 +401,7 @@ class _LoginScreenState extends State<LoginScreen>
                                         style: TextStyle(
                                           color: Colors.black87,
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 13,
+                                          fontSize: 14,
                                         ),
                                       ),
                                     ),
@@ -422,37 +422,36 @@ class _LoginScreenState extends State<LoginScreen>
                 top: 8,
                 left: 8,
                 child: TextButton(
-                  onPressed: () {
-                    // Navigate to Welcome Screen and clear the navigation stack
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const WelcomeScreen(),
-                      ),
-                      (route) => false, // Removes all previous routes
-                    );
-                  },
-                  style: TextButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 6,
-                    ),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text(
-                    'Back',
-                    style: TextStyle(
-                      color: Colors.black87,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
+  onPressed: () {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const WelcomeScreen(),
+      ),
+      (route) => false,
+    );
+  },
+  style: TextButton.styleFrom(
+    backgroundColor: Colors.white,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(20),
+    ),
+    padding: const EdgeInsets.symmetric(
+      horizontal: 18,
+      vertical: 8,
+    ),
+    minimumSize: Size.zero,
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  ),
+  child: const Text(
+    'Back',
+    style: TextStyle(
+      color: Colors.black87,
+      fontWeight: FontWeight.w600,
+      fontSize: 14,
+    ),
+  ),
+),
               ),
             ],
           ),

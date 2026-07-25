@@ -281,7 +281,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
               // Main content
               Padding(
-                padding: const EdgeInsets.only(top: 80),
+                padding: const EdgeInsets.only(top: 56),
                 child: AnimatedPadding(
                   duration: const Duration(milliseconds: 150),
                   curve: Curves.easeOut,
@@ -296,7 +296,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                         child: BackdropFilter(
                           filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                           child: Container(
-                            padding: const EdgeInsets.all(28),
+                            padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
                               color: Colors.white.withOpacity(0.55),
                               borderRadius: BorderRadius.circular(24),
@@ -311,21 +311,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                 // Logo
                                 Image.asset(
                                   'assets/images/transparent_logo.png',
-                                  height: 55,
+                                  height: 48,
                                   fit: BoxFit.contain,
                                 ),
-                                const SizedBox(height: 20),
+                                const SizedBox(height: 16),
 
                                 // Title based on step
                                 Text(
                                   _currentStep == 0 ? 'Forgot Password?' :
                                   _currentStep == 1 ? 'Verify OTP' : 'Create New Password',
                                   style: const TextStyle(
-                                    fontSize: 22,
+                                    fontSize: 19,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 6),
 
                                 // Subtitle based on step
                                 Text(
@@ -336,12 +336,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                   'Enter your new password below',
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
-                                    fontSize: 14,
+                                    fontSize: 12.5,
                                     color: Colors.black54,
-                                    height: 1.5,
+                                    height: 1.4,
                                   ),
                                 ),
-                                const SizedBox(height: 24),
+                                const SizedBox(height: 16),
 
                                 // Step 0: Email field
                                 if (_currentStep == 0) ...[
@@ -350,18 +350,27 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                     child: Text(
                                       'Email address/Phone No',
                                       style: TextStyle(
-                                        fontWeight: FontWeight.w500,
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(height: 6),
+                                  const SizedBox(height: 5),
                                   TextField(
                                     controller: _emailController,
                                     keyboardType: TextInputType.emailAddress,
+                                    style: const TextStyle(fontSize: 14),
                                     decoration: InputDecoration(
                                       hintText: 'Email/Phone',
+                                      hintStyle: const TextStyle(fontSize: 14),
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 12,
+                                      ),
                                       prefixIcon: const Icon(
                                         Icons.person_outline,
+                                        size: 20,
                                       ),
                                       filled: true,
                                       fillColor: Colors.white,
@@ -380,19 +389,28 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                     child: Text(
                                       'Enter OTP',
                                       style: TextStyle(
-                                        fontWeight: FontWeight.w500,
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(height: 6),
+                                  const SizedBox(height: 5),
                                   TextField(
                                     controller: _otpController,
                                     keyboardType: TextInputType.number,
                                     maxLength: 6,
+                                    style: const TextStyle(fontSize: 14),
                                     decoration: InputDecoration(
                                       hintText: 'Enter 6-digit OTP',
+                                      hintStyle: const TextStyle(fontSize: 14),
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 12,
+                                      ),
                                       prefixIcon: const Icon(
                                         Icons.pin,
+                                        size: 20,
                                       ),
                                       filled: true,
                                       fillColor: Colors.white,
@@ -411,24 +429,34 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                     child: Text(
                                       'New Password',
                                       style: TextStyle(
-                                        fontWeight: FontWeight.w500,
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(height: 6),
+                                  const SizedBox(height: 5),
                                   TextField(
                                     controller: _newPasswordController,
                                     obscureText: _obscureNewPassword,
+                                    style: const TextStyle(fontSize: 14),
                                     decoration: InputDecoration(
                                       hintText: 'Enter new password',
+                                      hintStyle: const TextStyle(fontSize: 14),
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 12,
+                                      ),
                                       prefixIcon: const Icon(
                                         Icons.lock_outline,
+                                        size: 20,
                                       ),
                                       suffixIcon: IconButton(
                                         icon: Icon(
                                           _obscureNewPassword
                                               ? Icons.visibility_off_outlined
                                               : Icons.visibility_outlined,
+                                          size: 18,
                                         ),
                                         onPressed: () {
                                           setState(() {
@@ -444,31 +472,41 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(height: 16),
+                                  const SizedBox(height: 12),
                                   
                                   const Align(
                                     alignment: Alignment.centerLeft,
                                     child: Text(
                                       'Confirm Password',
                                       style: TextStyle(
-                                        fontWeight: FontWeight.w500,
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(height: 6),
+                                  const SizedBox(height: 5),
                                   TextField(
                                     controller: _confirmPasswordController,
                                     obscureText: _obscureConfirmPassword,
+                                    style: const TextStyle(fontSize: 14),
                                     decoration: InputDecoration(
                                       hintText: 'Confirm new password',
+                                      hintStyle: const TextStyle(fontSize: 14),
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 12,
+                                      ),
                                       prefixIcon: const Icon(
                                         Icons.lock_outline,
+                                        size: 20,
                                       ),
                                       suffixIcon: IconButton(
                                         icon: Icon(
                                           _obscureConfirmPassword
                                               ? Icons.visibility_off_outlined
                                               : Icons.visibility_outlined,
+                                          size: 18,
                                         ),
                                         onPressed: () {
                                           setState(() {
@@ -486,12 +524,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                   ),
                                 ],
 
-                                const SizedBox(height: 24),
+                                const SizedBox(height: 16),
 
                                 // Action Button
                                 SizedBox(
                                   width: double.infinity,
-                                  height: 50,
+                                  height: 46,
                                   child: ElevatedButton(
                                     onPressed: _isLoading ? null : () {
                                       if (_currentStep == 0) {
@@ -523,22 +561,23 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                             _currentStep == 1 ? 'Verify OTP' : 'Submit',
                                             style: const TextStyle(
                                               color: Colors.white,
-                                              fontSize: 16,
+                                              fontSize: 15,
                                               fontWeight: FontWeight.w600,
                                             ),
                                           ),
                                   ),
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 12),
 
                                 // Navigation links
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Text(
-                                      _currentStep > 0 ? 'Remember password? ' : 'Remember password? ',
-                                      style: const TextStyle(
+                                    const Text(
+                                      'Remember password? ',
+                                      style: TextStyle(
                                         color: Colors.black54,
+                                        fontSize: 14,
                                       ),
                                     ),
                                     TextButton(
@@ -559,6 +598,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                         style: TextStyle(
                                           color: Colors.black87,
                                           fontWeight: FontWeight.bold,
+                                          fontSize: 14,
                                         ),
                                       ),
                                     ),
@@ -574,10 +614,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                 ),
               ),
 
-              // Back button
+              // Back button — left-aligned and consistent with other screens
               Positioned(
-                top: 10,
-                right: 10,
+                top: 8,
+                left: 8,
                 child: TextButton(
                   onPressed: () {
                     if (_currentStep > 0) {
@@ -615,6 +655,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                     style: TextStyle(
                       color: Colors.black87,
                       fontWeight: FontWeight.w600,
+                      fontSize: 14,
                     ),
                   ),
                 ),
