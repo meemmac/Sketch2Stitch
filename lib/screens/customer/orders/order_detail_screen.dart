@@ -23,6 +23,7 @@ class OrderItem {
   final double price;
   final double? tailorPrice;
   final String? retailerName;
+  final bool showCareInstructions;
 
   // New fields for Tailor reference
   final OrderDeliveryDestination destination;
@@ -38,6 +39,7 @@ class OrderItem {
     required this.price,
     this.tailorPrice,
     this.retailerName,
+    this.showCareInstructions = true,
     this.description = "Premium quality material with excellent durability and comfort.",
     this.itemComment,
     this.canWash = true,
@@ -62,8 +64,8 @@ class CustomerOrder {
   DateTime? deliveryDate;
   String status;
   bool isDelivered;
-  final String? review;
-  final double? rating;
+  final Map<String, String>? retailerReviews;
+  final Map<String, double>? retailerRatings;
   final String? tailorReview;
   final double? tailorRating;
   final String deliveryAddress;
@@ -81,17 +83,21 @@ class CustomerOrder {
     required this.deliveryAddress,
     required this.deliveryCharges,
     this.deliveryDate,
-    this.review,
-    this.rating,
+    this.retailerReviews,
+    this.retailerRatings,
     this.tailorReview,
     this.tailorRating,
   });
 
   String get _allRetailerNames {
     final names = items.map((i) => i.retailerName ?? retailerName).toSet().toList();
-    if (names.length <= 1) return names.first;
+    if (names.length <= 1) return names.isNotEmpty ? names.first : "";
     if (names.length == 2) return "${names[0]} & ${names[1]}";
     return "${names[0]}, ${names[1]} & more";
+  }
+
+  List<String> get _uniqueRetailerNames {
+    return items.map((i) => i.retailerName ?? retailerName).toSet().toList();
   }
 
   double get totalGrandAmount {
@@ -289,9 +295,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        border: Border.all(color: color.withOpacity(0.2)),
       ),
       child: Text(
         _getTailorStatusText(status),
@@ -314,6 +320,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       isDelivered: false,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
       deliveryCharges: {"Zaroon Fabrics": 50.0},
+      retailerReviews: {},
+      retailerRatings: {},
       items: [
         const OrderItem(
           name: "Embroidered Lawn",
@@ -338,6 +346,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       isDelivered: false,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
       deliveryCharges: {"Silk & Cotton": 50.0},
+      retailerReviews: {},
+      retailerRatings: {},
       items: [
         const OrderItem(
           name: "Premium Cotton",
@@ -360,6 +370,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       isDelivered: false,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
       deliveryCharges: {"Zaroon Fabrics": 45.0, "Thread & Co.": 45.0},
+      retailerReviews: {},
+      retailerRatings: {},
       items: [
         const OrderItem(
           name: "Premium Linen",
@@ -394,6 +406,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       isDelivered: false,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
       deliveryCharges: {"Heritage Silk": 50.0},
+      retailerReviews: {},
+      retailerRatings: {},
       items: [
         const OrderItem(
           name: "Pure Rajshahi Silk",
@@ -421,8 +435,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       isDelivered: true,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
       deliveryCharges: {"FabriCo": 50.0, "Master Stitch": 35.0},
-      review: "Excellent quality and fast delivery. Very satisfied!",
-      rating: 5.0,
+      retailerReviews: {"FabriCo": "Excellent quality and fast delivery. Very satisfied!"},
+      retailerRatings: {"FabriCo": 5.0},
       tailorReview: "The stitching is perfect and fits me exactly as I wanted. Highly recommended!",
       tailorRating: 4.8,
       items: [
@@ -443,21 +457,34 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     CustomerOrder(
       id: "ORD-9421",
       retailerName: "Bismillah Fabrics",
-      amount: 2800,
+      amount: 2600,
       orderDate: DateTime.now().subtract(const Duration(days: 60)),
       deliveryDate: DateTime.now().subtract(const Duration(days: 52)),
       status: "Delivered",
       isDelivered: true,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
-      deliveryCharges: {"Bismillah Fabrics": 50.0},
+      deliveryCharges: {"Bismillah Fabrics": 50.0, "Shelai": 30.0},
+      retailerReviews: {},
+      retailerRatings: {},
       items: [
         const OrderItem(
           name: "Soft Georgette",
-          quantity: 3,
-          price: 2800,
+          quantity: 2,
+          price: 2500,
+          retailerName: "Bismillah Fabrics",
           imagePath: "assets/images/fabrics_rolled.jpg",
           color: "Peach",
           destination: OrderDeliveryDestination.retailer,
+        ),
+        const OrderItem(
+          name: "Lace",
+          quantity: 1,
+          price: 100,
+          retailerName: "Shelai",
+          imagePath: "assets/images/lace.jpg",
+          color: "Cream",
+          destination: OrderDeliveryDestination.retailer,
+          showCareInstructions: false,
         ),
       ],
     ),
@@ -472,6 +499,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       isDelivered: true,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
       deliveryCharges: {"Style Hub": 50.0, "Fine Cut Tailors": 35.0},
+      retailerReviews: {},
+      retailerRatings: {},
       items: [
         const OrderItem(
           name: "Banarasi Silk",
@@ -792,12 +821,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           color: isSelected ? primaryGreen : Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: isSelected ? primaryGreen : Colors.green.shade100, width: isSelected ? 1.5 : 1),
-          boxShadow: isSelected ? [BoxShadow(color: primaryGreen.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 6))] : [],
+          boxShadow: isSelected ? [BoxShadow(color: primaryGreen.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 6))] : [],
         ),
         child: Column(
           children: [
             Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.green.shade900, fontSize: 16, fontWeight: FontWeight.w900)),
-            Text("$count orders", style: TextStyle(color: isSelected ? Colors.white.withValues(alpha: 0.8) : Colors.green.shade700, fontSize: 12, fontWeight: FontWeight.w700)),
+            Text("$count orders", style: TextStyle(color: isSelected ? Colors.white.withOpacity(0.8) : Colors.green.shade700, fontSize: 12, fontWeight: FontWeight.w700)),
           ],
         ),
       ),
@@ -868,7 +897,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5))],
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -886,7 +915,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                  decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(999)),
+                  decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(999)),
                   child: Text(order.status, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w900)),
                 ),
               ],
@@ -931,7 +960,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
             if (order.isDelivered) ...[
               const SizedBox(height: 12),
-              if (order.review != null || order.tailorReview != null)
+              if ((order.retailerReviews?.isNotEmpty ?? false) || order.tailorReview != null)
                 _buildCardReviewSummary(order)
               else
                 _buildCardLeaveReviewPrompt(),
@@ -943,8 +972,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildCardReviewSummary(CustomerOrder order) {
-    final rating = order.rating ?? order.tailorRating ?? 0.0;
-    final review = order.review ?? order.tailorReview ?? "";
+    final rating = (order.retailerRatings?.isNotEmpty ?? false) ? order.retailerRatings!.values.first : (order.tailorRating ?? 0.0);
+    final review = (order.retailerReviews?.isNotEmpty ?? false) ? order.retailerReviews!.values.first : (order.tailorReview ?? "");
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
@@ -994,9 +1023,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   void _showOrderDetail(CustomerOrder order) {
-    double tempRetailerRating = 0;
+    final currentOrderRef = _orders.firstWhere((o) => o.id == order.id);
+    final uniqueRetailers = currentOrderRef._uniqueRetailerNames;
+
+    Map<String, double> tempRetailerRatings = {for (var r in uniqueRetailers) r: 0.0};
+    Map<String, TextEditingController> retailerControllers = {for (var r in uniqueRetailers) r: TextEditingController()};
+
     double tempTailorRating = 0;
-    final retailerController = TextEditingController();
     final tailorController = TextEditingController();
 
     showModalBottomSheet(
@@ -1021,214 +1054,225 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               child: ListView(
                 controller: scrollController,
                 children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 20),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text("Order Details", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                        Text("ID: ${currentOrder.id}", style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                    _infoBadge(
-                      currentOrder.status,
-                      currentOrder.isDelivered ? primaryGreen.withValues(alpha: 0.1) : Colors.blueAccent.withValues(alpha: 0.1),
-                      currentOrder.isDelivered ? primaryGreen : Colors.blueAccent,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 25),
-                const Text("Products", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                ...currentOrder.items.map((item) => _itemPreviewCard(item)),
-                if (currentOrder.items.any((i) => i.destination == OrderDeliveryDestination.tailor)) ...[
-                  const SizedBox(height: 30),
-                  const Text("Tailor Customization Details", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  ...currentOrder.items.where((i) => i.destination == OrderDeliveryDestination.tailor).map((item) => _tailorCustomizationCard(item, currentOrder.isDelivered)),
-                ],
-                const SizedBox(height: 30),
-                const Text("Order Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                _detailRow("Retailer(s)", currentOrder._allRetailerNames),
-                if (currentOrder.tailorName != null) _buildTailorSummaryRow(currentOrder),
-                _detailRow("Total Items", "${currentOrder.totalQuantity} units"),
-                _detailRow("Order Date", _formatDate(currentOrder.orderDate)),
-                if (currentOrder.deliveryDate != null) _detailRow("Delivery Date", _formatDate(currentOrder.deliveryDate!)),
-                const SizedBox(height: 12),
-                const Divider(),
-                const SizedBox(height: 12),
-                ...currentOrder.deliveryCharges.entries.where((entry) {
-                  // Only show tailor delivery if it's delivered
-                  if (entry.key == currentOrder.tailorName && !currentOrder.isDelivered) return false;
-                  return true;
-                }).map((entry) => _detailRow("Delivery (${entry.key})", "Tk ${entry.value.toInt()}")),
-                const SizedBox(height: 20),
-                const Text("Shipping Address", style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
-       const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade200)),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.location_on_outlined, size: 16, color: primaryGreen),
-                          const SizedBox(width: 8),
-                          Expanded(child: Text(currentOrder.deliveryAddress, style: const TextStyle(fontSize: 13, height: 1.4, fontWeight: FontWeight.w600))),
+                          const Text("Order Details", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                          Text("ID: ${currentOrder.id}", style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      InkWell(
-                        onTap: () => launchUrl(
-                          Uri.parse('https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(currentOrder.deliveryAddress)}'),
-                          mode: LaunchMode.externalApplication,
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.map_outlined, size: 15, color: primaryGreen),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Open in Maps',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryGreen, decoration: TextDecoration.underline),
-                            ),
-                          ],
-                        ),
+                      _infoBadge(
+                        currentOrder.status,
+                        currentOrder.isDelivered ? primaryGreen.withOpacity(0.1) : Colors.blueAccent.withOpacity(0.1),
+                        currentOrder.isDelivered ? primaryGreen : Colors.blueAccent,
                       ),
                     ],
                   ),
-                ),
-                const Divider(height: 48),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text("Grand Total", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                    Text(
-                      "Tk ${currentOrder.isDelivered ? currentOrder.totalGrandAmount.toInt() : currentOrder.totalOngoingAmount.toInt()}",
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.green.shade800),
-                    ),
-                  ],
-                ),
-                if (currentOrder.isDelivered && (currentOrder.review != null || currentOrder.tailorReview != null)) ...[
-                  const SizedBox(height: 35),
-                  const Text("Your Reviews", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 25),
+                  const Text("Products", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  if (currentOrder.review != null) ...[
-                    _reviewCard("Retailer Review", currentOrder.review!, currentOrder.rating ?? 0.0, Colors.blue),
+                  ...currentOrder.items.map((item) => _itemPreviewCard(item)),
+                  if (currentOrder.items.any((i) => i.destination == OrderDeliveryDestination.tailor)) ...[
+                    const SizedBox(height: 30),
+                    const Text("Tailor Customization Details", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
+                    ...currentOrder.items.where((i) => i.destination == OrderDeliveryDestination.tailor).map((item) => _tailorCustomizationCard(item, currentOrder.isDelivered)),
                   ],
-                  if (currentOrder.tailorReview != null) ...[
-                    _reviewCard("Tailor Review", currentOrder.tailorReview!, currentOrder.tailorRating ?? 0.0, Colors.orange),
-                  ],
-                ] else if (currentOrder.isDelivered) ...[
-                  const SizedBox(height: 35),
-                  const Text("Leave a Review", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 30),
+                  const Text("Order Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  _buildLeaveReviewCard(
-                    title: "Rate Retailer",
-                    themeColor: Colors.blue,
-                    currentRating: tempRetailerRating,
-                    controller: retailerController,
-                    onRatingChanged: (r) => setModalState(() => tempRetailerRating = r),
-                    onSubmit: () {
-                      if (tempRetailerRating == 0) {
-                        ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text("Please select a rating")));
-                        return;
-                      }
-                      setState(() {
-                        final idx = _orders.indexWhere((o) => o.id == currentOrder.id);
-                        if (idx != -1) {
-                          _orders[idx] = CustomerOrder(
-                            id: currentOrder.id,
-                            retailerName: currentOrder.retailerName,
-                            tailorName: currentOrder.tailorName,
-                            items: currentOrder.items,
-                            amount: currentOrder.amount,
-                            orderDate: currentOrder.orderDate,
-                            status: currentOrder.status,
-                            isDelivered: currentOrder.isDelivered,
-                            deliveryAddress: currentOrder.deliveryAddress,
-                            deliveryCharges: currentOrder.deliveryCharges,
-                            deliveryDate: currentOrder.deliveryDate,
-                            review: retailerController.text,
-                            rating: tempRetailerRating,
-                            tailorReview: currentOrder.tailorReview,
-                            tailorRating: currentOrder.tailorRating,
-                          );
-                        }
-                      });
-                      Navigator.pop(modalContext);
-                      ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text("Review submitted successfully!")));
-                    },
-                  ),
+                  _detailRow("Retailer(s)", currentOrder._allRetailerNames),
+                  if (currentOrder.tailorName != null) _buildTailorSummaryRow(currentOrder),
+                  _detailRow("Total Items", "${currentOrder.totalQuantity} units"),
+                  _detailRow("Order Date", _formatDate(currentOrder.orderDate)),
+                  if (currentOrder.deliveryDate != null) _detailRow("Delivery Date", _formatDate(currentOrder.deliveryDate!)),
                   const SizedBox(height: 12),
-                  if (currentOrder.items.any((i) => i.destination == OrderDeliveryDestination.tailor))
-                    _buildLeaveReviewCard(
-                      title: "Rate Tailor",
-                      themeColor: Colors.orange,
-                      currentRating: tempTailorRating,
-                      controller: tailorController,
-                      onRatingChanged: (r) => setModalState(() => tempTailorRating = r),
-                      onSubmit: () {
-                        if (tempTailorRating == 0) {
-                          ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text("Please select a rating")));
-                          return;
-                        }
-                        setState(() {
-                          final idx = _orders.indexWhere((o) => o.id == currentOrder.id);
-                          if (idx != -1) {
-                            _orders[idx] = CustomerOrder(
-                              id: currentOrder.id,
-                              retailerName: currentOrder.retailerName,
-                              tailorName: currentOrder.tailorName,
-                              items: currentOrder.items,
-                              amount: currentOrder.amount,
-                              orderDate: currentOrder.orderDate,
-                              status: currentOrder.status,
-                              isDelivered: currentOrder.isDelivered,
-                              deliveryAddress: currentOrder.deliveryAddress,
-                              deliveryCharges: currentOrder.deliveryCharges,
-                              deliveryDate: currentOrder.deliveryDate,
-                              review: currentOrder.review,
-                              rating: currentOrder.rating,
-                              tailorReview: tailorController.text,
-                              tailorRating: tempTailorRating,
-                            );
-                          }
-                        });
-                        Navigator.pop(modalContext);
-                        ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text("Tailor review submitted!")));
-                      },
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  ...currentOrder.deliveryCharges.entries.where((entry) {
+                    // Only show tailor delivery if it's delivered
+                    if (entry.key == currentOrder.tailorName && !currentOrder.isDelivered) return false;
+                    return true;
+                  }).map((entry) => _detailRow("Delivery (${entry.key})", "Tk ${entry.value.toInt()}")),
+                  const SizedBox(height: 20),
+                  const Text("Shipping Address", style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade200)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.location_on_outlined, size: 16, color: primaryGreen),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(currentOrder.deliveryAddress, style: const TextStyle(fontSize: 13, height: 1.4, fontWeight: FontWeight.w600))),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        InkWell(
+                          onTap: () => launchUrl(
+                            Uri.parse('https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(currentOrder.deliveryAddress)}'),
+                            mode: LaunchMode.externalApplication,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.map_outlined, size: 15, color: primaryGreen),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Open in Maps',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryGreen, decoration: TextDecoration.underline),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+                  const Divider(height: 48),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text("Grand Total", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                      Text(
+                        "Tk ${currentOrder.isDelivered ? currentOrder.totalGrandAmount.toInt() : currentOrder.totalOngoingAmount.toInt()}",
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.green.shade800),
+                      ),
+                    ],
+                  ),
+                  if (currentOrder.isDelivered) ...[
+                    const SizedBox(height: 35),
+                    if ((currentOrder.retailerReviews?.isNotEmpty ?? false) || currentOrder.tailorReview != null) ...[
+                      const Text("Your Reviews", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      if (currentOrder.retailerReviews != null)
+                        ...currentOrder.retailerReviews!.entries.map((entry) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _reviewCard("${entry.key} Review", entry.value, currentOrder.retailerRatings?[entry.key] ?? 0.0, Colors.blue),
+                        )),
+                      if (currentOrder.tailorReview != null) ...[
+                        _reviewCard("Tailor Review", currentOrder.tailorReview!, currentOrder.tailorRating ?? 0.0, Colors.orange),
+                      ],
+                      const SizedBox(height: 24),
+                    ],
+
+                    if (uniqueRetailers.any((r) => currentOrder.retailerReviews?[r] == null) ||
+                        (currentOrder.items.any((i) => i.destination == OrderDeliveryDestination.tailor) && currentOrder.tailorReview == null)) ...[
+                      const Text("Leave a Review", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      ...uniqueRetailers.where((r) => currentOrder.retailerReviews?[r] == null).map((retailer) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildLeaveReviewCard(
+                          title: "Rate $retailer",
+                          themeColor: Colors.blue,
+                          currentRating: tempRetailerRatings[retailer] ?? 0,
+                          controller: retailerControllers[retailer]!,
+                          onRatingChanged: (r) => setModalState(() => tempRetailerRatings[retailer] = r),
+                          onSubmit: () {
+                            if (tempRetailerRatings[retailer] == 0) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Please select a rating for $retailer")));
+                              return;
+                            }
+                            setState(() {
+                              final idx = _orders.indexWhere((o) => o.id == currentOrder.id);
+                              if (idx != -1) {
+                                final updatedReviews = Map<String, String>.from(_orders[idx].retailerReviews ?? {});
+                                final updatedRatings = Map<String, double>.from(_orders[idx].retailerRatings ?? {});
+                                updatedReviews[retailer] = retailerControllers[retailer]!.text;
+                                updatedRatings[retailer] = tempRetailerRatings[retailer]!;
+
+                                _orders[idx] = CustomerOrder(
+                                  id: currentOrder.id,
+                                  retailerName: currentOrder.retailerName,
+                                  tailorName: currentOrder.tailorName,
+                                  items: currentOrder.items,
+                                  amount: currentOrder.amount,
+                                  orderDate: currentOrder.orderDate,
+                                  status: currentOrder.status,
+                                  isDelivered: currentOrder.isDelivered,
+                                  deliveryAddress: currentOrder.deliveryAddress,
+                                  deliveryCharges: currentOrder.deliveryCharges,
+                                  deliveryDate: currentOrder.deliveryDate,
+                                  retailerReviews: updatedReviews,
+                                  retailerRatings: updatedRatings,
+                                  tailorReview: currentOrder.tailorReview,
+                                  tailorRating: currentOrder.tailorRating,
+                                );
+                              }
+                            });
+                            Navigator.pop(modalContext);
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Review for $retailer submitted!")));
+                          },
+                        ),
+                      )),
+                      const SizedBox(height: 12),
+                      if (currentOrder.items.any((i) => i.destination == OrderDeliveryDestination.tailor) && currentOrder.tailorReview == null)
+                        _buildLeaveReviewCard(
+                          title: "Rate Tailor",
+                          themeColor: Colors.orange,
+                          currentRating: tempTailorRating,
+                          controller: tailorController,
+                          onRatingChanged: (r) => setModalState(() => tempTailorRating = r),
+                          onSubmit: () {
+                            if (tempTailorRating == 0) {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a rating")));
+                              return;
+                            }
+                            setState(() {
+                              final idx = _orders.indexWhere((o) => o.id == currentOrder.id);
+                              if (idx != -1) {
+                                _orders[idx] = CustomerOrder(
+                                  id: currentOrder.id,
+                                  retailerName: currentOrder.retailerName,
+                                  tailorName: currentOrder.tailorName,
+                                  items: currentOrder.items,
+                                  amount: currentOrder.amount,
+                                  orderDate: currentOrder.orderDate,
+                                  status: currentOrder.status,
+                                  isDelivered: currentOrder.isDelivered,
+                                  deliveryAddress: currentOrder.deliveryAddress,
+                                  deliveryCharges: currentOrder.deliveryCharges,
+                                  deliveryDate: currentOrder.deliveryDate,
+                                  retailerReviews: currentOrder.retailerReviews,
+                                  retailerRatings: currentOrder.retailerRatings,
+                                  tailorReview: tailorController.text,
+                                  tailorRating: tempTailorRating,
+                                );
+                              }
+                            });
+                            Navigator.pop(modalContext);
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Tailor review submitted!")));
+                          },
+                        ),
+                    ],
+                  ],
+                  const SizedBox(height: 40),
                 ],
-                const SizedBox(height: 40),
-              ],
+              ),
             ),
-          ),
-        );
-      },
-    ),
-  ).then((_) {
-    retailerController.dispose();
-    tailorController.dispose();
-  });
-}
+          );
+        },
+      ),
+    );
+  }
 
   Widget _itemPreviewCard(OrderItem item) {
     return Container(
@@ -1265,18 +1309,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               Text("Tk ${item.price.toInt()}", style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.w900)),
             ],
           ),
-          const SizedBox(height: 16),
-          const Text("Care Instructions", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: [
-              _careTag(Icons.wash, "Wash", item.canWash),
-              _careTag(Icons.biotech, "Bleach", item.canBleach),
-              _careTag(Icons.dry_cleaning, "Dry Clean", item.canDryClean),
-              _careTag(Icons.iron, "Iron: ${item.ironLevel}", true),
-            ]),
-          ),
+          if (item.showCareInstructions) ...[
+            const SizedBox(height: 16),
+            const Text("Care Instructions", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: [
+                _careTag(Icons.wash, "Wash", item.canWash),
+                _careTag(Icons.biotech, "Bleach", item.canBleach),
+                _careTag(Icons.dry_cleaning, "Dry Clean", item.canDryClean),
+                _careTag(Icons.iron, "Iron: ${item.ironLevel}", true),
+              ]),
+            ),
+          ],
         ],
       ),
     );
@@ -1287,7 +1333,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.orange.shade50.withValues(alpha: 0.3),
+        color: Colors.orange.shade50.withOpacity(0.3),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.orange.shade100),
       ),
@@ -1599,14 +1645,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: themeColor.withValues(alpha: 0.05),
+        color: themeColor.withOpacity(0.05),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: themeColor.withValues(alpha: 0.1)),
+        border: Border.all(color: themeColor.withOpacity(0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: TextStyle(color: themeColor.withValues(alpha: 0.8), fontSize: 13, fontWeight: FontWeight.w800)),
+          Text(title, style: TextStyle(color: themeColor.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.w800)),
           const SizedBox(height: 12),
           Row(
             children: List.generate(
@@ -1617,7 +1663,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   padding: const EdgeInsets.only(right: 4),
                   child: Icon(
                     index < currentRating ? Icons.star : Icons.star_outline,
-                    color: index < currentRating ? themeColor : themeColor.withValues(alpha: 0.4),
+                    color: index < currentRating ? themeColor : themeColor.withOpacity(0.4),
                     size: 28,
                   ),
                 ),
@@ -1659,9 +1705,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: themeColor.withValues(alpha: 0.05),
+        color: themeColor.withOpacity(0.05),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: themeColor.withValues(alpha: 0.1)),
+        border: Border.all(color: themeColor.withOpacity(0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1671,15 +1717,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             children: [
               Text(
                 title,
-                style: TextStyle(color: themeColor.withValues(alpha: 0.8), fontSize: 13, fontWeight: FontWeight.w800),
+                style: TextStyle(color: themeColor.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.w800),
               ),
               Row(
                 children: [
-                  Icon(Icons.star, color: themeColor.withValues(alpha: 0.8), size: 16),
+                  Icon(Icons.star, color: themeColor.withOpacity(0.8), size: 16),
                   const SizedBox(width: 4),
                   Text(
                     rating.toString(),
-                    style: TextStyle(color: themeColor.withValues(alpha: 0.9), fontWeight: FontWeight.w900, fontSize: 14),
+                    style: TextStyle(color: themeColor.withOpacity(0.9), fontWeight: FontWeight.w900, fontSize: 14),
                   ),
                 ],
               ),
