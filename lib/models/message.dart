@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_role.dart';
 
 // SenderRole is an alias for UserRole — same values: customer, tailor, retailer
@@ -11,7 +12,6 @@ class Message {
   final String msgText;
   final String? attachment;
   final DateTime sentAt;
-
   // 🆕 New fields for reply and read features
   final String? replyToMessageId;
   final String? replyToText;
@@ -75,6 +75,8 @@ class Message {
     );
   }
 
+  /// Use this for writing to Firestore directly (native Timestamp type,
+  /// matches the "timestamp" type declared in the schema).
   Map<String, dynamic> toJson() => {
     'id': id,
     'conversationId': conversationId,
@@ -82,15 +84,24 @@ class Message {
     'senderRole': senderRole.name,
     'msgText': msgText,
     'attachment': attachment,
-    'sentAt': sentAt.toIso8601String(),
+    'sentAt': Timestamp.fromDate(sentAt),
     'replyToMessageId': replyToMessageId,
     'replyToText': replyToText,
     'replyToSender': replyToSender,
     'isRead': isRead,
-    'readAt': readAt?.toIso8601String(),
+    'readAt': readAt != null ? Timestamp.fromDate(readAt!) : null,
   };
 
+  /// Handles both native Firestore Timestamp (current/new docs) and
+  /// ISO8601 strings (legacy docs written before this fix).
   factory Message.fromJson(Map<String, dynamic> json) {
+    DateTime? _parseDate(dynamic value) {
+      if (value == null) return null;
+      if (value is Timestamp) return value.toDate();
+      if (value is String) return DateTime.tryParse(value);
+      return null;
+    }
+
     return Message(
       id: json['id'] ?? '',
       conversationId: json['conversationId'] ?? '',
@@ -98,16 +109,12 @@ class Message {
       senderRole: UserRole.values.byName(json['senderRole'] ?? 'customer'),
       msgText: json['msgText'] ?? '',
       attachment: json['attachment'],
-      sentAt: json['sentAt'] != null
-          ? DateTime.parse(json['sentAt'])
-          : DateTime.now(),
+      sentAt: _parseDate(json['sentAt']) ?? DateTime.now(),
       replyToMessageId: json['replyToMessageId'],
       replyToText: json['replyToText'],
       replyToSender: json['replyToSender'],
       isRead: json['isRead'] ?? false,
-      readAt: json['readAt'] != null
-          ? DateTime.parse(json['readAt'])
-          : null,
+      readAt: _parseDate(json['readAt']),
     );
   }
 }

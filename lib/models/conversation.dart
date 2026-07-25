@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'message.dart';
 import 'user_role.dart';
 
@@ -7,7 +8,6 @@ class Conversation {
   final String otherId;
   final UserRole otherRole;
   final String orderId;
-
   // 🆕 New fields for messaging features
   final int unreadCount;
   final DateTime? lastReadAt;
@@ -18,7 +18,6 @@ class Conversation {
   final bool isDeleted;
   final DateTime? deletedAt;
   final String? deletedBy;
-
   // Relationships
   List<Message>? messages;
 
@@ -76,6 +75,8 @@ class Conversation {
     );
   }
 
+  /// Use this for writing to Firestore directly (native Timestamp type,
+  /// matches the "timestamp" type declared in the schema).
   Map<String, dynamic> toJson() => {
     'id': id,
     'customerId': customerId,
@@ -83,39 +84,42 @@ class Conversation {
     'otherRole': otherRole.name,
     'orderId': orderId,
     'unreadCount': unreadCount,
-    'lastReadAt': lastReadAt?.toIso8601String(),
+    'lastReadAt': lastReadAt != null ? Timestamp.fromDate(lastReadAt!) : null,
     'isBlocked': isBlocked,
     'isMuted': isMuted,
-    'mutedUntil': mutedUntil?.toIso8601String(),
-    'updatedAt': updatedAt?.toIso8601String(),
+    'mutedUntil': mutedUntil != null ? Timestamp.fromDate(mutedUntil!) : null,
+    'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
     'isDeleted': isDeleted,
-    'deletedAt': deletedAt?.toIso8601String(),
+    'deletedAt': deletedAt != null ? Timestamp.fromDate(deletedAt!) : null,
     'deletedBy': deletedBy,
   };
 
+  /// Handles both native Firestore Timestamp (current/new docs) and
+  /// ISO8601 strings (legacy docs written before this fix), plus a safe
+  /// numeric cast for unreadCount (guards against int64 vs double
+  /// ambiguity coming back from Firestore).
   factory Conversation.fromJson(Map<String, dynamic> json) {
+    DateTime? _parseDate(dynamic value) {
+      if (value == null) return null;
+      if (value is Timestamp) return value.toDate();
+      if (value is String) return DateTime.tryParse(value);
+      return null;
+    }
+
     return Conversation(
       id: json['id'] ?? '',
       customerId: json['customerId'] ?? '',
       otherId: json['otherId'] ?? '',
       otherRole: UserRole.values.byName(json['otherRole'] ?? 'tailor'),
       orderId: json['orderId'] ?? '',
-      unreadCount: json['unreadCount'] ?? 0,
-      lastReadAt: json['lastReadAt'] != null
-          ? DateTime.parse(json['lastReadAt'])
-          : null,
+      unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
+      lastReadAt: _parseDate(json['lastReadAt']),
       isBlocked: json['isBlocked'] ?? false,
       isMuted: json['isMuted'] ?? false,
-      mutedUntil: json['mutedUntil'] != null
-          ? DateTime.parse(json['mutedUntil'])
-          : null,
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'])
-          : null,
+      mutedUntil: _parseDate(json['mutedUntil']),
+      updatedAt: _parseDate(json['updatedAt']),
       isDeleted: json['isDeleted'] ?? false,
-      deletedAt: json['deletedAt'] != null
-          ? DateTime.parse(json['deletedAt'])
-          : null,
+      deletedAt: _parseDate(json['deletedAt']),
       deletedBy: json['deletedBy'],
     );
   }
