@@ -1,6 +1,10 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'location_picker_screen.dart';
+import '../../services/user_session.dart';
+import '../../widgets/dashboard_drawer.dart';
 
 enum RegisterStep { roleSelect, customerForm, tailorForm, retailerForm }
 
@@ -14,6 +18,10 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProviderStateMixin {
   RegisterStep _step = RegisterStep.roleSelect;
   String? _selectedRole;
+  GeoPoint? _customerLocation;
+  GeoPoint? _tailorLocation;
+  GeoPoint? _retailerLocation;
+  bool _locationError = false;
 
   late AnimationController _floatController;
 
@@ -325,15 +333,33 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
 
         _buildFieldLabel('Address'),
         const SizedBox(height: 4),
-        _buildTextField(
+       _buildTextField(
           controller: _cusomerAddressController,
           hint: 'Address',
           icon: Icons.storefront_outlined,
         ),
+        const SizedBox(height: 10),
+        _buildLocationField(
+          location: _customerLocation,
+          onTap: () => _pickLocation(_customerLocation, (loc) => _customerLocation = loc),
+        ),
         const SizedBox(height: 16),
 
         _buildNextButton(onPressed: () {
-          // Navigate to Login Screen after "submitting"
+          if (_customerLocation == null) {
+            setState(() => _locationError = true);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Please pin your delivery location.')),
+            );
+            return;
+          }
+          UserSession.instance.customerProfile.value = DrawerProfileData(
+            name: _customerFullNameController.text,
+            email: _customerEmailController.text,
+            phone: _customerPhoneController.text,
+            address: _cusomerAddressController.text,
+            location: _customerLocation,
+          );
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -393,9 +419,27 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
           hint: 'Shop address',
           icon: Icons.storefront_outlined,
         ),
+        const SizedBox(height: 10),
+        _buildLocationField(
+          location: _tailorLocation,
+          onTap: () => _pickLocation(_tailorLocation, (loc) => _tailorLocation = loc),
+        ),
         const SizedBox(height: 16),
         _buildNextButton(onPressed: () {
-          // Navigate to Login Screen after "submitting"
+          if (_tailorLocation == null) {
+            setState(() => _locationError = true);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Please pin your shop location.')),
+            );
+            return;
+          }
+          UserSession.instance.tailorProfile.value = DrawerProfileData(
+            name: _tailorFullNameController.text,
+            email: _tailorEmailController.text,
+            phone: _tailorPhoneController.text,
+            address: _tailorAddressController.text,
+            location: _tailorLocation,
+          );
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -455,10 +499,29 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
           hint: 'Shop address',
           icon: Icons.storefront_outlined,
         ),
+        const SizedBox(height: 10),
+        _buildLocationField(
+          location: _retailerLocation,
+          onTap: () => _pickLocation(_retailerLocation, (loc) => _retailerLocation = loc),
+        ),
         const SizedBox(height: 16),
 
         _buildNextButton(onPressed: () {
-          // Navigate to Login Screen after "submitting"
+          if (_retailerLocation == null) {
+            setState(() => _locationError = true);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Please pin your shop location.')),
+            );
+            return;
+          }
+          UserSession.instance.retailerProfile.value = DrawerProfileData(
+            name: _shopNameController.text,
+            shopName: _shopNameController.text,
+            email: _orgEmailController.text,
+            phone: _retailerPhoneController.text,
+            address: _shopAddressController.text,
+            location: _retailerLocation,
+          );
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -466,6 +529,62 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         }),
         const SizedBox(height: 10),
         _buildSignInRow(),
+      ],
+    );
+  }
+
+  Future<void> _pickLocation(GeoPoint? current, ValueChanged<GeoPoint> onPicked) async {
+    final result = await Navigator.push<GeoPoint>(
+      context,
+      MaterialPageRoute(builder: (_) => LocationPickerScreen(initialLocation: current)),
+    );
+    if (result != null) {
+      setState(() {
+        onPicked(result);
+        _locationError = false;
+      });
+    }
+  }
+
+  Widget _buildLocationField({required GeoPoint? location, required VoidCallback onTap}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildFieldLabel('Pin your location'),
+        const SizedBox(height: 4),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _locationError ? Colors.red : Colors.transparent, width: 1.2),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.pin_drop_outlined, size: 18, color: _locationError ? Colors.red : Colors.black87),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    location != null
+                        ? 'Pinned: ${location.latitude.toStringAsFixed(5)}, ${location.longitude.toStringAsFixed(5)}'
+                        : 'Tap to pin on map',
+                    style: TextStyle(fontSize: 13, color: location != null ? Colors.black87 : Colors.black45),
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, size: 18, color: Colors.black26),
+              ],
+            ),
+          ),
+        ),
+        if (_locationError)
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text('Please pin a location before continuing.', style: TextStyle(fontSize: 11.5, color: Colors.red)),
+          ),
       ],
     );
   }

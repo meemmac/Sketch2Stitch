@@ -715,6 +715,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   String? _profilePicturePath;
   GeoPoint? _selectedLocation;
+  bool _locationError = false; // true once the user has tried to save without pinning
 
   @override
   void initState() {
@@ -751,11 +752,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ),
     );
     if (result != null) {
-      setState(() => _selectedLocation = result);
+      setState(() {
+        _selectedLocation = result;
+        _locationError = false;
+      });
     }
   }
 
   void _save() {
+    if (_selectedLocation == null) {
+      setState(() => _locationError = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please pin your location before saving.')),
+      );
+      return;
+    }
+
     final updated = widget.initialProfile.copyWith(
       name: _nameController.text,
       shopName: widget.role == AppUserRole.retailer ? _shopNameController.text : null,
@@ -902,22 +914,40 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 maxLines: 2,
               ),
               const SizedBox(height: 14),
-              // Location pinpoint — shown for ALL roles.
+              // Location pinpoint — shown for ALL roles, and REQUIRED.
               // For customers this doubles as their delivery location
-              // (used later for rule-based delivery charge calc).
+              // (used later for rule-based delivery charge calc), so it
+              // cannot be left unset.
+              Row(
+                children: [
+                  Text(
+                    isCustomer ? 'Delivery location' : 'Shop / workspace location',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
+                  ),
+                  const SizedBox(width: 4),
+                  const Text('*', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 6),
               InkWell(
                 onTap: _pickLocation,
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.black26),
+                    border: Border.all(
+                      color: _locationError ? Colors.red : Colors.black26,
+                      width: _locationError ? 1.4 : 1.0,
+                    ),
                     borderRadius: BorderRadius.circular(8),
-                    color: Colors.white,
+                    color: _locationError ? Colors.red.withOpacity(0.03) : Colors.white,
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.pin_drop_outlined, color: themeColor),
+                      Icon(
+                        Icons.pin_drop_outlined,
+                        color: _locationError ? Colors.red : themeColor,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -929,15 +959,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                   : 'Tap to pin your shop/workspace location'),
                           style: TextStyle(
                             fontSize: 14,
-                            color: _selectedLocation != null ? Colors.black87 : Colors.black45,
+                            color: _selectedLocation != null
+                                ? Colors.black87
+                                : (_locationError ? Colors.red.shade700 : Colors.black45),
                           ),
                         ),
                       ),
-                      const Icon(Icons.chevron_right_rounded, color: Colors.black26),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: _locationError ? Colors.red.shade200 : Colors.black26,
+                      ),
                     ],
                   ),
                 ),
               ),
+              if (_locationError) ...[
+                const SizedBox(height: 6),
+                const Text(
+                  'This field is required — please pin a location.',
+                  style: TextStyle(fontSize: 12, color: Colors.red),
+                ),
+              ],
               if (!isCustomer) ...[
                 const SizedBox(height: 14),
                 TextField(
