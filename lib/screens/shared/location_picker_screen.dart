@@ -63,34 +63,6 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     Navigator.pop(context, GeoPoint(_picked.latitude, _picked.longitude));
   }
 
-  void _showInfoDialog() {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.info_outline, color: Color(0xFF6C9985)),
-            SizedBox(width: 10),
-            Text('Why we need this'),
-          ],
-        ),
-        content: const Text(
-          'The location you pin here is used to estimate your delivery charge, '
-          'based on the distance from the retailer and tailor to you. '
-          'You can update this anytime from your profile.',
-          style: TextStyle(fontSize: 14, height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Got it'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -100,11 +72,6 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         foregroundColor: Colors.black87,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            tooltip: 'Why we need this',
-            onPressed: _showInfoDialog,
-          ),
           TextButton(
             onPressed: _confirm,
             child: const Text('Confirm', style: TextStyle(fontWeight: FontWeight.bold)),

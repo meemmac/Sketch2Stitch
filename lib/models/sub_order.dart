@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'order_item.dart';
 
 enum SubOrderStatus {
@@ -18,6 +19,7 @@ class SubOrder {
   final String retailerId;
   final SubOrderStatus status;
   final SubOrderDeliveryDestination deliveryDestination;
+  final GeoPoint? deliveryPoint; // snapshot of the exact coords used for the charge calc
   final DateTime? deliveryDate;
   final DateTime? autoReleaseAt;
   final double itemsSubtotal;
@@ -32,6 +34,7 @@ class SubOrder {
     required this.retailerId,
     required this.status,
     this.deliveryDestination = SubOrderDeliveryDestination.pending,
+    this.deliveryPoint,
     this.deliveryDate,
     this.autoReleaseAt,
     this.itemsSubtotal = 0,
@@ -70,6 +73,7 @@ class SubOrder {
     String? retailerId,
     SubOrderStatus? status,
     SubOrderDeliveryDestination? deliveryDestination,
+    GeoPoint? deliveryPoint,
     DateTime? deliveryDate,
     DateTime? autoReleaseAt,
     double? itemsSubtotal,
@@ -83,6 +87,7 @@ class SubOrder {
       retailerId: retailerId ?? this.retailerId,
       status: status ?? this.status,
       deliveryDestination: deliveryDestination ?? this.deliveryDestination,
+      deliveryPoint: deliveryPoint ?? this.deliveryPoint,
       deliveryDate: deliveryDate ?? this.deliveryDate,
       autoReleaseAt: autoReleaseAt ?? this.autoReleaseAt,
       itemsSubtotal: itemsSubtotal ?? this.itemsSubtotal,
@@ -98,6 +103,7 @@ class SubOrder {
     'retailerId': retailerId,
     'status': status.name,
     'deliveryDestination': deliveryDestination.name,
+    'deliveryPoint': deliveryPoint,
     'deliveryDate': deliveryDate?.toIso8601String(),
     'autoReleaseAt': autoReleaseAt?.toIso8601String(),
     'itemsSubtotal': itemsSubtotal,
@@ -114,6 +120,7 @@ class SubOrder {
       deliveryDestination: SubOrderDeliveryDestination.values.byName(
         json['deliveryDestination'] ?? 'pending',
       ),
+      deliveryPoint: json['deliveryPoint'] as GeoPoint?,
       deliveryDate: json['deliveryDate'] != null
           ? DateTime.parse(json['deliveryDate'])
           : null,

@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'design.dart';
 import 'measurement.dart';
 
@@ -62,6 +63,7 @@ class TailorJob {
   final double? quoteAmount;       // tailoring service cost only
   final double? deliveryCharge;    // computed from distance — not a base rate
   final double? deliveryDistanceKm;
+  final GeoPoint? deliveryPoint;   // snapshot of the exact coords used for the charge calc
   final String? quoteNote;
   final QuoteStatus quoteStatus;
   final TailorPaymentStatus tailorPaymentStatus;
@@ -87,6 +89,7 @@ class TailorJob {
     this.quoteAmount,
     this.deliveryCharge,
     this.deliveryDistanceKm,
+    this.deliveryPoint,
     this.quoteNote,
     required this.quoteStatus,
     required this.tailorPaymentStatus,
@@ -154,6 +157,7 @@ class TailorJob {
     double? quoteAmount,
     double? deliveryCharge,
     double? deliveryDistanceKm,
+    GeoPoint? deliveryPoint,
     String? quoteNote,
     QuoteStatus? quoteStatus,
     TailorPaymentStatus? tailorPaymentStatus,
@@ -178,6 +182,7 @@ class TailorJob {
       quoteAmount: quoteAmount ?? this.quoteAmount,
       deliveryCharge: deliveryCharge ?? this.deliveryCharge,
       deliveryDistanceKm: deliveryDistanceKm ?? this.deliveryDistanceKm,
+      deliveryPoint: deliveryPoint ?? this.deliveryPoint,
       quoteNote: quoteNote ?? this.quoteNote,
       quoteStatus: quoteStatus ?? this.quoteStatus,
       tailorPaymentStatus: tailorPaymentStatus ?? this.tailorPaymentStatus,
@@ -204,6 +209,7 @@ class TailorJob {
     'quoteAmount': quoteAmount,
     'deliveryCharge': deliveryCharge,
     'deliveryDistanceKm': deliveryDistanceKm,
+    'deliveryPoint': deliveryPoint,
     'quoteNote': quoteNote,
     'quoteStatus': quoteStatus.toValue,
     'tailorPaymentStatus': tailorPaymentStatus.toValue,
@@ -236,6 +242,7 @@ class TailorJob {
       quoteAmount: json['quoteAmount']?.toDouble(),
       deliveryCharge: (json['deliveryCharge'] as num?)?.toDouble(),
       deliveryDistanceKm: (json['deliveryDistanceKm'] as num?)?.toDouble(),
+      deliveryPoint: json['deliveryPoint'] as GeoPoint?,
       quoteNote: json['quoteNote'],
       quoteStatus: QuoteStatus.fromValue(json['quoteStatus'] ?? 'not_sent'),
       tailorPaymentStatus: TailorPaymentStatus.fromValue(
