@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../screens/customer/virtual_trial_screen.dart';
@@ -8,6 +9,7 @@ import '../screens/customer/measurement_screen.dart';
 import '../models/measurement.dart';
 import '../screens/shared/welcome_screen.dart';
 import '../screens/shared/about_us_screen.dart';
+import '../screens/shared/location_picker_screen.dart';
 import '../screens/tailor/portfolio_screen.dart';
 import '../screens/tailor/orders_screen.dart';
 import '../screens/customer/cart_screen.dart';
@@ -30,6 +32,7 @@ class DrawerProfileData {
   final double rating; // For Tailor and Retailer
   final String? profilePicture;
   final String? about;
+  final GeoPoint? location; // Pinned lat/lng — doubles as delivery location for customers
 
   const DrawerProfileData({
     required this.name,
@@ -40,7 +43,11 @@ class DrawerProfileData {
     this.rating = 0.0,
     this.profilePicture,
     this.about = '',
+    this.location,
   });
+
+  double? get locationLat => location?.latitude;
+  double? get locationLng => location?.longitude;
 
   DrawerProfileData copyWith({
     String? name,
@@ -51,6 +58,7 @@ class DrawerProfileData {
     double? rating,
     String? profilePicture,
     String? about,
+    GeoPoint? location,
   }) {
     return DrawerProfileData(
       name: name ?? this.name,
@@ -61,6 +69,7 @@ class DrawerProfileData {
       rating: rating ?? this.rating,
       profilePicture: profilePicture ?? this.profilePicture,
       about: about ?? this.about,
+      location: location ?? this.location,
     );
   }
 }
@@ -391,6 +400,15 @@ class DrawerProfileSection extends StatelessWidget {
           _buildInfoRow(Icons.phone_outlined, profile.phone),
           const SizedBox(height: 8),
           _buildInfoRow(Icons.location_on_outlined, profile.address),
+          if (profile.location != null) ...[
+            const SizedBox(height: 8),
+            _buildInfoRow(
+              Icons.pin_drop_outlined,
+              '${profile.location!.latitude.toStringAsFixed(5)}, '
+              '${profile.location!.longitude.toStringAsFixed(5)}'
+              '${isCustomer ? '  (delivery location)' : ''}',
+            ),
+          ],
           if (!isCustomer && profile.about != null && profile.about!.isNotEmpty) ...[
             const SizedBox(height: 12),
             const Divider(),
@@ -686,6 +704,7 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
   late TextEditingController _aboutController;
 
   String? _profilePicturePath;
+  GeoPoint? _selectedLocation;
 
   @override
   void initState() {
@@ -697,6 +716,7 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
     _addressController = TextEditingController(text: widget.initialProfile.address);
     _aboutController = TextEditingController(text: widget.initialProfile.about ?? '');
     _profilePicturePath = widget.initialProfile.profilePicture;
+    _selectedLocation = widget.initialProfile.location;
   }
 
   Future<void> _pickImage() async {
@@ -710,6 +730,18 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
       }
     } catch (e) {
       debugPrint("Error picking profile image: $e");
+    }
+  }
+
+  Future<void> _pickLocation() async {
+    final result = await Navigator.push<GeoPoint>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LocationPickerScreen(initialLocation: _selectedLocation),
+      ),
+    );
+    if (result != null) {
+      setState(() => _selectedLocation = result);
     }
   }
 
@@ -846,6 +878,42 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
               ),
               maxLines: 2,
             ),
+            const SizedBox(height: 12),
+            // Location pinpoint — shown for ALL roles.
+            // For customers this doubles as their delivery location
+            // (used later for rule-based delivery charge calc).
+            InkWell(
+              onTap: _pickLocation,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.black26),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.pin_drop_outlined, color: Color(0xFF6C9985)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _selectedLocation != null
+                            ? 'Pinned: ${_selectedLocation!.latitude.toStringAsFixed(5)}, '
+                              '${_selectedLocation!.longitude.toStringAsFixed(5)}'
+                            : (isCustomer
+                                ? 'Tap to pin your delivery location'
+                                : 'Tap to pin your shop/workspace location'),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _selectedLocation != null ? Colors.black87 : Colors.black45,
+                        ),
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, color: Colors.black26),
+                  ],
+                ),
+              ),
+            ),
             if (!isCustomer) ...[
               const SizedBox(height: 12),
               TextField(
@@ -885,6 +953,7 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
               address: _addressController.text,
               about: _aboutController.text,
               profilePicture: _profilePicturePath,
+              location: _selectedLocation,
             );
             widget.onSave(updated);
             Navigator.pop(context);
