@@ -177,8 +177,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         unreadCount: 0,
         isMuted: false,
         isBlocked: true,
-        blockedBy: widget.customerId,
-        blockedAt: DateTime.now().subtract(const Duration(days: 1)),
         updatedAt: DateTime.now().subtract(const Duration(days: 2, hours: 12)),
         messages: [
           Message(
@@ -454,8 +452,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       if (index != -1) {
         _conversations[index] = _conversations[index].copyWith(
           isBlocked: true,
-          blockedBy: widget.customerId,
-          blockedAt: DateTime.now(),
           updatedAt: DateTime.now(),
         );
       }
@@ -485,8 +481,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         if (index != -1) {
           _conversations[index] = _conversations[index].copyWith(
             isBlocked: false,
-            blockedBy: null,
-            blockedAt: null,
           );
         }
         _applyFilter();
@@ -500,8 +494,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       if (index != -1) {
         _conversations[index] = _conversations[index].copyWith(
           isBlocked: false,
-          blockedBy: null,
-          blockedAt: null,
           updatedAt: DateTime.now(),
         );
       }
@@ -531,8 +523,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         if (index != -1) {
           _conversations[index] = _conversations[index].copyWith(
             isBlocked: true,
-            blockedBy: widget.customerId,
-            blockedAt: DateTime.now(),
           );
         }
         _applyFilter();
@@ -559,14 +549,14 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       // await api.deleteConversation(conversation.id);
       
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Conversation deleted'),
-          backgroundColor: Color(0xFF2C5C44),
+        SnackBar(
+          content: const Text('Conversation deleted'),
+          backgroundColor: const Color(0xFF2C5C44),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          margin: EdgeInsets.all(16),
+          margin: const EdgeInsets.all(16),
         ),
       );
       
@@ -957,36 +947,24 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
     return GestureDetector(
       onTap: () {
-        if (!isBlocked) {
-          _markConversationAsRead(conversation.id);
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ChatScreen(
-                conversationId: conversation.id,
-                customerId: widget.customerId,
-                otherUserId: conversation.otherId,
-                otherUserName: otherName,
-                otherUserRole: conversation.otherRole,
-                otherUserAvatar: otherAvatar,
-                orderId: conversation.orderId,
-                onConversationRead: _onConversationRead,
-              ),
+        // ✅ FIXED: Always open the chat, even if blocked
+        // The ChatScreen will handle the blocked state UI
+        _markConversationAsRead(conversation.id);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(
+              conversationId: conversation.id,
+              customerId: widget.customerId,
+              otherUserId: conversation.otherId,
+              otherUserName: otherName,
+              otherUserRole: conversation.otherRole,
+              otherUserAvatar: otherAvatar,
+              orderId: conversation.orderId,
+              onConversationRead: _onConversationRead,
             ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('This user is blocked. Unblock to chat.'),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              margin: EdgeInsets.all(16),
-            ),
-          );
-        }
+          ),
+        );
       },
       onLongPress: () {
         _showConversationOptions(conversation);
@@ -1134,7 +1112,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                         const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          isBlocked ? '🔒 User is blocked' : lastMessage,
+                          isBlocked ? '🔒 User is blocked - Tap to unblock' : lastMessage,
                           style: TextStyle(
                             fontSize: 13,
                             color: isBlocked ? Colors.red : (unreadCount > 0 ? Colors.black87 : Colors.grey[600]),
@@ -1535,7 +1513,7 @@ class _ConversationSearchDelegate extends SearchDelegate {
                             const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              conversation.isBlocked ? '🔒 User is blocked' : lastMessage,
+                              conversation.isBlocked ? '🔒 User is blocked - Tap to unblock' : lastMessage,
                               style: TextStyle(
                                 fontSize: 13,
                                 color: conversation.isBlocked ? Colors.red : (unreadCount > 0 ? Colors.black87 : Colors.grey[600]),

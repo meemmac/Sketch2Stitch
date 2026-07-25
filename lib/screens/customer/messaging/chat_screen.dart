@@ -1,13 +1,14 @@
 // lib/screens/customer/messaging/chat_screen.dart
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:photo_view/photo_view.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sketch2stitch/models/message.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/models/conversation.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-import 'package:flutter/services.dart';
-import 'package:photo_view/photo_view.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -18,6 +19,7 @@ class ChatScreen extends StatefulWidget {
   final String? otherUserAvatar;
   final String? orderId;
   final Function(String)? onConversationRead;
+  final bool? isBlocked; // 🆕 Add this parameter
 
   const ChatScreen({
     super.key,
@@ -29,6 +31,7 @@ class ChatScreen extends StatefulWidget {
     this.otherUserAvatar,
     this.orderId,
     this.onConversationRead,
+    this.isBlocked, // 🆕
   });
 
   @override
@@ -66,6 +69,10 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
+    
+    // 🆕 Set initial blocked state from widget parameter
+    _isBlocked = widget.isBlocked ?? false;
+    
     _loadMessages();
     _loadConversationStatus();
     _markConversationAsRead();
@@ -99,12 +106,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     
     try {
       // TODO: Replace with API call
-      // final response = await api.getMessages(widget.conversationId);
-      // setState(() {
-      //   _messages = response.data.map((json) => Message.fromJson(json)).toList();
-      //   _isLoading = false;
-      // });
-      
       await Future.delayed(const Duration(milliseconds: 500));
       final sampleMessages = _getSampleMessages();
       setState(() {
@@ -133,11 +134,14 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       final prefs = await SharedPreferences.getInstance();
       final isMuted = prefs.getBool('muted_${widget.conversationId}') ?? false;
       final mutedUntilStr = prefs.getString('mutedUntil_${widget.conversationId}');
-      final isBlocked = prefs.getBool('blocked_${widget.conversationId}') ?? false;
       
-      setState(() {
-        _isBlocked = isBlocked;
-      });
+      // 🆕 Only load blocked status from prefs if not already set from widget
+      if (widget.isBlocked == null) {
+        final isBlocked = prefs.getBool('blocked_${widget.conversationId}') ?? false;
+        setState(() {
+          _isBlocked = isBlocked;
+        });
+      }
       
       if (isMuted && mutedUntilStr != null) {
         final mutedUntil = DateTime.parse(mutedUntilStr);
@@ -219,15 +223,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
     try {
       // TODO: Replace with API call
-      // final response = await api.sendMessage(
-      //   conversationId: widget.conversationId,
-      //   senderId: widget.customerId,
-      //   msgText: text,
-      //   replyToMessageId: _replyingToMessageId,
-      //   replyToText: _replyingToMessageText,
-      //   replyToSender: _replyingToSender,
-      // );
-      
       setState(() => _isTyping = true);
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) {

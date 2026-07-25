@@ -6,13 +6,19 @@ import 'package:sketch2stitch/models/review.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
+import 'package:sketch2stitch/screens/customer/messaging/conversations_screen.dart';
+import 'package:sketch2stitch/models/user_role.dart';
 
 class RetailerDetailScreen extends StatefulWidget {
   final Retailer retailer;
-
+  final VoidCallback? onBackPressed;
+  final void Function(String retailerId)? onRetailerSelected;
+  
   const RetailerDetailScreen({
     super.key,
     required this.retailer,
+    this.onBackPressed,
+    this.onRetailerSelected,
   });
 
   @override
@@ -132,6 +138,19 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   List<Product> get _fabrics => widget.retailer.products?.where((p) => _isFabric(p)).toList() ?? [];
   List<Product> get _elements => widget.retailer.products?.where((p) => _isElement(p)).toList() ?? [];
 
+  // ─── Navigate to Conversations ─────────────────────────────────────────
+
+  void _startConversation() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ConversationsScreen(
+          customerId: 'current_customer_id',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -154,13 +173,14 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                     _buildCategoryToggle(isSmallScreen),
                   const SizedBox(height: 12),
                   _buildProductsSection(isSmallScreen, isMediumScreen),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 80),
                 ],
               ),
             ),
           ),
         ],
       ),
+      bottomNavigationBar: _buildBottomBar(isSmallScreen),
     );
   }
 
@@ -251,7 +271,13 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
           ),
           child: Icon(Icons.arrow_back, color: Colors.white, size: isSmallScreen ? 18 : 22),
         ),
-        onPressed: () => Navigator.pop(context),
+        onPressed: () {
+          if (widget.onBackPressed != null) {
+            widget.onBackPressed!();
+          } else {
+            Navigator.pop(context);
+          }
+        },
       ),
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
@@ -428,9 +454,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
             color: Colors.white,
             size: isSmallScreen ? 22 : 24,
           ),
-          onPressed: () {
-            // TODO: Implement chat functionality
-          },
+          onPressed: _startConversation,
         ),
         IconButton(
           icon: Icon(
@@ -567,218 +591,201 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   }
 
   // ─── Product Grid ──────────────────────────────────────────────────────
+Widget _buildProductGrid(List<Product> products, bool isSmallScreen, bool isMediumScreen) {
+  final displayProducts = _showAllProducts ? products : (products.length > 6 ? products.take(6).toList() : products);
+  final screenWidth = MediaQuery.of(context).size.width;
+  final spacing = isSmallScreen ? 10.0 : 12.0;
+  final horizontalPadding = 0.0; // No extra padding since parent already has padding
+  
+  // Calculate card width based on available space
+  final cardWidth = (screenWidth - (spacing * 3)) / 2; // 2 columns with spacing
+  final cardHeight = isSmallScreen ? 240.0 : 270.0;
+  final imageHeight = isSmallScreen ? 130.0 : 150.0;
+  final contentPadding = isSmallScreen ? 8.0 : 10.0;
 
-  Widget _buildProductGrid(List<Product> products, bool isSmallScreen, bool isMediumScreen) {
-    final displayProducts = _showAllProducts ? products : (products.length > 6 ? products.take(6).toList() : products);
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    final spacing = isSmallScreen ? 10.0 : 12.0;
-    final cardAspectRatio = screenHeight < 700 ? 0.72 : 0.78;
+  return GridView.builder(
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 2,
+      childAspectRatio: cardWidth / cardHeight,
+      crossAxisSpacing: spacing,
+      mainAxisSpacing: spacing,
+    ),
+    itemCount: displayProducts.length,
+    itemBuilder: (context, index) {
+      final product = displayProducts[index];
+      final coverImage = product.colorOptions.isNotEmpty
+          ? product.colorOptions.first.image
+          : null;
+      final bool outOfStock =
+          product.colorOptions.every((c) => c.stock <= 0);
+      final bool isElement = _isElement(product);
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: cardAspectRatio,
-        crossAxisSpacing: spacing,
-        mainAxisSpacing: spacing,
-      ),
-      itemCount: displayProducts.length,
-      itemBuilder: (context, index) {
-        final product = displayProducts[index];
-        final coverImage = product.colorOptions.isNotEmpty
-            ? product.colorOptions.first.image
-            : null;
-        final bool outOfStock =
-            product.colorOptions.every((c) => c.stock <= 0);
-        final bool isElement = _isElement(product);
-
-        return GestureDetector(
-          onTap: () => _showProductDetailOverlay(context, product),
-          child: Container(
-            decoration: BoxDecoration(
-              color: kCardBg,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: kBorder, width: 0.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Image section with category badge
-                Flexible(
-                  flex: 5,
-                  child: Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: double.infinity,
-                          child: coverImage != null
-                              ? Image.asset(
-                                  coverImage,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => Container(
-                                    color: kSage.withValues(alpha: 0.12),
-                                    child: Icon(
-                                      isElement ? Icons.category : Icons.texture,
-                                      size: isSmallScreen ? 36 : 40,
-                                      color: kSageDark,
-                                    ),
-                                  ),
-                                )
-                              : Container(
-                                  color: kSage.withValues(alpha: 0.12),
-                                  child: Icon(
-                                    isElement ? Icons.category : Icons.texture,
-                                    size: isSmallScreen ? 36 : 40,
-                                    color: kSageDark,
-                                  ),
-                                ),
-                        ),
-                      ),
-                      // Category Badge - Top Right
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isSmallScreen ? 8 : 10, 
-                            vertical: isSmallScreen ? 4 : 5
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.7),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              width: 0.3,
-                            ),
-                          ),
-                          child: Text(
-                            product.category,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Out of Stock Badge - Top Left
-                      if (outOfStock)
-                        Positioned(
-                          top: 8,
-                          left: 8,
-                          child: Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: isSmallScreen ? 8 : 10, 
-                              vertical: isSmallScreen ? 4 : 5
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.85),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                width: 0.3,
-                              ),
-                            ),
-                            child: Text(
-                              'Out of Stock',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                // Content section
-                Flexible(
-                  flex: 4,
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      isSmallScreen ? 10 : 12,
-                      isSmallScreen ? 8 : 10,
-                      isSmallScreen ? 10 : 12,
-                      isSmallScreen ? 10 : 12,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          product.productName,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            height: 1.2,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        SizedBox(height: isSmallScreen ? 2 : 3),
-                        Text(
-                          widget.retailer.shopName,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        SizedBox(height: isSmallScreen ? 4 : 6),
-                        Text(
-                          product.priceRange,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: kSageDark,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        SizedBox(height: isSmallScreen ? 6 : 8),
-                        // Bike icon removed — only color dots remain
-                        if (!outOfStock)
-                          Row(
-                            children: product.colorOptions
-                                .take(4)
-                                .map((option) => Padding(
-                                      padding: EdgeInsets.only(right: isSmallScreen ? 3 : 4),
-                                      child: _colorDot(option, isSmallScreen),
-                                    ))
-                                .toList(),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+      return GestureDetector(
+        onTap: () => _showProductDetailOverlay(context, product),
+        child: Container(
+          decoration: BoxDecoration(
+            color: kCardBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: kBorder, width: 0.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        );
-      },
-    );
-  }
-
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Image section with fixed height
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                    child: Container(
+                      width: double.infinity,
+                      height: imageHeight,
+                      color: Colors.grey[100],
+                      child: coverImage != null
+                          ? Image.asset(
+                              coverImage,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: kSage.withValues(alpha: 0.12),
+                                child: Icon(
+                                  isElement ? Icons.category : Icons.texture,
+                                  size: isSmallScreen ? 36 : 40,
+                                  color: kSageDark,
+                                ),
+                              ),
+                            )
+                          : Container(
+                              color: kSage.withValues(alpha: 0.12),
+                              child: Icon(
+                                isElement ? Icons.category : Icons.texture,
+                                size: isSmallScreen ? 36 : 40,
+                                color: kSageDark,
+                              ),
+                            ),
+                    ),
+                  ),
+                  // Category Badge - Top Right
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isSmallScreen ? 6 : 8, 
+                        vertical: isSmallScreen ? 3 : 4
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          width: 0.3,
+                        ),
+                      ),
+                      child: Text(
+                        product.category,
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 9 : 10,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.3,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                  ),
+                  // Out of Stock Badge - Top Left
+                  if (outOfStock)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 6 : 8, 
+                          vertical: isSmallScreen ? 3 : 4
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.85),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            width: 0.3,
+                          ),
+                        ),
+                        child: Text(
+                          'Out of Stock',
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 9 : 10,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              // Content section with constrained width
+              Padding(
+                padding: EdgeInsets.all(contentPadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      product.productName,
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 11 : 12,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: isSmallScreen ? 4 : 6),
+                    Text(
+                      product.priceRange,
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 11 : 12,
+                        fontWeight: FontWeight.w700,
+                        color: kSageDark,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (!outOfStock && product.colorOptions.isNotEmpty) ...[
+                      SizedBox(height: isSmallScreen ? 4 : 6),
+                      Wrap(
+                        spacing: isSmallScreen ? 2 : 3,
+                        runSpacing: 2,
+                        children: product.colorOptions
+                            .take(4)
+                            .map((option) => _colorDot(option, isSmallScreen))
+                            .toList(),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
   Widget _colorDot(ColorOption option, bool isSmall) {
     final color = _resolveColor(option.color);
     final bool outOfStock = option.stock <= 0;
-    final double size = isSmall ? 14 : 16;
+    final double size = isSmall ? 10 : 12;
     return Opacity(
       opacity: outOfStock ? 0.35 : 1.0,
       child: Container(
@@ -820,7 +827,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     }
   }
 
-  // ─── Reviews Page (matches RetailerReviewsScreen) ─────────────────────
+  // ─── Reviews Page ─────────────────────────────────────────────────────
 
   void _showReviewsOverlay(BuildContext context) {
     Navigator.push(
@@ -1229,6 +1236,73 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         product: product,
         isFabric: _isFabric(product),
         retailerName: widget.retailer.shopName,
+      ),
+    );
+  }
+
+  // ─── Bottom Bar ────────────────────────────────────────────────────────
+
+  Widget _buildBottomBar(bool isSmallScreen) {
+    final padding = isSmallScreen ? 12.0 : 16.0;
+    final verticalPadding = isSmallScreen ? 10.0 : 14.0;
+    final fontSize = isSmallScreen ? 13.0 : 15.0;
+    
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: padding, vertical: verticalPadding),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: ElevatedButton(
+              onPressed: _navigateToOrder,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2C5C44),
+                padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 10.0 : 14.0),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                textStyle: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              child: Text(
+                isSmallScreen ? 'Order' : 'Order Now',
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Navigation Methods ──────────────────────────────────────────────
+
+  void _navigateToOrder() {
+    if (widget.onRetailerSelected != null) {
+      widget.onRetailerSelected!(widget.retailer.id);
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Order from ${widget.retailer.shopName}'),
+        backgroundColor: const Color(0xFF2C5C44),
+        duration: const Duration(seconds: 2),
       ),
     );
   }

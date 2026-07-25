@@ -668,13 +668,13 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.directions_bike, size: isSmallScreen ? 10 : 12, color: Colors.grey[600]),
+                                Icon(Icons.directions_bike, size: isSmallScreen ? 14 : 16, color: const Color.fromARGB(255, 107, 106, 106)),
                                 const SizedBox(width: 2),
                                 Text(
                                   'Tk 50',
                                   style: TextStyle(
-                                    fontSize: isSmallScreen ? 9 : 10,
-                                    color: Colors.grey[600],
+                                    fontSize: isSmallScreen ? 12 : 14,
+                                    color: const Color.fromARGB(255, 107, 106, 106),
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),

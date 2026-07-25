@@ -34,6 +34,38 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
 
   bool get _inStock => (_selectedOption?.stock ?? 0) > 0;
 
+  /// Get the material blend display text from materialType
+  /// Supports formats like:
+  /// - "100% Cotton"
+  /// - "70% Silk, 30% Viscose"
+  /// - "Cotton" (defaults to "100% Cotton")
+  String get _materialBlendDisplay {
+    final material = widget.product.materialType.trim();
+    if (material.isEmpty || material == "N/A") {
+      return "N/A";
+    }
+    
+    // Check if material already has percentage format
+    if (material.contains('%')) {
+      return material;
+    }
+    
+    // Check if it has multiple materials (comma separated)
+    if (material.contains(',')) {
+      final parts = material.split(',').map((s) => s.trim()).toList();
+      // Try to parse percentages if present
+      final hasPercentages = parts.any((p) => p.contains('%'));
+      if (hasPercentages) {
+        return material;
+      }
+      // If no percentages, add "100%" to first item and keep others as is
+      return "100% $material";
+    }
+    
+    // Single material with no percentage
+    return "100% $material";
+  }
+
   void _selectOption(ColorOption option) {
     setState(() {
       _selectedOption = option;
@@ -247,9 +279,8 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 10),
 
-                  // Material Blend Badge — pill style like the reference design,
-                  // shows the blend text from product.dart's materialDisplay
-                  if (widget.product.materialDisplay.isNotEmpty && widget.product.materialDisplay != "N/A") ...[
+                  // Material Blend Badge — shows like "70% Silk, 30% Viscose" or "100% Cotton"
+                  if (_materialBlendDisplay != "N/A") ...[
                     Row(
                       children: [
                         Container(
@@ -260,7 +291,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                             border: Border.all(color: Colors.green[100]!),
                           ),
                           child: Text(
-                            widget.product.materialDisplay,
+                            _materialBlendDisplay,
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
