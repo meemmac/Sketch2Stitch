@@ -159,7 +159,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         otherRole: UserRole.tailor,
         orderId: 'ORD-001',
         unreadCount: 1,
-        isMuted: false,
         isBlocked: false,
         updatedAt: DateTime.now().subtract(const Duration(minutes: 5)),
         messages: [
@@ -191,8 +190,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         otherRole: UserRole.retailer,
         orderId: 'ORD-002',
         unreadCount: 0,
-        isMuted: true,
-        mutedUntil: DateTime.now().add(const Duration(days: 7)),
         isBlocked: false,
         updatedAt: DateTime.now().subtract(const Duration(days: 1)),
         messages: [
@@ -215,7 +212,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         otherRole: UserRole.tailor,
         orderId: 'ORD-003',
         unreadCount: 2,
-        isMuted: false,
         isBlocked: false,
         updatedAt: DateTime.now().subtract(const Duration(days: 1, hours: 23)),
         messages: [
@@ -256,7 +252,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         otherRole: UserRole.retailer,
         orderId: 'ORD-004',
         unreadCount: 0,
-        isMuted: false,
         isBlocked: true,
         updatedAt: DateTime.now().subtract(const Duration(days: 2, hours: 12)),
         messages: [
@@ -290,7 +285,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         otherRole: UserRole.customer,
         orderId: '',
         unreadCount: 3,
-        isMuted: false,
         isBlocked: false,
         updatedAt: DateTime.now().subtract(const Duration(hours: 1)),
         messages: [
@@ -321,7 +315,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         otherRole: UserRole.customer,
         orderId: '',
         unreadCount: 1,
-        isMuted: false,
         isBlocked: false,
         updatedAt: DateTime.now().subtract(const Duration(hours: 3)),
         messages: [
@@ -343,7 +336,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         otherRole: UserRole.retailer,
         orderId: '',
         unreadCount: 0,
-        isMuted: false,
         isBlocked: false,
         updatedAt: DateTime.now().subtract(const Duration(days: 1)),
         messages: [
@@ -639,40 +631,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     }
   }
 
-  Future<void> _toggleMute(Conversation conversation) async {
-    final isMuted = conversation.isMuted;
-    final newMuteStatus = !isMuted;
-    
-    setState(() {
-      final index = _conversations.indexWhere((c) => c.id == conversation.id);
-      if (index != -1) {
-        _conversations[index] = _conversations[index].copyWith(
-          isMuted: newMuteStatus,
-          mutedUntil: newMuteStatus ? DateTime.now().add(const Duration(days: 7)) : null,
-          updatedAt: DateTime.now(),
-        );
-      }
-      _applyFilter();
-    });
-
-    try {
-      _showTopNotification(
-        newMuteStatus 
-            ? 'Notifications muted for ${_getOtherUserName(conversation)}' 
-            : 'Notifications unmuted for ${_getOtherUserName(conversation)}',
-      );
-    } catch (e) {
-      setState(() {
-        final index = _conversations.indexWhere((c) => c.id == conversation.id);
-        if (index != -1) {
-          _conversations[index] = _conversations[index].copyWith(
-            isMuted: isMuted,
-          );
-        }
-        _applyFilter();
-      });
-    }
-  }
 
   Future<void> _blockUser(Conversation conversation) async {
     setState(() {
@@ -1095,7 +1053,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                       orderId: 'ORD-${DateTime.now().millisecondsSinceEpoch}',
                                       messages: [],
                                       unreadCount: 0,
-                                      isMuted: false,
                                       isBlocked: false,
                                       updatedAt: DateTime.now(),
                                     ),
@@ -1372,7 +1329,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     final lastMessage = _getLastMessage(conversation);
     final lastTime = _getLastMessageTime(conversation);
     final unreadCount = conversation.unreadCount;
-    final isMuted = conversation.isMuted;
     final isBlocked = conversation.isBlocked;
     final isAnonymous = _isAnonymous(conversation);
 
@@ -1470,14 +1426,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            if (isMuted && !isBlocked) ...[
-                              const SizedBox(width: 4),
-                              Icon(
-                                Icons.notifications_off,
-                                size: 14,
-                                color: Colors.grey[500],
-                              ),
-                            ],
                             if (unreadCount > 0) ...[
                               const SizedBox(width: 6),
                               Container(
@@ -1559,7 +1507,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
   void _showConversationOptions(Conversation conversation) {
     final isBlocked = conversation.isBlocked;
-    final isMuted = conversation.isMuted;
 
     showModalBottomSheet(
       context: context,
@@ -1582,18 +1529,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                if (!isBlocked)
-                  ListTile(
-                    leading: Icon(
-                      isMuted ? Icons.notifications : Icons.notifications_off,
-                      color: isMuted ? Colors.green : Colors.grey,
-                    ),
-                    title: Text(isMuted ? 'Unmute notifications' : 'Mute notifications'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _toggleMute(conversation);
-                    },
-                  ),
                 ListTile(
                   leading: Icon(
                     isBlocked ? Icons.block : Icons.block_outlined,
@@ -1920,14 +1855,6 @@ class _ConversationSearchDelegate extends SearchDelegate {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                if (conversation.isMuted && !isBlocked) ...[
-                                  const SizedBox(width: 4),
-                                  Icon(
-                                    Icons.notifications_off,
-                                    size: 14,
-                                    color: Colors.grey[500],
-                                  ),
-                                ],
                                 if (unreadCount > 0) ...[
                                   const SizedBox(width: 6),
                                   Container(
