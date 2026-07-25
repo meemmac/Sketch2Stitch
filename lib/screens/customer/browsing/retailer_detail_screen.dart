@@ -407,20 +407,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Icon(Icons.directions_bike, size: isSmallScreen ? 14 : 16, color: Colors.white70),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Delivery: Tk ${widget.retailer.deliveryCharge.toInt()}',
-                        style: TextStyle(
-                          fontSize: isSmallScreen ? 11.0 : 13.0,
-                          color: Colors.white70,
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -428,6 +414,16 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         ),
       ),
       actions: [
+        IconButton(
+          icon: Icon(
+            Icons.chat_bubble_outline,
+            color: Colors.white,
+            size: isSmallScreen ? 22 : 24,
+          ),
+          onPressed: () {
+            // TODO: Implement chat functionality
+          },
+        ),
         IconButton(
           icon: Icon(
             _isFavorite ? Icons.favorite : Icons.favorite_border,
@@ -566,124 +562,226 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
 
   Widget _buildProductGrid(List<Product> products, bool isSmallScreen, bool isMediumScreen) {
     final displayProducts = _showAllProducts ? products : (products.length > 6 ? products.take(6).toList() : products);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final spacing = isSmallScreen ? 10.0 : 12.0;
+    final cardAspectRatio = screenHeight < 700 ? 0.72 : 0.78;
 
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        crossAxisSpacing: isSmallScreen ? 8.0 : 12.0,
-        mainAxisSpacing: isSmallScreen ? 8.0 : 12.0,
-        childAspectRatio: isSmallScreen ? 0.65 : 0.75,
+        childAspectRatio: cardAspectRatio,
+        crossAxisSpacing: spacing,
+        mainAxisSpacing: spacing,
       ),
       itemCount: displayProducts.length,
       itemBuilder: (context, index) {
         final product = displayProducts[index];
-        final String imageUrl = product.colorOptions.isNotEmpty && 
-            product.colorOptions.first.image != null
-            ? product.colorOptions.first.image!
-            : 'assets/images/fab.jpg';
-        final double imageHeight = isSmallScreen ? 100.0 : 130.0;
+        final coverImage = product.colorOptions.isNotEmpty
+            ? product.colorOptions.first.image
+            : null;
+        final bool outOfStock =
+            product.colorOptions.every((c) => c.stock <= 0);
         final bool isElement = _isElement(product);
-        
+
         return GestureDetector(
           onTap: () => _showProductDetailOverlay(context, product),
           child: Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[200]!),
+              color: kCardBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: kBorder, width: 0.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                  child: Image.asset(
-                    imageUrl,
-                    height: imageHeight,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      height: imageHeight,
-                      color: Colors.grey[200],
-                      child: Icon(
-                        isElement ? Icons.category : Icons.texture,
-                        color: Colors.grey,
-                        size: isSmallScreen ? 30 : 40,
+                // Image section with category badge
+                Flexible(
+                  flex: 5,
+                  child: Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: double.infinity,
+                          child: coverImage != null
+                              ? Image.asset(
+                                  coverImage,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Container(
+                                    color: kSage.withValues(alpha: 0.12),
+                                    child: Icon(
+                                      isElement ? Icons.category : Icons.texture,
+                                      size: isSmallScreen ? 36 : 40,
+                                      color: kSageDark,
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  color: kSage.withValues(alpha: 0.12),
+                                  child: Icon(
+                                    isElement ? Icons.category : Icons.texture,
+                                    size: isSmallScreen ? 36 : 40,
+                                    color: kSageDark,
+                                  ),
+                                ),
+                        ),
                       ),
-                    ),
+                      // Category Badge - Top Right
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isSmallScreen ? 8 : 10, 
+                            vertical: isSmallScreen ? 4 : 5
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              width: 0.3,
+                            ),
+                          ),
+                          child: Text(
+                            product.category,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Out of Stock Badge - Top Left
+                      if (outOfStock)
+                        Positioned(
+                          top: 8,
+                          left: 8,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isSmallScreen ? 8 : 10, 
+                              vertical: isSmallScreen ? 4 : 5
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withValues(alpha: 0.85),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                width: 0.3,
+                              ),
+                            ),
+                            child: Text(
+                              'Out of Stock',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                Padding(
-                  padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        product.productName,
-                        style: TextStyle(
-                          fontSize: isSmallScreen ? 11.0 : 13.0,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        product.category,
-                        style: TextStyle(
-                          fontSize: isSmallScreen ? 9.0 : 11.0,
-                          color: Colors.grey,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Icon(Icons.palette, size: isSmallScreen ? 10.0 : 12.0, color: Colors.grey[600]),
-                          const SizedBox(width: 2),
-                          Text(
-                            '${product.colorOptions.length} colors',
-                            style: TextStyle(
-                              fontSize: isSmallScreen ? 8.0 : 10.0,
-                              color: Colors.grey,
-                            ),
+                // Content section
+                Flexible(
+                  flex: 4,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      isSmallScreen ? 10 : 12,
+                      isSmallScreen ? 8 : 10,
+                      isSmallScreen ? 10 : 12,
+                      isSmallScreen ? 10 : 12,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          product.productName,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            height: 1.2,
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Tk ${product.minPrice.toStringAsFixed(0)}',
-                              style: TextStyle(
-                                fontSize: isSmallScreen ? 12.0 : 14.0,
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF2C5C44),
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: isSmallScreen ? 2 : 3),
+                        Text(
+                          widget.retailer.shopName,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
                           ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
-                              const SizedBox(width: 2),
-                              Text(
-                                'Tk 50',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: isSmallScreen ? 4 : 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                product.priceRange,
                                 style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.grey[600],
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: kSageDark,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
+                                const SizedBox(width: 2),
+                                Text(
+                                  'Tk 50',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: isSmallScreen ? 6 : 8),
+                        if (!outOfStock) ...[
+                          Row(
+                            children: [
+                              Icon(Icons.directions_bike, size: isSmallScreen ? 10 : 12, color: Colors.grey[600]),
+                              const SizedBox(width: 4),
+                              ...product.colorOptions
+                                  .take(4)
+                                  .map((option) => Padding(
+                                        padding: EdgeInsets.only(right: isSmallScreen ? 3 : 4),
+                                        child: _colorDot(option, isSmallScreen),
+                                      ))
+                                  .toList(),
                             ],
                           ),
                         ],
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -692,6 +790,51 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         );
       },
     );
+  }
+
+  Widget _colorDot(ColorOption option, bool isSmall) {
+    final color = _resolveColor(option.color);
+    final bool outOfStock = option.stock <= 0;
+    final double size = isSmall ? 14 : 16;
+    return Opacity(
+      opacity: outOfStock ? 0.35 : 1.0,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(color: kBorder, width: 0.5),
+        ),
+      ),
+    );
+  }
+
+  Color _resolveColor(String name) {
+    switch (name.toLowerCase()) {
+      case 'white':
+        return Colors.white;
+      case 'black':
+        return Colors.black;
+      case 'pink':
+        return Colors.pink[200]!;
+      case 'blue':
+        return Colors.blue[300]!;
+      case 'green':
+        return Colors.green[300]!;
+      case 'beige':
+        return const Color(0xFFE8DCC8);
+      case 'brown':
+        return Colors.brown[300]!;
+      case 'gold':
+        return const Color(0xFFD4AF37);
+      case 'silver':
+        return Colors.grey[400]!;
+      case 'purple':
+        return Colors.purple[300]!;
+      default:
+        return Colors.grey[300]!;
+    }
   }
 
   // ─── Reviews Overlay ────────────────────────────────────────────────────
@@ -963,38 +1106,49 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
 
   Widget _buildReviewCard(Review review, int index, List<String> productNames, List<double> productPrices, bool isSmallScreen) {
     final customerName = _getCustomerName(index);
-    final productName = _getProductName(index, productNames);
-    final productImage = _getProductImage(index);
-    final productPrice = _getProductPrice(index, productPrices);
+    final reviewProducts = _getReviewProducts(index, productNames, productPrices);
     
-    // Larger sizes for review overlay
-    final avatarSize = isSmallScreen ? 20.0 : 24.0;
     final nameSize = isSmallScreen ? 14.0 : 16.0;
     final commentSize = isSmallScreen ? 13.0 : 14.0;
-    final productNameSize = isSmallScreen ? 12.0 : 13.0;
-    final productPriceSize = isSmallScreen ? 11.0 : 12.0;
-    final imageSize = isSmallScreen ? 48.0 : 56.0;
 
     return Container(
-      padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // User Name
-          Text(
-            customerName,
-            style: TextStyle(
-              fontSize: nameSize,
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                customerName,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: nameSize,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  "Retailer",
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          // Rating and Date
+          const SizedBox(height: 8),
           Row(
             children: [
               Row(
@@ -1003,98 +1157,98 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                   (starIndex) => Icon(
                     starIndex < review.rating.floor() ? Icons.star : Icons.star_border,
                     color: Colors.orange,
-                    size: isSmallScreen ? 14 : 16,
+                    size: 14,
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               Text(
-                '• ${review.timeAgo}',
-                style: TextStyle(
-                  fontSize: isSmallScreen ? 11.0 : 12.0,
-                  color: Colors.grey,
-                ),
+                "• ${review.timeAgo}",
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          // Comment
+          const SizedBox(height: 12),
           Text(
-            review.comment,
+            "\"${review.comment}\"",
             style: TextStyle(
               fontSize: commentSize,
-              color: Colors.grey[700],
               height: 1.5,
+              fontStyle: FontStyle.italic,
             ),
           ),
-          // Liked products with larger image and proper price
-          if (productName.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              'Liked products',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: isSmallScreen ? 12.0 : 13.0,
-              ),
+          if (reviewProducts.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text(
+              "Related Items",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
-            const SizedBox(height: 8),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 8.0 : 12.0, vertical: isSmallScreen ? 6.0 : 8.0),
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[200]!),
-              ),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: Image.asset(
-                      productImage,
-                      width: imageSize,
-                      height: imageSize,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        width: imageSize,
-                        height: imageSize,
-                        color: Colors.grey[200],
-                        child: Icon(Icons.texture, size: isSmallScreen ? 24 : 28, color: Colors.grey),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          productName,
-                          style: TextStyle(
-                            fontSize: productNameSize,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Tk ${productPrice.toStringAsFixed(0)}',
-                          style: TextStyle(
-                            fontSize: productPriceSize,
-                            color: const Color(0xFF2C5C44),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 70,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: reviewProducts.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 12),
+                itemBuilder: (context, index) => _buildProductMiniCard(reviewProducts[index]),
               ),
             ),
           ],
         ],
       ),
     );
+  }
+
+  Widget _buildProductMiniCard(Map<String, dynamic> product) {
+    return Container(
+      width: 60,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+              product['image'],
+              width: 60,
+              height: 60,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                width: 60,
+                height: 60,
+                color: Colors.grey[200],
+                child: Icon(Icons.texture, size: 24, color: Colors.grey),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _getReviewProducts(int index, List<String> productNames, List<double> productPrices) {
+    final products = <Map<String, dynamic>>[];
+    final productName = _getProductName(index, productNames);
+    final productImage = _getProductImage(index);
+    final productPrice = _getProductPrice(index, productPrices);
+    
+    if (productName.isNotEmpty) {
+      products.add({
+        'name': productName,
+        'image': productImage,
+        'price': productPrice,
+      });
+    }
+    
+    // Add a second product for demo purposes
+    if (productNames.length > index + 1) {
+      products.add({
+        'name': productNames[index + 1],
+        'image': _getProductImage(index + 1),
+        'price': productPrices[index + 1],
+      });
+    }
+    
+    return products;
   }
 
   // ─── Product Detail Overlay ──────────────────────────────────────────

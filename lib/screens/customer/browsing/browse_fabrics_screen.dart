@@ -669,13 +669,17 @@ Widget _buildProductGrid(List<Product> products, String type) {
                       SizedBox(height: isSmallScreen ? 6 : 8),
                       if (!outOfStock) ...[
                         Row(
-                          children: product.colorOptions
-                              .take(4)
-                              .map((option) => Padding(
-                                    padding: EdgeInsets.only(right: isSmallScreen ? 3 : 4),
-                                    child: _colorDot(option, isSmallScreen),
-                                  ))
-                              .toList(),
+                          children: [
+                            Icon(Icons.directions_bike, size: isSmallScreen ? 10 : 12, color: Colors.grey[600]),
+                            const SizedBox(width: 4),
+                            ...product.colorOptions
+                                .take(4)
+                                .map((option) => Padding(
+                                      padding: EdgeInsets.only(right: isSmallScreen ? 3 : 4),
+                                      child: _colorDot(option, isSmallScreen),
+                                    ))
+                                .toList(),
+                          ],
                         ),
                       ],
                     ],

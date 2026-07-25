@@ -94,12 +94,12 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
         right: 0,
         child: SafeArea(
           child: Material(
-            color: const Color.fromARGB(0, 132, 230, 112),
+            color: const Color.fromARGB(0, 129, 240, 106),
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: isError ? Colors.red[700] : const Color(0xFF2C5C44),
+                color: isError ? Colors.red[700] : const Color.fromARGB(255, 107, 236, 171),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(

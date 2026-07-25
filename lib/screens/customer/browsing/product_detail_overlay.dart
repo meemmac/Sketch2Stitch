@@ -416,8 +416,8 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Care Instructions - Like Inventory Page Style
-                  if (widget.isFabric && widget.product.careSymbol.isNotEmpty) ...[
+                  // Care Instructions - Exactly like Inventory Page (5 care levels)
+                  if (widget.isFabric) ...[
                     const Text(
                       'Care Instructions',
                       style: TextStyle(
@@ -434,46 +434,13 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                         border: Border.all(color: Colors.grey[200]!),
                       ),
                       child: Column(
-                        children: widget.product.careSymbol.map((care) {
-                          final careInfo = _getCareInfo(care);
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  careInfo['icon'],
-                                  size: 20,
-                                  color: careInfo['isPositive'] ? Colors.green : Colors.grey,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    careInfo['label'],
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: careInfo['isPositive'] ? Colors.black87 : Colors.grey,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Flexible(
-                                  child: Text(
-                                    careInfo['status'] ?? (careInfo['isPositive'] ? "Yes" : "No"),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    textAlign: TextAlign.right,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: careInfo['isPositive'] ? Colors.green.shade800 : Colors.grey,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
+                        children: [
+                          _careInfoRow(Icons.wash, 'Machine Washable', _canMachineWash()),
+                          _careInfoRow(Icons.biotech, 'Bleach Allowed', _canBleach()),
+                          _careInfoRow(Icons.dry_cleaning, 'Dry Clean Only', _canDryClean()),
+                          _careInfoRow(Icons.settings_input_component, 'Tumble Dry', _canTumbleDry()),
+                          _careInfoRow(Icons.iron, 'Iron Level', true, trailing: _getIronLevel()),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -654,141 +621,74 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
     );
   }
 
-  // ─── Care Info Helper for Inventory Style ─────────────────────────────
+  // ─── Care Info Helper Methods for Inventory Style ─────────────────────
 
-  Map<String, dynamic> _getCareInfo(String care) {
-    final careLower = care.toLowerCase();
-    
-    // Define default values
-    String label = care;
-    IconData icon = Icons.check_circle;
-    bool isPositive = true;
-    String status = "Yes";
-    
-    // Machine Wash
-    if (careLower.contains('machine wash') || careLower.contains('hand wash')) {
-      icon = Icons.local_laundry_service;
-      if (careLower.contains('machine wash cold')) {
-        label = 'Machine Wash (Cold)';
-      } else if (careLower.contains('machine wash warm')) {
-        label = 'Machine Wash (Warm)';
-      } else if (careLower.contains('machine wash')) {
-        label = 'Machine Wash';
-      } else if (careLower.contains('hand wash')) {
-        label = 'Hand Wash';
-      } else {
-        label = 'Washable';
-      }
-      isPositive = true;
-      status = "Yes";
+  Widget _careInfoRow(
+    IconData icon,
+    String label,
+    bool isOk, {
+    String? trailing,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: isOk ? Colors.green : Colors.grey),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: isOk ? Colors.black87 : Colors.grey),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              trailing ?? (isOk ? "Yes" : "No"),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isOk ? Colors.green.shade800 : Colors.grey,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _canMachineWash() {
+    final careSymbols = widget.product.careSymbol.map((s) => s.toLowerCase()).toList();
+    return careSymbols.any((s) => s.contains('wash'));
+  }
+
+  bool _canBleach() {
+    final careSymbols = widget.product.careSymbol.map((s) => s.toLowerCase()).toList();
+    return careSymbols.any((s) => s.contains('bleach') && !s.contains('do not') && !s.contains('no'));
+  }
+
+  bool _canDryClean() {
+    final careSymbols = widget.product.careSymbol.map((s) => s.toLowerCase()).toList();
+    return careSymbols.any((s) => s.contains('dry clean'));
+  }
+
+  bool _canTumbleDry() {
+    final careSymbols = widget.product.careSymbol.map((s) => s.toLowerCase()).toList();
+    return careSymbols.any((s) => s.contains('tumble dry'));
+  }
+
+  String _getIronLevel() {
+    final careSymbols = widget.product.careSymbol.map((s) => s.toLowerCase()).toList();
+    if (careSymbols.any((s) => s.contains('iron'))) {
+      if (careSymbols.any((s) => s.contains('low'))) return "Low";
+      if (careSymbols.any((s) => s.contains('medium'))) return "Medium";
+      if (careSymbols.any((s) => s.contains('high'))) return "High";
+      return "Medium";
     }
-    // Dry Clean
-    else if (careLower.contains('dry clean')) {
-      icon = Icons.dry_cleaning;
-      label = 'Dry Clean';
-      isPositive = true;
-      status = "Yes";
-    }
-    // Bleach
-    else if (careLower.contains('bleach')) {
-      icon = Icons.cleaning_services;
-      if (careLower.contains('do not') || careLower.contains('no')) {
-        label = 'Do Not Bleach';
-        isPositive = false;
-        status = "No";
-      } else {
-        label = 'Bleach Allowed';
-        isPositive = true;
-        status = "Yes";
-      }
-    }
-    // Iron
-    else if (careLower.contains('iron')) {
-      icon = Icons.iron;
-      if (careLower.contains('do not') || careLower.contains('no')) {
-        label = 'Do Not Iron';
-        isPositive = false;
-        status = "No";
-      } else if (careLower.contains('low')) {
-        label = 'Iron (Low)';
-        isPositive = true;
-        status = "Yes";
-      } else if (careLower.contains('medium')) {
-        label = 'Iron (Medium)';
-        isPositive = true;
-        status = "Yes";
-      } else if (careLower.contains('high')) {
-        label = 'Iron (High)';
-        isPositive = true;
-        status = "Yes";
-      } else {
-        label = 'Iron';
-        isPositive = true;
-        status = "Yes";
-      }
-    }
-    // Tumble Dry
-    else if (careLower.contains('tumble dry')) {
-      icon = Icons.tune;
-      label = 'Tumble Dry';
-      isPositive = true;
-      status = "Yes";
-    }
-    // Dry Flat
-    else if (careLower.contains('dry flat')) {
-      icon = Icons.wb_sunny;
-      label = 'Dry Flat';
-      isPositive = true;
-      status = "Yes";
-    }
-    // Air Dry
-    else if (careLower.contains('air dry')) {
-      icon = Icons.air;
-      label = 'Air Dry';
-      isPositive = true;
-      status = "Yes";
-    }
-    // Do Not Wring
-    else if (careLower.contains('wring')) {
-      icon = Icons.loop;
-      label = 'Do Not Wring';
-      isPositive = false;
-      status = "No";
-    }
-    // Store in cool place
-    else if (careLower.contains('store') || careLower.contains('cool')) {
-      icon = Icons.ac_unit;
-      label = 'Store in Cool Place';
-      isPositive = true;
-      status = "Yes";
-    }
-    // Handle with care
-    else if (careLower.contains('handle with care')) {
-      icon = Icons.pan_tool_alt;
-      label = 'Handle with Care';
-      isPositive = true;
-      status = "Yes";
-    }
-    // Do not iron directly
-    else if (careLower.contains('do not iron directly')) {
-      icon = Icons.iron;
-      label = 'Do Not Iron Directly';
-      isPositive = false;
-      status = "No";
-    }
-    // Default
-    else {
-      icon = Icons.info_outline;
-      label = care;
-      isPositive = true;
-      status = "Yes";
-    }
-    
-    return {
-      'icon': icon,
-      'label': label,
-      'isPositive': isPositive,
-      'status': status,
-    };
+    return "Medium";
   }
 }

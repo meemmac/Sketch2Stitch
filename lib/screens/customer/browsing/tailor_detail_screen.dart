@@ -440,20 +440,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Icon(Icons.directions_bike, size: isSmallScreen ? 14 : 16, color: Colors.white70),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Delivery: Tk ${widget.tailor.deliveryCharge.toInt()}',
-                        style: TextStyle(
-                          fontSize: isSmallScreen ? 11.0 : 13.0,
-                          color: Colors.white70,
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -461,6 +447,14 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         ),
       ),
       actions: [
+        IconButton(
+          icon: Icon(
+            Icons.chat_bubble_outline,
+            color: Colors.white,
+            size: isSmallScreen ? 22 : 24,
+          ),
+          onPressed: _startConversation,
+        ),
         IconButton(
           icon: Icon(
             _isFavorite ? Icons.favorite : Icons.favorite_border,
@@ -917,28 +911,49 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
 
   Widget _buildReviewCard(Review review, int index, bool isSmallScreen) {
     final customerName = _getCustomerName(index);
-    final avatarSize = isSmallScreen ? 20.0 : 24.0;
+    final reviewProducts = _getReviewProducts(index);
+    
     final nameSize = isSmallScreen ? 14.0 : 16.0;
     final commentSize = isSmallScreen ? 13.0 : 14.0;
 
     return Container(
-      padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            customerName,
-            style: TextStyle(
-              fontSize: nameSize,
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                customerName,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: nameSize,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  "Tailor",
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Row(
             children: [
               Row(
@@ -947,32 +962,97 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                   (starIndex) => Icon(
                     starIndex < review.rating.floor() ? Icons.star : Icons.star_border,
                     color: Colors.orange,
-                    size: isSmallScreen ? 14 : 16,
+                    size: 14,
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               Text(
-                '• ${review.timeAgo}',
-                style: TextStyle(
-                  fontSize: isSmallScreen ? 11.0 : 12.0,
-                  color: Colors.grey,
-                ),
+                "• ${review.timeAgo}",
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
-            review.comment,
+            "\"${review.comment}\"",
             style: TextStyle(
               fontSize: commentSize,
-              color: Colors.grey[700],
               height: 1.5,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+          if (reviewProducts.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text(
+              "Related Items",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 70,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: reviewProducts.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 12),
+                itemBuilder: (context, index) => _buildProductMiniCard(reviewProducts[index]),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductMiniCard(Map<String, dynamic> product) {
+    return Container(
+      width: 60,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+              product['image'],
+              width: 60,
+              height: 60,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                width: 60,
+                height: 60,
+                color: Colors.grey[200],
+                child: Icon(Icons.checkroom, size: 24, color: Colors.grey),
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  List<Map<String, dynamic>> _getReviewProducts(int index) {
+    final products = <Map<String, dynamic>>[];
+    
+    if (widget.tailor.portfolio != null && widget.tailor.portfolio!.isNotEmpty) {
+      final portfolioIndex = index % widget.tailor.portfolio!.length;
+      final portfolioItem = widget.tailor.portfolio![portfolioIndex];
+      
+      products.add({
+        'name': portfolioItem.title ?? 'Portfolio Item',
+        'image': portfolioItem.image ?? 'assets/images/fab.jpg',
+      });
+      
+      // Add a second product for demo purposes
+      if (widget.tailor.portfolio!.length > portfolioIndex + 1) {
+        final secondItem = widget.tailor.portfolio![portfolioIndex + 1];
+        products.add({
+          'name': secondItem.title ?? 'Portfolio Item',
+          'image': secondItem.image ?? 'assets/images/fab.jpg',
+        });
+      }
+    }
+    
+    return products;
   }
 
   // ─── Bottom Bar ────────────────────────────────────────────────────────
@@ -996,31 +1076,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: OutlinedButton(
-              onPressed: _startConversation,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF2C5C44),
-                padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 10.0 : 14.0),
-                side: const BorderSide(color: Color(0xFF2C5C44)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                textStyle: TextStyle(
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              child: Text(
-                isSmallScreen ? 'Chat' : 'Message',
-                style: TextStyle(
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton(
               onPressed: _navigateToBooking,
