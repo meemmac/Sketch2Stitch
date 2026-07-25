@@ -29,6 +29,7 @@ class TailoringSetupCallbacks {
   /// Orders.status = 'processing'; every Sub-orders.deliveryDestination = 'customer'.
   final Future<void> Function() onSkipTailoring;
 
+
   /// Orders.status = 'awaiting_tailor_search';
   /// tailorSelectionDeadline = orderDate + 72h.
   final Future<void> Function(DateTime tailorSelectionDeadline)
@@ -41,11 +42,12 @@ class TailoringSetupCallbacks {
   /// job id. Called once per tailor request (may be called again if a
   /// previous job was rejected and the customer picks another tailor).
   final Future<String> Function({
-    required String measurementId,
-    required List<String> designIds,
-    required String tailorId,
-  })
-  onCreateTailorJob;
+  required String measurementId,
+  required List<String> designIds,
+  required String tailorId,
+  required String instructions,
+})
+onCreateTailorJob;
 
   /// Payments.targetType = 'tailor' payment flow for a confirmed job.
   final Future<void> Function(String tailorJobId) onPayTailor;
@@ -100,6 +102,7 @@ class OrderResumeState {
   final String? status; // Tailor-jobs.status (raw schema value)
   final DateTime? requestedAt; // Tailor-jobs.requestedAt
   final double? quoteAmount; // Tailor-jobs.quoteAmount
+  final double? deliverCharge; // Tailor-jobs.deliverCharge
   final DateTime? estimatedDeliveryDate; // Tailor-jobs.estimatedDeliveryDate
   final String? rejectionReason; // Tailor-jobs.rejectionReason
 
@@ -110,6 +113,7 @@ class OrderResumeState {
     this.status,
     this.requestedAt,
     this.quoteAmount,
+    this.deliverCharge,
     this.estimatedDeliveryDate,
     this.rejectionReason,
   });
@@ -121,6 +125,7 @@ class _TailorJobState {
   final _JobStatus status;
   final DateTime requestedAt;
   final double? quoteAmount;
+  final double? deliverCharge;
   final DateTime? estimatedDeliveryDate;
   final String? rejectionReason;
 
@@ -130,13 +135,19 @@ class _TailorJobState {
     required this.status,
     required this.requestedAt,
     this.quoteAmount,
+    this.deliverCharge,
     this.estimatedDeliveryDate,
     this.rejectionReason,
   });
 
+  /// Tailor-jobs.quoteAmount + Tailor-jobs.deliverCharge — what actually
+  /// gets charged in the Payments doc for this job.
+  double get totalPayable => (quoteAmount ?? 0) + (deliverCharge ?? 0);
+
   _TailorJobState copyWith({
     _JobStatus? status,
     double? quoteAmount,
+    double? deliverCharge,
     DateTime? estimatedDeliveryDate,
     String? rejectionReason,
   }) {
@@ -146,6 +157,7 @@ class _TailorJobState {
       status: status ?? this.status,
       requestedAt: requestedAt,
       quoteAmount: quoteAmount ?? this.quoteAmount,
+      deliverCharge: deliverCharge ?? this.deliverCharge,
       estimatedDeliveryDate:
           estimatedDeliveryDate ?? this.estimatedDeliveryDate,
       rejectionReason: rejectionReason ?? this.rejectionReason,
@@ -239,6 +251,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
 
   DateTime? _tailorSelectionDeadline;
   _TailorJobState? _tailorJob;
+  final TextEditingController _instructionsController = TextEditingController();
 
   // ── Editable measurement grid (mirrors VirtualTrialScreen's layout) ──
   // Field order/labels match the Measurement schema. Editing here is a
@@ -322,43 +335,40 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   // for real.
   String get _stepPrefKey => 'tailoring_step_${widget.orderId}';
   String get _designsPrefKey => 'tailoring_designs_${widget.orderId}';
+  String get _instructionsPrefKey => 'tailoring_instructions_${widget.orderId}';
+  
 
   Future<void> _saveLocalProgress() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(_stepPrefKey, _currentStep);
-      await prefs.setStringList(
-        _designsPrefKey,
-        _designs.map((d) => d.path).toList(),
-      );
-    } catch (_) {
-      // Best-effort only — losing local resume state shouldn't block flow.
-    }
-  }
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_stepPrefKey, _currentStep);
+    await prefs.setStringList(_designsPrefKey, _designs.map((d) => d.path).toList());
+    await prefs.setString(_instructionsPrefKey, _instructionsController.text);
+  } catch (_) {}
+}
 
   Future<void> _clearLocalProgress() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_stepPrefKey);
-      await prefs.remove(_designsPrefKey);
-    } catch (_) {
-      // Nothing to clean up, or storage unavailable — either way, fine.
-    }
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_stepPrefKey);
+    await prefs.remove(_designsPrefKey);
+    await prefs.remove(_instructionsPrefKey);
+  } catch (_) {
+    // Nothing to clean up, or storage unavailable — either way, fine.
   }
+}
 
   Future<void> _loadLocalProgress() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final step = prefs.getInt(_stepPrefKey);
-      final designPaths = prefs.getStringList(_designsPrefKey);
-      if (step != null) _currentStep = step;
-      if (designPaths != null) {
-        _designs.addAll(designPaths.map((p) => DesignItem(path: p)));
-      }
-    } catch (_) {
-      // No local progress saved yet — fine, start fresh.
-    }
-  }
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final step = prefs.getInt(_stepPrefKey);
+    final designPaths = prefs.getStringList(_designsPrefKey);
+    final instructions = prefs.getString(_instructionsPrefKey);
+    if (step != null) _currentStep = step;
+    if (designPaths != null) _designs.addAll(designPaths.map((p) => DesignItem(path: p)));
+    if (instructions != null) _instructionsController.text = instructions;
+  } catch (_) {}
+}
 
   Future<void> _withLoading(Future<void> Function() action) async {
     setState(() => _loading = true);
@@ -381,12 +391,13 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   }
 
   @override
-  void dispose() {
-    for (final c in _measurementControllers.values) {
-      c.dispose();
-    }
-    super.dispose();
+void dispose() {
+  for (final c in _measurementControllers.values) {
+    c.dispose();
   }
+  _instructionsController.dispose();
+  super.dispose();
+}
 
   /// Read-only rehydration: if the customer already progressed past step 1
   /// on a previous visit (e.g. they requested a tailor, then closed the
@@ -418,6 +429,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
             status: _mapSchemaStatus(resume.status!),
             requestedAt: resume.requestedAt ?? DateTime.now(),
             quoteAmount: resume.quoteAmount,
+            deliverCharge: resume.deliverCharge,
             estimatedDeliveryDate: resume.estimatedDeliveryDate,
             rejectionReason: resume.rejectionReason,
           );
@@ -529,6 +541,7 @@ Future<void> _requestTailorJob({required String tailorId}) async {
       measurementId: _selectedMeasurement?.id ?? '',
       designIds: _designs.map((d) => d.path).toList(),
       tailorId: tailorId,
+      instructions: _instructionsController.text.trim(),
     );
   });
   if (!mounted || jobId == null) return;
@@ -545,12 +558,16 @@ Future<void> _requestTailorJob({required String tailorId}) async {
   void _onTailorConfirmed() {
   if (_tailorJob == null) return;
   final amount = 4500.0;
+  // Tailor-jobs.deliverCharge — separate from the quote itself, covers
+  // getting the finished garment from the tailor back to the customer.
+  final deliverCharge = 150.0;
   final delivery = DateTime.now().add(const Duration(days: 10));
   OrderSession.instance.setTailorConfirmed(amount: amount, estimatedDelivery: delivery);
   setState(() {
     _tailorJob = _tailorJob!.copyWith(
       status: _JobStatus.confirmed,
       quoteAmount: amount,
+      deliverCharge: deliverCharge,
       estimatedDeliveryDate: delivery,
     );
   });
@@ -584,14 +601,19 @@ void _onTailorRejected() {
   }
 
   void _promptTailorPayment(String tailorJobId) {
+    final job = _tailorJob;
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Text("Pay Tailor"),
-        content: const Text(
-          "Your tailor confirmed the job. Complete payment to continue.",
+        content: Text(
+          job == null
+              ? "Your tailor confirmed the job. Complete payment to continue."
+              : "Your tailor confirmed the job. You're paying Tk "
+                  "${job.totalPayable.toStringAsFixed(0)} in total "
+                  "(quote + delivery). Complete payment to continue.",
         ),
         actions: [
           ElevatedButton(
@@ -1147,7 +1169,7 @@ void _onTailorRejected() {
   // ─── Step 3 ────────────────────────────────────────────────────────
 
   Widget _buildDesignStep() {
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1238,47 +1260,89 @@ void _onTailorRejected() {
             ),
             const SizedBox(height: 10),
           ],
-          Expanded(
-            child: _designs.isEmpty
-                ? Center(
+          _designs.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
                     child: Text(
                       "No references added — that's okay, you can skip this.",
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.grey.shade500),
                     ),
-                  )
-                : GridView.builder(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                        ),
-                    itemCount: _designs.length,
-                    itemBuilder: (context, index) =>
-                        _buildDesignThumb(_designs[index]),
                   ),
+                )
+              : GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                        childAspectRatio: 1,
+                      ),
+                  itemCount: _designs.length,
+                  itemBuilder: (context, index) =>
+                      _buildDesignThumb(_designs[index]),
+                ),
+          const SizedBox(height: 18),
+          const Text(
+            "Instructions for your tailor",
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            "Required — describe any changes, fit preferences, or details you want followed.",
+            style: TextStyle(color: Colors.black54, fontSize: 12, height: 1.3),
           ),
           const SizedBox(height: 10),
+          TextField(
+            controller: _instructionsController,
+            maxLines: 4,
+            minLines: 3,
+            decoration: InputDecoration(
+              hintText: "e.g. Slightly loose fit around the waist, full sleeves, no embroidery on the collar…",
+              hintStyle: const TextStyle(fontSize: 12.5, color: Colors.black38),
+              filled: true,
+              fillColor: Colors.grey.shade50,
+              contentPadding: const EdgeInsets.all(14),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: Colors.grey.shade200),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: Colors.green.shade800),
+              ),
+            ),
+            style: const TextStyle(fontSize: 13),
+            onChanged: (_) {
+              _saveLocalProgress();
+              setState(() {}); // re-evaluate Continue button enabled state
+            },
+          ),
+          const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {
-                setState(() => _currentStep = 3);
-                _saveLocalProgress();
-              },
+              onPressed: _instructionsController.text.trim().isEmpty
+                  ? null
+                  : () {
+                      setState(() => _currentStep = 3);
+                      _saveLocalProgress();
+                    },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green.shade800,
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey.shade300,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(15),
                 ),
               ),
-              child: Text(
-                _designs.isEmpty ? "Skip and Continue" : "Continue",
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 15),
+              child: const Text(
+                "Continue",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               ),
             ),
           ),
@@ -1541,8 +1605,8 @@ void _onTailorRejected() {
     children: [
       const SizedBox(height: 18),
       _infoRow(
-        icon: Icons.payments_outlined,
-        label: "Total Cost",
+        icon: Icons.content_cut_outlined,
+        label: "Tailoring Cost",
         value: job.quoteAmount != null
             ? "Tk ${job.quoteAmount!.toStringAsFixed(0)}"
             : "—",
@@ -1550,9 +1614,25 @@ void _onTailorRejected() {
       const SizedBox(height: 10),
       _infoRow(
         icon: Icons.local_shipping_outlined,
+        label: "Delivery charge",
+        value: job.deliverCharge != null
+            ? (job.deliverCharge == 0
+                ? "Free"
+                : "Tk ${job.deliverCharge!.toStringAsFixed(0)}")
+            : "—",
+      ),
+      const SizedBox(height: 10),
+      _infoRow(
+        icon: Icons.payments_outlined,
+        label: "Total Cost",
+        value: "Tk ${job.totalPayable.toStringAsFixed(0)}",
+      ),
+      const SizedBox(height: 10),
+      _infoRow(
+        icon: Icons.event_available_outlined,
         label: "Estimated delivery",
         value: job.estimatedDeliveryDate != null
-            ? _formatDateTime(job.estimatedDeliveryDate!)
+            ? "28 July 2026"
             : "—",
       ),
       const SizedBox(height: 22),
@@ -1568,9 +1648,9 @@ void _onTailorRejected() {
               borderRadius: BorderRadius.circular(15),
             ),
           ),
-          child: const Text(
-            "Pay Now",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          child: Text(
+            "Pay Now · Tk ${job.totalPayable.toStringAsFixed(0)}",
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
           ),
         ),
       ),
@@ -1670,12 +1750,16 @@ void _onTailorRejected() {
     required IconData icon,
     required String label,
     required String value,
+    bool emphasize = false,
   }) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.green.shade50,
+        color: emphasize ? Colors.green.shade100 : Colors.green.shade50,
         borderRadius: BorderRadius.circular(12),
+        border: emphasize
+            ? Border.all(color: Colors.green.shade300, width: 1)
+            : null,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1700,8 +1784,8 @@ void _onTailorRejected() {
               textAlign: TextAlign.right,
               softWrap: true,
               style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
+                fontSize: emphasize ? 14 : 13,
+                fontWeight: emphasize ? FontWeight.w900 : FontWeight.w800,
                 color: Colors.green.shade900,
               ),
             ),

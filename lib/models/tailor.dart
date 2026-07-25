@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'portfolio.dart';
 import 'tailor_job.dart';
 import 'notification.dart';
@@ -11,11 +12,11 @@ class Tailor {
   final double rating;
   final String? profilePicture;
   final String? about;
-  final double deliveryCharge;
-  
+  final GeoPoint? location;
+
   // Relationships
   List<Portfolio>? portfolio;
-  List<AppNotification>? notifications;  // Notifications for this tailor
+  List<AppNotification>? notifications;
   List<TailorJob>? jobs;
 
   Tailor({
@@ -25,13 +26,16 @@ class Tailor {
     required this.phone,
     required this.address,
     required this.rating,
-    this.deliveryCharge = 60.0,
+    this.location,
     this.profilePicture,
     this.about,
     this.portfolio = const [],
     this.notifications = const [],
     this.jobs = const [],
   });
+
+  double? get locationLat => location?.latitude;
+  double? get locationLng => location?.longitude;
 
   String get generalArea {
     final parts = address.split(',');
@@ -48,7 +52,7 @@ class Tailor {
     String? phone,
     String? address,
     double? rating,
-    double? deliveryCharge,
+    GeoPoint? location,
     String? profilePicture,
     String? about,
     List<Portfolio>? portfolio,
@@ -62,7 +66,7 @@ class Tailor {
       phone: phone ?? this.phone,
       address: address ?? this.address,
       rating: rating ?? this.rating,
-      deliveryCharge: deliveryCharge ?? this.deliveryCharge,
+      location: location ?? this.location,
       profilePicture: profilePicture ?? this.profilePicture,
       about: about ?? this.about,
       portfolio: portfolio ?? this.portfolio,
@@ -78,7 +82,7 @@ class Tailor {
     'phone': phone,
     'address': address,
     'rating': rating,
-    'deliveryCharge': deliveryCharge,
+    'location': location,
     'profilePicture': profilePicture,
     'about': about,
   };
@@ -91,7 +95,7 @@ class Tailor {
       phone: json['phone'] ?? '',
       address: json['address'] ?? '',
       rating: (json['rating'] ?? 0).toDouble(),
-      deliveryCharge: (json['deliveryCharge'] ?? 60.0).toDouble(),
+      location: json['location'] is GeoPoint ? json['location'] as GeoPoint : null,
       profilePicture: json['profilePicture'],
       about: json['about'],
     );

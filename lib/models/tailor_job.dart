@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'design.dart';
 import 'measurement.dart';
 
@@ -9,7 +10,7 @@ enum TailorJobStatus {
   expired,
   cancelled;
 
-  String get toValue => name; // all match Firestore strings directly
+  String get toValue => name;
 
   static TailorJobStatus fromValue(String v) =>
       TailorJobStatus.values.byName(v);
@@ -36,12 +37,11 @@ enum QuoteStatus {
   }[v] ?? QuoteStatus.notSent;
 }
 
-/// Separate from Payments.status — only "unpaid" / "paid" apply to tailor jobs.
 enum TailorPaymentStatus {
   unpaid,
   paid;
 
-  String get toValue => name; // already match Firestore strings
+  String get toValue => name;
 
   static TailorPaymentStatus fromValue(String v) =>
       TailorPaymentStatus.values.byName(v);
@@ -60,14 +60,16 @@ class TailorJob {
   final DateTime? estimatedDeliveryDate;
   final String? specialInstructions;
   final String? rejectionReason;
-  final double? quoteAmount;
+  final double? quoteAmount;       // tailoring service cost only
+  final double? deliveryCharge;    // computed from distance — not a base rate
+  final double? deliveryDistanceKm;
+  final GeoPoint? deliveryPoint;   // snapshot of the exact coords used for the charge calc
   final String? quoteNote;
   final QuoteStatus quoteStatus;
   final TailorPaymentStatus tailorPaymentStatus;
   final DateTime? quoteResponseDeadline;
   final DateTime? autoReleaseAt;
 
-  // Relationships (lazy loaded)
   List<Design>? designs;
   List<Measurement>? measurements;
 
@@ -85,6 +87,9 @@ class TailorJob {
     this.specialInstructions,
     this.rejectionReason,
     this.quoteAmount,
+    this.deliveryCharge,
+    this.deliveryDistanceKm,
+    this.deliveryPoint,
     this.quoteNote,
     required this.quoteStatus,
     required this.tailorPaymentStatus,
@@ -93,6 +98,9 @@ class TailorJob {
     this.designs,
     this.measurements,
   });
+
+  double? get totalAmount =>
+      quoteAmount == null ? null : quoteAmount! + (deliveryCharge ?? 0);
 
   String get statusText {
     switch (status) {
@@ -147,6 +155,9 @@ class TailorJob {
     String? specialInstructions,
     String? rejectionReason,
     double? quoteAmount,
+    double? deliveryCharge,
+    double? deliveryDistanceKm,
+    GeoPoint? deliveryPoint,
     String? quoteNote,
     QuoteStatus? quoteStatus,
     TailorPaymentStatus? tailorPaymentStatus,
@@ -169,6 +180,9 @@ class TailorJob {
       specialInstructions: specialInstructions ?? this.specialInstructions,
       rejectionReason: rejectionReason ?? this.rejectionReason,
       quoteAmount: quoteAmount ?? this.quoteAmount,
+      deliveryCharge: deliveryCharge ?? this.deliveryCharge,
+      deliveryDistanceKm: deliveryDistanceKm ?? this.deliveryDistanceKm,
+      deliveryPoint: deliveryPoint ?? this.deliveryPoint,
       quoteNote: quoteNote ?? this.quoteNote,
       quoteStatus: quoteStatus ?? this.quoteStatus,
       tailorPaymentStatus: tailorPaymentStatus ?? this.tailorPaymentStatus,
@@ -193,6 +207,9 @@ class TailorJob {
     'specialInstructions': specialInstructions,
     'rejectionReason': rejectionReason,
     'quoteAmount': quoteAmount,
+    'deliveryCharge': deliveryCharge,
+    'deliveryDistanceKm': deliveryDistanceKm,
+    'deliveryPoint': deliveryPoint,
     'quoteNote': quoteNote,
     'quoteStatus': quoteStatus.toValue,
     'tailorPaymentStatus': tailorPaymentStatus.toValue,
@@ -223,6 +240,9 @@ class TailorJob {
       specialInstructions: json['specialInstructions'],
       rejectionReason: json['rejectionReason'],
       quoteAmount: json['quoteAmount']?.toDouble(),
+      deliveryCharge: (json['deliveryCharge'] as num?)?.toDouble(),
+      deliveryDistanceKm: (json['deliveryDistanceKm'] as num?)?.toDouble(),
+      deliveryPoint: json['deliveryPoint'] as GeoPoint?,
       quoteNote: json['quoteNote'],
       quoteStatus: QuoteStatus.fromValue(json['quoteStatus'] ?? 'not_sent'),
       tailorPaymentStatus: TailorPaymentStatus.fromValue(

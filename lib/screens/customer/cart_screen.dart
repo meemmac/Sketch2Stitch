@@ -45,8 +45,17 @@ class CartLine {
 class RetailerInfo {
   final String id;
   final String shopName;
+  // Flat delivery fee charged per retailer (i.e. per Sub-order), shown
+  // alongside that retailer's items subtotal. Mirrors
+  // Sub-orders.deliveryCharge — swap this mock map for a real per-retailer
+  // delivery calculation once the backend is connected.
+  final double deliveryCharge;
 
-  const RetailerInfo({required this.id, required this.shopName});
+  const RetailerInfo({
+    required this.id,
+    required this.shopName,
+    this.deliveryCharge = 0,
+  });
 }
 
 /// ─── Cart Screen ────────────────────────────────────────────────────────
@@ -62,8 +71,16 @@ class _CartScreenState extends State<CartScreen> {
   // Mock `Retailer` collection lookup. Replace with a real fetch keyed by
   // Products.retailerId once the backend is connected.
   final Map<String, RetailerInfo> _retailers = {
-    "RET001": const RetailerInfo(id: "RET001", shopName: "Elegant Fabrics Ltd."),
-    "RET002": const RetailerInfo(id: "RET002", shopName: "Dhaka Silk House"),
+    "RET001": const RetailerInfo(
+      id: "RET001",
+      shopName: "Elegant Fabrics Ltd.",
+      deliveryCharge: 80,
+    ),
+    "RET002": const RetailerInfo(
+      id: "RET002",
+      shopName: "Dhaka Silk House",
+      deliveryCharge: 120,
+    ),
   };
 
   // Mock single measurement profile. Replace with a real fetch by
@@ -150,8 +167,17 @@ class _CartScreenState extends State<CartScreen> {
   int get _totalItems =>
       _cartLines.fold(0, (sum, line) => sum + line.quantity);
 
-  double get _grandTotal =>
+  double get _itemsTotal =>
       _cartLines.fold(0.0, (sum, line) => sum + line.lineTotal);
+
+  // Sum of each represented retailer's flat delivery charge (one charge
+  // per Sub-order/retailer, not per line item).
+  double get _deliveryTotal => _groupedByRetailer.keys.fold(
+        0.0,
+        (sum, id) => sum + (_retailers[id]?.deliveryCharge ?? 0),
+      );
+
+  double get _grandTotal => _itemsTotal + _deliveryTotal;
 
   void _incrementQuantity(CartLine line) {
     setState(() => line.quantity++);
@@ -360,6 +386,7 @@ Widget _buildActiveOrderState() {
   Widget _buildRetailerSection(String retailerId, List<CartLine> lines) {
     final retailer = _retailers[retailerId];
     final shopName = retailer?.shopName ?? "Unknown Retailer";
+    final deliveryCharge = retailer?.deliveryCharge ?? 0;
     final itemCount = lines.fold<int>(0, (sum, l) => sum + l.quantity);
     final subtotal = lines.fold<double>(0, (sum, l) => sum + l.lineTotal);
 
@@ -434,27 +461,86 @@ Widget _buildActiveOrderState() {
 
           const Divider(height: 1),
 
-          // Retailer subtotal
+          // Retailer subtotal + delivery charge
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
               children: [
-                const Text(
-                  "Subtotal",
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black54,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "Subtotal",
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black54,
+                      ),
+                    ),
+                    Text(
+                      "Tk ${subtotal.toStringAsFixed(0)}",
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  "Tk ${subtotal.toStringAsFixed(0)}",
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.green.shade900,
-                  ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.local_shipping_outlined,
+                            size: 13, color: Colors.grey.shade500),
+                        const SizedBox(width: 5),
+                        const Text(
+                          "Delivery charge",
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      deliveryCharge == 0
+                          ? "Free"
+                          : "Tk ${deliveryCharge.toStringAsFixed(0)}",
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Divider(height: 1),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "Retailer total",
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    Text(
+                      "Tk ${(subtotal + deliveryCharge).toStringAsFixed(0)}",
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.green.shade900,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -614,41 +700,81 @@ Widget _buildActiveOrderState() {
     ),
     child: SafeArea(
       top: false,
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
+          // Items / delivery breakdown so the grand total isn't opaque.
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      "$_totalItems ${_totalItems == 1 ? 'item' : 'items'}",
-                      style: const TextStyle(fontSize: 12, color: Colors.black45, fontWeight: FontWeight.w600),
+                      "Items subtotal",
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                     ),
-                    const SizedBox(width: 8),
-                    _addMoreChip(),
+                    Text(
+                      "Tk ${_itemsTotal.toStringAsFixed(0)}",
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  "Tk ${_grandTotal.toStringAsFixed(0)}",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.green.shade900),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "Delivery (${_groupedByRetailer.length} ${_groupedByRetailer.length == 1 ? 'retailer' : 'retailers'})",
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                    Text(
+                      "Tk ${_deliveryTotal.toStringAsFixed(0)}",
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 16),
-          ElevatedButton(
-            onPressed: _cartLines.isEmpty ? null : _checkout,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade800,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              elevation: 0,
-            ),
-            child: const Text("Checkout", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          "$_totalItems ${_totalItems == 1 ? 'item' : 'items'}",
+                          style: const TextStyle(fontSize: 12, color: Colors.black45, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(width: 8),
+                        _addMoreChip(),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      "Tk ${_grandTotal.toStringAsFixed(0)}",
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.green.shade900),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              ElevatedButton(
+                onPressed: _cartLines.isEmpty ? null : _checkout,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade800,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  elevation: 0,
+                ),
+                child: const Text("Checkout", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              ),
+            ],
           ),
         ],
       ),
