@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/portfolio.dart';
-import 'package:sketch2stitch/widgets/rating_stars.dart';
+import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
 import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
 
-/// Hardcoded sample tailors with asset images.
+/// Hardcoded sample tailors
 final List<Tailor> kHardcodedTailors = [
   Tailor(
     id: 't1',
@@ -16,12 +16,25 @@ final List<Tailor> kHardcodedTailors = [
     address: '5 Banani Road, Banani, Dhaka',
     rating: 4.9,
     profilePicture: 'assets/images/fab.jpg',
+    about: 'Formal and informal wear specialist with 12 years experience.',
     portfolio: [
       Portfolio(
         id: 'pf1',
         tailorId: 't1',
         image: 'assets/images/fab.jpg',
-        description: 'Formal and informal wear specialist with 12 years experience.',
+        description: 'Premium formal suit with perfect fit',
+      ),
+      Portfolio(
+        id: 'pf2',
+        tailorId: 't1',
+        image: 'assets/images/silk.jpg',
+        description: 'Elegant wedding sherwani',
+      ),
+      Portfolio(
+        id: 'pf3',
+        tailorId: 't1',
+        image: 'assets/images/textile.jpg',
+        description: 'Casual blazer with modern cut',
       ),
     ],
   ),
@@ -33,12 +46,25 @@ final List<Tailor> kHardcodedTailors = [
     address: '22 Gulshan Avenue, Gulshan, Dhaka',
     rating: 4.7,
     profilePicture: 'assets/images/silk.jpg',
+    about: 'Traditional and ethnic wear specialist with 15 years experience.',
     portfolio: [
       Portfolio(
-        id: 'pf2',
+        id: 'pf4',
         tailorId: 't2',
         image: 'assets/images/silk.jpg',
-        description: 'Traditional and ethnic wear, saree blouses and lehengas.',
+        description: 'Designer silk saree with zari work',
+      ),
+      Portfolio(
+        id: 'pf5',
+        tailorId: 't2',
+        image: 'assets/images/saree.jpg',
+        description: 'Traditional lehenga for weddings',
+      ),
+      Portfolio(
+        id: 'pf6',
+        tailorId: 't2',
+        image: 'assets/images/gorgeous.jpg',
+        description: 'Hand-embroidered blouse design',
       ),
     ],
   ),
@@ -47,15 +73,22 @@ final List<Tailor> kHardcodedTailors = [
     name: 'Mohammed Rafiq',
     email: 'rafiq.tailors@example.com',
     phone: '01811000003',
-    address: ' Kotwali, Chittagong ',
+    address: 'Kotwali, Chittagong',
     rating: 4.4,
     profilePicture: 'assets/images/textile.jpg',
+    about: 'Casual and daily wear specialist with quick turnaround.',
     portfolio: [
       Portfolio(
-        id: 'pf3',
+        id: 'pf7',
         tailorId: 't3',
         image: 'assets/images/textile.jpg',
-        description: 'Casual and daily wear, quick turnaround alterations.',
+        description: 'Daily wear cotton kurta',
+      ),
+      Portfolio(
+        id: 'pf8',
+        tailorId: 't3',
+        image: 'assets/images/fabric_waves.jpg',
+        description: 'Casual shirt with modern fit',
       ),
     ],
   ),
@@ -67,12 +100,25 @@ final List<Tailor> kHardcodedTailors = [
     address: '3 Dhanmondi 27, Dhanmondi, Dhaka',
     rating: 4.8,
     profilePicture: 'assets/images/lace.jpg',
+    about: 'Bridal and formal wear specialist with custom embroidery.',
     portfolio: [
       Portfolio(
-        id: 'pf4',
+        id: 'pf9',
         tailorId: 't4',
         image: 'assets/images/lace.jpg',
-        description: 'Bridal and formal wear, custom embroidery finishing.',
+        description: 'Bridal gown with lace detailing',
+      ),
+      Portfolio(
+        id: 'pf10',
+        tailorId: 't4',
+        image: 'assets/images/embroidery.jpg',
+        description: 'Custom embroidered bridal blouse',
+      ),
+      Portfolio(
+        id: 'pf11',
+        tailorId: 't4',
+        image: 'assets/images/gorgeous.jpg',
+        description: 'Formal evening gown with embellishments',
       ),
     ],
   ),
@@ -84,29 +130,42 @@ final List<Tailor> kHardcodedTailors = [
     address: '15 Mirpur Road, Mirpur, Dhaka',
     rating: 4.6,
     profilePicture: 'assets/images/fab2.jpg',
+    about: 'Quick stitching and alterations for all types of garments.',
     portfolio: [
       Portfolio(
-        id: 'pf5',
+        id: 'pf12',
         tailorId: 't5',
         image: 'assets/images/fab2.jpg',
-        description: 'Quick stitching and alterations for all types of garments.',
+        description: 'School uniform stitching',
+      ),
+      Portfolio(
+        id: 'pf13',
+        tailorId: 't5',
+        image: 'assets/images/fab.jpg',
+        description: 'Office wear shirt and pant set',
+      ),
+      Portfolio(
+        id: 'pf14',
+        tailorId: 't5',
+        image: 'assets/images/textile.jpg',
+        description: 'Children\'s wear stitching',
       ),
     ],
   ),
 ];
 
-/// The actual tailors tab content, rendered as one page inside the shared
-/// [BrowseShell] PageView.
 class TailorsPageBody extends StatefulWidget {
   final ValueNotifier<String> searchQuery;
   final TailorsFilterData filterData;
   final void Function(String tailorId)? onTailorSelected;
+  final AppUserRole userRole;
 
   const TailorsPageBody({
     super.key,
     required this.searchQuery,
     required this.filterData,
-     this.onTailorSelected,
+    this.onTailorSelected,
+    this.userRole = AppUserRole.customer,
   });
 
   @override
@@ -127,19 +186,19 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
       valueListenable: widget.searchQuery,
       builder: (context, searchQuery, _) {
         final filteredTailors = _tailors.where((t) {
-          final matchesSearch = t.name.toLowerCase().contains(searchQuery.toLowerCase());
-          
-          // Rating filter from shell
+          final matchesSearch = t.name.toLowerCase().contains(
+            searchQuery.toLowerCase(),
+          );
           final matchesRating = t.rating >= widget.filterData.minRating;
-          
-          // Location filter from shell
-          final matchesLocation = widget.filterData.location == 'All' ||
-              t.address.toLowerCase().contains(widget.filterData.location.toLowerCase());
-          
+          final matchesLocation =
+              widget.filterData.location == 'All' ||
+              t.address.toLowerCase().contains(
+                widget.filterData.location.toLowerCase(),
+              );
+
           return matchesSearch && matchesRating && matchesLocation;
         }).toList();
 
-        // Sort by rating based on filterData.sortBy
         if (widget.filterData.sortBy == 'ratingHighToLow') {
           filteredTailors.sort((a, b) => b.rating.compareTo(a.rating));
         } else if (widget.filterData.sortBy == 'ratingLowToHigh') {
@@ -156,14 +215,15 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
     );
   }
 
-  // ─── Hero Section ─────────────────────────────────────────────────────────
-
   Widget _buildHeroSection() {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 400;
-    
+
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: isSmallScreen ? 12 : 16, vertical: 8),
+      margin: EdgeInsets.symmetric(
+        horizontal: isSmallScreen ? 12 : 16,
+        vertical: 8,
+      ),
       padding: EdgeInsets.all(isSmallScreen ? 14 : 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -208,7 +268,10 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
 
   Widget _buildHeroChip(IconData icon, String label, bool isSmall) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: isSmall ? 10 : 12, vertical: isSmall ? 4 : 5),
+      padding: EdgeInsets.symmetric(
+        horizontal: isSmall ? 10 : 12,
+        vertical: isSmall ? 4 : 5,
+      ),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(16),
@@ -231,19 +294,13 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
     );
   }
 
-  // ─── Tailors Grid ──────────────────────────────────────────────────────
-
   Widget _buildTailorsGrid(List<Tailor> tailors) {
     if (tailors.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.search_off_rounded,
-              size: 64,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.search_off_rounded, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
               'No tailors found',
@@ -257,10 +314,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
             const SizedBox(height: 8),
             Text(
               'Try adjusting your filters or search terms',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey[500],
-              ),
+              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
             ),
           ],
         ),
@@ -269,7 +323,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
 
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    
+
     final isSmallScreen = screenWidth < 400;
     final spacing = isSmallScreen ? 10.0 : 12.0;
     final cardAspectRatio = screenHeight < 700 ? 0.72 : 0.78;
@@ -283,44 +337,31 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
         mainAxisSpacing: spacing,
       ),
       itemCount: tailors.length,
-      itemBuilder: (context, index) => _buildTailorCard(tailors[index], isSmallScreen),
+      itemBuilder: (context, index) =>
+          _buildTailorCard(tailors[index], isSmallScreen),
     );
   }
 
   Widget _buildTailorCard(Tailor tailor, bool isSmall) {
     final bool isTopRated = tailor.rating >= 4.8;
-
-    // Get specialty from portfolio description
-    String specialty = 'Professional Tailoring';
-    if (tailor.portfolio != null && tailor.portfolio!.isNotEmpty) {
-      final desc = tailor.portfolio!.first.description ?? '';
-      if (desc.isNotEmpty) {
-        if (desc.length <= 30) {
-          specialty = desc;
-        } else {
-          specialty = desc.substring(0, 30) + '...';
-        }
-      }
-    }
-
-    // Get image from profilePicture or use fallback
     String imageUrl = tailor.profilePicture ?? 'assets/images/fab.jpg';
 
     return GestureDetector(
-     onTap: () async {
-  final result = await Navigator.push<String>(
-    context,
-    MaterialPageRoute(
-      builder: (context) => TailorDetailScreen(
-        tailor: tailor,
-        onTailorSelected: widget.onTailorSelected,
-      ),
-    ),
-  );
-  if (result != null && widget.onTailorSelected != null) {
-    widget.onTailorSelected!(result);
-  }
-},
+      onTap: () async {
+        final result = await Navigator.push<String>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TailorDetailScreen(
+              tailor: tailor,
+              onTailorSelected: widget.onTailorSelected,
+              userRole: widget.userRole,
+            ),
+          ),
+        );
+        if (result != null && widget.onTailorSelected != null) {
+          widget.onTailorSelected!(result);
+        }
+      },
       child: Container(
         decoration: BoxDecoration(
           color: kCardBg,
@@ -338,13 +379,14 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Image section with badges
             Flexible(
               flex: 5,
               child: Stack(
                 children: [
                   ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(14),
+                    ),
                     child: SizedBox(
                       width: double.infinity,
                       height: double.infinity,
@@ -353,12 +395,15 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
                           color: kSage.withValues(alpha: 0.12),
-                          child: Icon(Icons.person, size: isSmall ? 36 : 40, color: kSageDark),
+                          child: Icon(
+                            Icons.person,
+                            size: isSmall ? 36 : 40,
+                            color: kSageDark,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                  // Top Rated Badge
                   if (isTopRated)
                     Positioned(
                       top: 8,
@@ -386,7 +431,6 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                         ),
                       ),
                     ),
-                  // Rating Badge - Bottom Right
                   Positioned(
                     bottom: 8,
                     right: 8,
@@ -423,7 +467,6 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                 ],
               ),
             ),
-            // Content section
             Flexible(
               flex: 4,
               child: Padding(
@@ -473,17 +516,39 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                     Row(
                       children: [
                         Icon(
-                          Icons.local_shipping_outlined,
+                          Icons.location_on,
                           size: isSmall ? 12 : 14,
-                          color: kSage,
+                          color: Colors.grey[600],
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          "Tk 40",
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: kSage,
-                            fontWeight: FontWeight.w600,
+                        Expanded(
+                          child: Text(
+                            tailor.generalArea,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[600],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '1.8 km',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.green.shade800,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],

@@ -509,17 +509,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return DateTime(today.year, today.month, today.day, 23, 59, 59);
   }
 
-  String get _filterLabel {
-    switch (_filterPreset) {
-      case OrderFilterPreset.last3Months:
-        return "Last 3 months";
-      case OrderFilterPreset.last6Months:
-        return "Last 6 months";
-      case OrderFilterPreset.custom:
-        if (_customStartDate == null || _customEndDate == null) return "Custom dates";
-        return "${_formatDate(_customStartDate!)} - ${_formatDate(_customEndDate!)}";
-    }
-  }
 
   List<CustomerOrder> get _filteredOrders {
     return _orders.where((order) {
@@ -792,45 +781,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  Widget _filterOptionTile(String title, String subtitle, OrderFilterPreset preset, {bool isCustom = false}) {
-    final bool selected = _filterPreset == preset;
-    return ListTile(
-      onTap: () {
-        Navigator.pop(context);
-        if (isCustom) {
-          _pickCustomDateRange();
-        } else {
-          setState(() => _filterPreset = preset);
-        }
-      },
-      leading: CircleAvatar(
-        backgroundColor: selected ? primaryGreen : Colors.green.shade50,
-        child: Icon(selected ? Icons.check : Icons.calendar_month, color: selected ? Colors.white : primaryGreen, size: 20),
-      ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-      subtitle: Text(subtitle),
-    );
-  }
-
-  Future<void> _pickCustomDateRange() async {
-    final range = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(colorScheme: Theme.of(context).colorScheme.copyWith(primary: primaryGreen)),
-        child: child!,
-      ),
-    );
-    if (range != null) {
-      setState(() {
-        _filterPreset = OrderFilterPreset.custom;
-        _customStartDate = range.start;
-        _customEndDate = range.end.add(const Duration(hours: 23, minutes: 59));
-      });
-    }
-  }
-
   Widget _sectionToggle({required String label, required bool isSelected, required int count, required VoidCallback onTap}) {
     return InkWell(
       onTap: onTap,
@@ -1031,77 +981,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ],
       ),
     );
-  }
-
-  Widget _buildNoticeableNote(TailorStatus status) {
-    if (status == TailorStatus.notAssigned || status == TailorStatus.cancelled) {
-      return Container(
-        margin: const EdgeInsets.only(top: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.orange.shade50,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.orange.shade100),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.info_outline, color: Colors.orange.shade900, size: 16),
-            const SizedBox(width: 8),
-            Expanded(
-              child: RichText(
-                text: TextSpan(
-                  style: TextStyle(color: Colors.orange.shade900, fontSize: 11, fontWeight: FontWeight.w600),
-                  children: [
-                    const TextSpan(text: "If you want to assign tailor "),
-                    WidgetSpan(
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const BrowseShell(initialIndex: 2)),
-                          );
-                        },
-                        child: Text(
-                          "browse tailor",
-                          style: TextStyle(
-                            color: Colors.orange.shade900,
-                            fontWeight: FontWeight.w800,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    } else if (status == TailorStatus.pending) {
-      return Container(
-        margin: const EdgeInsets.only(top: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.blue.shade50,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.blue.shade100),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.timer_outlined, color: Colors.blue.shade900, size: 16),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                "Tailor will respond within 24 hours. You can cancel manually before that.",
-                style: TextStyle(color: Colors.blue.shade900, fontSize: 11, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    return const SizedBox.shrink();
   }
 
   Widget _orderInfo(IconData icon, String text) {

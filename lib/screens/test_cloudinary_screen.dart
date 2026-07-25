@@ -1,6 +1,5 @@
 // lib/screens/test_cloudinary_screen.dart
 import 'package:flutter/material.dart';
-import 'package:sketch2stitch/services/cloudinary_service.dart';
 import 'package:sketch2stitch/widgets/cloudinary_image.dart';
 import 'package:sketch2stitch/widgets/image_upload_button.dart';
 

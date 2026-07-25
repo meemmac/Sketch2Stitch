@@ -6,17 +6,20 @@ import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
 import 'package:sketch2stitch/screens/customer/cart_screen.dart';
-import '../../../widgets/dashboard_drawer.dart';
+import 'package:sketch2stitch/widgets/dashboard_drawer.dart'; // ✅ Import AppUserRole
 
-/// Shared shell for the three "Browse" tabs (Fabrics/Clothing, Tailors,
-/// Retailers). Provides one header, one animated navigation row, and a
-/// swipeable [PageView] so switching tabs feels like a standard app
-/// (tap a label OR swipe left/right, both animate smoothly together).
+/// Shared shell for the four "Browse" tabs (Fabrics, Elements, Tailors, Retailers)
 class BrowseShell extends StatefulWidget {
-  /// 0 = Fabrics/Clothing, 1 = Tailors, 2 = Retailers
   final int initialIndex;
   final void Function(String tailorId)? onTailorSelected;
-    const BrowseShell({super.key, this.initialIndex = 0, this.onTailorSelected});
+  final AppUserRole userRole;
+
+  const BrowseShell({
+    super.key,
+    this.initialIndex = 0,
+    this.onTailorSelected,
+    this.userRole = AppUserRole.customer,
+  });
 
   @override
   State<BrowseShell> createState() => _BrowseShellState();
@@ -48,36 +51,6 @@ class _BrowseShellState extends State<BrowseShell> {
     'Rangpur',
   ];
 
-  static const List<String> _materialTypes = [
-    'All',
-    'Cotton',
-    'Silk',
-    'Wool',
-    'Linen',
-    'Lace',
-    'Embroidery',
-    'Polyester',
-    'Nylon',
-    'Rayon',
-    'Denim',
-    'Leather',
-    'Velvet',
-    'Satin',
-  ];
-
-  // Element "type" options mirror the element categories (Fasteners,
-  // Buttons, Threads, etc.) rather than fabric materials, since elements
-  // are tagged/filtered by category, not by textile material.
-  static const List<String> _elementTypes = [
-    'All',
-    'Fasteners',
-    'Buttons',
-    'Threads',
-    'Embellishments',
-    'Trims',
-    'Ribbons',
-  ];
-
   static const List<String> _colorOptions = [
     'All',
     'White',
@@ -97,34 +70,34 @@ class _BrowseShellState extends State<BrowseShell> {
   final ValueNotifier<String> _searchNotifier = ValueNotifier('');
   double _page = 0;
 
+  final FocusNode _searchFocusNode = FocusNode();
+
   // ─── Tab-Specific Filter Values ──────────────────────────────────────
 
-  // Fabrics Filters (Price, Color, Material Type) - NO RATING
+  // Fabrics Filters
   double _fabricsMinPrice = 0;
   double _fabricsMaxPrice = 5000;
-  String _fabricsSelectedColor = 'All';
-  String _fabricsSelectedMaterial = 'All';
-  String _fabricsSortBy = 'default'; // 'default', 'lowToHigh', 'highToLow'
+  List<String> _fabricsSelectedColors = ['All'];
+  List<String> _fabricsSelectedMaterials = ['All'];
+  String _fabricsSortBy = 'default';
 
-  // Elements Filters (Price, Color, Material Type) - NO RATING
+  // Elements Filters
   double _elementsMinPrice = 0;
   double _elementsMaxPrice = 5000;
-  String _elementsSelectedColor = 'All';
-  String _elementsSelectedMaterial = 'All';
-  String _elementsSortBy = 'default'; // 'default', 'lowToHigh', 'highToLow'
+  List<String> _elementsSelectedColors = ['All'];
+  String _elementsSortBy = 'default';
 
-  // Tailors Filters (Rating, Location)
+  // Tailors Filters
   double _tailorsMinRating = 0;
   String _tailorsSelectedLocation = 'All';
-  String _tailorsSortBy = 'default'; // 'default', 'ratingHighToLow', 'ratingLowToHigh'
+  String _tailorsSortBy = 'default';
 
-  // Retailers Filters (Rating, Location)
+  // Retailers Filters
   double _retailersMinRating = 0;
   String _retailersSelectedLocation = 'All';
-  String _retailersSortBy = 'default'; // 'default', 'ratingHighToLow', 'ratingLowToHigh'
+  String _retailersSortBy = 'default';
 
   bool _showFilterOverlay = false;
-  bool _showSearchOverlay = false;
 
   @override
   void initState() {
@@ -146,6 +119,7 @@ class _BrowseShellState extends State<BrowseShell> {
     _pageController.removeListener(_onPageScroll);
     _pageController.dispose();
     _searchNotifier.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -158,16 +132,12 @@ class _BrowseShellState extends State<BrowseShell> {
   }
 
   void _toggleFilterOverlay() {
+    _searchFocusNode.unfocus();
     setState(() {
       _showFilterOverlay = !_showFilterOverlay;
     });
   }
 
-  void _toggleSearchOverlay() {
-    setState(() {
-      _showSearchOverlay = !_showSearchOverlay;
-    });
-  }
 
   void _applyFilters() {
     setState(() {
@@ -178,26 +148,21 @@ class _BrowseShellState extends State<BrowseShell> {
 
   void _resetFilters() {
     setState(() {
-      // Reset Fabrics filters
       _fabricsMinPrice = 0;
       _fabricsMaxPrice = 5000;
-      _fabricsSelectedColor = 'All';
-      _fabricsSelectedMaterial = 'All';
+      _fabricsSelectedColors = ['All'];
+      _fabricsSelectedMaterials = ['All'];
       _fabricsSortBy = 'default';
 
-      // Reset Elements filters
       _elementsMinPrice = 0;
       _elementsMaxPrice = 5000;
-      _elementsSelectedColor = 'All';
-      _elementsSelectedMaterial = 'All';
+      _elementsSelectedColors = ['All'];
       _elementsSortBy = 'default';
 
-      // Reset Tailors filters
       _tailorsMinRating = 0;
       _tailorsSelectedLocation = 'All';
       _tailorsSortBy = 'default';
 
-      // Reset Retailers filters
       _retailersMinRating = 0;
       _retailersSelectedLocation = 'All';
       _retailersSortBy = 'default';
@@ -211,26 +176,21 @@ class _BrowseShellState extends State<BrowseShell> {
     final currentIndex = _page.round().clamp(0, _tabLabels.length - 1);
 
     if (currentIndex == 0) {
-      // Fabrics tab - NO RATING
       return _fabricsMinPrice > 0 ||
           _fabricsMaxPrice < 5000 ||
-          _fabricsSelectedColor != 'All' ||
-          _fabricsSelectedMaterial != 'All' ||
+          (_fabricsSelectedColors.isNotEmpty && !_fabricsSelectedColors.contains('All')) ||
+          (_fabricsSelectedMaterials.isNotEmpty && !_fabricsSelectedMaterials.contains('All')) ||
           _fabricsSortBy != 'default';
     } else if (currentIndex == 1) {
-      // Elements tab - NO RATING
       return _elementsMinPrice > 0 ||
           _elementsMaxPrice < 5000 ||
-          _elementsSelectedColor != 'All' ||
-          _elementsSelectedMaterial != 'All' ||
+          (_elementsSelectedColors.isNotEmpty && !_elementsSelectedColors.contains('All')) ||
           _elementsSortBy != 'default';
     } else if (currentIndex == 2) {
-      // Tailors tab - Rating + Location
       return _tailorsMinRating > 0 ||
           _tailorsSelectedLocation != 'All' ||
           _tailorsSortBy != 'default';
     } else {
-      // Retailers tab - Rating + Location
       return _retailersMinRating > 0 ||
           _retailersSelectedLocation != 'All' ||
           _retailersSortBy != 'default';
@@ -240,21 +200,21 @@ class _BrowseShellState extends State<BrowseShell> {
   @override
   Widget build(BuildContext context) {
     final currentIndex = _page.round().clamp(0, _tabLabels.length - 1);
+    final isCustomer = widget.userRole == AppUserRole.customer;
 
-    // Create tab-specific filter data
     final fabricsFilterData = FabricsFilterData(
       minPrice: _fabricsMinPrice,
       maxPrice: _fabricsMaxPrice,
-      color: _fabricsSelectedColor,
-      materialType: _fabricsSelectedMaterial,
+      colors: _fabricsSelectedColors,
+      materialTypes: _fabricsSelectedMaterials,
       sortBy: _fabricsSortBy,
     );
 
     final elementsFilterData = ElementsFilterData(
       minPrice: _elementsMinPrice,
       maxPrice: _elementsMaxPrice,
-      color: _elementsSelectedColor,
-      materialType: _elementsSelectedMaterial,
+      colors: _elementsSelectedColors,
+      materialTypes: ['All'],
       sortBy: _elementsSortBy,
     );
 
@@ -272,100 +232,105 @@ class _BrowseShellState extends State<BrowseShell> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      drawer: const DashboardDrawer(initialRole: AppUserRole.customer),
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              _buildHeader(currentIndex),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF4F9F1), // Matches theme sage/pale colors
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade300, width: 0.5),
-                  ),
-                  child: TextField(
-                    onChanged: (value) => _searchNotifier.value = value,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.search, size: 22, color: Colors.grey),
-                      hintText: _searchHints[currentIndex],
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                      hintStyle: const TextStyle(fontSize: 14, color: Colors.grey),
+      body: GestureDetector(
+        onTap: () {
+          _searchFocusNode.unfocus();
+        },
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                _buildHeader(isCustomer),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF4F9F1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade300, width: 0.5),
                     ),
-                  ),
-                ),
-              ),
-              _buildNavigationRow(),
-              Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  physics: const BouncingScrollPhysics(),
-                  children: [
-                    FabricsPageBody(
-                      searchQuery: _searchNotifier,
-                      filterData: fabricsFilterData,
-                      showFabrics: true,
-                    ),
-                    FabricsPageBody(
-                      searchQuery: _searchNotifier,
-                      filterData: elementsFilterData,
-                      showFabrics: false,
-                    ),
-                    TailorsPageBody(
-  searchQuery: _searchNotifier,
-  filterData: tailorsFilterData,
-  onTailorSelected: widget.onTailorSelected,
-),
-                    RetailersPageBody(
-                      searchQuery: _searchNotifier,
-                      filterData: retailersFilterData,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          // Filter Overlay
-          if (_showFilterOverlay)
-            GestureDetector(
-              onTap: _toggleFilterOverlay,
-              child: Container(
-                color: Colors.black.withValues(alpha: 0.3),
-                child: GestureDetector(
-                  onTap: () {},
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: Container(
-                      margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.15),
-                            blurRadius: 20,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                    child: TextField(
+                      focusNode: _searchFocusNode,
+                      onChanged: (value) => _searchNotifier.value = value,
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.search, size: 22, color: Colors.grey),
+                        hintText: _searchHints[currentIndex],
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        hintStyle: const TextStyle(fontSize: 14, color: Colors.grey),
                       ),
-                      child: _buildFilterPanel(currentIndex),
+                    ),
+                  ),
+                ),
+                _buildNavigationRow(),
+                Expanded(
+                  child: PageView(
+                    controller: _pageController,
+                    physics: const BouncingScrollPhysics(),
+                    children: [
+                      FabricsPageBody(
+                        searchQuery: _searchNotifier,
+                        filterData: fabricsFilterData,
+                        showFabrics: true,
+                        userRole: widget.userRole,
+                      ),
+                      FabricsPageBody(
+                        searchQuery: _searchNotifier,
+                        filterData: elementsFilterData,
+                        showFabrics: false,
+                        userRole: widget.userRole,
+                      ),
+                      TailorsPageBody(
+                        searchQuery: _searchNotifier,
+                        filterData: tailorsFilterData,
+                        onTailorSelected: widget.onTailorSelected,
+                        userRole: widget.userRole,
+                      ),
+                      RetailersPageBody(
+                        searchQuery: _searchNotifier,
+                        filterData: retailersFilterData,
+                        userRole: widget.userRole,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (_showFilterOverlay)
+              GestureDetector(
+                onTap: _toggleFilterOverlay,
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  child: GestureDetector(
+                    onTap: () {},
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: Container(
+                        margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.15),
+                              blurRadius: 20,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: _buildFilterPanel(currentIndex),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  // ─── Header ────────────────────────────────────────────────────────────
-
-  Widget _buildHeader(int currentIndex) {
+  Widget _buildHeader(bool isCustomer) {
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 8,
@@ -375,13 +340,13 @@ class _BrowseShellState extends State<BrowseShell> {
       ),
       child: Row(
         children: [
-          Builder(
-            builder: (ctx) => IconButton(
-              icon: const Icon(Icons.menu, color: kSage, size: 24),
-              onPressed: () => Scaffold.of(ctx).openDrawer(),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
+          IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 24),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
           const SizedBox(width: 12),
           Image.asset(
@@ -409,65 +374,83 @@ class _BrowseShellState extends State<BrowseShell> {
             },
           ),
           const Spacer(),
-          Stack(
-            children: [
-              IconButton(
-                onPressed: _toggleFilterOverlay,
-                icon: Icon(
-                  Icons.filter_list,
-                  color: _showFilterOverlay || _hasActiveFilters ? kSage : Colors.black87,
-                  size: 24,
+          if (!isCustomer)
+            Stack(
+              children: [
+                IconButton(
+                  onPressed: _toggleFilterOverlay,
+                  icon: Icon(
+                    Icons.filter_list,
+                    color: _showFilterOverlay || _hasActiveFilters ? kSage : Colors.black87,
+                    size: 24,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-              if (_hasActiveFilters)
-                Positioned(
-                  top: 2,
-                  right: 2,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
+                if (_hasActiveFilters)
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
                     ),
                   ),
+              ],
+            ),
+          if (isCustomer) ...[
+            Stack(
+              children: [
+                IconButton(
+                  onPressed: _toggleFilterOverlay,
+                  icon: Icon(
+                    Icons.filter_list,
+                    color: _showFilterOverlay || _hasActiveFilters ? kSage : Colors.black87,
+                    size: 24,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
-            ],
-          ),
-          const SizedBox(width: 8),
-IconButton(
-  onPressed: () {
-
-    Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const CartScreen()),
-      );
-  },
-  icon: const Icon(
-    Icons.shopping_cart_outlined,
-    color: Colors.black87,
-    size: 24,
-  ),
-  padding: EdgeInsets.zero,
-  constraints: const BoxConstraints(),
-),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 24),
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
+                if (_hasActiveFilters)
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CartScreen()),
+                );
+              },
+              icon: const Icon(
+                Icons.shopping_cart_outlined,
+                color: Colors.black87,
+                size: 24,
+              ),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
         ],
       ),
     );
   }
-
-  // ─── Filter Panel ──────────────────────────────────────────────────────
 
   Widget _buildFilterPanel(int currentTab) {
     if (currentTab == 0) {
@@ -481,74 +464,12 @@ IconButton(
     }
   }
 
-  // ─── Search Panel ────────────────────────────────────────────────────────
-
-  Widget _buildSearchPanel(int currentIndex) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Search',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              TextButton(
-                onPressed: _toggleSearchOverlay,
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text(
-                  'Close',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: kSage,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            decoration: BoxDecoration(
-              color: kSagePale,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: kBorder, width: 0.5),
-            ),
-            child: TextField(
-              onChanged: (value) => _searchNotifier.value = value,
-              autofocus: true,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.search, size: 20),
-                hintText: _searchHints[currentIndex],
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                hintStyle: const TextStyle(fontSize: 15, color: Colors.grey),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─── Fabrics Filter Panel (NO RATING) ─────────────────────────────
-
   Widget _buildFabricsFilterPanel() {
+    final allMaterials = MaterialFilterOptions.getMaterialOptions();
+
     return Container(
       padding: const EdgeInsets.all(16),
-      constraints: const BoxConstraints(maxHeight: 480),
+      constraints: const BoxConstraints(maxHeight: 500),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -584,7 +505,6 @@ IconButton(
             ),
             const SizedBox(height: 12),
 
-            // Price Range
             const Text(
               'Price Range',
               style: TextStyle(
@@ -626,7 +546,6 @@ IconButton(
             ),
             const SizedBox(height: 6),
 
-            // Sort by Price (small toggle buttons)
             const Text(
               'Sort by Price',
               style: TextStyle(
@@ -637,26 +556,23 @@ IconButton(
             const SizedBox(height: 6),
             Row(
               children: [
-                _buildSortChip(
+                _buildFabricsSortChip(
                   label: 'Low to High',
                   icon: Icons.arrow_upward,
                   value: 'lowToHigh',
-                  isFabrics: true,
                 ),
                 const SizedBox(width: 8),
-                _buildSortChip(
+                _buildFabricsSortChip(
                   label: 'High to Low',
                   icon: Icons.arrow_downward,
                   value: 'highToLow',
-                  isFabrics: true,
                 ),
               ],
             ),
             const SizedBox(height: 12),
 
-            // Color Filter
             const Text(
-              'Color',
+              'Color (Select multiple)',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -667,11 +583,23 @@ IconButton(
               spacing: 4,
               runSpacing: 4,
               children: _colorOptions.map((color) {
-                final isSelected = _fabricsSelectedColor == color;
+                final isSelected = _fabricsSelectedColors.contains(color);
                 return GestureDetector(
                   onTap: () {
                     setState(() {
-                      _fabricsSelectedColor = color;
+                      if (color == 'All') {
+                        _fabricsSelectedColors = ['All'];
+                      } else {
+                        _fabricsSelectedColors.remove('All');
+                        if (_fabricsSelectedColors.contains(color)) {
+                          _fabricsSelectedColors.remove(color);
+                          if (_fabricsSelectedColors.isEmpty) {
+                            _fabricsSelectedColors.add('All');
+                          }
+                        } else {
+                          _fabricsSelectedColors.add(color);
+                        }
+                      }
                     });
                   },
                   child: Container(
@@ -714,9 +642,8 @@ IconButton(
             ),
             const SizedBox(height: 12),
 
-            // Material Type Filter
             const Text(
-              'Material Type',
+              'Material Types (Select multiple)',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -726,12 +653,24 @@ IconButton(
             Wrap(
               spacing: 4,
               runSpacing: 4,
-              children: _materialTypes.map((material) {
-                final isSelected = _fabricsSelectedMaterial == material;
+              children: allMaterials.map((material) {
+                final isSelected = _fabricsSelectedMaterials.contains(material);
                 return GestureDetector(
                   onTap: () {
                     setState(() {
-                      _fabricsSelectedMaterial = material;
+                      if (material == 'All') {
+                        _fabricsSelectedMaterials = ['All'];
+                      } else {
+                        _fabricsSelectedMaterials.remove('All');
+                        if (_fabricsSelectedMaterials.contains(material)) {
+                          _fabricsSelectedMaterials.remove(material);
+                          if (_fabricsSelectedMaterials.isEmpty) {
+                            _fabricsSelectedMaterials.add('All');
+                          }
+                        } else {
+                          _fabricsSelectedMaterials.add(material);
+                        }
+                      }
                     });
                   },
                   child: Container(
@@ -747,7 +686,7 @@ IconButton(
                     child: Text(
                       material,
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         color: isSelected ? Colors.white : Colors.grey.shade700,
                         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                       ),
@@ -758,7 +697,6 @@ IconButton(
             ),
             const SizedBox(height: 14),
 
-            // Apply Button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -787,12 +725,10 @@ IconButton(
     );
   }
 
-  // ─── Elements Filter Panel (NO RATING) ───────────────────────────
-
   Widget _buildElementsFilterPanel() {
     return Container(
       padding: const EdgeInsets.all(16),
-      constraints: const BoxConstraints(maxHeight: 480),
+      constraints: const BoxConstraints(maxHeight: 400),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -828,7 +764,6 @@ IconButton(
             ),
             const SizedBox(height: 12),
 
-            // Price Range
             const Text(
               'Price Range',
               style: TextStyle(
@@ -870,7 +805,6 @@ IconButton(
             ),
             const SizedBox(height: 6),
 
-            // Sort by Price (small toggle buttons)
             const Text(
               'Sort by Price',
               style: TextStyle(
@@ -881,26 +815,23 @@ IconButton(
             const SizedBox(height: 6),
             Row(
               children: [
-                _buildSortChip(
+                _buildElementsSortChip(
                   label: 'Low to High',
                   icon: Icons.arrow_upward,
                   value: 'lowToHigh',
-                  isFabrics: false,
                 ),
                 const SizedBox(width: 8),
-                _buildSortChip(
+                _buildElementsSortChip(
                   label: 'High to Low',
                   icon: Icons.arrow_downward,
                   value: 'highToLow',
-                  isFabrics: false,
                 ),
               ],
             ),
             const SizedBox(height: 12),
 
-            // Color Filter
             const Text(
-              'Color',
+              'Color (Select multiple)',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -911,11 +842,23 @@ IconButton(
               spacing: 4,
               runSpacing: 4,
               children: _colorOptions.map((color) {
-                final isSelected = _elementsSelectedColor == color;
+                final isSelected = _elementsSelectedColors.contains(color);
                 return GestureDetector(
                   onTap: () {
                     setState(() {
-                      _elementsSelectedColor = color;
+                      if (color == 'All') {
+                        _elementsSelectedColors = ['All'];
+                      } else {
+                        _elementsSelectedColors.remove('All');
+                        if (_elementsSelectedColors.contains(color)) {
+                          _elementsSelectedColors.remove(color);
+                          if (_elementsSelectedColors.isEmpty) {
+                            _elementsSelectedColors.add('All');
+                          }
+                        } else {
+                          _elementsSelectedColors.add(color);
+                        }
+                      }
                     });
                   },
                   child: Container(
@@ -956,53 +899,8 @@ IconButton(
                 );
               }).toList(),
             ),
-            const SizedBox(height: 12),
-
-            // Type Filter (element categories, e.g. Buttons, Threads)
-            const Text(
-              'Type',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 4,
-              runSpacing: 4,
-              children: _elementTypes.map((material) {
-                final isSelected = _elementsSelectedMaterial == material;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _elementsSelectedMaterial = material;
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isSelected ? kSage : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSelected ? kSage : Colors.grey.shade300,
-                        width: 0.5,
-                      ),
-                    ),
-                    child: Text(
-                      material,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isSelected ? Colors.white : Colors.grey.shade700,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
             const SizedBox(height: 14),
 
-            // Apply Button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -1031,24 +929,16 @@ IconButton(
     );
   }
 
-  // Small pill-style sort toggle button used under the Price Range slider.
-  // Tapping the already-selected chip clears the sort back to 'default'.
-  Widget _buildSortChip({
+  Widget _buildFabricsSortChip({
     required String label,
     required IconData icon,
     required String value,
-    required bool isFabrics,
   }) {
-    final sortBy = isFabrics ? _fabricsSortBy : _elementsSortBy;
-    final isSelected = sortBy == value;
+    final isSelected = _fabricsSortBy == value;
     return GestureDetector(
       onTap: () {
         setState(() {
-          if (isFabrics) {
-            _fabricsSortBy = isSelected ? 'default' : value;
-          } else {
-            _elementsSortBy = isSelected ? 'default' : value;
-          }
+          _fabricsSortBy = isSelected ? 'default' : value;
         });
       },
       child: Container(
@@ -1084,7 +974,51 @@ IconButton(
     );
   }
 
-  // Small pill-style rating sort chip for the Tailors filter panel.
+  Widget _buildElementsSortChip({
+    required String label,
+    required IconData icon,
+    required String value,
+  }) {
+    final isSelected = _elementsSortBy == value;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _elementsSortBy = isSelected ? 'default' : value;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? kSage : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? kSage : Colors.grey.shade300,
+            width: 0.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: isSelected ? Colors.white : Colors.grey.shade700,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: isSelected ? Colors.white : Colors.grey.shade700,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTailorsSortChip({
     required String label,
     required IconData icon,
@@ -1130,7 +1064,6 @@ IconButton(
     );
   }
 
-  // Small pill-style rating sort chip for the Retailers filter panel.
   Widget _buildRetailersSortChip({
     required String label,
     required IconData icon,
@@ -1176,8 +1109,6 @@ IconButton(
     );
   }
 
-  // ─── Tailors Filter Panel (Rating + Location) ──────────────────────
-
   Widget _buildTailorsFilterPanel() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1217,7 +1148,6 @@ IconButton(
             ),
             const SizedBox(height: 12),
 
-            // Rating Filter
             const Text(
               'Minimum Rating',
               style: TextStyle(
@@ -1259,7 +1189,6 @@ IconButton(
             ),
             const SizedBox(height: 6),
 
-            // Sort by Rating (small toggle buttons)
             const Text(
               'Sort by Rating',
               style: TextStyle(
@@ -1285,7 +1214,6 @@ IconButton(
             ),
             const SizedBox(height: 12),
 
-            // Location Filter
             const Text(
               'Location',
               style: TextStyle(
@@ -1329,7 +1257,6 @@ IconButton(
             ),
             const SizedBox(height: 14),
 
-            // Apply Button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -1357,8 +1284,6 @@ IconButton(
       ),
     );
   }
-
-  // ─── Retailers Filter Panel (Rating + Location) ────────────────────
 
   Widget _buildRetailersFilterPanel() {
     return Container(
@@ -1399,7 +1324,6 @@ IconButton(
             ),
             const SizedBox(height: 12),
 
-            // Rating Filter
             const Text(
               'Minimum Rating',
               style: TextStyle(
@@ -1441,7 +1365,6 @@ IconButton(
             ),
             const SizedBox(height: 6),
 
-            // Sort by Rating (small toggle buttons)
             const Text(
               'Sort by Rating',
               style: TextStyle(
@@ -1467,7 +1390,6 @@ IconButton(
             ),
             const SizedBox(height: 12),
 
-            // Location Filter
             const Text(
               'Location',
               style: TextStyle(
@@ -1511,7 +1433,6 @@ IconButton(
             ),
             const SizedBox(height: 14),
 
-            // Apply Button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -1568,8 +1489,6 @@ IconButton(
         return Colors.grey[300]!;
     }
   }
-
-  // ─── Navigation Row ──────────────────────────────────────────────────────
 
   Widget _buildNavigationRow() {
     return SizedBox(

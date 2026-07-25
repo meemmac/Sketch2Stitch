@@ -480,26 +480,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
       ),
     );
   }
-
-  Widget _buildGlassIconButton({required IconData icon, required VoidCallback onPressed}) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(15),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withAlpha(80),
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: Colors.white.withAlpha(60), width: 0.8),
-          ),
-          child: IconButton(
-            icon: Icon(icon, color: const Color(0xFF2D6A4F), size: 22),
-            onPressed: onPressed,
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class SpecularButton extends StatefulWidget {

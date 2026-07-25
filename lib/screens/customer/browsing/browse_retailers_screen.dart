@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/models/product.dart';
-import 'package:sketch2stitch/widgets/rating_stars.dart';
+import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
 import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
 
-// ─── Sample Color Options ──────────────────────────────────────────────────
-
-ColorOption _createColorOption(int id, String color, String? image, double price, int stock, {String? video}) {
+ColorOption _createColorOption(
+  int id,
+  String color,
+  String? image,
+  double price,
+  int stock, {
+  String? video,
+}) {
   return ColorOption(
     optionId: id,
     color: color,
@@ -19,10 +24,277 @@ ColorOption _createColorOption(int id, String color, String? image, double price
   );
 }
 
-// ─── Sample Products ───────────────────────────────────────────────────────
+final List<Product> _sampleElementProducts = [
+  Product(
+    id: 'e1',
+    retailerId: 'r1',
+    productName: 'Premium Metal Zipper',
+    category: 'Fasteners',
+    materialType: 'Metal',
+    colorOptions: [
+      ColorOption(
+        optionId: 1,
+        color: 'Silver',
+        image: 'assets/images/zipper.jpg',
+        price: 120,
+        stock: 100,
+      ),
+      ColorOption(
+        optionId: 2,
+        color: 'Gold',
+        image: 'assets/images/zipper_gold.jpg',
+        price: 150,
+        stock: 50,
+      ),
+      ColorOption(
+        optionId: 3,
+        color: 'Black',
+        image: 'assets/images/zipper.jpg',
+        price: 130,
+        stock: 75,
+      ),
+    ],
+    description: 'High-quality metal zippers with smooth operation.',
+    careSymbol: ['Do not iron directly', 'Clean with damp cloth'],
+  ),
+  Product(
+    id: 'e2',
+    retailerId: 'r1',
+    productName: 'Decorative Buttons Set',
+    category: 'Buttons',
+    materialType: 'Plastic',
+    colorOptions: [
+      ColorOption(
+        optionId: 1,
+        color: 'White',
+        image: 'assets/images/buttons.jpg',
+        price: 80,
+        stock: 200,
+      ),
+      ColorOption(
+        optionId: 2,
+        color: 'Black',
+        image: 'assets/images/buttons.jpg',
+        price: 80,
+        stock: 150,
+      ),
+      ColorOption(
+        optionId: 3,
+        color: 'Gold',
+        image: 'assets/images/buttons.jpg',
+        price: 100,
+        stock: 100,
+      ),
+    ],
+    description: 'Elegant button sets in various sizes and finishes.',
+    careSymbol: ['Hand wash', 'Do not bleach'],
+  ),
+  Product(
+    id: 'e3',
+    retailerId: 'r2',
+    productName: 'Sewing Thread Collection',
+    category: 'Threads',
+    materialType: 'Cotton',
+    colorOptions: [
+      ColorOption(
+        optionId: 1,
+        color: 'White',
+        image: 'assets/images/thread.jpg',
+        price: 45,
+        stock: 300,
+      ),
+      ColorOption(
+        optionId: 2,
+        color: 'Black',
+        image: 'assets/images/thread.jpg',
+        price: 45,
+        stock: 250,
+      ),
+      ColorOption(
+        optionId: 3,
+        color: 'Beige',
+        image: 'assets/images/thread.jpg',
+        price: 45,
+        stock: 200,
+      ),
+    ],
+    description: 'Premium quality sewing thread in essential colors.',
+    careSymbol: ['Store in cool dry place'],
+  ),
+  Product(
+    id: 'e4',
+    retailerId: 'r2',
+    productName: 'Pearl Embellishments',
+    category: 'Embellishments',
+    materialType: 'Glass',
+    colorOptions: [
+      ColorOption(
+        optionId: 1,
+        color: 'White',
+        image: 'assets/images/pearls.jpg',
+        price: 200,
+        stock: 80,
+      ),
+      ColorOption(
+        optionId: 2,
+        color: 'Pink',
+        image: 'assets/images/pearls.jpg',
+        price: 220,
+        stock: 60,
+      ),
+    ],
+    description: 'Beautiful pearl embellishments for bridal and formal wear.',
+    careSymbol: ['Dry clean only', 'Handle with care'],
+  ),
+  Product(
+    id: 'e5',
+    retailerId: 'r3',
+    productName: 'Lace Trim',
+    category: 'Trims',
+    materialType: 'Lace',
+    colorOptions: [
+      ColorOption(
+        optionId: 1,
+        color: 'White',
+        image: 'assets/images/lace_trim.jpg',
+        price: 180,
+        stock: 40,
+      ),
+      ColorOption(
+        optionId: 2,
+        color: 'Black',
+        image: 'assets/images/lace_trim.jpg',
+        price: 180,
+        stock: 35,
+      ),
+    ],
+    description: 'Fine lace trim with delicate patterns.',
+    careSymbol: ['Hand wash', 'Do not bleach'],
+  ),
+  Product(
+    id: 'e6',
+    retailerId: 'r3',
+    productName: 'Ribbon Collection',
+    category: 'Ribbons',
+    materialType: 'Satin',
+    colorOptions: [
+      ColorOption(
+        optionId: 1,
+        color: 'White',
+        image: 'assets/images/ribbon.jpg',
+        price: 60,
+        stock: 150,
+      ),
+      ColorOption(
+        optionId: 2,
+        color: 'Gold',
+        image: 'assets/images/ribbon.jpg',
+        price: 70,
+        stock: 120,
+      ),
+      ColorOption(
+        optionId: 3,
+        color: 'Blue',
+        image: 'assets/images/ribbon.jpg',
+        price: 65,
+        stock: 100,
+      ),
+    ],
+    description: 'Versatile satin ribbons in various colors and widths.',
+    careSymbol: ['Iron on low heat', 'Do not bleach'],
+  ),
+  Product(
+    id: 'e7',
+    retailerId: 'r4',
+    productName: 'Cotton Thread Set',
+    category: 'Threads',
+    materialType: 'Cotton',
+    colorOptions: [
+      ColorOption(
+        optionId: 1,
+        color: 'White',
+        image: 'assets/images/thread.jpg',
+        price: 35,
+        stock: 200,
+      ),
+      ColorOption(
+        optionId: 2,
+        color: 'Black',
+        image: 'assets/images/thread.jpg',
+        price: 35,
+        stock: 180,
+      ),
+      ColorOption(
+        optionId: 3,
+        color: 'Blue',
+        image: 'assets/images/thread.jpg',
+        price: 40,
+        stock: 150,
+      ),
+    ],
+    description: 'Premium cotton thread for all your stitching needs.',
+    careSymbol: ['Store in cool dry place'],
+  ),
+  Product(
+    id: 'e8',
+    retailerId: 'r5',
+    productName: 'Embellishment Set',
+    category: 'Embellishments',
+    materialType: 'Glass',
+    colorOptions: [
+      ColorOption(
+        optionId: 1,
+        color: 'Gold',
+        image: 'assets/images/embroidery.jpg',
+        price: 250,
+        stock: 50,
+      ),
+      ColorOption(
+        optionId: 2,
+        color: 'Silver',
+        image: 'assets/images/embroidery.jpg',
+        price: 250,
+        stock: 45,
+      ),
+    ],
+    description: 'Beautiful embellishments for traditional and formal wear.',
+    careSymbol: ['Dry clean only'],
+  ),
+  Product(
+    id: 'e9',
+    retailerId: 'r5',
+    productName: 'Satin Ribbon Set',
+    category: 'Ribbons',
+    materialType: 'Satin',
+    colorOptions: [
+      ColorOption(
+        optionId: 1,
+        color: 'Red',
+        image: 'assets/images/ribbon.jpg',
+        price: 55,
+        stock: 120,
+      ),
+      ColorOption(
+        optionId: 2,
+        color: 'Gold',
+        image: 'assets/images/ribbon.jpg',
+        price: 60,
+        stock: 100,
+      ),
+      ColorOption(
+        optionId: 3,
+        color: 'Green',
+        image: 'assets/images/ribbon.jpg',
+        price: 55,
+        stock: 90,
+      ),
+    ],
+    description: 'Luxurious satin ribbons for all your decoration needs.',
+    careSymbol: ['Iron on low heat'],
+  ),
+];
 
-final List<Product> _sampleProducts = [
-  // Products for Dhaka Fabric House (r1)
+final List<Product> _sampleFabricProducts = [
   Product(
     id: 'p1',
     retailerId: 'r1',
@@ -30,9 +302,30 @@ final List<Product> _sampleProducts = [
     category: 'Cotton',
     materialType: 'Cotton',
     colorOptions: [
-      _createColorOption(1, 'Red', 'assets/images/fab.jpg', 1200, 10, video: 'assets/images/Videos/vid1.mp4'),
-      _createColorOption(2, 'Blue', 'assets/images/textile.jpg', 1300, 8, video: 'assets/images/Videos/vid2.mp4'),
-      _createColorOption(3, 'Green', 'assets/images/silk.jpg', 1100, 15, video: 'assets/images/Videos/vid3.mp4'),
+      _createColorOption(
+        1,
+        'Red',
+        'assets/images/fab.jpg',
+        1200,
+        10,
+        video: 'assets/images/Videos/vid1.mp4',
+      ),
+      _createColorOption(
+        2,
+        'Blue',
+        'assets/images/textile.jpg',
+        1300,
+        8,
+        video: 'assets/images/Videos/vid2.mp4',
+      ),
+      _createColorOption(
+        3,
+        'Green',
+        'assets/images/silk.jpg',
+        1100,
+        15,
+        video: 'assets/images/Videos/vid3.mp4',
+      ),
     ],
     description: 'High quality premium cotton fabric perfect for summer wear.',
     careSymbol: ['Machine Wash', 'Do Not Bleach'],
@@ -44,8 +337,22 @@ final List<Product> _sampleProducts = [
     category: 'Silk',
     materialType: 'Silk',
     colorOptions: [
-      _createColorOption(1, 'Gold', 'assets/images/silk.jpg', 2500, 5, video: 'assets/images/Videos/vid2.mp4'),
-      _createColorOption(2, 'Red', 'assets/images/fab2.jpg', 2800, 3, video: 'assets/images/Videos/vid1.mp4'),
+      _createColorOption(
+        1,
+        'Gold',
+        'assets/images/silk.jpg',
+        2500,
+        5,
+        video: 'assets/images/Videos/vid2.mp4',
+      ),
+      _createColorOption(
+        2,
+        'Red',
+        'assets/images/fab2.jpg',
+        2800,
+        3,
+        video: 'assets/images/Videos/vid1.mp4',
+      ),
     ],
     description: 'Beautiful silk blend saree with intricate embroidery.',
     careSymbol: ['Dry Clean Only'],
@@ -57,8 +364,22 @@ final List<Product> _sampleProducts = [
     category: 'Linen',
     materialType: 'Linen',
     colorOptions: [
-      _createColorOption(1, 'White', 'assets/images/fab.jpg', 800, 20, video: 'assets/images/Videos/vid3.mp4'),
-      _createColorOption(2, 'Beige', 'assets/images/textile.jpg', 850, 18, video: 'assets/images/Videos/vid2.mp4'),
+      _createColorOption(
+        1,
+        'White',
+        'assets/images/fab.jpg',
+        800,
+        20,
+        video: 'assets/images/Videos/vid3.mp4',
+      ),
+      _createColorOption(
+        2,
+        'Beige',
+        'assets/images/textile.jpg',
+        850,
+        18,
+        video: 'assets/images/Videos/vid2.mp4',
+      ),
     ],
     description: 'Premium linen fabric perfect for formal shirts.',
     careSymbol: ['Machine Wash', 'Iron Medium'],
@@ -70,14 +391,26 @@ final List<Product> _sampleProducts = [
     category: 'Cotton',
     materialType: 'Cotton',
     colorOptions: [
-      _createColorOption(1, 'Pink', 'assets/images/fab2.jpg', 950, 12, video: 'assets/images/Videos/vid1.mp4'),
-      _createColorOption(2, 'Purple', 'assets/images/fab.jpg', 1000, 10, video: 'assets/images/Videos/vid3.mp4'),
+      _createColorOption(
+        1,
+        'Pink',
+        'assets/images/fab2.jpg',
+        950,
+        12,
+        video: 'assets/images/Videos/vid1.mp4',
+      ),
+      _createColorOption(
+        2,
+        'Purple',
+        'assets/images/fab.jpg',
+        1000,
+        10,
+        video: 'assets/images/Videos/vid3.mp4',
+      ),
     ],
     description: 'Beautiful printed cotton fabric for dresses and tops.',
     careSymbol: ['Machine Wash', 'Do Not Bleach'],
   ),
-  
-  // Products for Chowdhury Textiles (r2)
   Product(
     id: 'p5',
     retailerId: 'r2',
@@ -85,8 +418,22 @@ final List<Product> _sampleProducts = [
     category: 'Cotton',
     materialType: 'Cotton',
     colorOptions: [
-      _createColorOption(1, 'White', 'assets/images/textile.jpg', 1500, 7, video: 'assets/images/Videos/vid1.mp4'),
-      _createColorOption(2, 'Cream', 'assets/images/fab2.jpg', 1600, 5, video: 'assets/images/Videos/vid2.mp4'),
+      _createColorOption(
+        1,
+        'White',
+        'assets/images/textile.jpg',
+        1500,
+        7,
+        video: 'assets/images/Videos/vid1.mp4',
+      ),
+      _createColorOption(
+        2,
+        'Cream',
+        'assets/images/fab2.jpg',
+        1600,
+        5,
+        video: 'assets/images/Videos/vid2.mp4',
+      ),
     ],
     description: 'Authentic Jamdani fabric with traditional patterns.',
     careSymbol: ['Hand Wash', 'Do Not Bleach'],
@@ -98,14 +445,26 @@ final List<Product> _sampleProducts = [
     category: 'Polyester',
     materialType: 'Polyester',
     colorOptions: [
-      _createColorOption(1, 'Pink', 'assets/images/fab2.jpg', 950, 12, video: 'assets/images/Videos/vid3.mp4'),
-      _createColorOption(2, 'Purple', 'assets/images/silk.jpg', 1000, 8, video: 'assets/images/Videos/vid1.mp4'),
+      _createColorOption(
+        1,
+        'Pink',
+        'assets/images/fab2.jpg',
+        950,
+        12,
+        video: 'assets/images/Videos/vid3.mp4',
+      ),
+      _createColorOption(
+        2,
+        'Purple',
+        'assets/images/silk.jpg',
+        1000,
+        8,
+        video: 'assets/images/Videos/vid1.mp4',
+      ),
     ],
     description: 'Light weight georgette chiffon for elegant drapes.',
     careSymbol: ['Dry Clean Only'],
   ),
-  
-  // Products for Silk & Lace Emporium (r3)
   Product(
     id: 'p7',
     retailerId: 'r3',
@@ -113,8 +472,22 @@ final List<Product> _sampleProducts = [
     category: 'Silk',
     materialType: 'Silk',
     colorOptions: [
-      _createColorOption(1, 'Gold', 'assets/images/silk.jpg', 3200, 4, video: 'assets/images/Videos/vid2.mp4'),
-      _createColorOption(2, 'Silver', 'assets/images/lace.jpg', 3500, 3, video: 'assets/images/Videos/vid1.mp4'),
+      _createColorOption(
+        1,
+        'Gold',
+        'assets/images/silk.jpg',
+        3200,
+        4,
+        video: 'assets/images/Videos/vid2.mp4',
+      ),
+      _createColorOption(
+        2,
+        'Silver',
+        'assets/images/lace.jpg',
+        3500,
+        3,
+        video: 'assets/images/Videos/vid1.mp4',
+      ),
     ],
     description: 'Luxurious raw silk with a natural sheen.',
     careSymbol: ['Dry Clean Only'],
@@ -126,8 +499,22 @@ final List<Product> _sampleProducts = [
     category: 'Lace',
     materialType: 'Lace',
     colorOptions: [
-      _createColorOption(1, 'White', 'assets/images/lace.jpg', 1800, 6, video: 'assets/images/Videos/vid3.mp4'),
-      _createColorOption(2, 'Cream', 'assets/images/silk.jpg', 1900, 5, video: 'assets/images/Videos/vid2.mp4'),
+      _createColorOption(
+        1,
+        'White',
+        'assets/images/lace.jpg',
+        1800,
+        6,
+        video: 'assets/images/Videos/vid3.mp4',
+      ),
+      _createColorOption(
+        2,
+        'Cream',
+        'assets/images/silk.jpg',
+        1900,
+        5,
+        video: 'assets/images/Videos/vid2.mp4',
+      ),
     ],
     description: 'Beautiful lace fabric with intricate floral patterns.',
     careSymbol: ['Hand Wash', 'Do Not Wring'],
@@ -139,15 +526,34 @@ final List<Product> _sampleProducts = [
     category: 'Velvet',
     materialType: 'Velvet',
     colorOptions: [
-      _createColorOption(1, 'Red', 'assets/images/fab.jpg', 2200, 7, video: 'assets/images/Videos/vid1.mp4'),
-      _createColorOption(2, 'Blue', 'assets/images/textile.jpg', 2300, 5, video: 'assets/images/Videos/vid2.mp4'),
-      _createColorOption(3, 'Green', 'assets/images/silk.jpg', 2400, 4, video: 'assets/images/Videos/vid3.mp4'),
+      _createColorOption(
+        1,
+        'Red',
+        'assets/images/fab.jpg',
+        2200,
+        7,
+        video: 'assets/images/Videos/vid1.mp4',
+      ),
+      _createColorOption(
+        2,
+        'Blue',
+        'assets/images/textile.jpg',
+        2300,
+        5,
+        video: 'assets/images/Videos/vid2.mp4',
+      ),
+      _createColorOption(
+        3,
+        'Green',
+        'assets/images/silk.jpg',
+        2400,
+        4,
+        video: 'assets/images/Videos/vid3.mp4',
+      ),
     ],
     description: 'Luxurious velvet fabric for evening wear.',
     careSymbol: ['Dry Clean Only'],
   ),
-  
-  // Products for Bengal Cotton Co. (r4)
   Product(
     id: 'p10',
     retailerId: 'r4',
@@ -155,8 +561,22 @@ final List<Product> _sampleProducts = [
     category: 'Cotton',
     materialType: 'Cotton',
     colorOptions: [
-      _createColorOption(1, 'Natural', 'assets/images/fab2.jpg', 700, 25, video: 'assets/images/Videos/vid1.mp4'),
-      _createColorOption(2, 'Brown', 'assets/images/fab.jpg', 750, 20, video: 'assets/images/Videos/vid2.mp4'),
+      _createColorOption(
+        1,
+        'Natural',
+        'assets/images/fab2.jpg',
+        700,
+        25,
+        video: 'assets/images/Videos/vid1.mp4',
+      ),
+      _createColorOption(
+        2,
+        'Brown',
+        'assets/images/fab.jpg',
+        750,
+        20,
+        video: 'assets/images/Videos/vid2.mp4',
+      ),
     ],
     description: 'Hand-spun khadi cotton fabric with a rustic feel.',
     careSymbol: ['Machine Wash'],
@@ -168,14 +588,26 @@ final List<Product> _sampleProducts = [
     category: 'Denim',
     materialType: 'Denim',
     colorOptions: [
-      _createColorOption(1, 'Blue', 'assets/images/textile.jpg', 850, 15, video: 'assets/images/Videos/vid3.mp4'),
-      _createColorOption(2, 'Black', 'assets/images/fab2.jpg', 900, 12, video: 'assets/images/Videos/vid1.mp4'),
+      _createColorOption(
+        1,
+        'Blue',
+        'assets/images/textile.jpg',
+        850,
+        15,
+        video: 'assets/images/Videos/vid3.mp4',
+      ),
+      _createColorOption(
+        2,
+        'Black',
+        'assets/images/fab2.jpg',
+        900,
+        12,
+        video: 'assets/images/Videos/vid1.mp4',
+      ),
     ],
     description: 'Premium denim fabric for jeans and jackets.',
     careSymbol: ['Machine Wash', 'Do Not Bleach'],
   ),
-  
-  // Products for Heritage Weaves (r5)
   Product(
     id: 'p12',
     retailerId: 'r5',
@@ -183,8 +615,22 @@ final List<Product> _sampleProducts = [
     category: 'Embroidery',
     materialType: 'Embroidery',
     colorOptions: [
-      _createColorOption(1, 'Green', 'assets/images/lace.jpg', 2100, 8, video: 'assets/images/Videos/vid2.mp4'),
-      _createColorOption(2, 'Gold', 'assets/images/silk.jpg', 2300, 6, video: 'assets/images/Videos/vid3.mp4'),
+      _createColorOption(
+        1,
+        'Green',
+        'assets/images/lace.jpg',
+        2100,
+        8,
+        video: 'assets/images/Videos/vid2.mp4',
+      ),
+      _createColorOption(
+        2,
+        'Gold',
+        'assets/images/silk.jpg',
+        2300,
+        6,
+        video: 'assets/images/Videos/vid3.mp4',
+      ),
     ],
     description: 'Hand-embroidered fabric with traditional motifs.',
     careSymbol: ['Dry Clean Only'],
@@ -196,8 +642,22 @@ final List<Product> _sampleProducts = [
     category: 'Silk',
     materialType: 'Silk',
     colorOptions: [
-      _createColorOption(1, 'Copper', 'assets/images/textile.jpg', 2800, 4, video: 'assets/images/Videos/vid1.mp4'),
-      _createColorOption(2, 'Gold', 'assets/images/silk.jpg', 3000, 3, video: 'assets/images/Videos/vid2.mp4'),
+      _createColorOption(
+        1,
+        'Copper',
+        'assets/images/textile.jpg',
+        2800,
+        4,
+        video: 'assets/images/Videos/vid1.mp4',
+      ),
+      _createColorOption(
+        2,
+        'Gold',
+        'assets/images/silk.jpg',
+        3000,
+        3,
+        video: 'assets/images/Videos/vid2.mp4',
+      ),
     ],
     description: 'Beautiful tussar silk with a textured finish.',
     careSymbol: ['Dry Clean Only'],
@@ -209,21 +669,38 @@ final List<Product> _sampleProducts = [
     category: 'Satin',
     materialType: 'Satin',
     colorOptions: [
-      _createColorOption(1, 'Pink', 'assets/images/fab.jpg', 1200, 10, video: 'assets/images/Videos/vid3.mp4'),
-      _createColorOption(2, 'White', 'assets/images/lace.jpg', 1300, 8, video: 'assets/images/Videos/vid1.mp4'),
+      _createColorOption(
+        1,
+        'Pink',
+        'assets/images/fab.jpg',
+        1200,
+        10,
+        video: 'assets/images/Videos/vid3.mp4',
+      ),
+      _createColorOption(
+        2,
+        'White',
+        'assets/images/lace.jpg',
+        1300,
+        8,
+        video: 'assets/images/Videos/vid1.mp4',
+      ),
     ],
     description: 'Smooth satin fabric for bridal and formal wear.',
     careSymbol: ['Dry Clean Only'],
   ),
 ];
 
-// ─── Helper to get products by retailer ID ──────────────────────────────────
-
 List<Product> _getProductsForRetailer(String retailerId) {
-  return _sampleProducts.where((p) => p.retailerId == retailerId).toList();
+  final fabrics = _sampleFabricProducts
+      .where((p) => p.retailerId == retailerId)
+      .toList();
+  final elements = _sampleElementProducts
+      .where((p) => p.retailerId == retailerId)
+      .toList();
+  return [...fabrics, ...elements];
 }
 
-/// Hardcoded sample retailers with products.
 final List<Retailer> kHardcodedRetailers = [
   Retailer(
     id: 'r1',
@@ -277,16 +754,16 @@ final List<Retailer> kHardcodedRetailers = [
   ),
 ];
 
-/// The actual retailers tab content, rendered as one page inside the
-/// shared [BrowseShell] PageView.
 class RetailersPageBody extends StatefulWidget {
   final ValueNotifier<String> searchQuery;
   final RetailersFilterData filterData;
+  final AppUserRole userRole;
 
   const RetailersPageBody({
     super.key,
     required this.searchQuery,
     required this.filterData,
+    this.userRole = AppUserRole.customer,
   });
 
   @override
@@ -307,15 +784,16 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
       valueListenable: widget.searchQuery,
       builder: (context, searchQuery, _) {
         final filteredRetailers = _retailers.where((r) {
-          final matchesSearch = r.shopName.toLowerCase().contains(searchQuery.toLowerCase());
-          
-          // Rating filter from shell
+          final matchesSearch = r.shopName.toLowerCase().contains(
+            searchQuery.toLowerCase(),
+          );
           final matchesRating = r.rating >= widget.filterData.minRating;
-          
-          // Location filter from shell
-          final matchesLocation = widget.filterData.location == 'All' ||
-              r.address.toLowerCase().contains(widget.filterData.location.toLowerCase());
-          
+          final matchesLocation =
+              widget.filterData.location == 'All' ||
+              r.address.toLowerCase().contains(
+                widget.filterData.location.toLowerCase(),
+              );
+
           return matchesSearch && matchesRating && matchesLocation;
         }).toList();
 
@@ -329,14 +807,15 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
     );
   }
 
-  // ─── Hero Section ─────────────────────────────────────────────────────────
-
   Widget _buildHeroSection() {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 400;
-    
+
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: isSmallScreen ? 12 : 16, vertical: 8),
+      margin: EdgeInsets.symmetric(
+        horizontal: isSmallScreen ? 12 : 16,
+        vertical: 8,
+      ),
       padding: EdgeInsets.all(isSmallScreen ? 14 : 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -381,7 +860,10 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
 
   Widget _buildHeroChip(IconData icon, String label, bool isSmall) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: isSmall ? 10 : 12, vertical: isSmall ? 4 : 5),
+      padding: EdgeInsets.symmetric(
+        horizontal: isSmall ? 10 : 12,
+        vertical: isSmall ? 4 : 5,
+      ),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(16),
@@ -404,19 +886,13 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
     );
   }
 
-  // ─── Retailers Grid ──────────────────────────────────────────────────────
-
   Widget _buildRetailersGrid(List<Retailer> retailers) {
     if (retailers.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.search_off_rounded,
-              size: 64,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.search_off_rounded, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
               'No retailers found',
@@ -430,10 +906,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
             const SizedBox(height: 8),
             Text(
               'Try adjusting your filters or search terms',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey[500],
-              ),
+              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
             ),
           ],
         ),
@@ -442,7 +915,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
 
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    
+
     final isSmallScreen = screenWidth < 400;
     final spacing = isSmallScreen ? 10.0 : 12.0;
     final cardAspectRatio = screenHeight < 700 ? 0.72 : 0.78;
@@ -456,20 +929,26 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
         mainAxisSpacing: spacing,
       ),
       itemCount: retailers.length,
-      itemBuilder: (context, index) => _buildRetailerCard(retailers[index], isSmallScreen),
+      itemBuilder: (context, index) =>
+          _buildRetailerCard(retailers[index], isSmallScreen),
     );
   }
 
   Widget _buildRetailerCard(Retailer retailer, bool isSmall) {
     final bool isTopRated = retailer.rating >= 4.8;
-
-    // Get image from profilePicture or use fallback
     String imageUrl = retailer.profilePicture ?? 'assets/images/fab.jpg';
 
     return GestureDetector(
       onTap: () {
-        // Navigate to retailer detail
-        _navigateToRetailerDetail(retailer);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RetailerDetailScreen(
+              retailer: retailer,
+              userRole: widget.userRole,
+            ),
+          ),
+        );
       },
       child: Container(
         decoration: BoxDecoration(
@@ -488,13 +967,14 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Image section with badges
             Flexible(
               flex: 5,
               child: Stack(
                 children: [
                   ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(14),
+                    ),
                     child: SizedBox(
                       width: double.infinity,
                       height: double.infinity,
@@ -503,12 +983,15 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
                           color: kSage.withValues(alpha: 0.12),
-                          child: Icon(Icons.store, size: isSmall ? 36 : 40, color: kSageDark),
+                          child: Icon(
+                            Icons.store,
+                            size: isSmall ? 36 : 40,
+                            color: kSageDark,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                  // Top Rated Badge
                   if (isTopRated)
                     Positioned(
                       top: 8,
@@ -536,7 +1019,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                         ),
                       ),
                     ),
-                  // Rating Badge - Bottom Right
                   Positioned(
                     bottom: 8,
                     right: 8,
@@ -573,7 +1055,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                 ],
               ),
             ),
-            // Content section
             Flexible(
               flex: 4,
               child: Padding(
@@ -623,23 +1104,45 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                     Row(
                       children: [
                         Icon(
-                          Icons.local_shipping_outlined,
+                          Icons.location_on,
                           size: isSmall ? 12 : 14,
-                          color: kSage,
+                          color: Colors.grey[600],
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          "Tk 50",
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: kSage,
-                            fontWeight: FontWeight.w600,
+                        Expanded(
+                          child: Text(
+                            retailer.generalArea,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[600],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '2.5 km',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.green.shade800,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    // Show product count if available
-                    if (retailer.products != null && retailer.products!.isNotEmpty)
+                    if (retailer.products != null &&
+                        retailer.products!.isNotEmpty)
                       Padding(
                         padding: EdgeInsets.only(top: isSmall ? 2 : 4),
                         child: Text(
@@ -656,19 +1159,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  // ─── Navigation Method ──────────────────────────────────────────────────
-
-  void _navigateToRetailerDetail(Retailer retailer) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => RetailerDetailScreen(
-          retailer: retailer,
         ),
       ),
     );

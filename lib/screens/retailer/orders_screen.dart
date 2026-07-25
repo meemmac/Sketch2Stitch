@@ -239,21 +239,6 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     return DateTime(today.year, today.month, today.day, 23, 59, 59);
   }
 
-  String get _filterLabel {
-    switch (_filterPreset) {
-      case OrderFilterPreset.last3Months:
-        return "Last 3 months";
-      case OrderFilterPreset.last6Months:
-        return "Last 6 months";
-      case OrderFilterPreset.custom:
-        if (_customStartDate == null || _customEndDate == null) {
-          return "Custom dates";
-        }
-
-        return "${_formatDate(_customStartDate!)} - ${_formatDate(_customEndDate!)}";
-    }
-  }
-
   List<RetailerOrder> get _filteredOrders {
     return _orders
         .where((order) {
@@ -297,51 +282,6 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
           SnackBar(content: Text("Order ${order.id} marked as Delivered")),
         );
       }
-    });
-  }
-
-  Future<void> _pickCustomDateRange() async {
-    final initialStart =
-        _customStartDate ?? DateTime.now().subtract(const Duration(days: 30));
-    final selectedEnd = _customEndDate ?? DateTime.now();
-    final initialEnd = DateTime(
-      selectedEnd.year,
-      selectedEnd.month,
-      selectedEnd.day,
-    );
-    final range = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      initialDateRange: DateTimeRange(start: initialStart, end: initialEnd),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: primaryGreen,
-              secondary: primaryGreen.withValues(alpha: 0.1),
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (range == null) {
-      return;
-    }
-
-    setState(() {
-      _filterPreset = OrderFilterPreset.custom;
-      _customStartDate = range.start;
-      _customEndDate = DateTime(
-        range.end.year,
-        range.end.month,
-        range.end.day,
-        23,
-        59,
-        59,
-      );
     });
   }
 
@@ -657,131 +597,6 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 color: isSelected ? Colors.white : Colors.grey.shade700,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 fontSize: 13,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showDetailedFilterSheet() {
-    final TextEditingController filterController = TextEditingController(
-      text: _searchQuery,
-    );
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Material(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        child: Container(
-          padding: EdgeInsets.fromLTRB(
-            24,
-            12,
-            24,
-            MediaQuery.of(context).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 18),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const Text(
-                "Detailed Filter",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                "Filter by Order ID, Product Name, or Customer",
-                style: TextStyle(color: Colors.black54, fontSize: 13),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: filterController,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: "Enter keywords...",
-                  prefixIcon: const Icon(Icons.search),
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _searchQuery = filterController.text;
-                      _searchController.text = filterController.text;
-                    });
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryGreen,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    "Apply Filter",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _filterButton() {
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: _showFilterSheet,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.green.shade100),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.tune, color: primaryGreen, size: 20),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                _filterLabel,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: primaryGreen,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                ),
               ),
             ),
           ],

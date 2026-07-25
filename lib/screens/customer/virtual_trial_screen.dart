@@ -2,8 +2,6 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import '../shared/welcome_screen.dart';
 import '../../models/appearance_profile.dart';
 import '../../services/ai_service.dart';
 import '../../utils/api_config.dart';

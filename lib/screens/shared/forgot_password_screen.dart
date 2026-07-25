@@ -103,7 +103,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
       ),
     );
 
-    overlayState?.insert(_overlayEntry!);
+    overlayState.insert(_overlayEntry!);
 
     Future.delayed(const Duration(seconds: 3), () {
       _hideOverlayNotification();

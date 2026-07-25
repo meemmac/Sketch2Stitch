@@ -1,4 +1,3 @@
-import '../../models/measurement.dart';
 
 /// Enum values mirror Orders.status / Tailor-jobs.status exactly, so this
 /// maps 1:1 onto real backend docs later — swapping this singleton for
