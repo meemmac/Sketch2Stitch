@@ -741,6 +741,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                         otherUserAvatar: contact['avatar'],
                                         orderId: existingConv.orderId,
                                         onConversationRead: _onConversationRead,
+                                        isBlocked: existingConv.isBlocked,
                                       ),
                                     ),
                                   );
@@ -783,6 +784,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                 otherUserAvatar: _getOtherUserAvatar(conversation),
                 orderId: conversation.orderId,
                 onConversationRead: _onConversationRead,
+                isBlocked: conversation.isBlocked,
               ),
             ),
           );
@@ -947,8 +949,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
     return GestureDetector(
       onTap: () {
-        // ✅ FIXED: Always open the chat, even if blocked
-        // The ChatScreen will handle the blocked state UI
+        // Pass isBlocked status to ChatScreen
         _markConversationAsRead(conversation.id);
         Navigator.push(
           context,
@@ -962,6 +963,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
               otherUserAvatar: otherAvatar,
               orderId: conversation.orderId,
               onConversationRead: _onConversationRead,
+              isBlocked: isBlocked,
             ),
           ),
         );

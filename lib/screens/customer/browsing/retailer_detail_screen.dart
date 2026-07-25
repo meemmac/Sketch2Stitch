@@ -599,7 +599,7 @@ Widget _buildProductGrid(List<Product> products, bool isSmallScreen, bool isMedi
   
   // Calculate card width based on available space
   final cardWidth = (screenWidth - (spacing * 3)) / 2; // 2 columns with spacing
-  final cardHeight = isSmallScreen ? 240.0 : 270.0;
+  final cardHeight = isSmallScreen ? 210.0 : 240.0;
   final imageHeight = isSmallScreen ? 130.0 : 150.0;
   final contentPadding = isSmallScreen ? 8.0 : 10.0;
 
