@@ -479,7 +479,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          "Tk ${tailor.deliveryCharge.toInt()}",
+                          "Tk 40",
                           style: TextStyle(
                             fontSize: 11,
                             color: kSage,

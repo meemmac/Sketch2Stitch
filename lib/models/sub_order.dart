@@ -20,8 +20,10 @@ class SubOrder {
   final SubOrderDeliveryDestination deliveryDestination;
   final DateTime? deliveryDate;
   final DateTime? autoReleaseAt;
+  final double itemsSubtotal;
+  final double deliveryCharge;     // computed from distance — not a base rate
+  final double? deliveryDistanceKm;
 
-  // Relationships
   List<OrderItem>? items;
 
   SubOrder({
@@ -32,8 +34,13 @@ class SubOrder {
     this.deliveryDestination = SubOrderDeliveryDestination.pending,
     this.deliveryDate,
     this.autoReleaseAt,
+    this.itemsSubtotal = 0,
+    this.deliveryCharge = 0,
+    this.deliveryDistanceKm,
     this.items = const [],
   });
+
+  double get total => itemsSubtotal + deliveryCharge;
 
   String get statusText {
     switch (status) {
@@ -65,6 +72,9 @@ class SubOrder {
     SubOrderDeliveryDestination? deliveryDestination,
     DateTime? deliveryDate,
     DateTime? autoReleaseAt,
+    double? itemsSubtotal,
+    double? deliveryCharge,
+    double? deliveryDistanceKm,
     List<OrderItem>? items,
   }) {
     return SubOrder(
@@ -75,6 +85,9 @@ class SubOrder {
       deliveryDestination: deliveryDestination ?? this.deliveryDestination,
       deliveryDate: deliveryDate ?? this.deliveryDate,
       autoReleaseAt: autoReleaseAt ?? this.autoReleaseAt,
+      itemsSubtotal: itemsSubtotal ?? this.itemsSubtotal,
+      deliveryCharge: deliveryCharge ?? this.deliveryCharge,
+      deliveryDistanceKm: deliveryDistanceKm ?? this.deliveryDistanceKm,
       items: items ?? this.items,
     );
   }
@@ -87,6 +100,9 @@ class SubOrder {
     'deliveryDestination': deliveryDestination.name,
     'deliveryDate': deliveryDate?.toIso8601String(),
     'autoReleaseAt': autoReleaseAt?.toIso8601String(),
+    'itemsSubtotal': itemsSubtotal,
+    'deliveryCharge': deliveryCharge,
+    'deliveryDistanceKm': deliveryDistanceKm,
   };
 
   factory SubOrder.fromJson(Map<String, dynamic> json) {
@@ -104,6 +120,9 @@ class SubOrder {
       autoReleaseAt: json['autoReleaseAt'] != null
           ? DateTime.parse(json['autoReleaseAt'])
           : null,
+      itemsSubtotal: (json['itemsSubtotal'] ?? 0).toDouble(),
+      deliveryCharge: (json['deliveryCharge'] ?? 0).toDouble(),
+      deliveryDistanceKm: (json['deliveryDistanceKm'] as num?)?.toDouble(),
     );
   }
 }
