@@ -15,15 +15,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   final _otpController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   late AnimationController _floatController;
-  
+
   // Step management
   int _currentStep = 0; // 0: Email, 1: OTP, 2: New Password
   bool _isLoading = false;
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
-  
+
   // For overlay notification
   OverlayEntry? _overlayEntry;
 
@@ -50,7 +50,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   // Show notification at the top of the glass card using Overlay
   void _showOverlayNotification(String message, Color color) {
     _hideOverlayNotification();
-    
+
     OverlayState? overlayState = Overlay.of(context);
     _overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
@@ -75,8 +75,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
             child: Row(
               children: [
                 Icon(
-                  color == Colors.green 
-                      ? Icons.check_circle_outline 
+                  color == Colors.green
+                      ? Icons.check_circle_outline
                       : Icons.error_outline,
                   color: Colors.white,
                   size: 24,
@@ -94,11 +94,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                 ),
                 GestureDetector(
                   onTap: _hideOverlayNotification,
-                  child: const Icon(
-                    Icons.close,
-                    color: Colors.white,
-                    size: 20,
-                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 20),
                 ),
               ],
             ),
@@ -106,9 +102,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         ),
       ),
     );
-    
+
     overlayState?.insert(_overlayEntry!);
-    
+
     Future.delayed(const Duration(seconds: 3), () {
       _hideOverlayNotification();
     });
@@ -121,14 +117,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
   void _sendOTP() {
     if (_emailController.text.isEmpty) {
-      _showOverlayNotification('Please enter your email or phone number', Colors.red);
+      _showOverlayNotification(
+        'Please enter your email or phone number',
+        Colors.red,
+      );
       return;
     }
 
     setState(() {
       _isLoading = true;
     });
-    
+
     Future.delayed(const Duration(seconds: 2), () {
       setState(() {
         _isLoading = false;
@@ -147,7 +146,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     setState(() {
       _isLoading = true;
     });
-    
+
     Future.delayed(const Duration(seconds: 2), () {
       setState(() {
         _isLoading = false;
@@ -159,24 +158,27 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
   void _resetPassword() {
     if (_newPasswordController.text.length < 6) {
-      _showOverlayNotification('Password must be at least 6 characters', Colors.red);
+      _showOverlayNotification(
+        'Password must be at least 6 characters',
+        Colors.red,
+      );
       return;
     }
-    
+
     if (_newPasswordController.text != _confirmPasswordController.text) {
       _showOverlayNotification('Passwords do not match', Colors.red);
       return;
     }
-    
+
     setState(() {
       _isLoading = true;
     });
-    
+
     Future.delayed(const Duration(seconds: 2), () {
       setState(() {
         _isLoading = false;
       });
-      
+
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -200,9 +202,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                 Navigator.pop(context);
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => const LoginScreen(),
-                  ),
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
                 );
               },
               style: TextButton.styleFrom(
@@ -318,8 +318,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
                                 // Title based on step
                                 Text(
-                                  _currentStep == 0 ? 'Forgot Password?' :
-                                  _currentStep == 1 ? 'Verify OTP' : 'Create New Password',
+                                  _currentStep == 0
+                                      ? 'Forgot Password?'
+                                      : _currentStep == 1
+                                      ? 'Verify OTP'
+                                      : 'Create New Password',
                                   style: const TextStyle(
                                     fontSize: 19,
                                     fontWeight: FontWeight.bold,
@@ -329,11 +332,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
                                 // Subtitle based on step
                                 Text(
-                                  _currentStep == 0 ? 
-                                  'An OTP will be sent to your email/message\nto reset your Password' :
-                                  _currentStep == 1 ?
-                                  'Enter the OTP sent to your email/message' :
-                                  'Enter your new password below',
+                                  _currentStep == 0
+                                      ? 'An OTP will be sent to your email/message\nto reset your Password'
+                                      : _currentStep == 1
+                                      ? 'Enter the OTP sent to your email/message'
+                                      : 'Enter your new password below',
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
                                     fontSize: 12.5,
@@ -364,10 +367,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                       hintText: 'Email/Phone',
                                       hintStyle: const TextStyle(fontSize: 14),
                                       isDense: true,
-                                      contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 12,
-                                      ),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 12,
+                                          ),
                                       prefixIcon: const Icon(
                                         Icons.person_outline,
                                         size: 20,
@@ -404,10 +408,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                       hintText: 'Enter 6-digit OTP',
                                       hintStyle: const TextStyle(fontSize: 14),
                                       isDense: true,
-                                      contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 12,
-                                      ),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 12,
+                                          ),
                                       prefixIcon: const Icon(
                                         Icons.pin,
                                         size: 20,
@@ -443,10 +448,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                       hintText: 'Enter new password',
                                       hintStyle: const TextStyle(fontSize: 14),
                                       isDense: true,
-                                      contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 12,
-                                      ),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 12,
+                                          ),
                                       prefixIcon: const Icon(
                                         Icons.lock_outline,
                                         size: 20,
@@ -460,7 +466,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                         ),
                                         onPressed: () {
                                           setState(() {
-                                            _obscureNewPassword = !_obscureNewPassword;
+                                            _obscureNewPassword =
+                                                !_obscureNewPassword;
                                           });
                                         },
                                       ),
@@ -473,7 +480,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                     ),
                                   ),
                                   const SizedBox(height: 12),
-                                  
+
                                   const Align(
                                     alignment: Alignment.centerLeft,
                                     child: Text(
@@ -493,10 +500,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                       hintText: 'Confirm new password',
                                       hintStyle: const TextStyle(fontSize: 14),
                                       isDense: true,
-                                      contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 12,
-                                      ),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 12,
+                                          ),
                                       prefixIcon: const Icon(
                                         Icons.lock_outline,
                                         size: 20,
@@ -510,7 +518,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                         ),
                                         onPressed: () {
                                           setState(() {
-                                            _obscureConfirmPassword = !_obscureConfirmPassword;
+                                            _obscureConfirmPassword =
+                                                !_obscureConfirmPassword;
                                           });
                                         },
                                       ),
@@ -531,15 +540,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                   width: double.infinity,
                                   height: 46,
                                   child: ElevatedButton(
-                                    onPressed: _isLoading ? null : () {
-                                      if (_currentStep == 0) {
-                                        _sendOTP();
-                                      } else if (_currentStep == 1) {
-                                        _verifyOTP();
-                                      } else if (_currentStep == 2) {
-                                        _resetPassword();
-                                      }
-                                    },
+                                    onPressed: _isLoading
+                                        ? null
+                                        : () {
+                                            if (_currentStep == 0) {
+                                              _sendOTP();
+                                            } else if (_currentStep == 1) {
+                                              _verifyOTP();
+                                            } else if (_currentStep == 2) {
+                                              _resetPassword();
+                                            }
+                                          },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.black,
                                       shape: RoundedRectangleBorder(
@@ -557,8 +568,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                             ),
                                           )
                                         : Text(
-                                            _currentStep == 0 ? 'Send OTP' :
-                                            _currentStep == 1 ? 'Verify OTP' : 'Submit',
+                                            _currentStep == 0
+                                                ? 'Send OTP'
+                                                : _currentStep == 1
+                                                ? 'Verify OTP'
+                                                : 'Submit',
                                             style: const TextStyle(
                                               color: Colors.white,
                                               fontSize: 15,
@@ -585,7 +599,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                         Navigator.pushReplacement(
                                           context,
                                           MaterialPageRoute(
-                                            builder: (context) => const LoginScreen(),
+                                            builder: (context) =>
+                                                const LoginScreen(),
                                           ),
                                         );
                                       },
@@ -643,11 +658,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                   style: TextButton.styleFrom(
                     backgroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(14),
                     ),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 8,
+                      horizontal: 20,
+                      vertical: 10,
                     ),
                   ),
                   child: const Text(
@@ -671,10 +686,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
   }
 }

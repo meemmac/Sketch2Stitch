@@ -15,7 +15,8 @@ class RegisterScreen extends StatefulWidget {
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProviderStateMixin {
+class _RegisterScreenState extends State<RegisterScreen>
+    with SingleTickerProviderStateMixin {
   RegisterStep _step = RegisterStep.roleSelect;
   String? _selectedRole;
   GeoPoint? _customerLocation;
@@ -31,13 +32,11 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
   final _customerPhoneController = TextEditingController();
   final _cusomerAddressController = TextEditingController();
 
-
   // Tailor form controllers
   final _tailorFullNameController = TextEditingController();
   final _tailorEmailController = TextEditingController();
   final _tailorPhoneController = TextEditingController();
   final _tailorAddressController = TextEditingController();
-
 
   // Retailer form controllers
   final _shopNameController = TextEditingController();
@@ -93,6 +92,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
       });
     }
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -118,22 +118,34 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                       Positioned(
                         top: 60 - offset,
                         left: -30,
-                        child: _floatingCircle(120, Colors.white.withValues(alpha: 0.25)),
+                        child: _floatingCircle(
+                          120,
+                          Colors.white.withValues(alpha: 0.25),
+                        ),
                       ),
                       Positioned(
                         top: 180 + offset,
                         right: -40,
-                        child: _floatingCircle(90, Colors.green.shade100.withValues(alpha: 0.35)),
+                        child: _floatingCircle(
+                          90,
+                          Colors.green.shade100.withValues(alpha: 0.35),
+                        ),
                       ),
                       Positioned(
                         bottom: 100 - offset,
                         left: 20,
-                        child: _floatingCircle(70, Colors.white.withValues(alpha: 0.3)),
+                        child: _floatingCircle(
+                          70,
+                          Colors.white.withValues(alpha: 0.3),
+                        ),
                       ),
                       Positioned(
                         bottom: 40 + offset,
                         right: 30,
-                        child: _floatingCircle(50, Colors.green.shade200.withValues(alpha: 0.3)),
+                        child: _floatingCircle(
+                          50,
+                          Colors.green.shade200.withValues(alpha: 0.3),
+                        ),
                       ),
                     ],
                   );
@@ -154,7 +166,10 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       return SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 16,
+                        ),
                         child: ConstrainedBox(
                           constraints: BoxConstraints(
                             minHeight: constraints.maxHeight - 32,
@@ -163,15 +178,22 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(24),
                               child: BackdropFilter(
-                                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                                filter: ImageFilter.blur(
+                                  sigmaX: 12,
+                                  sigmaY: 12,
+                                ),
                                 child: Container(
                                   padding: const EdgeInsets.all(18),
-                                  constraints: const BoxConstraints(maxWidth: 340),
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 340,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.white.withValues(alpha: 0.55),
                                     borderRadius: BorderRadius.circular(24),
                                     border: Border.all(
-                                      color: Colors.white.withValues(alpha: 0.6),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.6,
+                                      ),
                                       width: 1.2,
                                     ),
                                   ),
@@ -198,21 +220,19 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                   style: TextButton.styleFrom(
                     backgroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(14),
                     ),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 6,
+                      horizontal: 20,
+                      vertical: 10,
                     ),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   child: const Text(
                     'Back',
                     style: TextStyle(
                       color: Colors.black87,
                       fontWeight: FontWeight.w600,
-                      fontSize: 13,
+                      fontSize: 14,
                     ),
                   ),
                 ),
@@ -258,9 +278,9 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         ),
         const SizedBox(height: 18),
         _buildRoleButton('Customer'),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         _buildRoleButton('Retailer'),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         _buildRoleButton('Tailor'),
         const SizedBox(height: 14),
         _buildSignInRow(),
@@ -336,7 +356,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
 
         _buildFieldLabel('Address'),
         const SizedBox(height: 3),
-       _buildTextField(
+        _buildTextField(
           controller: _cusomerAddressController,
           hint: 'Address',
           icon: Icons.storefront_outlined,
@@ -344,30 +364,37 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         const SizedBox(height: 7),
         _buildLocationField(
           location: _customerLocation,
-          onTap: () => _pickLocation(_customerLocation, (loc) => _customerLocation = loc),
+          onTap: () => _pickLocation(
+            _customerLocation,
+            (loc) => _customerLocation = loc,
+          ),
         ),
         const SizedBox(height: 12),
 
-        _buildNextButton(onPressed: () {
-          if (_customerLocation == null) {
-            setState(() => _locationError = true);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Please pin your delivery location.')),
+        _buildNextButton(
+          onPressed: () {
+            if (_customerLocation == null) {
+              setState(() => _locationError = true);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Please pin your delivery location.'),
+                ),
+              );
+              return;
+            }
+            UserSession.instance.customerProfile.value = DrawerProfileData(
+              name: _customerFullNameController.text,
+              email: _customerEmailController.text,
+              phone: _customerPhoneController.text,
+              address: _cusomerAddressController.text,
+              location: _customerLocation,
             );
-            return;
-          }
-          UserSession.instance.customerProfile.value = DrawerProfileData(
-            name: _customerFullNameController.text,
-            email: _customerEmailController.text,
-            phone: _customerPhoneController.text,
-            address: _cusomerAddressController.text,
-            location: _customerLocation,
-          );
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const LoginScreen()),
-          );
-        }),
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const LoginScreen()),
+            );
+          },
+        ),
         const SizedBox(height: 8),
         _buildSignInRow(),
       ],
@@ -377,7 +404,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
   // ---------------- Step 2b: Tailor Form ----------------
   Widget _buildTailorForm() {
     return Column(
-       mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.min,
       children: [
         _buildLogo(),
         const SizedBox(height: 6),
@@ -425,29 +452,32 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         const SizedBox(height: 7),
         _buildLocationField(
           location: _tailorLocation,
-          onTap: () => _pickLocation(_tailorLocation, (loc) => _tailorLocation = loc),
+          onTap: () =>
+              _pickLocation(_tailorLocation, (loc) => _tailorLocation = loc),
         ),
         const SizedBox(height: 12),
-        _buildNextButton(onPressed: () {
-          if (_tailorLocation == null) {
-            setState(() => _locationError = true);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Please pin your shop location.')),
+        _buildNextButton(
+          onPressed: () {
+            if (_tailorLocation == null) {
+              setState(() => _locationError = true);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please pin your shop location.')),
+              );
+              return;
+            }
+            UserSession.instance.tailorProfile.value = DrawerProfileData(
+              name: _tailorFullNameController.text,
+              email: _tailorEmailController.text,
+              phone: _tailorPhoneController.text,
+              address: _tailorAddressController.text,
+              location: _tailorLocation,
             );
-            return;
-          }
-          UserSession.instance.tailorProfile.value = DrawerProfileData(
-            name: _tailorFullNameController.text,
-            email: _tailorEmailController.text,
-            phone: _tailorPhoneController.text,
-            address: _tailorAddressController.text,
-            location: _tailorLocation,
-          );
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const LoginScreen()),
-          );
-        }),
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const LoginScreen()),
+            );
+          },
+        ),
         const SizedBox(height: 8),
         _buildSignInRow(),
       ],
@@ -469,10 +499,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
 
         _buildFieldLabel('Shop name'),
         const SizedBox(height: 3),
-        _buildTextField(
-          controller: _shopNameController,
-          hint: 'Shop name',
-        ),
+        _buildTextField(controller: _shopNameController, hint: 'Shop name'),
         const SizedBox(height: 7),
 
         _buildFieldLabel('Organizational email'),
@@ -505,41 +532,51 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         const SizedBox(height: 7),
         _buildLocationField(
           location: _retailerLocation,
-          onTap: () => _pickLocation(_retailerLocation, (loc) => _retailerLocation = loc),
+          onTap: () => _pickLocation(
+            _retailerLocation,
+            (loc) => _retailerLocation = loc,
+          ),
         ),
         const SizedBox(height: 12),
 
-        _buildNextButton(onPressed: () {
-          if (_retailerLocation == null) {
-            setState(() => _locationError = true);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Please pin your shop location.')),
+        _buildNextButton(
+          onPressed: () {
+            if (_retailerLocation == null) {
+              setState(() => _locationError = true);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please pin your shop location.')),
+              );
+              return;
+            }
+            UserSession.instance.retailerProfile.value = DrawerProfileData(
+              name: _shopNameController.text,
+              shopName: _shopNameController.text,
+              email: _orgEmailController.text,
+              phone: _retailerPhoneController.text,
+              address: _shopAddressController.text,
+              location: _retailerLocation,
             );
-            return;
-          }
-          UserSession.instance.retailerProfile.value = DrawerProfileData(
-            name: _shopNameController.text,
-            shopName: _shopNameController.text,
-            email: _orgEmailController.text,
-            phone: _retailerPhoneController.text,
-            address: _shopAddressController.text,
-            location: _retailerLocation,
-          );
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const LoginScreen()),
-          );
-        }),
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const LoginScreen()),
+            );
+          },
+        ),
         const SizedBox(height: 8),
         _buildSignInRow(),
       ],
     );
   }
 
-  Future<void> _pickLocation(GeoPoint? current, ValueChanged<GeoPoint> onPicked) async {
+  Future<void> _pickLocation(
+    GeoPoint? current,
+    ValueChanged<GeoPoint> onPicked,
+  ) async {
     final result = await Navigator.push<GeoPoint>(
       context,
-      MaterialPageRoute(builder: (_) => LocationPickerScreen(initialLocation: current)),
+      MaterialPageRoute(
+        builder: (_) => LocationPickerScreen(initialLocation: current),
+      ),
     );
     if (result != null) {
       setState(() {
@@ -549,7 +586,10 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
     }
   }
 
-  Widget _buildLocationField({required GeoPoint? location, required VoidCallback onTap}) {
+  Widget _buildLocationField({
+    required GeoPoint? location,
+    required VoidCallback onTap,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -563,21 +603,35 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _locationError ? Colors.red : Colors.transparent, width: 1.2),
+              border: Border.all(
+                color: _locationError ? Colors.red : Colors.transparent,
+                width: 1.2,
+              ),
             ),
             child: Row(
               children: [
-                Icon(Icons.pin_drop_outlined, size: 17, color: _locationError ? Colors.red : Colors.black87),
+                Icon(
+                  Icons.pin_drop_outlined,
+                  size: 17,
+                  color: _locationError ? Colors.red : Colors.black87,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     location != null
                         ? 'Pinned: ${location.latitude.toStringAsFixed(5)}, ${location.longitude.toStringAsFixed(5)}'
                         : 'Tap to pin on map',
-                    style: TextStyle(fontSize: 12.5, color: location != null ? Colors.black87 : Colors.black45),
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: location != null ? Colors.black87 : Colors.black45,
+                    ),
                   ),
                 ),
-                const Icon(Icons.chevron_right_rounded, size: 17, color: Colors.black26),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 17,
+                  color: Colors.black26,
+                ),
               ],
             ),
           ),
@@ -585,7 +639,10 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         if (_locationError)
           const Padding(
             padding: EdgeInsets.only(top: 3),
-            child: Text('Please pin a location before continuing.', style: TextStyle(fontSize: 11, color: Colors.red)),
+            child: Text(
+              'Please pin a location before continuing.',
+              style: TextStyle(fontSize: 11, color: Colors.red),
+            ),
           ),
       ],
     );
@@ -611,12 +668,15 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
-      style: const TextStyle(fontSize: 12.5),
+      style: const TextStyle(fontSize: 14),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(fontSize: 12.5),
+        hintStyle: const TextStyle(fontSize: 14),
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
         suffixIcon: icon == null
             ? null
             : Container(
@@ -657,7 +717,11 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
           children: const [
             Text(
               'Submit',
-              style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             SizedBox(width: 8),
           ],
@@ -684,7 +748,11 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
           ),
           child: const Text(
             'Sign in',
-            style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
+            style: TextStyle(
+              color: Colors.black87,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
           ),
         ),
       ],
@@ -695,10 +763,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
   }
 }

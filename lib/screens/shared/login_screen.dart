@@ -195,7 +195,10 @@ class _LoginScreenState extends State<LoginScreen>
                                   alignment: Alignment.centerLeft,
                                   child: Text(
                                     'Credential',
-                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 5),
@@ -230,7 +233,10 @@ class _LoginScreenState extends State<LoginScreen>
                                   alignment: Alignment.centerLeft,
                                   child: Text(
                                     'Password',
-                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 5),
@@ -246,7 +252,10 @@ class _LoginScreenState extends State<LoginScreen>
                                       horizontal: 12,
                                       vertical: 12,
                                     ),
-                                    prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                                    prefixIcon: const Icon(
+                                      Icons.lock_outline,
+                                      size: 20,
+                                    ),
                                     suffixIcon: IconButton(
                                       icon: Icon(
                                         _obscurePassword
@@ -275,15 +284,24 @@ class _LoginScreenState extends State<LoginScreen>
                                   alignment: Alignment.centerLeft,
                                   child: Text(
                                     'User Type',
-                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 5),
                                 DropdownButtonFormField<String>(
                                   value: _selectedUserType,
                                   dropdownColor: const Color(0xFFDFF2DF),
-                                  style: const TextStyle(fontSize: 14, color: Colors.black87),
-                                  hint: const Text('User Type', style: TextStyle(fontSize: 14)),
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.black87,
+                                  ),
+                                  hint: const Text(
+                                    'User Type',
+                                    style: TextStyle(fontSize: 14),
+                                  ),
                                   icon: Container(
                                     width: 20,
                                     height: 20,
@@ -314,7 +332,10 @@ class _LoginScreenState extends State<LoginScreen>
                                   items: _userTypes.map((type) {
                                     return DropdownMenuItem(
                                       value: type,
-                                      child: Text(type, style: const TextStyle(fontSize: 14)),
+                                      child: Text(
+                                        type,
+                                        style: const TextStyle(fontSize: 14),
+                                      ),
                                     );
                                   }).toList(),
                                   onChanged: (value) {
@@ -333,7 +354,8 @@ class _LoginScreenState extends State<LoginScreen>
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => const ForgotPasswordScreen(),
+                                          builder: (context) =>
+                                              const ForgotPasswordScreen(),
                                         ),
                                       );
                                     },
@@ -381,7 +403,10 @@ class _LoginScreenState extends State<LoginScreen>
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const Text('Or ', style: TextStyle(fontSize: 14)),
+                                    const Text(
+                                      'Or ',
+                                      style: TextStyle(fontSize: 14),
+                                    ),
                                     TextButton(
                                       onPressed: () {
                                         Navigator.pushReplacement(
@@ -422,36 +447,34 @@ class _LoginScreenState extends State<LoginScreen>
                 top: 8,
                 left: 8,
                 child: TextButton(
-  onPressed: () {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const WelcomeScreen(),
-      ),
-      (route) => false,
-    );
-  },
-  style: TextButton.styleFrom(
-    backgroundColor: Colors.white,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(20),
-    ),
-    padding: const EdgeInsets.symmetric(
-      horizontal: 18,
-      vertical: 8,
-    ),
-    minimumSize: Size.zero,
-    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-  ),
-  child: const Text(
-    'Back',
-    style: TextStyle(
-      color: Colors.black87,
-      fontWeight: FontWeight.w600,
-      fontSize: 14,
-    ),
-  ),
-),
+                  onPressed: () {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const WelcomeScreen(),
+                      ),
+                      (route) => false,
+                    );
+                  },
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                  ),
+                  child: const Text(
+                    'Back',
+                    style: TextStyle(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

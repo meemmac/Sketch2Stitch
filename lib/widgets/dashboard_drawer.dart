@@ -16,11 +16,7 @@ import '../screens/customer/cart_screen.dart';
 import '../screens/customer/orders/order_detail_screen.dart';
 
 /// Enum representing the three user roles.
-enum AppUserRole {
-  customer,
-  tailor,
-  retailer,
-}
+enum AppUserRole { customer, tailor, retailer }
 
 /// Model class representing the profile information for the drawer.
 class DrawerProfileData {
@@ -32,7 +28,8 @@ class DrawerProfileData {
   final double rating; // For Tailor and Retailer
   final String? profilePicture;
   final String? about;
-  final GeoPoint? location; // Pinned lat/lng — doubles as delivery location for customers
+  final GeoPoint?
+  location; // Pinned lat/lng — doubles as delivery location for customers
 
   const DrawerProfileData({
     required this.name,
@@ -82,10 +79,7 @@ class DrawerProfileData {
 class DashboardDrawer extends StatefulWidget {
   final AppUserRole initialRole;
 
-  const DashboardDrawer({
-    super.key,
-    this.initialRole = AppUserRole.customer,
-  });
+  const DashboardDrawer({super.key, this.initialRole = AppUserRole.customer});
 
   @override
   State<DashboardDrawer> createState() => _DashboardDrawerState();
@@ -138,7 +132,8 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       phone: "+880 1234567890",
       address: "Suite 4B, Concord Tower, Dhaka",
       rating: 4.8,
-      about: "Bespoke traditional and modern wear expert with over 15 years of experience in custom tailoring.",
+      about:
+          "Bespoke traditional and modern wear expert with over 15 years of experience in custom tailoring.",
     );
 
     _retailerProfile = const DrawerProfileData(
@@ -148,7 +143,8 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       phone: "+880 1234567890",
       address: "Shop 12, Banani Super Market, Dhaka",
       rating: 4.6,
-      about: "Premium local and imported fabric supplier specializing in silk, cotton, and wedding collections.",
+      about:
+          "Premium local and imported fabric supplier specializing in silk, cotton, and wedding collections.",
     );
   }
 
@@ -182,7 +178,9 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
 
   @override
   Widget build(BuildContext context) {
-    const themeColor = Color(0xFF6C9985); // Sage theme color matching AI Test Screen
+    const themeColor = Color(
+      0xFF6C9985,
+    ); // Sage theme color matching AI Test Screen
 
     return Drawer(
       shape: const RoundedRectangleBorder(
@@ -225,7 +223,9 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                             themeColor: themeColor,
                             measurement: _customerMeasurement,
                             onSave: (updated) async {
-                              await Future.delayed(const Duration(milliseconds: 500));
+                              await Future.delayed(
+                                const Duration(milliseconds: 500),
+                              );
                               if (!mounted) return;
                               setState(() {
                                 _customerMeasurement = updated;
@@ -240,11 +240,15 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                           onLogoutPressed: () {
                             debugPrint("Logout pressed");
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Logged out successfully!")),
+                              const SnackBar(
+                                content: Text("Logged out successfully!"),
+                              ),
                             );
                             Navigator.pushAndRemoveUntil(
                               context,
-                              MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+                              MaterialPageRoute(
+                                builder: (_) => const WelcomeScreen(),
+                              ),
                               (route) => false,
                             );
                           },
@@ -313,17 +317,21 @@ class DrawerProfileSection extends StatelessWidget {
               CircleAvatar(
                 radius: 28,
                 backgroundColor: themeColor.withValues(alpha: 0.15),
-                backgroundImage: profile.profilePicture != null && profile.profilePicture!.isNotEmpty
+                backgroundImage:
+                    profile.profilePicture != null &&
+                        profile.profilePicture!.isNotEmpty
                     ? FileImage(File(profile.profilePicture!))
                     : null,
-                child: profile.profilePicture != null && profile.profilePicture!.isNotEmpty
+                child:
+                    profile.profilePicture != null &&
+                        profile.profilePicture!.isNotEmpty
                     ? null
                     : Icon(
                         isCustomer
                             ? Icons.person_rounded
                             : (role == AppUserRole.tailor
-                                ? Icons.design_services_rounded
-                                : Icons.storefront_rounded),
+                                  ? Icons.design_services_rounded
+                                  : Icons.storefront_rounded),
                         color: themeColor,
                         size: 32,
                       ),
@@ -334,7 +342,9 @@ class DrawerProfileSection extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      role == AppUserRole.retailer ? profile.shopName : profile.name,
+                      role == AppUserRole.retailer
+                          ? profile.shopName
+                          : profile.name,
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -345,7 +355,10 @@ class DrawerProfileSection extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: themeColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
@@ -386,7 +399,10 @@ class DrawerProfileSection extends StatelessWidget {
               TextButton.icon(
                 style: TextButton.styleFrom(
                   foregroundColor: themeColor,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
                 ),
                 onPressed: onEditPressed,
                 icon: const Icon(Icons.edit_rounded, size: 16),
@@ -414,7 +430,9 @@ class DrawerProfileSection extends StatelessWidget {
               '${isCustomer ? '  (delivery location)' : ''}',
             ),
           ],
-          if (!isCustomer && profile.about != null && profile.about!.isNotEmpty) ...[
+          if (!isCustomer &&
+              profile.about != null &&
+              profile.about!.isNotEmpty) ...[
             const SizedBox(height: 12),
             const Divider(),
             const SizedBox(height: 8),
@@ -494,9 +512,7 @@ class DrawerNavigationSection extends StatelessWidget {
               if (item['title'] == 'Virtual Trial') {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const VirtualTrialScreen(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const VirtualTrialScreen()),
                 );
               } else if (item['title'] == 'Orders') {
                 if (role == AppUserRole.retailer) {
@@ -534,27 +550,23 @@ class DrawerNavigationSection extends StatelessWidget {
                   );
                 }
               } else if (item['title'] == 'Cart') {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const CartScreen(),
-    ),
-  );
-}else if (item['title'] == 'Inventory') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CartScreen()),
+                );
+              } else if (item['title'] == 'Inventory') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const InventoryScreen()),
+                );
+              } else if (item['title'] == 'Portfolio') {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const InventoryScreen(),
+                    builder: (_) => const TailorPortfolioScreen(),
                   ),
                 );
-              } else if (item['title'] == 'Portfolio') {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const TailorPortfolioScreen(),
-    ),
-  );
-}else {
+              } else {
                 debugPrint("Navigation clicked: ${item['title']}");
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -583,7 +595,7 @@ class DrawerNavigationSection extends StatelessWidget {
       case AppUserRole.tailor:
         return [
           {'title': 'Orders', 'icon': Icons.receipt_long_rounded},
-           {'title': 'Portfolio', 'icon': Icons.design_services_outlined},
+          {'title': 'Portfolio', 'icon': Icons.design_services_outlined},
           {'title': 'Messages', 'icon': Icons.chat_bubble_outline_rounded},
         ];
       case AppUserRole.retailer:
@@ -619,9 +631,7 @@ class NavigationDrawerDestination extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
           child: Row(
             children: [
               Icon(icon, color: Colors.black54, size: 22),
@@ -635,7 +645,11 @@ class NavigationDrawerDestination extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              const Icon(Icons.chevron_right_rounded, color: Colors.black26, size: 18),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.black26,
+                size: 18,
+              ),
             ],
           ),
         ),
@@ -648,10 +662,7 @@ class NavigationDrawerDestination extends StatelessWidget {
 class DrawerLogoutButton extends StatelessWidget {
   final VoidCallback onLogoutPressed;
 
-  const DrawerLogoutButton({
-    super.key,
-    required this.onLogoutPressed,
-  });
+  const DrawerLogoutButton({super.key, required this.onLogoutPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -672,10 +683,7 @@ class DrawerLogoutButton extends StatelessWidget {
           icon: const Icon(Icons.logout_rounded, size: 18),
           label: const Text(
             "Logout",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-            ),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
           ),
         ),
       ),
@@ -715,17 +723,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   String? _profilePicturePath;
   GeoPoint? _selectedLocation;
-  bool _locationError = false; // true once the user has tried to save without pinning
+  bool _locationError =
+      false; // true once the user has tried to save without pinning
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.initialProfile.name);
-    _shopNameController = TextEditingController(text: widget.initialProfile.shopName);
+    _shopNameController = TextEditingController(
+      text: widget.initialProfile.shopName,
+    );
     _emailController = TextEditingController(text: widget.initialProfile.email);
     _phoneController = TextEditingController(text: widget.initialProfile.phone);
-    _addressController = TextEditingController(text: widget.initialProfile.address);
-    _aboutController = TextEditingController(text: widget.initialProfile.about ?? '');
+    _addressController = TextEditingController(
+      text: widget.initialProfile.address,
+    );
+    _aboutController = TextEditingController(
+      text: widget.initialProfile.about ?? '',
+    );
     _profilePicturePath = widget.initialProfile.profilePicture;
     _selectedLocation = widget.initialProfile.location;
   }
@@ -748,7 +763,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final result = await Navigator.push<GeoPoint>(
       context,
       MaterialPageRoute(
-        builder: (_) => LocationPickerScreen(initialLocation: _selectedLocation),
+        builder: (_) =>
+            LocationPickerScreen(initialLocation: _selectedLocation),
       ),
     );
     if (result != null) {
@@ -763,14 +779,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (_selectedLocation == null) {
       setState(() => _locationError = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please pin your location before saving.')),
+        const SnackBar(
+          content: Text('Please pin your location before saving.'),
+        ),
       );
       return;
     }
 
     final updated = widget.initialProfile.copyWith(
       name: _nameController.text,
-      shopName: widget.role == AppUserRole.retailer ? _shopNameController.text : null,
+      shopName: widget.role == AppUserRole.retailer
+          ? _shopNameController.text
+          : null,
       email: _emailController.text,
       phone: _phoneController.text,
       address: _addressController.text,
@@ -806,7 +826,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       appBar: AppBar(
         title: Text(
           isRetailer ? "Edit Shop Profile" : "Edit Profile",
-          style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E392A)),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1E392A),
+          ),
         ),
         backgroundColor: const Color(0xFFF7FBF7),
         foregroundColor: const Color(0xFF1E392A),
@@ -825,12 +848,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       CircleAvatar(
                         radius: 48,
                         backgroundColor: Colors.grey.shade200,
-                        backgroundImage: _profilePicturePath != null && _profilePicturePath!.isNotEmpty
+                        backgroundImage:
+                            _profilePicturePath != null &&
+                                _profilePicturePath!.isNotEmpty
                             ? FileImage(File(_profilePicturePath!))
                             : null,
-                        child: _profilePicturePath == null || _profilePicturePath!.isEmpty
+                        child:
+                            _profilePicturePath == null ||
+                                _profilePicturePath!.isEmpty
                             ? Icon(
-                                isRetailer ? Icons.storefront_rounded : Icons.design_services_rounded,
+                                isRetailer
+                                    ? Icons.storefront_rounded
+                                    : Icons.design_services_rounded,
                                 size: 46,
                                 color: Colors.grey.shade600,
                               )
@@ -844,7 +873,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           child: const CircleAvatar(
                             radius: 16,
                             backgroundColor: themeColor,
-                            child: Icon(Icons.camera_alt, size: 16, color: Colors.white),
+                            child: Icon(
+                              Icons.camera_alt,
+                              size: 16,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
@@ -921,11 +954,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               Row(
                 children: [
                   Text(
-                    isCustomer ? 'Delivery location' : 'Shop / workspace location',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
+                    isCustomer
+                        ? 'Delivery location'
+                        : 'Shop / workspace location',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
                   ),
                   const SizedBox(width: 4),
-                  const Text('*', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                  const Text(
+                    '*',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 6),
@@ -933,14 +978,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 onTap: _pickLocation,
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 16,
+                  ),
                   decoration: BoxDecoration(
                     border: Border.all(
                       color: _locationError ? Colors.red : Colors.black26,
                       width: _locationError ? 1.4 : 1.0,
                     ),
                     borderRadius: BorderRadius.circular(8),
-                    color: _locationError ? Colors.red.withOpacity(0.03) : Colors.white,
+                    color: _locationError
+                        ? Colors.red.withOpacity(0.03)
+                        : Colors.white,
                   ),
                   child: Row(
                     children: [
@@ -953,21 +1003,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         child: Text(
                           _selectedLocation != null
                               ? 'Pinned: ${_selectedLocation!.latitude.toStringAsFixed(5)}, '
-                                '${_selectedLocation!.longitude.toStringAsFixed(5)}'
+                                    '${_selectedLocation!.longitude.toStringAsFixed(5)}'
                               : (isCustomer
-                                  ? 'Tap to pin your delivery location'
-                                  : 'Tap to pin your shop/workspace location'),
+                                    ? 'Tap to pin your delivery location'
+                                    : 'Tap to pin your shop/workspace location'),
                           style: TextStyle(
                             fontSize: 14,
                             color: _selectedLocation != null
                                 ? Colors.black87
-                                : (_locationError ? Colors.red.shade700 : Colors.black45),
+                                : (_locationError
+                                      ? Colors.red.shade700
+                                      : Colors.black45),
                           ),
                         ),
                       ),
                       Icon(
                         Icons.chevron_right_rounded,
-                        color: _locationError ? Colors.red.shade200 : Colors.black26,
+                        color: _locationError
+                            ? Colors.red.shade200
+                            : Colors.black26,
                       ),
                     ],
                   ),
@@ -1008,7 +1062,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   onPressed: () => Navigator.pop(context),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   child: const Text("Cancel"),
                 ),
@@ -1022,9 +1078,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     backgroundColor: themeColor,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  child: const Text("Save Changes", style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    "Save Changes",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ],
