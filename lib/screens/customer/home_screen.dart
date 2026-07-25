@@ -5,29 +5,25 @@ import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_fabrics_screen.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_tailors_screen.dart' show kHardcodedTailors;
-import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.dart' show kHardcodedRetailers;
+import 'package:sketch2stitch/screens/customer/browsing/browse_tailors_screen.dart'
+    show kHardcodedTailors;
+import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.dart'
+    show kHardcodedRetailers;
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
 import 'package:sketch2stitch/screens/customer/cart_screen.dart';
 import '../../widgets/dashboard_drawer.dart';
-import '../../widgets/video_preview_player.dart';
 import 'virtual_trial_screen.dart';
-import 'notification_screen.dart' ;
+import 'notification_screen.dart';
 import 'package:sketch2stitch/screens/retailer/inventory_screen.dart';
 import 'package:sketch2stitch/screens/tailor/orders_screen.dart';
-import 'track_order.dart';
 import 'order_list_screen.dart';
-import 'package:sketch2stitch/screens/retailer/orders_screen.dart';
 
 class UnifiedHomeScreen extends StatefulWidget {
   final AppUserRole initialRole;
 
-  const UnifiedHomeScreen({
-    super.key,
-    this.initialRole = AppUserRole.customer,
-  });
+  const UnifiedHomeScreen({super.key, this.initialRole = AppUserRole.customer});
 
   @override
   State<UnifiedHomeScreen> createState() => _UnifiedHomeScreenState();
@@ -54,7 +50,9 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   // ─── Get all fabric products from kHardcodedFabricData ──────────────
 
   List<Product> get _allFabricProducts {
-    return kHardcodedFabricData.map((fabricData) => fabricData.product).toList();
+    return kHardcodedFabricData
+        .map((fabricData) => fabricData.product)
+        .toList();
   }
 
   List<Product> get _allElementProducts => kHardcodedElements;
@@ -89,7 +87,17 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   List<Product> get _elementSectionProducts {
     final elements = _allElementProducts;
     return elements
-        .where((p) => ['Lace', 'Embroidery', 'Fasteners', 'Buttons', 'Threads', 'Trims', 'Ribbons'].contains(p.category))
+        .where(
+          (p) => [
+            'Lace',
+            'Embroidery',
+            'Fasteners',
+            'Buttons',
+            'Threads',
+            'Trims',
+            'Ribbons',
+          ].contains(p.category),
+        )
         .take(6)
         .toList();
   }
@@ -99,6 +107,18 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   String _getRetailerName(String retailerId) {
     return retailerNameMap[retailerId] ?? 'Unknown Retailer';
   }
+
+  final List<String> _elementCategories = [
+    'Fasteners',
+    'Buttons',
+    'Threads',
+    'Embellishments',
+    'Trims',
+    'Ribbons',
+  ];
+
+  bool _isElement(Product product) =>
+      _elementCategories.contains(product.category);
 
   @override
   void initState() {
@@ -125,9 +145,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => OrderListScreen(
-          userRole: _currentRole,
-        ),
+        builder: (context) => OrderListScreen(userRole: _currentRole),
       ),
     );
   }
@@ -137,21 +155,21 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => BrowseShell(
-          initialIndex: index,
-          userRole: _currentRole,
-        ),
+        builder: (_) =>
+            BrowseShell(initialIndex: index, userRole: _currentRole),
       ),
     );
   }
 
-  // ✅ FIXED: Pass userRole to ProductDetailOverlay
   void _showProductOverlay(Product product) {
+    final bool isFabric = !_isElement(product);
     List<String>? materialBlends;
-    for (final fabricData in kHardcodedFabricData) {
-      if (fabricData.product.id == product.id) {
-        materialBlends = fabricData.materialBlendList;
-        break;
+    if (isFabric) {
+      for (final fabricData in kHardcodedFabricData) {
+        if (fabricData.product.id == product.id) {
+          materialBlends = fabricData.materialBlendList;
+          break;
+        }
       }
     }
 
@@ -161,7 +179,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => ProductDetailOverlay(
         product: product,
-        isFabric: true,
+        isFabric: isFabric,
         retailerName: _getRetailerName(product.retailerId),
         materialBlends: materialBlends,
         userRole: _currentRole,
@@ -174,10 +192,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => TailorDetailScreen(
-          tailor: tailor,
-          userRole: _currentRole,
-        ),
+        builder: (context) =>
+            TailorDetailScreen(tailor: tailor, userRole: _currentRole),
       ),
     );
   }
@@ -187,10 +203,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => RetailerDetailScreen(
-          retailer: retailer,
-          userRole: _currentRole,
-        ),
+        builder: (context) =>
+            RetailerDetailScreen(retailer: retailer, userRole: _currentRole),
       ),
     );
   }
@@ -264,9 +278,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     return Scaffold(
       key: ValueKey(_currentRole),
       backgroundColor: const Color(0xFFF4F9F1),
-      drawer: DashboardDrawer(
-        initialRole: _currentRole,
-      ),
+      drawer: DashboardDrawer(initialRole: _currentRole),
       body: SafeArea(
         child: Column(
           children: [
@@ -312,8 +324,11 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
               'assets/images/transparent_logo.png',
               height: 36,
               fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) =>
-              const Icon(Icons.checkroom_rounded, size: 28, color: Color(0xFF2E7D32)),
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                Icons.checkroom_rounded,
+                size: 28,
+                color: Color(0xFF2E7D32),
+              ),
             ),
           ),
           const Spacer(),
@@ -321,7 +336,10 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
             clipBehavior: Clip.none,
             children: [
               IconButton(
-                icon: const Icon(Icons.notifications_none_rounded, color: Colors.black87),
+                icon: const Icon(
+                  Icons.notifications_none_rounded,
+                  color: Colors.black87,
+                ),
                 iconSize: 28,
                 onPressed: _openNotifications,
               ),
@@ -335,7 +353,10 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                     decoration: BoxDecoration(
                       color: Colors.red,
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFF4F9F1), width: 1.5),
+                      border: Border.all(
+                        color: const Color(0xFFF4F9F1),
+                        width: 1.5,
+                      ),
                     ),
                   ),
                 ),
@@ -343,14 +364,20 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           ),
           if (_currentRole == AppUserRole.customer)
             IconButton(
-              icon: const Icon(Icons.local_shipping_outlined, color: Colors.black87),
+              icon: const Icon(
+                Icons.local_shipping_outlined,
+                color: Colors.black87,
+              ),
               iconSize: 28,
               onPressed: _openOrderList,
               tooltip: 'My Orders',
             ),
           if (_currentRole == AppUserRole.customer)
             IconButton(
-              icon: const Icon(Icons.shopping_cart_outlined, color: Colors.black87),
+              icon: const Icon(
+                Icons.shopping_cart_outlined,
+                color: Colors.black87,
+              ),
               iconSize: 28,
               onPressed: () {
                 Navigator.push(
@@ -370,28 +397,54 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
 
     if (_currentRole == AppUserRole.customer) {
       pills.addAll([
-        _navPill('Last Viewed', Icons.history_rounded, () => _scrollToSection(_lastViewedKey)),
+        _navPill(
+          'Last Viewed',
+          Icons.history_rounded,
+          () => _scrollToSection(_lastViewedKey),
+        ),
         const SizedBox(width: 10),
-        _navPill('Favorites', Icons.favorite_border_rounded, () => _scrollToSection(_favoritesKey)),
+        _navPill(
+          'Favorites',
+          Icons.favorite_border_rounded,
+          () => _scrollToSection(_favoritesKey),
+        ),
         const SizedBox(width: 10),
       ]);
     }
 
     pills.addAll([
-      _navPill('Fabrics', Icons.texture_rounded, () => _scrollToSection(_exploreFabricsKey)),
+      _navPill(
+        'Fabrics',
+        Icons.texture_rounded,
+        () => _scrollToSection(_exploreFabricsKey),
+      ),
       const SizedBox(width: 10),
-      _navPill('Elements', Icons.category_outlined, () => _scrollToSection(_exploreElementsKey)),
+      _navPill(
+        'Elements',
+        Icons.category_outlined,
+        () => _scrollToSection(_exploreElementsKey),
+      ),
       const SizedBox(width: 10),
-      _navPill('Retailers', Icons.storefront_outlined, () => _scrollToSection(_exploreRetailersKey)),
+      _navPill(
+        'Retailers',
+        Icons.storefront_outlined,
+        () => _scrollToSection(_exploreRetailersKey),
+      ),
       const SizedBox(width: 10),
-      _navPill('Tailors', Icons.storefront_rounded, () => _scrollToSection(_exploreTailorsKey)),
+      _navPill(
+        'Tailors',
+        Icons.storefront_rounded,
+        () => _scrollToSection(_exploreTailorsKey),
+      ),
     ]);
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
         color: const Color(0xFFF4F9F1),
-        border: Border(bottom: BorderSide(color: Colors.black.withOpacity(0.06))),
+        border: Border(
+          bottom: BorderSide(color: Colors.black.withOpacity(0.06)),
+        ),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -411,7 +464,11 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: Colors.black.withOpacity(0.08)),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 2)),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
         child: Row(
@@ -419,7 +476,14 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           children: [
             Icon(icon, size: 15, color: Colors.green.shade800),
             const SizedBox(width: 6),
-            Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.green.shade900)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: Colors.green.shade900,
+              ),
+            ),
           ],
         ),
       ),
@@ -453,7 +517,10 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(color: const Color(0xFFD7EFD8), borderRadius: BorderRadius.circular(28)),
+      decoration: BoxDecoration(
+        color: const Color(0xFFD7EFD8),
+        borderRadius: BorderRadius.circular(28),
+      ),
       child: Row(
         children: [
           Expanded(
@@ -463,7 +530,12 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
               children: [
                 Text(
                   title,
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.green.shade900, height: 1.25),
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.green.shade900,
+                    height: 1.25,
+                  ),
                 ),
                 if (showButton) ...[
                   const SizedBox(height: 18),
@@ -473,10 +545,22 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
                     ),
-                    child: const Text('Explore Now', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                    child: const Text(
+                      'Explore Now',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
                   ),
                 ],
               ],
@@ -494,7 +578,11 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                 errorBuilder: (context, error, stackTrace) => Container(
                   height: 150,
                   color: Colors.white,
-                  child: const Icon(Icons.checkroom_rounded, size: 60, color: Color(0xFF4A9A55)),
+                  child: const Icon(
+                    Icons.checkroom_rounded,
+                    size: 60,
+                    color: Color(0xFF4A9A55),
+                  ),
                 ),
               ),
             ),
@@ -546,13 +634,25 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   Widget _buildCommonSections() {
     return Column(
       children: [
-        Container(key: _exploreFabricsKey, child: _buildExploreFabricsSection()),
+        Container(
+          key: _exploreFabricsKey,
+          child: _buildExploreFabricsSection(),
+        ),
         const SizedBox(height: 30),
-        Container(key: _exploreElementsKey, child: _buildExploreElementsSection()),
+        Container(
+          key: _exploreElementsKey,
+          child: _buildExploreElementsSection(),
+        ),
         const SizedBox(height: 30),
-        Container(key: _exploreRetailersKey, child: _buildExploreRetailersSection()),
+        Container(
+          key: _exploreRetailersKey,
+          child: _buildExploreRetailersSection(),
+        ),
         const SizedBox(height: 30),
-        Container(key: _exploreTailorsKey, child: _buildExploreTailorsSection()),
+        Container(
+          key: _exploreTailorsKey,
+          child: _buildExploreTailorsSection(),
+        ),
         const SizedBox(height: 30),
       ],
     );
@@ -563,7 +663,10 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: const Color(0xFF245244), borderRadius: BorderRadius.circular(24)),
+      decoration: BoxDecoration(
+        color: const Color(0xFF245244),
+        borderRadius: BorderRadius.circular(24),
+      ),
       child: Row(
         children: [
           ClipRRect(
@@ -577,7 +680,11 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                 width: 90,
                 height: 90,
                 color: Colors.white10,
-                child: const Icon(Icons.checkroom_rounded, color: Colors.white54, size: 36),
+                child: const Icon(
+                  Icons.checkroom_rounded,
+                  color: Colors.white54,
+                  size: 36,
+                ),
               ),
             ),
           ),
@@ -585,10 +692,23 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           Expanded(
             child: RichText(
               text: TextSpan(
-                style: const TextStyle(fontSize: 15, height: 1.4, color: Colors.white, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: 15,
+                  height: 1.4,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
                 children: [
-                  const TextSpan(text: 'Want to see how you look in that dress? '),
-                  TextSpan(text: 'Try our virtual trial!', style: TextStyle(color: Colors.green.shade200, fontWeight: FontWeight.bold)),
+                  const TextSpan(
+                    text: 'Want to see how you look in that dress? ',
+                  ),
+                  TextSpan(
+                    text: 'Try our virtual trial!',
+                    style: TextStyle(
+                      color: Colors.green.shade200,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -598,15 +718,26 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const VirtualTrialScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const VirtualTrialScreen(),
+                ),
               );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green.shade400,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             ),
-            child: const Text('Try Now', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12)),
+            child: const Text(
+              'Try Now',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
           ),
         ],
       ),
@@ -617,7 +748,10 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(color: const Color(0xFFD7EFD8), borderRadius: BorderRadius.circular(28)),
+      decoration: BoxDecoration(
+        color: const Color(0xFFD7EFD8),
+        borderRadius: BorderRadius.circular(28),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -625,7 +759,12 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
             flex: 6,
             child: Text(
               'From trusted fabric retailers to skilled tailors.',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.green.shade900, height: 1.25),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: Colors.green.shade900,
+                height: 1.25,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -640,7 +779,11 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                 errorBuilder: (context, error, stackTrace) => Container(
                   height: 100,
                   color: Colors.white,
-                  child: const Icon(Icons.content_cut_rounded, size: 40, color: Color(0xFF4A9A55)),
+                  child: const Icon(
+                    Icons.content_cut_rounded,
+                    size: 40,
+                    color: Color(0xFF4A9A55),
+                  ),
                 ),
               ),
             ),
@@ -658,7 +801,9 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         _buildSectionHeader('Your last viewed'),
         const SizedBox(height: 12),
         _buildFabricRow(items),
-        _buildSeeAllButton(() => _openSeeAllProducts('Your Last Viewed', items)),
+        _buildSeeAllButton(
+          () => _openSeeAllProducts('Your Last Viewed', items),
+        ),
       ],
     );
   }
@@ -683,7 +828,9 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         return Column(
           children: [
             _buildRetailerRow(items),
-            _buildSeeAllButton(() => _openSeeAllRetailers('Favorite Retailers', items)),
+            _buildSeeAllButton(
+              () => _openSeeAllRetailers('Favorite Retailers', items),
+            ),
           ],
         );
       case 'Tailors':
@@ -691,7 +838,9 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         return Column(
           children: [
             _buildTailorRow(items),
-            _buildSeeAllButton(() => _openSeeAllTailors('Favorite Tailors', items)),
+            _buildSeeAllButton(
+              () => _openSeeAllTailors('Favorite Tailors', items),
+            ),
           ],
         );
       default:
@@ -699,7 +848,9 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         return Column(
           children: [
             _buildFabricRow(items),
-            _buildSeeAllButton(() => _openSeeAllProducts('Favorite Fabrics & Elements', items)),
+            _buildSeeAllButton(
+              () => _openSeeAllProducts('Favorite Fabrics & Elements', items),
+            ),
           ],
         );
     }
@@ -723,7 +874,12 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                     padding: const EdgeInsets.only(bottom: 8),
                     decoration: BoxDecoration(
                       border: Border(
-                        bottom: BorderSide(color: active ? Colors.green.shade600 : Colors.transparent, width: 2),
+                        bottom: BorderSide(
+                          color: active
+                              ? Colors.green.shade600
+                              : Colors.transparent,
+                          width: 2,
+                        ),
                       ),
                     ),
                     child: Text(
@@ -766,7 +922,11 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
               children: [
                 Text(
                   'Your Orders',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal.shade900),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.teal.shade900,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -785,10 +945,19 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.teal.shade700,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),
-            child: const Text('View Orders', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12)),
+            child: const Text(
+              'View Orders',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
           ),
         ],
       ),
@@ -816,7 +985,11 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
               children: [
                 Text(
                   ' Inventory Management',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal.shade900),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.teal.shade900,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -830,17 +1003,24 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const InventoryScreen(),
-                ),
+                MaterialPageRoute(builder: (_) => const InventoryScreen()),
               );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.teal.shade700,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),
-            child: const Text('Manage Stock', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12)),
+            child: const Text(
+              'Manage Stock',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
           ),
         ],
       ),
@@ -853,7 +1033,10 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
-          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
         ],
       ),
     );
@@ -861,7 +1044,14 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
 
   Widget _buildCenteredHeading(String title) {
     return Center(
-      child: Text(title, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green.shade900)),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.green.shade900,
+        ),
+      ),
     );
   }
 
@@ -873,13 +1063,22 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           onPressed: onTap,
           style: OutlinedButton.styleFrom(
             side: BorderSide(color: Colors.black.withOpacity(0.2)),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
             padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 10),
           ),
           child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('See all', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 13)),
+              Text(
+                'See all',
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
               SizedBox(width: 6),
               Icon(Icons.arrow_forward, size: 14, color: Colors.black87),
             ],
@@ -897,13 +1096,16 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: products.length,
-        itemBuilder: (context, index) => SizedBox(width: 150, child: _buildFabricCard(products[index])),
+        itemBuilder: (context, index) =>
+            SizedBox(width: 150, child: _buildFabricCard(products[index])),
       ),
     );
   }
 
   Widget _buildFabricCard(Product product) {
-    final coverImage = product.colorOptions.isNotEmpty ? product.colorOptions.first.image : null;
+    final coverImage = product.colorOptions.isNotEmpty
+        ? product.colorOptions.first.image
+        : null;
     final bool outOfStock = product.colorOptions.every((c) => c.stock <= 0);
 
     return GestureDetector(
@@ -922,39 +1124,80 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(14),
+                  ),
                   child: SizedBox(
                     height: 120,
                     width: double.infinity,
                     child: coverImage != null
                         ? Image.asset(
-                      coverImage,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: kSage.withOpacity(0.12),
-                        child: Icon(Icons.texture, size: 34, color: kSageDark),
+                            coverImage,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  color: kSage.withOpacity(0.12),
+                                  child: Icon(
+                                    Icons.texture,
+                                    size: 34,
+                                    color: kSageDark,
+                                  ),
+                                ),
+                          )
+                        : Container(
+                            color: kSage.withOpacity(0.12),
+                            child: Icon(
+                              Icons.texture,
+                              size: 34,
+                              color: kSageDark,
+                            ),
+                          ),
+                  ),
+                ),
+                if (!_isElement(product))
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
                       ),
-                    )
-                        : Container(color: kSage.withOpacity(0.12), child: Icon(Icons.texture, size: 34, color: kSageDark)),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.75),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        _materialBadgeText(product),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.75), borderRadius: BorderRadius.circular(10)),
-                    child: Text(product.category, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
-                  ),
-                ),
                 if (outOfStock)
                   Positioned(
                     top: 8,
                     left: 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(color: Colors.red.withOpacity(0.85), borderRadius: BorderRadius.circular(10)),
-                      child: const Text('Out of Stock', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.85),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text(
+                        'Out of Stock',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
               ],
@@ -969,12 +1212,19 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                     product.productName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     product.priceRange,
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kSageDark),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: kSageDark,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (!outOfStock) ...[
@@ -986,20 +1236,30 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                         Row(
                           children: product.colorOptions
                               .take(4)
-                              .map((o) => Padding(
-                            padding: const EdgeInsets.only(right: 4),
-                            child: _colorDot(o),
-                          ))
+                              .map(
+                                (o) => Padding(
+                                  padding: const EdgeInsets.only(right: 4),
+                                  child: _colorDot(o),
+                                ),
+                              )
                               .toList(),
                         ),
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
+                            Icon(
+                              Icons.directions_bike,
+                              size: 12,
+                              color: Colors.grey[600],
+                            ),
                             const SizedBox(width: 2),
                             Text(
                               'Tk 50',
-                              style: TextStyle(fontSize: 10, color: Colors.grey[600], fontWeight: FontWeight.w600),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ],
                         ),
@@ -1012,11 +1272,19 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
+                          Icon(
+                            Icons.directions_bike,
+                            size: 12,
+                            color: Colors.grey[600],
+                          ),
                           const SizedBox(width: 2),
                           Text(
                             'Tk 50',
-                            style: TextStyle(fontSize: 10, color: Colors.grey[600], fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ],
                       ),
@@ -1070,6 +1338,28 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     }
   }
 
+  String _materialBadgeText(Product product) {
+    for (final fabricData in kHardcodedFabricData) {
+      if (fabricData.product.id == product.id) {
+        return fabricData.materialDisplay;
+      }
+    }
+    final material = product.materialType.trim();
+    if (material.isEmpty || material == "N/A") {
+      return "N/A";
+    }
+    if (material.contains('%')) {
+      return material;
+    }
+    if (material.contains(',')) {
+      final parts = material.split(',').map((s) => s.trim()).toList();
+      final hasPercentages = parts.any((p) => p.contains('%'));
+      if (hasPercentages) return material;
+      return "100% $material";
+    }
+    return "100% $material";
+  }
+
   // ---------------- Tailor row & card ----------------
   Widget _buildTailorRow(List<Tailor> tailors) {
     return SizedBox(
@@ -1078,7 +1368,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: tailors.length,
-        itemBuilder: (context, index) => SizedBox(width: 150, child: _buildTailorCard(tailors[index])),
+        itemBuilder: (context, index) =>
+            SizedBox(width: 150, child: _buildTailorCard(tailors[index])),
       ),
     );
   }
@@ -1103,7 +1394,9 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(14),
+                  ),
                   child: SizedBox(
                     height: 110,
                     width: double.infinity,
@@ -1122,23 +1415,49 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                     top: 8,
                     right: 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(color: kSage, borderRadius: BorderRadius.circular(10)),
-                      child: const Text('⭐ Top Rated', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: kSage,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text(
+                        '⭐ Top Rated',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                 Positioned(
                   bottom: 8,
                   right: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(Icons.star, color: Colors.amber, size: 10),
                         const SizedBox(width: 3),
-                        Text(tailor.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
+                        Text(
+                          tailor.rating.toStringAsFixed(1),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -1151,30 +1470,52 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(tailor.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  Text(
+                    tailor.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.location_on, size: 12, color: Colors.grey[600]),
+                      Icon(
+                        Icons.location_on,
+                        size: 12,
+                        color: Colors.grey[600],
+                      ),
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(
                           tailor.generalArea,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 10.5, color: Colors.grey[600]),
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: Colors.grey[600],
+                          ),
                         ),
                       ),
                       const SizedBox(width: 4),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 1,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.green.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           '1.8 km',
-                          style: TextStyle(fontSize: 9, color: Colors.green.shade800, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: Colors.green.shade800,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
@@ -1185,11 +1526,19 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
+                        Icon(
+                          Icons.directions_bike,
+                          size: 12,
+                          color: Colors.grey[600],
+                        ),
                         const SizedBox(width: 2),
                         Text(
                           'Tk 50',
-                          style: TextStyle(fontSize: 10, color: Colors.grey[600], fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
@@ -1211,7 +1560,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: retailers.length,
-        itemBuilder: (context, index) => SizedBox(width: 150, child: _buildRetailerCard(retailers[index])),
+        itemBuilder: (context, index) =>
+            SizedBox(width: 150, child: _buildRetailerCard(retailers[index])),
       ),
     );
   }
@@ -1236,7 +1586,9 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(14),
+                  ),
                   child: SizedBox(
                     height: 110,
                     width: double.infinity,
@@ -1255,23 +1607,49 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                     top: 8,
                     right: 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(color: kSage, borderRadius: BorderRadius.circular(10)),
-                      child: const Text('⭐ Top Rated', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: kSage,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text(
+                        '⭐ Top Rated',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                 Positioned(
                   bottom: 8,
                   right: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(Icons.star, color: Colors.amber, size: 10),
                         const SizedBox(width: 3),
-                        Text(retailer.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
+                        Text(
+                          retailer.rating.toStringAsFixed(1),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -1284,30 +1662,52 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(retailer.shopName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  Text(
+                    retailer.shopName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.location_on, size: 12, color: Colors.grey[600]),
+                      Icon(
+                        Icons.location_on,
+                        size: 12,
+                        color: Colors.grey[600],
+                      ),
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(
                           retailer.generalArea,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 10.5, color: Colors.grey[600]),
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: Colors.grey[600],
+                          ),
                         ),
                       ),
                       const SizedBox(width: 4),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 1,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.green.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           '2.5 km',
-                          style: TextStyle(fontSize: 9, color: Colors.green.shade800, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: Colors.green.shade800,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
@@ -1318,11 +1718,19 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
+                        Icon(
+                          Icons.directions_bike,
+                          size: 12,
+                          color: Colors.grey[600],
+                        ),
                         const SizedBox(width: 2),
                         Text(
                           'Tk 50',
-                          style: TextStyle(fontSize: 10, color: Colors.grey[600], fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
@@ -1348,7 +1756,10 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           child: Text(
             'Get in on the trend with our curated selection of fabrics.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.55)),
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.black.withOpacity(0.55),
+            ),
           ),
         ),
         const SizedBox(height: 14),
@@ -1417,7 +1828,10 @@ class _SeeAllGridScreen<T> extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        title: Text(
+          title,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         elevation: 0,
@@ -1425,16 +1839,17 @@ class _SeeAllGridScreen<T> extends StatelessWidget {
       body: items.isEmpty
           ? const Center(child: Text('Nothing here yet.'))
           : GridView.builder(
-        padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 0.72,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-        ),
-        itemCount: items.length,
-        itemBuilder: (context, index) => cardBuilder(context, items[index]),
-      ),
+              padding: const EdgeInsets.all(16),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 0.72,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              itemCount: items.length,
+              itemBuilder: (context, index) =>
+                  cardBuilder(context, items[index]),
+            ),
     );
   }
 }

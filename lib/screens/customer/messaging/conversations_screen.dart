@@ -6,7 +6,6 @@ import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ConversationsScreen extends StatefulWidget {
@@ -523,13 +522,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     return conversation.otherId;
   }
 
-  String _getOtherUserPhone(Conversation conversation) {
-    final userData = _userCache[conversation.otherId];
-    if (userData != null) {
-      return userData['phone'] ?? '';
-    }
-    return '';
-  }
 
   String _getOtherUserAvatar(Conversation conversation) {
     final userData = _userCache[conversation.otherId];
@@ -1027,7 +1019,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                               final contact = filteredContacts[index];
                               final isTailor = contact['role'] == UserRole.tailor;
                               final isAnonymous = contact['isAnonymous'] == true;
-                              final roleDisplay = contact['roleDisplay'] ?? (isTailor ? 'Tailor' : 'Retailer');
                               
                               // For anonymous users, show the phone number as name
                               String displayName = contact['name'];

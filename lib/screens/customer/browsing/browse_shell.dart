@@ -98,7 +98,6 @@ class _BrowseShellState extends State<BrowseShell> {
   String _retailersSortBy = 'default';
 
   bool _showFilterOverlay = false;
-  bool _showSearchOverlay = false;
 
   @override
   void initState() {
@@ -139,11 +138,6 @@ class _BrowseShellState extends State<BrowseShell> {
     });
   }
 
-  void _toggleSearchOverlay() {
-    setState(() {
-      _showSearchOverlay = !_showSearchOverlay;
-    });
-  }
 
   void _applyFilters() {
     setState(() {

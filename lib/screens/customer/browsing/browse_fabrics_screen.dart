@@ -4,7 +4,6 @@ import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
-import '../../../widgets/video_preview_player.dart';
 
 // ─── Material Blend Class ─────────────────────────────────────────────
 
