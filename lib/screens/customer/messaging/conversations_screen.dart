@@ -33,6 +33,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   // User data cache with Tailor and Retailer models
   final Map<String, Map<String, dynamic>> _userCache = {};
 
+  // Overlay notification
+  OverlayEntry? _notificationOverlay;
+
   @override
   void initState() {
     super.initState();
@@ -62,7 +65,84 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _removeNotificationOverlay();
     super.dispose();
+  }
+
+  // ─── Top Notification System ──────────────────────────────────────────
+
+  void _showTopNotification(String message, {bool isError = false}) {
+    _removeNotificationOverlay();
+    
+    final overlay = Overlay.of(context);
+    final entry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        child: SafeArea(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: isError ? Colors.red[700] : const Color(0xFFE67E22),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.25),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    isError ? Icons.error_outline : Icons.notifications_active,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _removeNotificationOverlay,
+                    child: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    
+    overlay.insert(entry);
+    _notificationOverlay = entry;
+    
+    // Auto dismiss after 2 seconds
+    Future.delayed(const Duration(seconds: 2), () {
+      _removeNotificationOverlay();
+    });
+  }
+
+  void _removeNotificationOverlay() {
+    _notificationOverlay?.remove();
+    _notificationOverlay = null;
   }
 
   Future<void> _loadConversations() async {
@@ -332,31 +412,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       profilePicture: 'assets/images/textile.jpg',
     );
 
-    // Anonymous contacts (phone numbers only, no name)
-    final anonymous1 = {
-      'name': 'Unknown',
-      'phone': '01611111111',
-      'avatar': 'assets/images/fab.jpg',
-      'role': UserRole.customer,
-      'isAnonymous': true,
-    };
-
-    final anonymous2 = {
-      'name': 'Unknown',
-      'phone': '01622222222',
-      'avatar': 'assets/images/fab2.jpg',
-      'role': UserRole.customer,
-      'isAnonymous': true,
-    };
-
-    final anonymous3 = {
-      'name': 'Unknown',
-      'phone': '01633333333',
-      'avatar': 'assets/images/fab.jpg',
-      'role': UserRole.retailer,
-      'isAnonymous': true,
-    };
-
     _userCache.addAll({
       't1': {
         'name': tailor1.name,
@@ -390,7 +445,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         'model': retailer2,
         'isAnonymous': false,
       },
-      // Anonymous contacts
       'anonymous_1': {
         'name': 'Unknown',
         'phone': '01611111111',
@@ -422,7 +476,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       // Exclude deleted conversations
       filtered = filtered.where((conv) => !conv.isDeleted).toList();
 
-      // Search filter - searches by name AND phone number
+      // Search filter
       if (_searchQuery.isNotEmpty) {
         filtered = filtered.where((conv) {
           final userData = _userCache[conv.otherId];
@@ -431,14 +485,12 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           final lastMessage = _getLastMessage(conv).toLowerCase();
           final query = _searchQuery.toLowerCase();
           
-          // Search by name, phone, or last message
           return userName.contains(query) ||
               userPhone.contains(query) ||
               lastMessage.contains(query);
         }).toList();
       }
 
-      // Tab filter
       switch (_selectedTab) {
         case "Unread":
           filtered = filtered.where((conv) => conv.unreadCount > 0).toList();
@@ -462,7 +514,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   String _getOtherUserName(Conversation conversation) {
     final userData = _userCache[conversation.otherId];
     if (userData != null) {
-      // For anonymous users, show phone number instead of "Unknown"
       if (userData['isAnonymous'] == true) {
         return userData['phone'] ?? 'Unknown';
       }
@@ -533,7 +584,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       if (index != -1) {
         final conversation = _conversations[index];
         
-        // Mark all messages from other user as read
         final updatedMessages = conversation.messages?.map((m) {
           if (m.senderId != widget.customerId && !m.isRead) {
             return m.copyWith(
@@ -554,48 +604,29 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       _applyFilter();
     });
 
-    // Save to local storage
     _updateConversationReadStatus(conversationId);
   }
 
   Future<void> _updateConversationReadStatus(String conversationId) async {
     try {
-      // TODO: Replace with API call
-      // await api.markConversationAsRead(conversationId);
-      
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
         'last_read_$conversationId',
         DateTime.now().toIso8601String(),
       );
       await prefs.setInt('unread_count_$conversationId', 0);
-      
     } catch (e) {
       print('Error updating read status: $e');
     }
   }
 
   void _onConversationRead(String conversationId) {
-    // Mark conversation as read
     _markConversationAsRead(conversationId);
-    
-    // Refresh the conversation status (including block status)
     _refreshConversationStatus(conversationId);
   }
 
   Future<void> _refreshConversationStatus(String conversationId) async {
     try {
-      // TODO: Replace with API call
-      // final updatedConversation = await api.getConversation(conversationId);
-      // setState(() {
-      //   final index = _conversations.indexWhere((c) => c.id == conversationId);
-      //   if (index != -1) {
-      //     _conversations[index] = updatedConversation;
-      //   }
-      //   _applyFilter();
-      // });
-      
-      // For now, reload from SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       final isBlocked = prefs.getBool('blocked_$conversationId') ?? false;
       final unreadCount = prefs.getInt('unread_count_$conversationId') ?? 0;
@@ -610,7 +641,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         }
         _applyFilter();
       });
-      
     } catch (e) {
       print('Error refreshing conversation status: $e');
     }
@@ -633,22 +663,12 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     });
 
     try {
-      // TODO: Replace with API call
-      // await api.updateConversation(
-      //   conversation.id,
-      //   isMuted: newMuteStatus,
-      //   mutedUntil: newMuteStatus ? DateTime.now().add(const Duration(days: 7)) : null,
-      // );
-      
-      _showCenteredNotification(
+      _showTopNotification(
         newMuteStatus 
             ? 'Notifications muted for ${_getOtherUserName(conversation)}' 
             : 'Notifications unmuted for ${_getOtherUserName(conversation)}',
-        isSuccess: true,
       );
-      
     } catch (e) {
-      // Revert on error
       setState(() {
         final index = _conversations.indexWhere((c) => c.id == conversation.id);
         if (index != -1) {
@@ -674,16 +694,8 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     });
 
     try {
-      // TODO: Replace with API call
-      // await api.blockConversation(conversation.id, widget.customerId);
-      
-      _showCenteredNotification(
-        '${_getOtherUserName(conversation)} has been blocked',
-        isSuccess: true,
-      );
-      
+      _showTopNotification('${_getOtherUserName(conversation)} has been blocked');
     } catch (e) {
-      // Revert on error
       setState(() {
         final index = _conversations.indexWhere((c) => c.id == conversation.id);
         if (index != -1) {
@@ -709,16 +721,8 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     });
 
     try {
-      // TODO: Replace with API call
-      // await api.unblockConversation(conversation.id);
-      
-      _showCenteredNotification(
-        '${_getOtherUserName(conversation)} has been unblocked',
-        isSuccess: true,
-      );
-      
+      _showTopNotification('${_getOtherUserName(conversation)} has been unblocked');
     } catch (e) {
-      // Revert on error
       setState(() {
         final index = _conversations.indexWhere((c) => c.id == conversation.id);
         if (index != -1) {
@@ -746,16 +750,8 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     });
 
     try {
-      // TODO: Replace with API call
-      // await api.deleteConversation(conversation.id);
-      
-      _showCenteredNotification(
-        'Conversation deleted',
-        isSuccess: true,
-      );
-      
+      _showTopNotification('Conversation deleted');
     } catch (e) {
-      // Revert on error
       setState(() {
         final index = _conversations.indexWhere((c) => c.id == conversation.id);
         if (index != -1) {
@@ -770,65 +766,15 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     }
   }
 
-  // ─── Centered Notification ───────────────────────────────────────────
-
-  void _showCenteredNotification(String message, {bool isSuccess = true}) {
-    showDialog(
-      context: context,
-      barrierColor: Colors.transparent,
-      barrierDismissible: true,
-      builder: (context) {
-        return Center(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-            decoration: BoxDecoration(
-              color: isSuccess ? const Color(0xFF2C5C44) : Colors.red[700],
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  isSuccess ? Icons.check_circle : Icons.error_outline,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  message,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // ─── New Conversation Dialog with Search by Name or Phone ──────────
-
   void _showNewConversationDialog() {
-    // Contacts including anonymous (phone only) contacts
     final List<Map<String, dynamic>> contacts = [
-      // Tailors (with names)
       {
         'id': 't3',
         'name': 'Fatima Noor',
         'phone': '01733333333',
         'role': UserRole.tailor,
         'avatar': 'assets/images/lace.jpg',
+        'roleDisplay': 'Tailor',
         'model': Tailor(
           id: 't3',
           name: 'Fatima Noor',
@@ -845,6 +791,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         'phone': '01744444444',
         'role': UserRole.tailor,
         'avatar': 'assets/images/fab2.jpg',
+        'roleDisplay': 'Tailor',
         'model': Tailor(
           id: 't4',
           name: 'Kamal Hossain',
@@ -855,13 +802,13 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           profilePicture: 'assets/images/fab2.jpg',
         ),
       },
-      // Retailers (with names/shop names)
       {
         'id': 'r3',
         'name': 'Silk & Lace Emporium',
         'phone': '01933333333',
         'role': UserRole.retailer,
         'avatar': 'assets/images/silk.jpg',
+        'roleDisplay': 'Retailer',
         'model': Retailer(
           id: 'r3',
           shopName: 'Silk & Lace Emporium',
@@ -878,6 +825,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         'phone': '01944444444',
         'role': UserRole.retailer,
         'avatar': 'assets/images/fab2.jpg',
+        'roleDisplay': 'Retailer',
         'model': Retailer(
           id: 'r4',
           shopName: 'Bengal Cotton Co.',
@@ -894,6 +842,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         'phone': '01755555555',
         'role': UserRole.tailor,
         'avatar': 'assets/images/textile.jpg',
+        'roleDisplay': 'Tailor',
         'model': Tailor(
           id: 't5',
           name: 'Mohammed Rafiq',
@@ -910,6 +859,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         'phone': '01955555555',
         'role': UserRole.retailer,
         'avatar': 'assets/images/lace.jpg',
+        'roleDisplay': 'Retailer',
         'model': Retailer(
           id: 'r5',
           shopName: 'Heritage Weaves',
@@ -920,29 +870,41 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           profilePicture: 'assets/images/lace.jpg',
         ),
       },
-      // Anonymous contacts (phone numbers only, no name)
+      // Anonymous contacts - name shows as "Tailor" or "Retailer"
       {
         'id': 'anonymous_4',
-        'name': 'Unknown',
+        'name': 'Tailor',
         'phone': '01644444444',
-        'role': UserRole.customer,
+        'role': UserRole.tailor,
         'avatar': 'assets/images/fab.jpg',
+        'roleDisplay': 'Tailor',
         'isAnonymous': true,
       },
       {
         'id': 'anonymous_5',
-        'name': 'Unknown',
+        'name': 'Retailer',
         'phone': '01655555555',
-        'role': UserRole.customer,
+        'role': UserRole.retailer,
         'avatar': 'assets/images/fab2.jpg',
+        'roleDisplay': 'Retailer',
         'isAnonymous': true,
       },
       {
         'id': 'anonymous_6',
-        'name': 'Unknown',
+        'name': 'Tailor',
         'phone': '01666666666',
-        'role': UserRole.retailer,
+        'role': UserRole.tailor,
         'avatar': 'assets/images/textile.jpg',
+        'roleDisplay': 'Tailor',
+        'isAnonymous': true,
+      },
+      {
+        'id': 'anonymous_7',
+        'name': 'Retailer',
+        'phone': '01677777777',
+        'role': UserRole.retailer,
+        'avatar': 'assets/images/lace.jpg',
+        'roleDisplay': 'Retailer',
         'isAnonymous': true,
       },
     ];
@@ -958,7 +920,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           builder: (context, setState) {
             String searchQuery = '';
             
-            // 🔍 Search by name OR phone number
             List filteredContacts = contacts.where((contact) {
               final name = contact['name'].toLowerCase();
               final phone = contact['phone'].toLowerCase();
@@ -1065,9 +1026,10 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                               final contact = filteredContacts[index];
                               final isTailor = contact['role'] == UserRole.tailor;
                               final isAnonymous = contact['isAnonymous'] == true;
-                              final displayName = isAnonymous 
-                                  ? contact['phone'] 
-                                  : contact['name'];
+                              final roleDisplay = contact['roleDisplay'] ?? (isTailor ? 'Tailor' : 'Retailer');
+                              
+                              // For anonymous users, show the role as the name (Tailor/Retailer)
+                              String displayName = contact['name'];
                               
                               return ListTile(
                                 leading: CircleAvatar(
@@ -1106,27 +1068,40 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                      decoration: BoxDecoration(
-                                        color: isTailor 
-                                            ? Colors.green.shade50 
-                                            : (isAnonymous ? Colors.grey.shade100 : Colors.blue.shade50),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        isAnonymous 
-                                            ? 'Unknown' 
-                                            : (isTailor ? 'Tailor' : 'Retailer'),
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: isAnonymous 
-                                              ? Colors.grey.shade600
-                                              : (isTailor ? Colors.green.shade700 : Colors.blue.shade700),
-                                          fontWeight: FontWeight.w600,
+                                    if (isAnonymous)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade100,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          'Unknown',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.grey.shade600,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: isTailor 
+                                              ? Colors.green.shade50 
+                                              : Colors.blue.shade50,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          isTailor ? 'Tailor' : 'Retailer',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: isTailor ? Colors.green.shade700 : Colors.blue.shade700,
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                         ),
                                       ),
-                                    ),
                                   ],
                                 ),
                                 trailing: const Icon(Icons.chevron_right, color: Colors.grey),
@@ -1150,9 +1125,8 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                     ),
                                   );
 
-                                  // Add to cache
                                   _userCache[contactId] = {
-                                    'name': contact['name'],
+                                    'name': displayName,
                                     'phone': contact['phone'],
                                     'avatar': contact['avatar'],
                                     'role': contact['role'],
@@ -1209,7 +1183,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         getLastMessageTime: _getLastMessageTime,
         customerId: widget.customerId,
         onConversationTap: (conversation) {
-          // ✅ Blocked user cannot enter chat - must unblock first
           if (conversation.isBlocked) {
             _showBlockedDialog(conversation);
             return;
@@ -1426,7 +1399,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
     return GestureDetector(
       onTap: () {
-        // ✅ Blocked user cannot enter chat - must unblock first
         if (isBlocked) {
           _showBlockedDialog(conversation);
           return;
@@ -1639,7 +1611,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                // ✅ Mute option only shown if not blocked
                 if (!isBlocked)
                   ListTile(
                     leading: Icon(
@@ -1831,7 +1802,6 @@ class _ConversationSearchDelegate extends SearchDelegate {
       final lastMessage = getLastMessage(conv).toLowerCase();
       final searchQuery = query.toLowerCase();
       
-      // Search by name, phone, or last message
       return userName.contains(searchQuery) ||
           userPhone.contains(searchQuery) ||
           lastMessage.contains(searchQuery);
@@ -1876,9 +1846,7 @@ class _ConversationSearchDelegate extends SearchDelegate {
         return GestureDetector(
           onTap: () {
             close(context, null);
-            // ✅ Blocked user cannot enter chat - must unblock first
             if (isBlocked) {
-              // Show blocked dialog
               showDialog(
                 context: context,
                 builder: (context) {

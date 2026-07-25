@@ -599,6 +599,9 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
             product.colorOptions.every((c) => c.stock <= 0);
 
         final retailerName = _getRetailerName(product.retailerId);
+        
+        // Get the material blend display for the top-right badge
+        final materialDisplay = fabricData.materialDisplay;
 
         return GestureDetector(
           onTap: () => _showFabricDetailOverlay(context, fabricData),
@@ -652,35 +655,38 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                                 ),
                         ),
                       ),
-                      // Category Badge
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isSmallScreen ? 8 : 10, 
-                            vertical: isSmallScreen ? 4 : 5
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.7),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              width: 0.3,
+                      // 🔥 Material Blend Badge - Top Right (replaces category)
+                      if (materialDisplay != "N/A")
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isSmallScreen ? 6 : 8, 
+                              vertical: isSmallScreen ? 3 : 4
                             ),
-                          ),
-                          child: Text(
-                            product.category,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.3,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.75),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                width: 0.3,
+                              ),
+                            ),
+                            child: Text(
+                              materialDisplay,
+                              style: TextStyle(
+                                fontSize: isSmallScreen ? 9 : 10,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ),
-                      ),
-                      // Out of Stock Badge
+                      // Out of Stock Badge - Top Left
                       if (outOfStock)
                         Positioned(
                           top: 8,
@@ -708,7 +714,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                             ),
                           ),
                         ),
-                      // ⚠️ Material Blend Badge REMOVED - not shown on fabric cards
                     ],
                   ),
                 ),
@@ -897,8 +902,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                         child: SizedBox(
                           width: double.infinity,
                           height: double.infinity,
-                          child: coverImage != null
-                              ? Image.asset(
+                          child: coverImage != null                              ? Image.asset(
                                   coverImage,
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) => Container(
@@ -920,6 +924,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                                 ),
                         ),
                       ),
+                      // Category Badge - Top Right for elements
                       Positioned(
                         top: 8,
                         right: 8,
