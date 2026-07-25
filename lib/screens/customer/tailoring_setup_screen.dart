@@ -1272,7 +1272,7 @@ void _onTailorRejected() {
           ),
           const SizedBox(height: 4),
           const Text(
-            "Optional — describe any changes, fit preferences, or details you want followed.",
+            "Required — describe any changes, fit preferences, or details you want followed.",
             style: TextStyle(color: Colors.black54, fontSize: 12, height: 1.3),
           ),
           const SizedBox(height: 10),
@@ -1296,28 +1296,33 @@ void _onTailorRejected() {
               ),
             ),
             style: const TextStyle(fontSize: 13),
-            onChanged: (_) => _saveLocalProgress(),
+            onChanged: (_) {
+              _saveLocalProgress();
+              setState(() {}); // re-evaluate Continue button enabled state
+            },
           ),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {
-                setState(() => _currentStep = 3);
-                _saveLocalProgress();
-              },
+              onPressed: _instructionsController.text.trim().isEmpty
+                  ? null
+                  : () {
+                      setState(() => _currentStep = 3);
+                      _saveLocalProgress();
+                    },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green.shade800,
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey.shade300,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(15),
                 ),
               ),
-              child: Text(
-                _designs.isEmpty ? "Skip and Continue" : "Continue",
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 15),
+              child: const Text(
+                "Continue",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               ),
             ),
           ),
