@@ -8,7 +8,6 @@ import 'package:photo_view/photo_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sketch2stitch/models/message.dart';
 import 'package:sketch2stitch/models/user_role.dart';
-import 'package:sketch2stitch/models/conversation.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;

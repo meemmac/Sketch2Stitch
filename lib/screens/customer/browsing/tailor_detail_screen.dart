@@ -3,7 +3,8 @@ import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/review.dart';
 import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
-import 'package:sketch2stitch/screens/customer/messaging/conversations_screen.dart';
+import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
+import 'package:sketch2stitch/models/user_role.dart';
 
 class TailorDetailScreen extends StatefulWidget {
   final Tailor tailor;
@@ -213,15 +214,20 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   }
 
   void _startConversation() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ConversationsScreen(
-          customerId: 'current_customer_id',
-        ),
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => ChatScreen(
+        conversationId: 'current_customer_id_${widget.tailor.id}',
+        customerId: 'current_customer_id',
+        otherUserId: widget.tailor.id,
+        otherUserName: widget.tailor.name,
+        otherUserRole: UserRole.tailor,
+        otherUserAvatar: widget.tailor.profilePicture,
       ),
-    );
-  }
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {

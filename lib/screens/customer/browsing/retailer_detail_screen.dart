@@ -6,7 +6,8 @@ import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
-import 'package:sketch2stitch/screens/customer/messaging/conversations_screen.dart';
+import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
+import 'package:sketch2stitch/models/user_role.dart';
 
 class RetailerDetailScreen extends StatefulWidget {
   final Retailer retailer;
@@ -136,15 +137,20 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   List<Product> get _elements => widget.retailer.products?.where((p) => _isElement(p)).toList() ?? [];
 
   void _startConversation() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ConversationsScreen(
-          customerId: 'current_customer_id',
-        ),
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => ChatScreen(
+        conversationId: 'current_customer_id_${widget.retailer.id}',
+        customerId: 'current_customer_id',
+        otherUserId: widget.retailer.id,
+        otherUserName: widget.retailer.shopName,
+        otherUserRole: UserRole.retailer,
+        otherUserAvatar: widget.retailer.profilePicture,
       ),
-    );
-  }
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
