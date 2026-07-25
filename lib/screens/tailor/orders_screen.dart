@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../models/measurement.dart';
 import 'reviews_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 enum TailorOrderStatus { pending, confirmed, inProgress, ready, completed, cancelled }
 
@@ -884,16 +885,40 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                     color: Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Row(
+           ),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.location_on_outlined, size: 16, color: primaryGreen),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          order.deliveryAddress,
-                          style: const TextStyle(fontSize: 13, height: 1.4, fontWeight: FontWeight.w600),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.location_on_outlined, size: 16, color: primaryGreen),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              order.deliveryAddress,
+                              style: const TextStyle(fontSize: 13, height: 1.4, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      InkWell(
+                        onTap: () => launchUrl(
+                          Uri.parse('https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(order.deliveryAddress)}'),
+                          mode: LaunchMode.externalApplication,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.map_outlined, size: 15, color: primaryGreen),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Open in Maps',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryGreen, decoration: TextDecoration.underline),
+                            ),
+                          ],
                         ),
                       ),
                     ],
