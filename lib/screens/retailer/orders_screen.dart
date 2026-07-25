@@ -1355,40 +1355,59 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.grey.shade200),
                 ),
-                child: Row(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.location_on_outlined,
-                      size: 16,
-                      color: primaryGreen,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        order.deliveryAddress,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          height: 1.4,
-                          fontWeight: FontWeight.w600,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.location_on_outlined,
+                          size: 16,
+                          color: primaryGreen,
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            order.deliveryAddress,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              height: 1.4,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      onPressed: () => launchUrl(
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () => launchUrl(
                         Uri.parse(
                           'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(order.deliveryAddress)}',
                         ),
                         mode: LaunchMode.externalApplication,
                       ),
-                      icon: Icon(
-                        Icons.map_outlined,
-                        size: 18,
-                        color: primaryGreen,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.map_outlined,
+                            size: 15,
+                            color: primaryGreen,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Open in Maps',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: primaryGreen,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ],
                       ),
-                      tooltip: 'Open in Maps',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
                     ),
                   ],
                 ),
