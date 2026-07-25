@@ -29,7 +29,6 @@ class TailoringSetupCallbacks {
   /// Orders.status = 'processing'; every Sub-orders.deliveryDestination = 'customer'.
   final Future<void> Function() onSkipTailoring;
 
-  final TextEditingController _instructionsController = TextEditingController();
 
   /// Orders.status = 'awaiting_tailor_search';
   /// tailorSelectionDeadline = orderDate + 72h.
@@ -242,6 +241,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
 
   DateTime? _tailorSelectionDeadline;
   _TailorJobState? _tailorJob;
+  final TextEditingController _instructionsController = TextEditingController();
 
   // ── Editable measurement grid (mirrors VirtualTrialScreen's layout) ──
   // Field order/labels match the Measurement schema. Editing here is a
