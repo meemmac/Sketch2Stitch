@@ -203,7 +203,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                       role: _currentRole,
                       profile: _activeProfile,
                       themeColor: themeColor,
-                      onEditPressed: () => _showEditDialog(context),
+                      onEditPressed: () => _openEditScreen(context),
                     ),
                   ),
                   const SliverToBoxAdapter(
@@ -261,19 +261,24 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
     );
   }
 
-  void _showEditDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return ProfileEditDialog(
+  Future<void> _openEditScreen(BuildContext context) async {
+    // Close the drawer first so we're not pushing a full-screen route
+    // on top of an open Drawer overlay.
+    Navigator.pop(context);
+
+    final updatedProfile = await Navigator.push<DrawerProfileData>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditProfileScreen(
           role: _currentRole,
           initialProfile: _activeProfile,
-          onSave: (updatedProfile) {
-            _updateProfile(updatedProfile);
-          },
-        );
-      },
+        ),
+      ),
     );
+
+    if (updatedProfile != null) {
+      _updateProfile(updatedProfile);
+    }
   }
 }
 
@@ -678,24 +683,29 @@ class DrawerLogoutButton extends StatelessWidget {
   }
 }
 
-/// Dialog widget for editing profile info.
-class ProfileEditDialog extends StatefulWidget {
+/// Full-screen profile editor, shared across all three roles.
+///
+/// Replaces the old `ProfileEditDialog` (AlertDialog). A full screen gives
+/// the form room to breathe and makes pushing the map picker a normal
+/// screen -> screen navigation instead of a route stacked on a modal.
+///
+/// Returns the updated `DrawerProfileData` via `Navigator.pop(context, data)`
+/// when saved, or `null` if the user backs out without saving.
+class EditProfileScreen extends StatefulWidget {
   final AppUserRole role;
   final DrawerProfileData initialProfile;
-  final ValueChanged<DrawerProfileData> onSave;
 
-  const ProfileEditDialog({
+  const EditProfileScreen({
     super.key,
     required this.role,
     required this.initialProfile,
-    required this.onSave,
   });
 
   @override
-  State<ProfileEditDialog> createState() => _ProfileEditDialogState();
+  State<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
-class _ProfileEditDialogState extends State<ProfileEditDialog> {
+class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _shopNameController;
   late TextEditingController _emailController;
@@ -745,6 +755,20 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
     }
   }
 
+  void _save() {
+    final updated = widget.initialProfile.copyWith(
+      name: _nameController.text,
+      shopName: widget.role == AppUserRole.retailer ? _shopNameController.text : null,
+      email: _emailController.text,
+      phone: _phoneController.text,
+      address: _addressController.text,
+      about: _aboutController.text,
+      profilePicture: _profilePicturePath,
+      location: _selectedLocation,
+    );
+    Navigator.pop(context, updated);
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -760,207 +784,211 @@ class _ProfileEditDialogState extends State<ProfileEditDialog> {
   Widget build(BuildContext context) {
     final bool isRetailer = widget.role == AppUserRole.retailer;
     final bool isCustomer = widget.role == AppUserRole.customer;
+    const themeColor = Color(0xFF6C9985);
 
-    const fieldTextStyle = TextStyle(fontSize: 13);
-    const fieldLabelStyle = TextStyle(fontSize: 13);
+    const fieldTextStyle = TextStyle(fontSize: 14);
+    const fieldLabelStyle = TextStyle(fontSize: 14);
 
-    return AlertDialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      title: Text(
-        isRetailer ? "Edit Shop Profile" : "Edit Profile",
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          color: Color(0xFF1E392A),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7FBF7),
+      appBar: AppBar(
+        title: Text(
+          isRetailer ? "Edit Shop Profile" : "Edit Profile",
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E392A)),
         ),
+        backgroundColor: const Color(0xFFF7FBF7),
+        foregroundColor: const Color(0xFF1E392A),
+        elevation: 0,
       ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!isCustomer) ...[
-              Center(
-                child: Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: 40,
-                      backgroundColor: Colors.grey.shade200,
-                      backgroundImage: _profilePicturePath != null && _profilePicturePath!.isNotEmpty
-                          ? FileImage(File(_profilePicturePath!))
-                          : null,
-                      child: _profilePicturePath == null || _profilePicturePath!.isEmpty
-                          ? Icon(
-                              isRetailer ? Icons.storefront_rounded : Icons.design_services_rounded,
-                              size: 40,
-                              color: Colors.grey.shade600,
-                            )
-                          : null,
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: GestureDetector(
-                        onTap: _pickImage,
-                        child: CircleAvatar(
-                          radius: 14,
-                          backgroundColor: const Color(0xFF6C9985),
-                          child: const Icon(
-                            Icons.camera_alt,
-                            size: 14,
-                            color: Colors.white,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!isCustomer) ...[
+                Center(
+                  child: Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 48,
+                        backgroundColor: Colors.grey.shade200,
+                        backgroundImage: _profilePicturePath != null && _profilePicturePath!.isNotEmpty
+                            ? FileImage(File(_profilePicturePath!))
+                            : null,
+                        child: _profilePicturePath == null || _profilePicturePath!.isEmpty
+                            ? Icon(
+                                isRetailer ? Icons.storefront_rounded : Icons.design_services_rounded,
+                                size: 46,
+                                color: Colors.grey.shade600,
+                              )
+                            : null,
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: GestureDetector(
+                          onTap: _pickImage,
+                          child: const CircleAvatar(
+                            radius: 16,
+                            backgroundColor: themeColor,
+                            child: Icon(Icons.camera_alt, size: 16, color: Colors.white),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-            ],
-            if (isRetailer) ...[
+                const SizedBox(height: 24),
+              ],
+              if (isRetailer) ...[
+                TextField(
+                  controller: _shopNameController,
+                  style: fieldTextStyle,
+                  decoration: const InputDecoration(
+                    labelText: "Shop Name",
+                    labelStyle: fieldLabelStyle,
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.storefront_rounded),
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ] else ...[
+                TextField(
+                  controller: _nameController,
+                  style: fieldTextStyle,
+                  decoration: const InputDecoration(
+                    labelText: "Name",
+                    labelStyle: fieldLabelStyle,
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person_rounded),
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
               TextField(
-                controller: _shopNameController,
+                controller: _emailController,
                 style: fieldTextStyle,
                 decoration: const InputDecoration(
-                  labelText: "Shop Name",
+                  labelText: "Email",
                   labelStyle: fieldLabelStyle,
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.storefront_rounded),
+                  prefixIcon: Icon(Icons.email_outlined),
                 ),
+                keyboardType: TextInputType.emailAddress,
               ),
-              const SizedBox(height: 12),
-            ] else ...[
+              const SizedBox(height: 14),
               TextField(
-                controller: _nameController,
+                controller: _phoneController,
                 style: fieldTextStyle,
                 decoration: const InputDecoration(
-                  labelText: "Name",
+                  labelText: "Phone",
                   labelStyle: fieldLabelStyle,
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person_rounded),
+                  prefixIcon: Icon(Icons.phone_outlined),
                 ),
+                keyboardType: TextInputType.phone,
               ),
-              const SizedBox(height: 12),
-            ],
-            TextField(
-              controller: _emailController,
-              style: fieldTextStyle,
-              decoration: const InputDecoration(
-                labelText: "Email",
-                labelStyle: fieldLabelStyle,
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.email_outlined),
-              ),
-              keyboardType: TextInputType.emailAddress,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _phoneController,
-              style: fieldTextStyle,
-              decoration: const InputDecoration(
-                labelText: "Phone",
-                labelStyle: fieldLabelStyle,
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.phone_outlined),
-              ),
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _addressController,
-              style: fieldTextStyle,
-              decoration: const InputDecoration(
-                labelText: "Address",
-                labelStyle: fieldLabelStyle,
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 12),
-            // Location pinpoint — shown for ALL roles.
-            // For customers this doubles as their delivery location
-            // (used later for rule-based delivery charge calc).
-            InkWell(
-              onTap: _pickLocation,
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.black26),
-                  borderRadius: BorderRadius.circular(8),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _addressController,
+                style: fieldTextStyle,
+                decoration: const InputDecoration(
+                  labelText: "Address",
+                  labelStyle: fieldLabelStyle,
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.location_on_outlined),
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.pin_drop_outlined, color: Color(0xFF6C9985)),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _selectedLocation != null
-                            ? 'Pinned: ${_selectedLocation!.latitude.toStringAsFixed(5)}, '
-                              '${_selectedLocation!.longitude.toStringAsFixed(5)}'
-                            : (isCustomer
-                                ? 'Tap to pin your delivery location'
-                                : 'Tap to pin your shop/workspace location'),
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: _selectedLocation != null ? Colors.black87 : Colors.black45,
+                maxLines: 2,
+              ),
+              const SizedBox(height: 14),
+              // Location pinpoint — shown for ALL roles.
+              // For customers this doubles as their delivery location
+              // (used later for rule-based delivery charge calc).
+              InkWell(
+                onTap: _pickLocation,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.black26),
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.pin_drop_outlined, color: themeColor),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _selectedLocation != null
+                              ? 'Pinned: ${_selectedLocation!.latitude.toStringAsFixed(5)}, '
+                                '${_selectedLocation!.longitude.toStringAsFixed(5)}'
+                              : (isCustomer
+                                  ? 'Tap to pin your delivery location'
+                                  : 'Tap to pin your shop/workspace location'),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: _selectedLocation != null ? Colors.black87 : Colors.black45,
+                          ),
                         ),
                       ),
-                    ),
-                    const Icon(Icons.chevron_right_rounded, color: Colors.black26),
-                  ],
+                      const Icon(Icons.chevron_right_rounded, color: Colors.black26),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            if (!isCustomer) ...[
-              const SizedBox(height: 12),
-              TextField(
-                controller: _aboutController,
-                style: fieldTextStyle,
-                decoration: const InputDecoration(
-                  labelText: "About / Biography",
-                  labelStyle: fieldLabelStyle,
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.info_outline),
+              if (!isCustomer) ...[
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _aboutController,
+                  style: fieldTextStyle,
+                  decoration: const InputDecoration(
+                    labelText: "About / Biography",
+                    labelStyle: fieldLabelStyle,
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.info_outline),
+                  ),
+                  maxLines: 3,
                 ),
-                maxLines: 3,
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text("Cancel"),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF6C9985),
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text("Cancel"),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: _save,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: themeColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text("Save Changes", style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
           ),
-          onPressed: () {
-            final updated = widget.initialProfile.copyWith(
-              name: _nameController.text,
-              shopName: isRetailer ? _shopNameController.text : null,
-              email: _emailController.text,
-              phone: _phoneController.text,
-              address: _addressController.text,
-              about: _aboutController.text,
-              profilePicture: _profilePicturePath,
-              location: _selectedLocation,
-            );
-            widget.onSave(updated);
-            Navigator.pop(context);
-          },
-          child: const Text("Save"),
         ),
-      ],
+      ),
     );
   }
 }
