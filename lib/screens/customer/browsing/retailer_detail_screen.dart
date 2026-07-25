@@ -37,17 +37,31 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   String _selectedFilter = "Top reviews";
 
   final List<String> _customerNames = [
-    'Priya Sharma', 'Amina Rahman', 'Nusrat Jahan', 'Tahsin Ahmed', 'Farhana Islam',
-    'Rafi Hasan', 'Sadia Akhter'
+    'Priya Sharma',
+    'Amina Rahman',
+    'Nusrat Jahan',
+    'Tahsin Ahmed',
+    'Farhana Islam',
+    'Rafi Hasan',
+    'Sadia Akhter',
   ];
 
   final List<String> _productImages = [
-    'assets/images/fab.jpg', 'assets/images/silk.jpg', 'assets/images/lace.jpg',
-    'assets/images/textile.jpg', 'assets/images/fab2.jpg', 'assets/images/gorgeous.jpg',
+    'assets/images/fab.jpg',
+    'assets/images/silk.jpg',
+    'assets/images/lace.jpg',
+    'assets/images/textile.jpg',
+    'assets/images/fab2.jpg',
+    'assets/images/gorgeous.jpg',
   ];
 
   final List<String> _elementCategories = [
-    'Fasteners', 'Buttons', 'Threads', 'Embellishments', 'Trims', 'Ribbons'
+    'Fasteners',
+    'Buttons',
+    'Threads',
+    'Embellishments',
+    'Trims',
+    'Ribbons',
   ];
 
   bool get _isCustomer => widget.userRole == AppUserRole.customer;
@@ -61,7 +75,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   Future<void> _loadReviews() async {
     setState(() => _isLoading = true);
     await Future.delayed(const Duration(milliseconds: 500));
-    
+
     final sampleReviews = [
       Review(
         id: 'R001',
@@ -70,7 +84,8 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         targetRole: ReviewTargetRole.retailer,
         orderId: 'O001',
         rating: 5.0,
-        comment: 'Great quality products! Everything matched the description perfectly.',
+        comment:
+            'Great quality products! Everything matched the description perfectly.',
         createdAt: DateTime.now().subtract(const Duration(days: 2)),
       ),
       Review(
@@ -119,45 +134,57 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
       _reviews = sampleReviews;
       _isLoading = false;
       if (_reviews.isNotEmpty) {
-        final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
+        final sum = _reviews.fold(
+          0.0,
+          (total, review) => total + review.rating,
+        );
         _averageRating = sum / _reviews.length;
       }
     });
   }
 
-  String _getCustomerName(int index) => _customerNames[index % _customerNames.length];
-  String _getProductName(int index, List<String> productNames) => productNames.isEmpty ? 'Product ${index + 1}' : productNames[index % productNames.length];
-  String _getProductImage(int index) => _productImages[index % _productImages.length];
-  double _getProductPrice(int index, List<double> productPrices) => productPrices.isEmpty ? 0 : productPrices[index % productPrices.length];
+  String _getCustomerName(int index) =>
+      _customerNames[index % _customerNames.length];
+  String _getProductName(int index, List<String> productNames) =>
+      productNames.isEmpty
+      ? 'Product ${index + 1}'
+      : productNames[index % productNames.length];
+  String _getProductImage(int index) =>
+      _productImages[index % _productImages.length];
+  double _getProductPrice(int index, List<double> productPrices) =>
+      productPrices.isEmpty ? 0 : productPrices[index % productPrices.length];
 
-  bool _isElement(Product product) => _elementCategories.contains(product.category);
+  bool _isElement(Product product) =>
+      _elementCategories.contains(product.category);
   bool _isFabric(Product product) => !_isElement(product);
 
-  List<Product> get _fabrics => widget.retailer.products?.where((p) => _isFabric(p)).toList() ?? [];
-  List<Product> get _elements => widget.retailer.products?.where((p) => _isElement(p)).toList() ?? [];
+  List<Product> get _fabrics =>
+      widget.retailer.products?.where((p) => _isFabric(p)).toList() ?? [];
+  List<Product> get _elements =>
+      widget.retailer.products?.where((p) => _isElement(p)).toList() ?? [];
 
   void _startConversation() {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => ChatScreen(
-        conversationId: 'current_customer_id_${widget.retailer.id}',
-        customerId: 'current_customer_id',
-        otherUserId: widget.retailer.id,
-        otherUserName: widget.retailer.shopName,
-        otherUserRole: UserRole.retailer,
-        otherUserAvatar: widget.retailer.profilePicture,
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          conversationId: 'current_customer_id_${widget.retailer.id}',
+          customerId: 'current_customer_id',
+          otherUserId: widget.retailer.id,
+          otherUserName: widget.retailer.shopName,
+          otherUserRole: UserRole.retailer,
+          otherUserAvatar: widget.retailer.profilePicture,
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 380;
     final isMediumScreen = screenWidth >= 380 && screenWidth < 600;
-    
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -202,7 +229,9 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                   vertical: isSmallScreen ? 8.0 : 10.0,
                 ),
                 decoration: BoxDecoration(
-                  color: _showFabrics ? const Color(0xFF2C5C44) : Colors.transparent,
+                  color: _showFabrics
+                      ? const Color(0xFF2C5C44)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Center(
@@ -227,7 +256,9 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                   vertical: isSmallScreen ? 8.0 : 10.0,
                 ),
                 decoration: BoxDecoration(
-                  color: !_showFabrics ? const Color(0xFF2C5C44) : Colors.transparent,
+                  color: !_showFabrics
+                      ? const Color(0xFF2C5C44)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Center(
@@ -251,7 +282,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   SliverAppBar _buildAppBar(bool isSmallScreen) {
     final ratingSize = isSmallScreen ? 12.0 : 14.0;
     final fontSize = isSmallScreen ? 20.0 : 22.0;
-    
+
     return SliverAppBar(
       expandedHeight: isSmallScreen ? 240 : 280,
       pinned: true,
@@ -265,7 +296,11 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
             color: Colors.black.withValues(alpha: 0.5),
             shape: BoxShape.circle,
           ),
-          child: Icon(Icons.arrow_back, color: Colors.white, size: isSmallScreen ? 18 : 22),
+          child: Icon(
+            Icons.arrow_back,
+            color: Colors.white,
+            size: isSmallScreen ? 18 : 22,
+          ),
         ),
         onPressed: () {
           if (widget.onBackPressed != null) {
@@ -285,7 +320,10 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Colors.black.withValues(alpha: 0.8)],
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.8),
+                  ],
                 ),
               ),
             ),
@@ -313,7 +351,10 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                     alignment: WrapAlignment.start,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      RatingStars(rating: widget.retailer.rating, size: ratingSize),
+                      RatingStars(
+                        rating: widget.retailer.rating,
+                        size: ratingSize,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '${widget.retailer.rating}',
@@ -375,7 +416,11 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.location_on, size: isSmallScreen ? 14 : 16, color: Colors.white70),
+                      Icon(
+                        Icons.location_on,
+                        size: isSmallScreen ? 14 : 16,
+                        color: Colors.white70,
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Row(
@@ -394,7 +439,10 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                             if (_isCustomer) ...[
                               const SizedBox(width: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.green.withValues(alpha: 0.3),
                                   borderRadius: BorderRadius.circular(8),
@@ -402,7 +450,11 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.directions_bike, size: 10, color: Colors.white),
+                                    Icon(
+                                      Icons.directions_bike,
+                                      size: 10,
+                                      color: Colors.white,
+                                    ),
                                     const SizedBox(width: 4),
                                     Text(
                                       '2.5 km • Tk 50',
@@ -424,7 +476,11 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      Icon(Icons.phone, size: isSmallScreen ? 14 : 16, color: Colors.white70),
+                      Icon(
+                        Icons.phone,
+                        size: isSmallScreen ? 14 : 16,
+                        color: Colors.white70,
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
@@ -445,30 +501,33 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
           ],
         ),
       ),
-      actions: _isCustomer ? [
-        IconButton(
-          icon: Icon(
-            Icons.chat_bubble_outline,
-            color: Colors.white,
-            size: isSmallScreen ? 22 : 24,
-          ),
-          onPressed: _startConversation,
-        ),
-        IconButton(
-          icon: Icon(
-            _isFavorite ? Icons.favorite : Icons.favorite_border,
-            color: _isFavorite ? Colors.red : Colors.white,
-            size: isSmallScreen ? 22 : 24,
-          ),
-          onPressed: () => setState(() => _isFavorite = !_isFavorite),
-        ),
-      ] : [],
+      actions: _isCustomer
+          ? [
+              IconButton(
+                icon: Icon(
+                  Icons.chat_bubble_outline,
+                  color: Colors.white,
+                  size: isSmallScreen ? 22 : 24,
+                ),
+                onPressed: _startConversation,
+              ),
+              IconButton(
+                icon: Icon(
+                  _isFavorite ? Icons.favorite : Icons.favorite_border,
+                  color: _isFavorite ? Colors.red : Colors.white,
+                  size: isSmallScreen ? 22 : 24,
+                ),
+                onPressed: () => setState(() => _isFavorite = !_isFavorite),
+              ),
+            ]
+          : [],
     );
   }
 
   Widget _buildCoverImage() {
     String imageUrl = 'assets/images/fab.jpg';
-    if (widget.retailer.products != null && widget.retailer.products!.isNotEmpty) {
+    if (widget.retailer.products != null &&
+        widget.retailer.products!.isNotEmpty) {
       final firstProduct = widget.retailer.products!.first;
       if (firstProduct.colorOptions.isNotEmpty) {
         final firstColor = firstProduct.colorOptions.first;
@@ -491,8 +550,10 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   }
 
   Widget _buildAboutSection(bool isSmallScreen) {
-    String description = widget.retailer.about ?? 'Quality products with excellent customer service.';
-    
+    String description =
+        widget.retailer.about ??
+        'Quality products with excellent customer service.';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -560,7 +621,8 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
             ),
             if (products.length > 6)
               TextButton(
-                onPressed: () => setState(() => _showAllProducts = !_showAllProducts),
+                onPressed: () =>
+                    setState(() => _showAllProducts = !_showAllProducts),
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.symmetric(
                     horizontal: isSmallScreen ? 8.0 : 16.0,
@@ -571,9 +633,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                 ),
                 child: Text(
                   _showAllProducts ? 'Show Less' : 'See All',
-                  style: TextStyle(
-                    fontSize: isSmallScreen ? 12.0 : 14.0,
-                  ),
+                  style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
                 ),
               ),
           ],
@@ -584,11 +644,17 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     );
   }
 
-  Widget _buildProductGrid(List<Product> products, bool isSmallScreen, bool isMediumScreen) {
-    final displayProducts = _showAllProducts ? products : (products.length > 6 ? products.take(6).toList() : products);
+  Widget _buildProductGrid(
+    List<Product> products,
+    bool isSmallScreen,
+    bool isMediumScreen,
+  ) {
+    final displayProducts = _showAllProducts
+        ? products
+        : (products.length > 6 ? products.take(6).toList() : products);
     final screenWidth = MediaQuery.of(context).size.width;
     final spacing = isSmallScreen ? 10.0 : 12.0;
-    
+
     final cardWidth = (screenWidth - (spacing * 3)) / 2;
     final cardHeight = isSmallScreen ? 220.0 : 240.0;
     final imageHeight = isSmallScreen ? 130.0 : 150.0;
@@ -609,8 +675,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         final coverImage = product.colorOptions.isNotEmpty
             ? product.colorOptions.first.image
             : null;
-        final bool outOfStock =
-            product.colorOptions.every((c) => c.stock <= 0);
+        final bool outOfStock = product.colorOptions.every((c) => c.stock <= 0);
         final bool isElement = _isElement(product);
 
         return GestureDetector(
@@ -635,7 +700,9 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                 Stack(
                   children: [
                     ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(14),
+                      ),
                       child: Container(
                         width: double.infinity,
                         height: imageHeight,
@@ -644,14 +711,17 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                             ? Image.asset(
                                 coverImage,
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => Container(
-                                  color: kSage.withValues(alpha: 0.12),
-                                  child: Icon(
-                                    isElement ? Icons.category : Icons.texture,
-                                    size: isSmallScreen ? 36 : 40,
-                                    color: kSageDark,
-                                  ),
-                                ),
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Container(
+                                      color: kSage.withValues(alpha: 0.12),
+                                      child: Icon(
+                                        isElement
+                                            ? Icons.category
+                                            : Icons.texture,
+                                        size: isSmallScreen ? 36 : 40,
+                                        color: kSageDark,
+                                      ),
+                                    ),
                               )
                             : Container(
                                 color: kSage.withValues(alpha: 0.12),
@@ -663,43 +733,44 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                               ),
                       ),
                     ),
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isSmallScreen ? 6 : 8, 
-                          vertical: isSmallScreen ? 3 : 4
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.7),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            width: 0.3,
+                    if (!isElement)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isSmallScreen ? 6 : 8,
+                            vertical: isSmallScreen ? 3 : 4,
                           ),
-                        ),
-                        child: Text(
-                          product.category,
-                          style: TextStyle(
-                            fontSize: isSmallScreen ? 9 : 10,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.3,
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              width: 0.3,
+                            ),
                           ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
+                          child: Text(
+                            _materialBadgeText(product),
+                            style: TextStyle(
+                              fontSize: isSmallScreen ? 9 : 10,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.3,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
                         ),
                       ),
-                    ),
                     if (outOfStock)
                       Positioned(
                         top: 8,
                         left: 8,
                         child: Container(
                           padding: EdgeInsets.symmetric(
-                            horizontal: isSmallScreen ? 6 : 8, 
-                            vertical: isSmallScreen ? 3 : 4
+                            horizontal: isSmallScreen ? 6 : 8,
+                            vertical: isSmallScreen ? 3 : 4,
                           ),
                           decoration: BoxDecoration(
                             color: Colors.red.withValues(alpha: 0.85),
@@ -815,6 +886,25 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     }
   }
 
+  String _materialBadgeText(Product product) {
+    final material = product.materialType.trim();
+    if (material.isEmpty || material == "N/A") {
+      return "N/A";
+    }
+    if (material.contains('%')) {
+      return material;
+    }
+    if (material.contains(',')) {
+      final parts = material.split(',').map((s) => s.trim()).toList();
+      final hasPercentages = parts.any((p) => p.contains('%'));
+      if (hasPercentages) {
+        return material;
+      }
+      return "100% $material";
+    }
+    return "100% $material";
+  }
+
   void _showReviewsOverlay(BuildContext context) {
     Navigator.push(
       context,
@@ -831,7 +921,11 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87, size: 20),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: Colors.black87,
+            size: 20,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         title: Column(
@@ -839,7 +933,11 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
           children: [
             const Text(
               "Ratings & Reviews",
-              style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             Text(
               widget.retailer.shopName,
@@ -863,7 +961,12 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
             _buildReviewsPageFilterChips(),
             const SizedBox(height: 16),
             if (_isLoading)
-              const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(40),
+                  child: CircularProgressIndicator(),
+                ),
+              )
             else if (_reviews.isEmpty)
               const Center(
                 child: Padding(
@@ -872,9 +975,19 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                     children: [
                       Icon(Icons.rate_review, size: 48, color: Colors.grey),
                       SizedBox(height: 8),
-                      Text('No reviews yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey)),
+                      Text(
+                        'No reviews yet',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey,
+                        ),
+                      ),
                       SizedBox(height: 4),
-                      Text('Be the first to review this retailer!', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                      Text(
+                        'Be the first to review this retailer!',
+                        style: TextStyle(fontSize: 13, color: Colors.grey),
+                      ),
                     ],
                   ),
                 ),
@@ -885,8 +998,10 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                 physics: const NeverScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: filtered.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 16),
-                itemBuilder: (context, index) => _buildReviewsPageItem(filtered[index], index),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 16),
+                itemBuilder: (context, index) =>
+                    _buildReviewsPageItem(filtered[index], index),
               ),
             const SizedBox(height: 32),
           ],
@@ -913,7 +1028,10 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
               children: [
                 Text(
                   _averageRating.toStringAsFixed(1),
-                  style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w900),
+                  style: const TextStyle(
+                    fontSize: 42,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 Row(
                   children: List.generate(
@@ -921,7 +1039,9 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                     (index) => Icon(
                       index < _averageRating.floor()
                           ? Icons.star
-                          : (index < _averageRating.ceil() ? Icons.star_half : Icons.star_border),
+                          : (index < _averageRating.ceil()
+                                ? Icons.star_half
+                                : Icons.star_border),
                       color: Colors.orange,
                       size: 18,
                     ),
@@ -959,7 +1079,10 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          Text("$star", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          Text(
+            "$star",
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(width: 4),
           const Icon(Icons.star, color: Colors.orange, size: 12),
           const SizedBox(width: 8),
@@ -980,7 +1103,12 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   }
 
   Widget _buildReviewsPageFilterChips() {
-    final filters = ["Top reviews", "Newest", "Highest rating", "Lowest rating"];
+    final filters = [
+      "Top reviews",
+      "Newest",
+      "Highest rating",
+      "Lowest rating",
+    ];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1003,7 +1131,9 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
-                side: BorderSide(color: isSelected ? Colors.transparent : Colors.grey.shade300),
+                side: BorderSide(
+                  color: isSelected ? Colors.transparent : Colors.grey.shade300,
+                ),
               ),
             ),
           );
@@ -1031,12 +1161,15 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     return sortedList;
   }
 
-  int _getRatingCount(double rating) => _reviews.where((r) => r.rating == rating).length;
+  int _getRatingCount(double rating) =>
+      _reviews.where((r) => r.rating == rating).length;
 
   Widget _buildReviewsPageItem(Review review, int index) {
     final customerName = _getCustomerName(index);
-    final productNames = widget.retailer.products?.map((p) => p.productName).toList() ?? [];
-    final productPrices = widget.retailer.products?.map((p) => p.minPrice).toList() ?? [];
+    final productNames =
+        widget.retailer.products?.map((p) => p.productName).toList() ?? [];
+    final productPrices =
+        widget.retailer.products?.map((p) => p.minPrice).toList() ?? [];
     final products = _getReviewProducts(index, productNames, productPrices);
 
     return Container(
@@ -1060,7 +1193,9 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                 children: List.generate(
                   5,
                   (starIndex) => Icon(
-                    starIndex < review.rating.floor() ? Icons.star : Icons.star_border,
+                    starIndex < review.rating.floor()
+                        ? Icons.star
+                        : Icons.star_border,
                     color: Colors.orange,
                     size: 14,
                   ),
@@ -1091,7 +1226,8 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                 scrollDirection: Axis.horizontal,
                 itemCount: products.length,
                 separatorBuilder: (context, index) => const SizedBox(width: 12),
-                itemBuilder: (context, i) => _buildReviewsPageProductCard(products[i]),
+                itemBuilder: (context, i) =>
+                    _buildReviewsPageProductCard(products[i]),
               ),
             ),
           ],
@@ -1136,7 +1272,10 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                   product['name'],
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -1151,12 +1290,16 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     );
   }
 
-  List<Map<String, dynamic>> _getReviewProducts(int index, List<String> productNames, List<double> productPrices) {
+  List<Map<String, dynamic>> _getReviewProducts(
+    int index,
+    List<String> productNames,
+    List<double> productPrices,
+  ) {
     final products = <Map<String, dynamic>>[];
     final productName = _getProductName(index, productNames);
     final productImage = _getProductImage(index);
     final productPrice = _getProductPrice(index, productPrices);
-    
+
     if (productName.isNotEmpty) {
       products.add({
         'name': productName,
@@ -1164,7 +1307,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         'price': productPrice,
       });
     }
-    
+
     if (productNames.length > index + 1) {
       products.add({
         'name': productNames[index + 1],
@@ -1172,7 +1315,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         'price': productPrices[index + 1],
       });
     }
-    
+
     return products;
   }
 
