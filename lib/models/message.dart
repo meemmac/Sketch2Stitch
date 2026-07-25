@@ -12,6 +12,13 @@ class Message {
   final String? attachment;
   final DateTime sentAt;
 
+  // 🆕 New fields for reply and read features
+  final String? replyToMessageId;
+  final String? replyToText;
+  final String? replyToSender;
+  final bool isRead;
+  final DateTime? readAt;
+
   Message({
     required this.id,
     required this.conversationId,
@@ -20,6 +27,11 @@ class Message {
     required this.msgText,
     this.attachment,
     required this.sentAt,
+    this.replyToMessageId,
+    this.replyToText,
+    this.replyToSender,
+    this.isRead = false,
+    this.readAt,
   });
 
   String get senderRoleText {
@@ -41,6 +53,11 @@ class Message {
     String? msgText,
     String? attachment,
     DateTime? sentAt,
+    String? replyToMessageId,
+    String? replyToText,
+    String? replyToSender,
+    bool? isRead,
+    DateTime? readAt,
   }) {
     return Message(
       id: id ?? this.id,
@@ -50,6 +67,11 @@ class Message {
       msgText: msgText ?? this.msgText,
       attachment: attachment ?? this.attachment,
       sentAt: sentAt ?? this.sentAt,
+      replyToMessageId: replyToMessageId ?? this.replyToMessageId,
+      replyToText: replyToText ?? this.replyToText,
+      replyToSender: replyToSender ?? this.replyToSender,
+      isRead: isRead ?? this.isRead,
+      readAt: readAt ?? this.readAt,
     );
   }
 
@@ -61,6 +83,11 @@ class Message {
     'msgText': msgText,
     'attachment': attachment,
     'sentAt': sentAt.toIso8601String(),
+    'replyToMessageId': replyToMessageId,
+    'replyToText': replyToText,
+    'replyToSender': replyToSender,
+    'isRead': isRead,
+    'readAt': readAt?.toIso8601String(),
   };
 
   factory Message.fromJson(Map<String, dynamic> json) {
@@ -74,6 +101,13 @@ class Message {
       sentAt: json['sentAt'] != null
           ? DateTime.parse(json['sentAt'])
           : DateTime.now(),
+      replyToMessageId: json['replyToMessageId'],
+      replyToText: json['replyToText'],
+      replyToSender: json['replyToSender'],
+      isRead: json['isRead'] ?? false,
+      readAt: json['readAt'] != null
+          ? DateTime.parse(json['readAt'])
+          : null,
     );
   }
 }

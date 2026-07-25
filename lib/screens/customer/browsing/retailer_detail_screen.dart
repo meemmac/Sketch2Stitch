@@ -5,6 +5,7 @@ import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/review.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 
 class RetailerDetailScreen extends StatefulWidget {
   final Retailer retailer;
@@ -26,6 +27,8 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   bool _isLoading = true;
   double _averageRating = 0.0;
   String _selectedFilter = "Top reviews";
+  final Map<String, int> _helpfulCounts = {};
+  final Map<String, bool> _isHelpful = {};
 
   final List<String> _customerNames = [
     'Priya Sharma', 'Amina Rahman', 'Nusrat Jahan', 'Tahsin Ahmed', 'Farhana Islam',
@@ -50,9 +53,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   Future<void> _loadReviews() async {
     setState(() => _isLoading = true);
     await Future.delayed(const Duration(milliseconds: 500));
-    
-    final productNames = widget.retailer.products?.map((p) => p.productName).toList() ?? [];
-    final productPrices = widget.retailer.products?.map((p) => p.minPrice).toList() ?? [];
     
     final sampleReviews = [
       Review(
@@ -110,6 +110,10 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     setState(() {
       _reviews = sampleReviews;
       _isLoading = false;
+      for (final r in _reviews) {
+        _helpfulCounts[r.id] = 0;
+        _isHelpful[r.id] = false;
+      }
       if (_reviews.isNotEmpty) {
         final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
         _averageRating = sum / _reviews.length;
@@ -398,11 +402,15 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                     children: [
                       Icon(Icons.phone, size: isSmallScreen ? 14 : 16, color: Colors.white70),
                       const SizedBox(width: 4),
-                      Text(
-                        widget.retailer.phone,
-                        style: TextStyle(
-                          fontSize: isSmallScreen ? 11.0 : 13.0,
-                          color: Colors.white70,
+                      Expanded(
+                        child: Text(
+                          widget.retailer.phone,
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 11.0 : 13.0,
+                            color: Colors.white70,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -733,53 +741,28 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         SizedBox(height: isSmallScreen ? 4 : 6),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                product.priceRange,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: kSageDark,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.directions_bike, size: 12, color: Colors.grey[600]),
-                                const SizedBox(width: 2),
-                                Text(
-                                  'Tk 50',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey[600],
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                        Text(
+                          product.priceRange,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: kSageDark,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         SizedBox(height: isSmallScreen ? 6 : 8),
-                        if (!outOfStock) ...[
+                        // Bike icon removed — only color dots remain
+                        if (!outOfStock)
                           Row(
-                            children: [
-                              Icon(Icons.directions_bike, size: isSmallScreen ? 10 : 12, color: Colors.grey[600]),
-                              const SizedBox(width: 4),
-                              ...product.colorOptions
-                                  .take(4)
-                                  .map((option) => Padding(
-                                        padding: EdgeInsets.only(right: isSmallScreen ? 3 : 4),
-                                        child: _colorDot(option, isSmallScreen),
-                                      ))
-                                  .toList(),
-                            ],
+                            children: product.colorOptions
+                                .take(4)
+                                .map((option) => Padding(
+                                      padding: EdgeInsets.only(right: isSmallScreen ? 3 : 4),
+                                      child: _colorDot(option, isSmallScreen),
+                                    ))
+                                .toList(),
                           ),
-                        ],
                       ],
                     ),
                   ),
@@ -837,174 +820,137 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     }
   }
 
-  // ─── Reviews Overlay ────────────────────────────────────────────────────
+  // ─── Reviews Page (matches RetailerReviewsScreen) ─────────────────────
 
   void _showReviewsOverlay(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenWidth < 380;
-    final productNames = widget.retailer.products?.map((p) => p.productName).toList() ?? [];
-    final productPrices = widget.retailer.products?.map((p) => p.minPrice).toList() ?? [];
-    
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setStateDialog) {
-            return Dialog(
-              insetPadding: EdgeInsets.all(isSmallScreen ? 12.0 : 20.0),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              child: Container(
-                width: double.infinity,
-                constraints: BoxConstraints(
-                  maxWidth: 500,
-                  maxHeight: isSmallScreen ? 500 : 600,
-                ),
-                padding: EdgeInsets.all(isSmallScreen ? 16.0 : 20.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Ratings & Reviews',
-                              style: TextStyle(
-                                fontSize: isSmallScreen ? 18.0 : 20.0,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              widget.retailer.shopName,
-                              style: TextStyle(
-                                fontSize: isSmallScreen ? 12.0 : 14.0,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.pop(context),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    
-                    if (_isLoading)
-                      const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
-                    else if (_reviews.isEmpty)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(20),
-                          child: Column(
-                            children: [
-                              Icon(Icons.rate_review, size: 48, color: Colors.grey),
-                              SizedBox(height: 8),
-                              Text('No reviews yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey)),
-                              SizedBox(height: 4),
-                              Text('Be the first to review this retailer!', style: TextStyle(fontSize: 13, color: Colors.grey)),
-                            ],
-                          ),
-                        ),
-                      )
-                    else ...[
-                      _buildRatingSummary(isSmallScreen),
-                      const SizedBox(height: 16),
-                      _buildFilterChips(isSmallScreen, setStateDialog),
-                      const SizedBox(height: 16),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          physics: const BouncingScrollPhysics(),
-                          child: Column(
-                            children: _getFilteredReviews().asMap().entries.map((entry) {
-                              final index = entry.key;
-                              final review = entry.value;
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: _buildReviewCard(
-                                  review, 
-                                  index, 
-                                  productNames, 
-                                  productPrices,
-                                  isSmallScreen
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => _buildReviewsPage()),
     );
   }
 
-  // ─── Rating Summary ─────────────────────────────────────────────────────
+  Widget _buildReviewsPage() {
+    final filtered = _getFilteredReviews();
 
-  Widget _buildRatingSummary(bool isSmallScreen) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF9FBF9),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Ratings & Reviews",
+              style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            Text(
+              widget.retailer.shopName,
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildReviewsPageSummary(),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
+              child: Text(
+                "Reviews",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+            ),
+            _buildReviewsPageFilterChips(),
+            const SizedBox(height: 16),
+            if (_isLoading)
+              const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+            else if (_reviews.isEmpty)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(40),
+                  child: Column(
+                    children: [
+                      Icon(Icons.rate_review, size: 48, color: Colors.grey),
+                      SizedBox(height: 8),
+                      Text('No reviews yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey)),
+                      SizedBox(height: 4),
+                      Text('Be the first to review this retailer!', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                    ],
+                  ),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: filtered.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 16),
+                itemBuilder: (context, index) => _buildReviewsPageItem(filtered[index], index),
+              ),
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReviewsPageSummary() {
     return Container(
-      padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.grey.shade200),
       ),
       child: Row(
         children: [
           Expanded(
-            flex: 1,
+            flex: 4,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   _averageRating.toStringAsFixed(1),
-                  style: TextStyle(
-                    fontSize: isSmallScreen ? 28.0 : 32.0,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w900),
                 ),
                 Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: List.generate(
                     5,
                     (index) => Icon(
-                      index < _averageRating.floor() ? Icons.star : 
-                      (index < _averageRating.ceil() ? Icons.star_half : Icons.star_border),
+                      index < _averageRating.floor()
+                          ? Icons.star
+                          : (index < _averageRating.ceil() ? Icons.star_half : Icons.star_border),
                       color: Colors.orange,
-                      size: isSmallScreen ? 14 : 16,
+                      size: 18,
                     ),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${_reviews.length} Reviews',
-                  style: TextStyle(
-                    fontSize: isSmallScreen ? 10.0 : 12.0,
-                    color: Colors.grey[600],
-                  ),
+                  "${_reviews.length}+ All ratings",
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ],
             ),
           ),
           Expanded(
-            flex: 2,
+            flex: 6,
             child: Column(
               children: [
-                _buildRatingRow(5, _getRatingCount(5.0), isSmallScreen),
-                _buildRatingRow(4, _getRatingCount(4.0), isSmallScreen),
-                _buildRatingRow(3, _getRatingCount(3.0), isSmallScreen),
-                _buildRatingRow(2, _getRatingCount(2.0), isSmallScreen),
-                _buildRatingRow(1, _getRatingCount(1.0), isSmallScreen),
+                _reviewsPageRatingBar(5, _getRatingCount(5.0)),
+                _reviewsPageRatingBar(4, _getRatingCount(4.0)),
+                _reviewsPageRatingBar(3, _getRatingCount(3.0)),
+                _reviewsPageRatingBar(2, _getRatingCount(2.0)),
+                _reviewsPageRatingBar(1, _getRatingCount(1.0)),
               ],
             ),
           ),
@@ -1013,27 +959,25 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     );
   }
 
-  Widget _buildRatingRow(int stars, int count, bool isSmallScreen) {
+  Widget _reviewsPageRatingBar(int star, int count) {
     final total = _reviews.length;
-    final percentage = total > 0 ? (count / total) : 0.0;
-    final fontSize = isSmallScreen ? 10.0 : 12.0;
-    final iconSize = isSmallScreen ? 10.0 : 12.0;
-    
+    final percent = total > 0 ? count / total : 0.0;
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 1.0 : 2.0),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          Text('$stars', style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w500)),
-          Icon(Icons.star, color: Colors.orange, size: iconSize),
-          const SizedBox(width: 6),
+          Text("$star", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          const SizedBox(width: 4),
+          const Icon(Icons.star, color: Colors.orange, size: 12),
+          const SizedBox(width: 8),
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
-                value: percentage,
-                backgroundColor: Colors.grey[200],
+                value: percent,
+                backgroundColor: Colors.grey.shade100,
                 color: Colors.orange,
-                minHeight: isSmallScreen ? 4.0 : 6.0,
+                minHeight: 6,
               ),
             ),
           ),
@@ -1042,40 +986,32 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     );
   }
 
-  int _getRatingCount(double rating) => _reviews.where((r) => r.rating == rating).length;
-
-  // ─── Filter Chips ──────────────────────────────────────────────────────
-
-  Widget _buildFilterChips(bool isSmallScreen, StateSetter setStateDialog) {
+  Widget _buildReviewsPageFilterChips() {
     final filters = ["Top reviews", "Newest", "Highest rating", "Lowest rating"];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: filters.map((filter) {
           final isSelected = _selectedFilter == filter;
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ChoiceChip(
-              label: Text(filter, style: TextStyle(fontSize: isSmallScreen ? 11.0 : 12.0)),
+              label: Text(filter),
               selected: isSelected,
               onSelected: (val) {
-                if (val) {
-                  setStateDialog(() => _selectedFilter = filter);
-                  setState(() => _selectedFilter = filter);
-                }
+                if (val) setState(() => _selectedFilter = filter);
               },
               selectedColor: const Color(0xFF1E232C),
               labelStyle: TextStyle(
                 color: isSelected ? Colors.white : Colors.black87,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                fontSize: isSmallScreen ? 11.0 : 12.0,
               ),
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
                 side: BorderSide(color: isSelected ? Colors.transparent : Colors.grey.shade300),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             ),
           );
         }).toList(),
@@ -1102,14 +1038,15 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     return sortedList;
   }
 
-  // ─── Review Card ──────────────────────────────────────────────────────
+  int _getRatingCount(double rating) => _reviews.where((r) => r.rating == rating).length;
 
-  Widget _buildReviewCard(Review review, int index, List<String> productNames, List<double> productPrices, bool isSmallScreen) {
+  Widget _buildReviewsPageItem(Review review, int index) {
     final customerName = _getCustomerName(index);
-    final reviewProducts = _getReviewProducts(index, productNames, productPrices);
-    
-    final nameSize = isSmallScreen ? 14.0 : 16.0;
-    final commentSize = isSmallScreen ? 13.0 : 14.0;
+    final productNames = widget.retailer.products?.map((p) => p.productName).toList() ?? [];
+    final productPrices = widget.retailer.products?.map((p) => p.minPrice).toList() ?? [];
+    final products = _getReviewProducts(index, productNames, productPrices);
+    final helpfulCount = _helpfulCounts[review.id] ?? 0;
+    final isHelpful = _isHelpful[review.id] ?? false;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1121,32 +1058,9 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                customerName,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: nameSize,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  "Retailer",
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
-                  ),
-                ),
-              ),
-            ],
+          Text(
+            customerName,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
           const SizedBox(height: 8),
           Row(
@@ -1170,17 +1084,13 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            "\"${review.comment}\"",
-            style: TextStyle(
-              fontSize: commentSize,
-              height: 1.5,
-              fontStyle: FontStyle.italic,
-            ),
+            review.comment,
+            style: const TextStyle(fontSize: 14, height: 1.5),
           ),
-          if (reviewProducts.isNotEmpty) ...[
+          if (products.isNotEmpty) ...[
             const SizedBox(height: 16),
             const Text(
-              "Related Items",
+              "Liked products",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
             const SizedBox(height: 12),
@@ -1188,36 +1098,94 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
               height: 70,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: reviewProducts.length,
+                itemCount: products.length,
                 separatorBuilder: (context, index) => const SizedBox(width: 12),
-                itemBuilder: (context, index) => _buildProductMiniCard(reviewProducts[index]),
+                itemBuilder: (context, i) => _buildReviewsPageProductCard(products[i]),
               ),
             ),
           ],
+          const SizedBox(height: 16),
+          InkWell(
+            onTap: () {
+              setState(() {
+                if (isHelpful) {
+                  _helpfulCounts[review.id] = helpfulCount - 1;
+                  _isHelpful[review.id] = false;
+                } else {
+                  _helpfulCounts[review.id] = helpfulCount + 1;
+                  _isHelpful[review.id] = true;
+                }
+              });
+            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isHelpful ? Icons.thumb_up_alt : Icons.thumb_up_alt_outlined,
+                  size: 16,
+                  color: isHelpful ? Colors.orange : Colors.grey,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  helpfulCount > 0 ? "Helpful $helpfulCount" : "Helpful",
+                  style: TextStyle(
+                    color: isHelpful ? Colors.orange : Colors.grey,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildProductMiniCard(Map<String, dynamic> product) {
+  Widget _buildReviewsPageProductCard(Map<String, dynamic> product) {
     return Container(
-      width: 60,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      width: 220,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: Image.asset(
               product['image'],
-              width: 60,
-              height: 60,
+              width: 50,
+              height: 50,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => Container(
-                width: 60,
-                height: 60,
+                width: 50,
+                height: 50,
                 color: Colors.grey[200],
-                child: Icon(Icons.texture, size: 24, color: Colors.grey),
+                child: const Icon(Icons.texture, size: 20, color: Colors.grey),
               ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product['name'],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  "Tk ${(product['price'] as double).toInt()}",
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+              ],
             ),
           ),
         ],
@@ -1239,7 +1207,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
       });
     }
     
-    // Add a second product for demo purposes
     if (productNames.length > index + 1) {
       products.add({
         'name': productNames[index + 1],

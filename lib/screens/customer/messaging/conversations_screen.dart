@@ -5,6 +5,7 @@ import 'package:sketch2stitch/models/message.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ConversationsScreen extends StatefulWidget {
   final String customerId;
@@ -26,6 +27,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   String _searchQuery = "";
   late TabController _tabController;
   String _selectedTab = "All";
+
+  // User data cache (in production, fetch from API)
+  final Map<String, Map<String, dynamic>> _userCache = {};
 
   @override
   void initState() {
@@ -63,6 +67,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     setState(() => _isLoading = true);
     await Future.delayed(const Duration(milliseconds: 800));
 
+    // Initialize user cache
+    _initUserCache();
+
     final sampleConversations = [
       Conversation(
         id: 'conv_1',
@@ -70,6 +77,10 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         otherId: 't1',
         otherRole: UserRole.tailor,
         orderId: 'ORD-001',
+        unreadCount: 1,
+        isMuted: false,
+        isBlocked: false,
+        updatedAt: DateTime.now().subtract(const Duration(minutes: 5)),
         messages: [
           Message(
             id: 'm1',
@@ -78,6 +89,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
             senderRole: UserRole.tailor,
             msgText: 'Your suit is ready for fitting! 🎉',
             sentAt: DateTime.now().subtract(const Duration(minutes: 5)),
+            isRead: false,
           ),
           Message(
             id: 'm2',
@@ -86,6 +98,8 @@ class _ConversationsScreenState extends State<ConversationsScreen>
             senderRole: UserRole.customer,
             msgText: 'Great! I\'ll come tomorrow.',
             sentAt: DateTime.now().subtract(const Duration(hours: 2)),
+            isRead: true,
+            readAt: DateTime.now().subtract(const Duration(hours: 1, minutes: 55)),
           ),
         ],
       ),
@@ -95,6 +109,11 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         otherId: 'r1',
         otherRole: UserRole.retailer,
         orderId: 'ORD-002',
+        unreadCount: 0,
+        isMuted: true,
+        mutedUntil: DateTime.now().add(const Duration(days: 7)),
+        isBlocked: false,
+        updatedAt: DateTime.now().subtract(const Duration(days: 1)),
         messages: [
           Message(
             id: 'm3',
@@ -103,6 +122,8 @@ class _ConversationsScreenState extends State<ConversationsScreen>
             senderRole: UserRole.retailer,
             msgText: 'Your fabric order has been shipped! 📦',
             sentAt: DateTime.now().subtract(const Duration(days: 1)),
+            isRead: true,
+            readAt: DateTime.now().subtract(const Duration(days: 1)),
           ),
         ],
       ),
@@ -112,6 +133,10 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         otherId: 't2',
         otherRole: UserRole.tailor,
         orderId: 'ORD-003',
+        unreadCount: 2,
+        isMuted: false,
+        isBlocked: false,
+        updatedAt: DateTime.now().subtract(const Duration(days: 1, hours: 23)),
         messages: [
           Message(
             id: 'm4',
@@ -120,6 +145,8 @@ class _ConversationsScreenState extends State<ConversationsScreen>
             senderRole: UserRole.customer,
             msgText: 'I need a custom blazer for my presentation.',
             sentAt: DateTime.now().subtract(const Duration(days: 2)),
+            isRead: true,
+            readAt: DateTime.now().subtract(const Duration(days: 1, hours: 23)),
           ),
           Message(
             id: 'm5',
@@ -128,6 +155,16 @@ class _ConversationsScreenState extends State<ConversationsScreen>
             senderRole: UserRole.tailor,
             msgText: 'Sure! Let me know your measurements.',
             sentAt: DateTime.now().subtract(const Duration(days: 1, hours: 23)),
+            isRead: false,
+          ),
+          Message(
+            id: 'm6',
+            conversationId: 'conv_3',
+            senderId: 't2',
+            senderRole: UserRole.tailor,
+            msgText: 'I can start working on it next week.',
+            sentAt: DateTime.now().subtract(const Duration(days: 1, hours: 22)),
+            isRead: false,
           ),
         ],
       ),
@@ -137,22 +174,32 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         otherId: 'r2',
         otherRole: UserRole.retailer,
         orderId: 'ORD-004',
+        unreadCount: 0,
+        isMuted: false,
+        isBlocked: true,
+        blockedBy: widget.customerId,
+        blockedAt: DateTime.now().subtract(const Duration(days: 1)),
+        updatedAt: DateTime.now().subtract(const Duration(days: 2, hours: 12)),
         messages: [
           Message(
-            id: 'm6',
+            id: 'm7',
             conversationId: 'conv_4',
             senderId: 'r2',
             senderRole: UserRole.retailer,
             msgText: 'New silk collection just arrived! 🌟',
             sentAt: DateTime.now().subtract(const Duration(days: 3)),
+            isRead: true,
+            readAt: DateTime.now().subtract(const Duration(days: 2, hours: 12)),
           ),
           Message(
-            id: 'm7',
+            id: 'm8',
             conversationId: 'conv_4',
             senderId: widget.customerId,
             senderRole: UserRole.customer,
             msgText: 'I\'ll visit your store tomorrow.',
             sentAt: DateTime.now().subtract(const Duration(days: 2, hours: 12)),
+            isRead: true,
+            readAt: DateTime.now().subtract(const Duration(days: 2, hours: 11)),
           ),
         ],
       ),
@@ -165,10 +212,47 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     });
   }
 
+  void _initUserCache() {
+    _userCache.addAll({
+      't1': {
+        'name': 'Abdul Karim',
+        'avatar': 'assets/images/fab.jpg',
+        'role': UserRole.tailor,
+        'isOnline': true,
+        'lastSeen': null,
+      },
+      't2': {
+        'name': 'Rehana Begum',
+        'avatar': 'assets/images/silk.jpg',
+        'role': UserRole.tailor,
+        'isOnline': false,
+        'lastSeen': DateTime.now().subtract(const Duration(hours: 2)),
+      },
+      'r1': {
+        'name': 'Dhaka Fabric House',
+        'avatar': 'assets/images/fab.jpg',
+        'role': UserRole.retailer,
+        'isOnline': false,
+        'lastSeen': DateTime.now().subtract(const Duration(hours: 5)),
+      },
+      'r2': {
+        'name': 'Chowdhury Textiles',
+        'avatar': 'assets/images/textile.jpg',
+        'role': UserRole.retailer,
+        'isOnline': true,
+        'lastSeen': null,
+      },
+    });
+  }
+
   void _applyFilter() {
     setState(() {
       List<Conversation> filtered = List.from(_conversations);
 
+      // Exclude deleted conversations
+      filtered = filtered.where((conv) => !conv.isDeleted).toList();
+
+      // Search filter
       if (_searchQuery.isNotEmpty) {
         filtered = filtered.where((conv) {
           final otherName = _getOtherUserName(conv).toLowerCase();
@@ -178,12 +262,10 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         }).toList();
       }
 
+      // Tab filter
       switch (_selectedTab) {
         case "Unread":
-          filtered = filtered.where((conv) {
-            final unreadCount = _getUnreadCount(conv);
-            return unreadCount > 0;
-          }).toList();
+          filtered = filtered.where((conv) => conv.unreadCount > 0).toList();
           break;
         case "Tailors":
           filtered = filtered.where((conv) =>
@@ -202,23 +284,27 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   }
 
   String _getOtherUserName(Conversation conversation) {
-    final names = {
-      't1': 'Abdul Karim',
-      't2': 'Rehana Begum',
-      'r1': 'Dhaka Fabric House',
-      'r2': 'Chowdhury Textiles',
-    };
-    return names[conversation.otherId] ?? 'Unknown';
+    final userData = _userCache[conversation.otherId];
+    if (userData != null) {
+      return userData['name'] ?? conversation.otherId;
+    }
+    return conversation.otherId;
   }
 
   String _getOtherUserAvatar(Conversation conversation) {
-    final avatars = {
-      't1': 'assets/images/fab.jpg',
-      't2': 'assets/images/silk.jpg',
-      'r1': 'assets/images/fab.jpg',
-      'r2': 'assets/images/textile.jpg',
-    };
-    return avatars[conversation.otherId] ?? 'assets/images/fab.jpg';
+    final userData = _userCache[conversation.otherId];
+    if (userData != null) {
+      return userData['avatar'] ?? 'assets/images/fab.jpg';
+    }
+    return 'assets/images/fab.jpg';
+  }
+
+  bool _getUserOnlineStatus(Conversation conversation) {
+    final userData = _userCache[conversation.otherId];
+    if (userData != null) {
+      return userData['isOnline'] ?? false;
+    }
+    return false;
   }
 
   String _getLastMessage(Conversation conversation) {
@@ -230,7 +316,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
   DateTime _getLastMessageTime(Conversation conversation) {
     if (conversation.messages == null || conversation.messages!.isEmpty) {
-      return DateTime.now();
+      return conversation.updatedAt ?? DateTime.now();
     }
     return conversation.messages!.last.sentAt;
   }
@@ -256,38 +342,248 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     }
   }
 
-  int _getUnreadCount(Conversation conversation) {
-    if (conversation.messages == null || conversation.messages!.isEmpty) {
-      return 0;
-    }
-    return conversation.messages!.where((m) => 
-      m.senderId != widget.customerId
-    ).length;
-  }
-
-  void _markConversationAsRead(Conversation conversation) {
+  void _markConversationAsRead(String conversationId) {
     setState(() {
-      final index = _conversations.indexWhere((c) => c.id == conversation.id);
+      final index = _conversations.indexWhere((c) => c.id == conversationId);
       if (index != -1) {
-        // Create a new list with all messages marked as read
-        final updatedMessages = _conversations[index].messages?.map((m) {
-          return Message(
-            id: m.id,
-            conversationId: m.conversationId,
-            senderId: m.senderId,
-            senderRole: m.senderRole,
-            msgText: m.msgText,
-            attachment: m.attachment,
-            sentAt: m.sentAt,
-          );
+        final conversation = _conversations[index];
+        
+        // Mark all messages from other user as read
+        final updatedMessages = conversation.messages?.map((m) {
+          if (m.senderId != widget.customerId && !m.isRead) {
+            return m.copyWith(
+              isRead: true,
+              readAt: DateTime.now(),
+            );
+          }
+          return m;
         }).toList();
         
-        _conversations[index] = _conversations[index].copyWith(
+        _conversations[index] = conversation.copyWith(
           messages: updatedMessages,
+          unreadCount: 0,
+          lastReadAt: DateTime.now(),
+          updatedAt: DateTime.now(),
         );
       }
       _applyFilter();
     });
+
+    // Save to local storage
+    _updateConversationReadStatus(conversationId);
+  }
+
+  Future<void> _updateConversationReadStatus(String conversationId) async {
+    try {
+      // TODO: Replace with API call
+      // await api.markConversationAsRead(conversationId);
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'last_read_$conversationId',
+        DateTime.now().toIso8601String(),
+      );
+      await prefs.setInt('unread_count_$conversationId', 0);
+      
+    } catch (e) {
+      print('Error updating read status: $e');
+    }
+  }
+
+  void _onConversationRead(String conversationId) {
+    _markConversationAsRead(conversationId);
+  }
+
+  Future<void> _toggleMute(Conversation conversation) async {
+    final isMuted = conversation.isMuted;
+    final newMuteStatus = !isMuted;
+    
+    setState(() {
+      final index = _conversations.indexWhere((c) => c.id == conversation.id);
+      if (index != -1) {
+        _conversations[index] = _conversations[index].copyWith(
+          isMuted: newMuteStatus,
+          mutedUntil: newMuteStatus ? DateTime.now().add(const Duration(days: 7)) : null,
+          updatedAt: DateTime.now(),
+        );
+      }
+      _applyFilter();
+    });
+
+    try {
+      // TODO: Replace with API call
+      // await api.updateConversation(
+      //   conversation.id,
+      //   isMuted: newMuteStatus,
+      //   mutedUntil: newMuteStatus ? DateTime.now().add(const Duration(days: 7)) : null,
+      // );
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            newMuteStatus 
+                ? 'Notifications muted for ${_getOtherUserName(conversation)}' 
+                : 'Notifications unmuted for ${_getOtherUserName(conversation)}',
+          ),
+          backgroundColor: const Color(0xFF2C5C44),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      
+    } catch (e) {
+      // Revert on error
+      setState(() {
+        final index = _conversations.indexWhere((c) => c.id == conversation.id);
+        if (index != -1) {
+          _conversations[index] = _conversations[index].copyWith(
+            isMuted: isMuted,
+          );
+        }
+        _applyFilter();
+      });
+    }
+  }
+
+  Future<void> _blockUser(Conversation conversation) async {
+    setState(() {
+      final index = _conversations.indexWhere((c) => c.id == conversation.id);
+      if (index != -1) {
+        _conversations[index] = _conversations[index].copyWith(
+          isBlocked: true,
+          blockedBy: widget.customerId,
+          blockedAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+      }
+      _applyFilter();
+    });
+
+    try {
+      // TODO: Replace with API call
+      // await api.blockConversation(conversation.id, widget.customerId);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${_getOtherUserName(conversation)} has been blocked'),
+          backgroundColor: const Color(0xFF2C5C44),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      
+    } catch (e) {
+      // Revert on error
+      setState(() {
+        final index = _conversations.indexWhere((c) => c.id == conversation.id);
+        if (index != -1) {
+          _conversations[index] = _conversations[index].copyWith(
+            isBlocked: false,
+            blockedBy: null,
+            blockedAt: null,
+          );
+        }
+        _applyFilter();
+      });
+    }
+  }
+
+  Future<void> _unblockUser(Conversation conversation) async {
+    setState(() {
+      final index = _conversations.indexWhere((c) => c.id == conversation.id);
+      if (index != -1) {
+        _conversations[index] = _conversations[index].copyWith(
+          isBlocked: false,
+          blockedBy: null,
+          blockedAt: null,
+          updatedAt: DateTime.now(),
+        );
+      }
+      _applyFilter();
+    });
+
+    try {
+      // TODO: Replace with API call
+      // await api.unblockConversation(conversation.id);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${_getOtherUserName(conversation)} has been unblocked'),
+          backgroundColor: const Color(0xFF2C5C44),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      
+    } catch (e) {
+      // Revert on error
+      setState(() {
+        final index = _conversations.indexWhere((c) => c.id == conversation.id);
+        if (index != -1) {
+          _conversations[index] = _conversations[index].copyWith(
+            isBlocked: true,
+            blockedBy: widget.customerId,
+            blockedAt: DateTime.now(),
+          );
+        }
+        _applyFilter();
+      });
+    }
+  }
+
+  Future<void> _deleteConversation(Conversation conversation) async {
+    setState(() {
+      final index = _conversations.indexWhere((c) => c.id == conversation.id);
+      if (index != -1) {
+        _conversations[index] = _conversations[index].copyWith(
+          isDeleted: true,
+          deletedAt: DateTime.now(),
+          deletedBy: widget.customerId,
+          updatedAt: DateTime.now(),
+        );
+      }
+      _applyFilter();
+    });
+
+    try {
+      // TODO: Replace with API call
+      // await api.deleteConversation(conversation.id);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Conversation deleted'),
+          backgroundColor: Color(0xFF2C5C44),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: EdgeInsets.all(16),
+        ),
+      );
+      
+    } catch (e) {
+      // Revert on error
+      setState(() {
+        final index = _conversations.indexWhere((c) => c.id == conversation.id);
+        if (index != -1) {
+          _conversations[index] = _conversations[index].copyWith(
+            isDeleted: false,
+            deletedAt: null,
+            deletedBy: null,
+          );
+        }
+        _applyFilter();
+      });
+    }
   }
 
   void _showNewConversationDialog() {
@@ -420,10 +716,23 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                       otherRole: contact['role'],
                                       orderId: 'ORD-${DateTime.now().millisecondsSinceEpoch}',
                                       messages: [],
+                                      unreadCount: 0,
+                                      isMuted: false,
+                                      isBlocked: false,
+                                      updatedAt: DateTime.now(),
                                     ),
                                   );
 
-                                  if (!_conversations.contains(existingConv)) {
+                                  // Add to cache
+                                  _userCache[contact['id']] = {
+                                    'name': contact['name'],
+                                    'avatar': contact['avatar'],
+                                    'role': contact['role'],
+                                    'isOnline': false,
+                                    'lastSeen': null,
+                                  };
+
+                                  if (!_conversations.any((c) => c.id == existingConv.id)) {
                                     setState(() {
                                       _conversations.add(existingConv);
                                       _applyFilter();
@@ -441,6 +750,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                         otherUserRole: existingConv.otherRole,
                                         otherUserAvatar: contact['avatar'],
                                         orderId: existingConv.orderId,
+                                        onConversationRead: _onConversationRead,
                                       ),
                                     ),
                                   );
@@ -463,11 +773,14 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       context: context,
       delegate: _ConversationSearchDelegate(
         conversations: _conversations,
+        userCache: _userCache,
         getOtherUserName: _getOtherUserName,
+        getOtherUserAvatar: _getOtherUserAvatar,
         getLastMessage: _getLastMessage,
+        getLastMessageTime: _getLastMessageTime,
         customerId: widget.customerId,
         onConversationTap: (conversation) {
-          _markConversationAsRead(conversation);
+          _markConversationAsRead(conversation.id);
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -479,6 +792,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                 otherUserRole: conversation.otherRole,
                 otherUserAvatar: _getOtherUserAvatar(conversation),
                 orderId: conversation.orderId,
+                onConversationRead: _onConversationRead,
               ),
             ),
           );
@@ -538,7 +852,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                 color: Color(0xFF2C5C44),
               ),
             )
-          : _conversations.isEmpty
+          : _conversations.where((c) => !c.isDeleted).isEmpty
               ? _buildEmptyState()
               : _filteredConversations.isEmpty
                   ? _buildEmptyFilterState()
@@ -636,26 +950,43 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     final otherAvatar = _getOtherUserAvatar(conversation);
     final lastMessage = _getLastMessage(conversation);
     final lastTime = _getLastMessageTime(conversation);
-    
-    final unreadCount = _getUnreadCount(conversation);
+    final isOnline = _getUserOnlineStatus(conversation);
+    final unreadCount = conversation.unreadCount;
+    final isMuted = conversation.isMuted;
+    final isBlocked = conversation.isBlocked;
 
     return GestureDetector(
       onTap: () {
-        _markConversationAsRead(conversation);
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ChatScreen(
-              conversationId: conversation.id,
-              customerId: widget.customerId,
-              otherUserId: conversation.otherId,
-              otherUserName: otherName,
-              otherUserRole: conversation.otherRole,
-              otherUserAvatar: otherAvatar,
-              orderId: conversation.orderId,
+        if (!isBlocked) {
+          _markConversationAsRead(conversation.id);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChatScreen(
+                conversationId: conversation.id,
+                customerId: widget.customerId,
+                otherUserId: conversation.otherId,
+                otherUserName: otherName,
+                otherUserRole: conversation.otherRole,
+                otherUserAvatar: otherAvatar,
+                orderId: conversation.orderId,
+                onConversationRead: _onConversationRead,
+              ),
             ),
-          ),
-        );
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('This user is blocked. Unblock to chat.'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              margin: EdgeInsets.all(16),
+            ),
+          );
+        }
       },
       onLongPress: () {
         _showConversationOptions(conversation);
@@ -682,31 +1013,40 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                   radius: 28,
                   backgroundColor: Colors.grey[200],
                   backgroundImage: AssetImage(otherAvatar),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.grey,
-                        width: 1,
+                ),
+                if (isOnline)
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: const BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.fromBorderSide(
+                          BorderSide(color: Colors.white, width: 2),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 14,
-                    height: 14,
-                    decoration: const BoxDecoration(
-                      color: Colors.green,
-                      shape: BoxShape.circle,
-                      border: Border.fromBorderSide(
-                        BorderSide(color: Colors.white, width: 2),
+                if (isBlocked)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.block,
+                        size: 10,
+                        color: Colors.white,
                       ),
                     ),
                   ),
-                ),
               ],
             ),
             const SizedBox(width: 12),
@@ -728,6 +1068,14 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
+                            if (isMuted) ...[
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.notifications_off,
+                                size: 14,
+                                color: Colors.grey[500],
+                              ),
+                            ],
                             if (unreadCount > 0) ...[
                               const SizedBox(width: 6),
                               Container(
@@ -764,7 +1112,8 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                     children: [
                       if (conversation.messages != null && 
                           conversation.messages!.isNotEmpty &&
-                          conversation.messages!.last.senderId != widget.customerId)
+                          conversation.messages!.last.senderId != widget.customerId &&
+                          conversation.messages!.last.isRead)
                         const Icon(
                           Icons.done_all,
                           size: 14,
@@ -772,14 +1121,23 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                         ),
                       if (conversation.messages != null && 
                           conversation.messages!.isNotEmpty &&
+                          conversation.messages!.last.senderId != widget.customerId &&
+                          !conversation.messages!.last.isRead)
+                        const Icon(
+                          Icons.done,
+                          size: 14,
+                          color: Colors.grey,
+                        ),
+                      if (conversation.messages != null && 
+                          conversation.messages!.isNotEmpty &&
                           conversation.messages!.last.senderId != widget.customerId)
                         const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          lastMessage,
+                          isBlocked ? '🔒 User is blocked' : lastMessage,
                           style: TextStyle(
                             fontSize: 13,
-                            color: unreadCount > 0 ? Colors.black87 : Colors.grey[600],
+                            color: isBlocked ? Colors.red : (unreadCount > 0 ? Colors.black87 : Colors.grey[600]),
                             fontWeight: unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
                           ),
                           maxLines: 1,
@@ -798,6 +1156,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   }
 
   void _showConversationOptions(Conversation conversation) {
+    final isBlocked = conversation.isBlocked;
+    final isMuted = conversation.isMuted;
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -820,29 +1181,34 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                   ),
                 ),
                 ListTile(
-                  leading: const Icon(Icons.archive, color: Colors.orange),
-                  title: const Text('Archive'),
+                  leading: Icon(
+                    isMuted ? Icons.notifications : Icons.notifications_off,
+                    color: isMuted ? Colors.green : Colors.grey,
+                  ),
+                  title: Text(isMuted ? 'Unmute notifications' : 'Mute notifications'),
                   onTap: () {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Conversation archived'),
-                        backgroundColor: Color(0xFF2C5C44),
-                      ),
-                    );
+                    _toggleMute(conversation);
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.notifications_off, color: Colors.grey),
-                  title: const Text('Mute notifications'),
+                  leading: Icon(
+                    isBlocked ? Icons.block : Icons.block_outlined,
+                    color: isBlocked ? Colors.green : Colors.red,
+                  ),
+                  title: Text(
+                    isBlocked ? 'Unblock user' : 'Block user',
+                    style: TextStyle(
+                      color: isBlocked ? Colors.green : Colors.red,
+                    ),
+                  ),
                   onTap: () {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Notifications muted'),
-                        backgroundColor: Color(0xFF2C5C44),
-                      ),
-                    );
+                    if (isBlocked) {
+                      _unblockUser(conversation);
+                    } else {
+                      _showBlockConfirmation(conversation);
+                    }
                   },
                 ),
                 ListTile(
@@ -859,6 +1225,40 @@ class _ConversationsScreenState extends State<ConversationsScreen>
               ],
             ),
           ),
+        );
+      },
+    );
+  }
+
+  void _showBlockConfirmation(Conversation conversation) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text('Block User'),
+          content: Text(
+            'Are you sure you want to block ${_getOtherUserName(conversation)}?\n\n'
+            'You will no longer receive messages from this user.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _blockUser(conversation);
+              },
+              child: const Text(
+                'Block',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -884,16 +1284,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
-                setState(() {
-                  _conversations.remove(conversation);
-                  _applyFilter();
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Conversation deleted'),
-                    backgroundColor: Color(0xFF2C5C44),
-                  ),
-                );
+                _deleteConversation(conversation);
               },
               child: const Text(
                 'Delete',
@@ -911,15 +1302,21 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
 class _ConversationSearchDelegate extends SearchDelegate {
   final List<Conversation> conversations;
+  final Map<String, Map<String, dynamic>> userCache;
   final String Function(Conversation) getOtherUserName;
+  final String Function(Conversation) getOtherUserAvatar;
   final String Function(Conversation) getLastMessage;
+  final DateTime Function(Conversation) getLastMessageTime;
   final String customerId;
   final Function(Conversation) onConversationTap;
 
   _ConversationSearchDelegate({
     required this.conversations,
+    required this.userCache,
     required this.getOtherUserName,
+    required this.getOtherUserAvatar,
     required this.getLastMessage,
+    required this.getLastMessageTime,
     required this.customerId,
     required this.onConversationTap,
   });
@@ -966,6 +1363,7 @@ class _ConversationSearchDelegate extends SearchDelegate {
   @override
   Widget buildResults(BuildContext context) {
     final results = conversations.where((conv) {
+      if (conv.isDeleted) return false;
       final otherName = getOtherUserName(conv).toLowerCase();
       final lastMessage = getLastMessage(conv).toLowerCase();
       return otherName.contains(query.toLowerCase()) ||
@@ -1001,13 +1399,10 @@ class _ConversationSearchDelegate extends SearchDelegate {
       itemBuilder: (context, index) {
         final conversation = results[index];
         final otherName = getOtherUserName(conversation);
-        final otherAvatar = _getOtherUserAvatar(conversation);
+        final otherAvatar = getOtherUserAvatar(conversation);
         final lastMessage = getLastMessage(conversation);
-        final lastTime = _getLastMessageTime(conversation);
-        
-        final unreadCount = conversation.messages?.where((m) => 
-          m.senderId != customerId
-        ).length ?? 0;
+        final lastTime = getLastMessageTime(conversation);
+        final unreadCount = conversation.unreadCount;
 
         return GestureDetector(
           onTap: () {
@@ -1036,31 +1431,23 @@ class _ConversationSearchDelegate extends SearchDelegate {
                       radius: 28,
                       backgroundColor: Colors.grey[200],
                       backgroundImage: AssetImage(otherAvatar),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.grey,
-                            width: 1,
+                    ),
+                    if (userCache[conversation.otherId]?['isOnline'] == true)
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: const BoxDecoration(
+                            color: Colors.green,
+                            shape: BoxShape.circle,
+                            border: Border.fromBorderSide(
+                              BorderSide(color: Colors.white, width: 2),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        width: 14,
-                        height: 14,
-                        decoration: const BoxDecoration(
-                          color: Colors.green,
-                          shape: BoxShape.circle,
-                          border: Border.fromBorderSide(
-                            BorderSide(color: Colors.white, width: 2),
-                          ),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
                 const SizedBox(width: 12),
@@ -1082,6 +1469,14 @@ class _ConversationSearchDelegate extends SearchDelegate {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
+                                if (conversation.isMuted) ...[
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.notifications_off,
+                                    size: 14,
+                                    color: Colors.grey[500],
+                                  ),
+                                ],
                                 if (unreadCount > 0) ...[
                                   const SizedBox(width: 6),
                                   Container(
@@ -1118,7 +1513,8 @@ class _ConversationSearchDelegate extends SearchDelegate {
                         children: [
                           if (conversation.messages != null && 
                               conversation.messages!.isNotEmpty &&
-                              conversation.messages!.last.senderId != customerId)
+                              conversation.messages!.last.senderId != customerId &&
+                              conversation.messages!.last.isRead)
                             const Icon(
                               Icons.done_all,
                               size: 14,
@@ -1126,14 +1522,23 @@ class _ConversationSearchDelegate extends SearchDelegate {
                             ),
                           if (conversation.messages != null && 
                               conversation.messages!.isNotEmpty &&
+                              conversation.messages!.last.senderId != customerId &&
+                              !conversation.messages!.last.isRead)
+                            const Icon(
+                              Icons.done,
+                              size: 14,
+                              color: Colors.grey,
+                            ),
+                          if (conversation.messages != null && 
+                              conversation.messages!.isNotEmpty &&
                               conversation.messages!.last.senderId != customerId)
                             const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              lastMessage,
+                              conversation.isBlocked ? '🔒 User is blocked' : lastMessage,
                               style: TextStyle(
                                 fontSize: 13,
-                                color: unreadCount > 0 ? Colors.black87 : Colors.grey[600],
+                                color: conversation.isBlocked ? Colors.red : (unreadCount > 0 ? Colors.black87 : Colors.grey[600]),
                                 fontWeight: unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
                               ),
                               maxLines: 1,
@@ -1156,23 +1561,6 @@ class _ConversationSearchDelegate extends SearchDelegate {
   @override
   Widget buildSuggestions(BuildContext context) {
     return buildResults(context);
-  }
-
-  String _getOtherUserAvatar(Conversation conversation) {
-    final avatars = {
-      't1': 'assets/images/fab.jpg',
-      't2': 'assets/images/silk.jpg',
-      'r1': 'assets/images/fab.jpg',
-      'r2': 'assets/images/textile.jpg',
-    };
-    return avatars[conversation.otherId] ?? 'assets/images/fab.jpg';
-  }
-
-  DateTime _getLastMessageTime(Conversation conversation) {
-    if (conversation.messages == null || conversation.messages!.isEmpty) {
-      return DateTime.now();
-    }
-    return conversation.messages!.last.sentAt;
   }
 
   String _getTimeAgo(DateTime time) {

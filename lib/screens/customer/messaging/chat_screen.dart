@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:photo_view/photo_view.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -16,6 +17,7 @@ class ChatScreen extends StatefulWidget {
   final UserRole otherUserRole;
   final String? otherUserAvatar;
   final String? orderId;
+  final Function(String)? onConversationRead;
 
   const ChatScreen({
     super.key,
@@ -26,6 +28,7 @@ class ChatScreen extends StatefulWidget {
     required this.otherUserRole,
     this.otherUserAvatar,
     this.orderId,
+    this.onConversationRead,
   });
 
   @override
@@ -42,7 +45,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   bool _isLoading = true;
   bool _isTyping = false;
   
-  // Reply tracking (local only, not in model)
+  // Reply tracking
   String? _replyingToMessageId;
   String? _replyingToMessageText;
   String? _replyingToSender;
@@ -50,8 +53,12 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   String? _selectedMessageId;
   late AnimationController _typingAnimationController;
   late Animation<double> _typingAnimation;
+  
+  // Conversation status
+  bool _isBlocked = false;
   bool _isMuted = false;
-  int _selectedMuteDuration = 0;
+  DateTime? _mutedUntil;
+  Timer? _muteTimer;
 
   // Overlay notification
   OverlayEntry? _notificationOverlay;
@@ -60,6 +67,8 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   void initState() {
     super.initState();
     _loadMessages();
+    _loadConversationStatus();
+    _markConversationAsRead();
     
     _typingAnimationController = AnimationController(
       duration: const Duration(milliseconds: 1000),
@@ -77,11 +86,348 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     _scrollController.dispose();
     _focusNode.dispose();
     _typingAnimationController.dispose();
+    _muteTimer?.cancel();
     _removeNotificationOverlay();
+    _markConversationAsRead();
     super.dispose();
   }
 
-  // ─── Top Notification System ──────────────────────────────────────────
+  // ─── Load Data ──────────────────────────────────────────────────────
+
+  Future<void> _loadMessages() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      // TODO: Replace with API call
+      // final response = await api.getMessages(widget.conversationId);
+      // setState(() {
+      //   _messages = response.data.map((json) => Message.fromJson(json)).toList();
+      //   _isLoading = false;
+      // });
+      
+      await Future.delayed(const Duration(milliseconds: 500));
+      final sampleMessages = _getSampleMessages();
+      setState(() {
+        _messages = sampleMessages;
+        _isLoading = false;
+      });
+      _scrollToBottom();
+      
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showTopNotification('Failed to load messages', isError: true);
+    }
+  }
+
+  Future<void> _loadConversationStatus() async {
+    try {
+      // TODO: Replace with API call
+      // final response = await api.getConversation(widget.conversationId);
+      // final conversation = Conversation.fromJson(response.data);
+      // setState(() {
+      //   _isBlocked = conversation.isBlocked;
+      //   _isMuted = conversation.isMuted;
+      //   _mutedUntil = conversation.mutedUntil;
+      // });
+      
+      final prefs = await SharedPreferences.getInstance();
+      final isMuted = prefs.getBool('muted_${widget.conversationId}') ?? false;
+      final mutedUntilStr = prefs.getString('mutedUntil_${widget.conversationId}');
+      final isBlocked = prefs.getBool('blocked_${widget.conversationId}') ?? false;
+      
+      setState(() {
+        _isBlocked = isBlocked;
+      });
+      
+      if (isMuted && mutedUntilStr != null) {
+        final mutedUntil = DateTime.parse(mutedUntilStr);
+        if (DateTime.now().isAfter(mutedUntil)) {
+          setState(() {
+            _isMuted = false;
+            _mutedUntil = null;
+          });
+          await _saveMuteStatus(false, null);
+        } else {
+          setState(() {
+            _isMuted = true;
+            _mutedUntil = mutedUntil;
+          });
+          _startMuteTimer(mutedUntil.difference(DateTime.now()));
+        }
+      }
+      
+    } catch (e) {
+      print('Error loading conversation status: $e');
+    }
+  }
+
+  // ─── Mark as Read ──────────────────────────────────────────────────
+
+  Future<void> _markConversationAsRead() async {
+    try {
+      // TODO: Replace with API call
+      // await api.markConversationAsRead(widget.conversationId);
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'last_read_${widget.conversationId}',
+        DateTime.now().toIso8601String(),
+      );
+      await prefs.setInt('unread_count_${widget.conversationId}', 0);
+      
+      if (widget.onConversationRead != null) {
+        widget.onConversationRead!(widget.conversationId);
+      }
+      
+    } catch (e) {
+      print('Error marking as read: $e');
+    }
+  }
+
+  // ─── Send Message ──────────────────────────────────────────────────
+
+  Future<void> _sendMessage() async {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
+
+    if (_isBlocked) {
+      _showTopNotification('You cannot send messages to a blocked user', isError: true);
+      return;
+    }
+
+    final newMessage = Message(
+      id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+      conversationId: widget.conversationId,
+      senderId: widget.customerId,
+      senderRole: UserRole.customer,
+      msgText: text,
+      sentAt: DateTime.now(),
+      replyToMessageId: _replyingToMessageId,
+      replyToText: _replyingToMessageText,
+      replyToSender: _replyingToSender,
+      isRead: false,
+    );
+
+    setState(() {
+      _messages.add(newMessage);
+      _messageController.clear();
+      _replyingToMessageId = null;
+      _replyingToMessageText = null;
+      _replyingToSender = null;
+    });
+    _scrollToBottom();
+
+    try {
+      // TODO: Replace with API call
+      // final response = await api.sendMessage(
+      //   conversationId: widget.conversationId,
+      //   senderId: widget.customerId,
+      //   msgText: text,
+      //   replyToMessageId: _replyingToMessageId,
+      //   replyToText: _replyingToMessageText,
+      //   replyToSender: _replyingToSender,
+      // );
+      
+      setState(() => _isTyping = true);
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          final replies = [
+            'That\'s great! I\'ll take care of it.',
+            'Perfect! Let me know if you need anything else.',
+            'I understand. I\'ll get back to you shortly.',
+            'Thanks for letting me know! 🙌',
+            'Sure thing! I\'ll prepare that for you.',
+            'Got it! I\'ll update you soon.',
+          ];
+          final reply = replies[DateTime.now().millisecond % replies.length];
+          
+          final replyMessage = Message(
+            id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+            conversationId: widget.conversationId,
+            senderId: widget.otherUserId,
+            senderRole: widget.otherUserRole,
+            msgText: reply,
+            sentAt: DateTime.now(),
+            isRead: false,
+          );
+
+          setState(() {
+            _messages.add(replyMessage);
+            _isTyping = false;
+          });
+          _scrollToBottom();
+        }
+      });
+      
+    } catch (e) {
+      setState(() {
+        _messages.removeWhere((m) => m.id == newMessage.id);
+      });
+      _showTopNotification('Failed to send message', isError: true);
+    }
+  }
+
+  // ─── Mute Functions ─────────────────────────────────────────────────
+
+  Future<void> _saveMuteStatus(bool isMuted, DateTime? mutedUntil) async {
+    try {
+      // TODO: Replace with API call
+      // await api.updateConversation(
+      //   widget.conversationId,
+      //   isMuted: isMuted,
+      //   mutedUntil: mutedUntil,
+      // );
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('muted_${widget.conversationId}', isMuted);
+      if (mutedUntil != null) {
+        await prefs.setString('mutedUntil_${widget.conversationId}', mutedUntil.toIso8601String());
+      } else {
+        await prefs.remove('mutedUntil_${widget.conversationId}');
+      }
+      
+    } catch (e) {
+      print('Error saving mute status: $e');
+    }
+  }
+
+  void _startMuteTimer(Duration duration) {
+    _muteTimer?.cancel();
+    _muteTimer = Timer(duration, () {
+      if (mounted) {
+        setState(() {
+          _isMuted = false;
+          _mutedUntil = null;
+        });
+        _saveMuteStatus(false, null);
+        _showTopNotification('🔔 Mute expired! Notifications are back.');
+      }
+    });
+  }
+
+  void _setMuteDuration(int duration) {
+    final durationMap = {
+      1: const Duration(hours: 1),
+      2: const Duration(hours: 2),
+      3: const Duration(hours: 4),
+      4: const Duration(hours: 8),
+      5: const Duration(hours: 24),
+      6: const Duration(days: 7),
+    };
+    
+    final muteDuration = durationMap[duration] ?? const Duration(hours: 1);
+    final mutedUntil = DateTime.now().add(muteDuration);
+    
+    setState(() {
+      _isMuted = true;
+      _mutedUntil = mutedUntil;
+    });
+    
+    _saveMuteStatus(true, mutedUntil);
+    _startMuteTimer(muteDuration);
+    
+    String label = '';
+    switch (duration) {
+      case 1: label = '1 hour'; break;
+      case 2: label = '2 hours'; break;
+      case 3: label = '4 hours'; break;
+      case 4: label = '8 hours'; break;
+      case 5: label = '24 hours'; break;
+      case 6: label = '7 days'; break;
+    }
+    
+    _showTopNotification('🔇 Notifications muted for $label');
+  }
+
+  void _toggleMuteNotifications() {
+    if (_isMuted) {
+      _muteTimer?.cancel();
+      setState(() {
+        _isMuted = false;
+        _mutedUntil = null;
+      });
+      _saveMuteStatus(false, null);
+      _showTopNotification('🔔 Notifications unmuted');
+    } else {
+      _showMuteOptions();
+    }
+  }
+
+  // ─── Block Functions ─────────────────────────────────────────────────
+
+  Future<void> _blockUser() async {
+    try {
+      // TODO: Replace with API call
+      // await api.updateConversation(
+      //   widget.conversationId,
+      //   isBlocked: true,
+      //   blockedBy: widget.customerId,
+      //   blockedAt: DateTime.now(),
+      // );
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('blocked_${widget.conversationId}', true);
+      
+      setState(() {
+        _isBlocked = true;
+      });
+      
+      _showTopNotification('${widget.otherUserName} has been blocked');
+      
+      Future.delayed(const Duration(seconds: 1), () {
+        Navigator.pop(context);
+      });
+      
+    } catch (e) {
+      _showTopNotification('Failed to block user', isError: true);
+    }
+  }
+
+  Future<void> _unblockUser() async {
+    try {
+      // TODO: Replace with API call
+      // await api.updateConversation(
+      //   widget.conversationId,
+      //   isBlocked: false,
+      //   blockedBy: null,
+      //   blockedAt: null,
+      // );
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('blocked_${widget.conversationId}');
+      
+      setState(() {
+        _isBlocked = false;
+      });
+      
+      _showTopNotification('${widget.otherUserName} has been unblocked');
+      
+    } catch (e) {
+      _showTopNotification('Failed to unblock user', isError: true);
+    }
+  }
+
+  Future<void> _deleteConversation() async {
+    try {
+      // TODO: Replace with API call
+      // await api.deleteConversation(widget.conversationId);
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('blocked_${widget.conversationId}');
+      await prefs.remove('muted_${widget.conversationId}');
+      await prefs.remove('mutedUntil_${widget.conversationId}');
+      await prefs.remove('last_read_${widget.conversationId}');
+      await prefs.remove('unread_count_${widget.conversationId}');
+      
+      _showTopNotification('Conversation deleted');
+      Navigator.pop(context);
+      
+    } catch (e) {
+      _showTopNotification('Failed to delete conversation', isError: true);
+    }
+  }
+
+  // ─── Notification System ────────────────────────────────────────────
 
   void _showTopNotification(String message, {bool isError = false}) {
     _removeNotificationOverlay();
@@ -94,12 +440,12 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
         right: 0,
         child: SafeArea(
           child: Material(
-            color: const Color.fromARGB(0, 129, 240, 106),
+            color: Colors.transparent,
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: isError ? Colors.red[700] : const Color.fromARGB(255, 107, 236, 171),
+                color: isError ? Colors.red[700] : const Color(0xFF2C5C44),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
@@ -146,7 +492,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     overlay.insert(entry);
     _notificationOverlay = entry;
     
-    // Auto dismiss after 3 seconds
     Future.delayed(const Duration(seconds: 3), () {
       _removeNotificationOverlay();
     });
@@ -157,329 +502,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     _notificationOverlay = null;
   }
 
-  Future<void> _loadMessages() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    final sampleMessages = [
-      Message(
-        id: 'm1',
-        conversationId: widget.conversationId,
-        senderId: widget.otherUserId,
-        senderRole: widget.otherUserRole,
-        msgText: 'Hello! How can I help you today? 👋',
-        sentAt: DateTime.now().subtract(const Duration(hours: 3)),
-      ),
-      Message(
-        id: 'm2',
-        conversationId: widget.conversationId,
-        senderId: widget.customerId,
-        senderRole: UserRole.customer,
-        msgText: 'Hi! I need some help with my order.',
-        sentAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 50)),
-      ),
-      Message(
-        id: 'm3',
-        conversationId: widget.conversationId,
-        senderId: widget.otherUserId,
-        senderRole: widget.otherUserRole,
-        msgText: 'Sure! What can I assist you with?',
-        sentAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 45)),
-      ),
-      Message(
-        id: 'm4',
-        conversationId: widget.conversationId,
-        senderId: widget.customerId,
-        senderRole: UserRole.customer,
-        msgText: 'I want to check the status of my order.',
-        sentAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 40)),
-      ),
-      Message(
-        id: 'm5',
-        conversationId: widget.conversationId,
-        senderId: widget.otherUserId,
-        senderRole: widget.otherUserRole,
-        msgText: 'Let me check that for you... 📋',
-        sentAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 35)),
-      ),
-      Message(
-        id: 'm6',
-        conversationId: widget.conversationId,
-        senderId: widget.otherUserId,
-        senderRole: widget.otherUserRole,
-        msgText: 'Your order is being processed and will be shipped soon! 🚀',
-        sentAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 30)),
-      ),
-      Message(
-        id: 'm7',
-        conversationId: widget.conversationId,
-        senderId: widget.customerId,
-        senderRole: UserRole.customer,
-        msgText: 'Thank you so much! 😊',
-        sentAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 25)),
-      ),
-    ];
-
-    setState(() {
-      _messages = sampleMessages;
-      _isLoading = false;
-    });
-
-    _scrollToBottom();
-  }
-
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
-
-  void _sendMessage() {
-    final text = _messageController.text.trim();
-    if (text.isEmpty) return;
-
-    final newMessage = Message(
-      id: 'm${_messages.length + 1}',
-      conversationId: widget.conversationId,
-      senderId: widget.customerId,
-      senderRole: UserRole.customer,
-      msgText: text,
-      sentAt: DateTime.now(),
-    );
-
-    setState(() {
-      _messages.add(newMessage);
-      _messageController.clear();
-      _replyingToMessageId = null;
-      _replyingToMessageText = null;
-      _replyingToSender = null;
-    });
-
-    _scrollToBottom();
-
-    setState(() => _isTyping = true);
-
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        final replies = [
-          'That\'s great! I\'ll take care of it.',
-          'Perfect! Let me know if you need anything else.',
-          'I understand. I\'ll get back to you shortly.',
-          'Thanks for letting me know! 🙌',
-          'Sure thing! I\'ll prepare that for you.',
-          'Got it! I\'ll update you soon.',
-        ];
-        final reply = replies[DateTime.now().millisecond % replies.length];
-        
-        final replyMessage = Message(
-          id: 'm${_messages.length + 1}',
-          conversationId: widget.conversationId,
-          senderId: widget.otherUserId,
-          senderRole: widget.otherUserRole,
-          msgText: reply,
-          sentAt: DateTime.now(),
-        );
-
-        setState(() {
-          _messages.add(replyMessage);
-          _isTyping = false;
-        });
-        _scrollToBottom();
-      }
-    });
-  }
-
-  Future<void> _pickImage() async {
-    final XFile? image = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 80,
-    );
-    
-    if (image != null) {
-      final newMessage = Message(
-        id: 'm${_messages.length + 1}',
-        conversationId: widget.conversationId,
-        senderId: widget.customerId,
-        senderRole: UserRole.customer,
-        msgText: '',
-        attachment: image.path,
-        sentAt: DateTime.now(),
-      );
-
-      setState(() {
-        _messages.add(newMessage);
-      });
-      _scrollToBottom();
-    }
-  }
-
-  Future<void> _takePhoto() async {
-    final XFile? image = await _imagePicker.pickImage(
-      source: ImageSource.camera,
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 80,
-    );
-    
-    if (image != null) {
-      final newMessage = Message(
-        id: 'm${_messages.length + 1}',
-        conversationId: widget.conversationId,
-        senderId: widget.customerId,
-        senderRole: UserRole.customer,
-        msgText: '',
-        attachment: image.path,
-        sentAt: DateTime.now(),
-      );
-
-      setState(() {
-        _messages.add(newMessage);
-      });
-      _scrollToBottom();
-    }
-  }
-
-  Future<void> _pickDocument() async {
-    final XFile? document = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 80,
-    );
-    
-    if (document != null) {
-      final fileName = document.path.split('/').last;
-      final newMessage = Message(
-        id: 'm${_messages.length + 1}',
-        conversationId: widget.conversationId,
-        senderId: widget.customerId,
-        senderRole: UserRole.customer,
-        msgText: '📄 $fileName',
-        attachment: document.path,
-        sentAt: DateTime.now(),
-      );
-
-      setState(() {
-        _messages.add(newMessage);
-      });
-      _scrollToBottom();
-      _showTopNotification('Document shared!');
-    }
-  }
-
-  void _showAttachmentOptions() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const Text(
-                  'Share',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildAttachmentOption(
-                      icon: Icons.photo_library,
-                      label: 'Gallery',
-                      color: Colors.blue,
-                      onTap: () {
-                        Navigator.pop(context);
-                        _pickImage();
-                      },
-                    ),
-                    _buildAttachmentOption(
-                      icon: Icons.camera_alt,
-                      label: 'Camera',
-                      color: Colors.green,
-                      onTap: () {
-                        Navigator.pop(context);
-                        _takePhoto();
-                      },
-                    ),
-                    _buildAttachmentOption(
-                      icon: Icons.insert_drive_file,
-                      label: 'Document',
-                      color: Colors.orange,
-                      onTap: () {
-                        Navigator.pop(context);
-                        _pickDocument();
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildAttachmentOption({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 28,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // ─── Message Options ─────────────────────────────────────────────────
 
   void _showMessageOptions(Message message) {
     setState(() {
@@ -695,6 +718,10 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                   _selectedMessageId = null;
                 });
                 _showTopNotification('Message deleted');
+                
+                // TODO: Call API to delete message
+                // await api.deleteMessage(message.id);
+                
               },
               child: const Text(
                 'Delete',
@@ -704,6 +731,182 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
           ],
         );
       },
+    );
+  }
+
+  // ─── Image/Attachment Functions ──────────────────────────────────────
+
+  Future<void> _pickImage() async {
+    final XFile? image = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 80,
+    );
+    
+    if (image != null) {
+      _sendAttachment(image.path, 'image');
+    }
+  }
+
+  Future<void> _takePhoto() async {
+    final XFile? image = await _imagePicker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 80,
+    );
+    
+    if (image != null) {
+      _sendAttachment(image.path, 'image');
+    }
+  }
+
+  Future<void> _pickDocument() async {
+    final XFile? document = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 80,
+    );
+    
+    if (document != null) {
+      final fileName = document.path.split('/').last;
+      _sendAttachment(document.path, 'document', fileName: fileName);
+    }
+  }
+
+  void _sendAttachment(String path, String type, {String? fileName}) {
+    if (_isBlocked) {
+      _showTopNotification('Cannot send messages to blocked user', isError: true);
+      return;
+    }
+
+    final messageText = type == 'document' ? '📄 $fileName' : '';
+    
+    final newMessage = Message(
+      id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+      conversationId: widget.conversationId,
+      senderId: widget.customerId,
+      senderRole: UserRole.customer,
+      msgText: messageText,
+      attachment: path,
+      sentAt: DateTime.now(),
+      isRead: false,
+    );
+
+    setState(() {
+      _messages.add(newMessage);
+    });
+    _scrollToBottom();
+
+    // TODO: Upload attachment and send message via API
+    // await api.sendAttachment(...);
+  }
+
+  void _showAttachmentOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const Text(
+                  'Share',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildAttachmentOption(
+                      icon: Icons.photo_library,
+                      label: 'Gallery',
+                      color: Colors.blue,
+                      onTap: () {
+                        Navigator.pop(context);
+                        _pickImage();
+                      },
+                    ),
+                    _buildAttachmentOption(
+                      icon: Icons.camera_alt,
+                      label: 'Camera',
+                      color: Colors.green,
+                      onTap: () {
+                        Navigator.pop(context);
+                        _takePhoto();
+                      },
+                    ),
+                    _buildAttachmentOption(
+                      icon: Icons.insert_drive_file,
+                      label: 'Document',
+                      color: Colors.orange,
+                      onTap: () {
+                        Navigator.pop(context);
+                        _pickDocument();
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAttachmentOption({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 28,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.grey,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -733,7 +936,14 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     );
   }
 
+  // ─── Dialog Functions ─────────────────────────────────────────────────
+
   void _showBlockConfirmation() {
+    if (_isBlocked) {
+      _showUnblockConfirmation();
+      return;
+    }
+    
     showDialog(
       context: context,
       builder: (context) {
@@ -742,7 +952,10 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
             borderRadius: BorderRadius.circular(16),
           ),
           title: const Text('Block User'),
-          content: Text('Are you sure you want to block ${widget.otherUserName}?'),
+          content: Text(
+            'Are you sure you want to block ${widget.otherUserName}?\n\n'
+            'You will no longer receive messages from this user.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -751,12 +964,45 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
-                Navigator.pop(context);
-                _showTopNotification('${widget.otherUserName} has been blocked');
+                _blockUser();
               },
               child: const Text(
                 'Block',
                 style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showUnblockConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text('Unblock User'),
+          content: Text(
+            'Are you sure you want to unblock ${widget.otherUserName}?\n\n'
+            'You will start receiving messages from this user again.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _unblockUser();
+              },
+              child: const Text(
+                'Unblock',
+                style: TextStyle(color: Colors.green),
               ),
             ),
           ],
@@ -787,6 +1033,10 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                   _messages.clear();
                 });
                 _showTopNotification('Chat cleared');
+                
+                // TODO: Call API to clear chat
+                // await api.clearChat(widget.conversationId);
+                
               },
               child: const Text(
                 'Clear',
@@ -799,7 +1049,39 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     );
   }
 
-  // ─── Mute Notifications ──────────────────────────────────────────────
+  void _showDeleteConversationConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text('Delete Conversation'),
+          content: Text(
+            'Are you sure you want to delete this conversation with ${widget.otherUserName}?\n\n'
+            'All messages will be permanently deleted.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _deleteConversation();
+              },
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   void _showMuteOptions() {
     showDialog(
@@ -842,7 +1124,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildMuteOptionDialog(String label, int duration, {bool isUnmute = false}) {
-    final isSelected = _selectedMuteDuration == duration;
+    final isSelected = _mutedUntil != null && duration == 0;
     
     return GestureDetector(
       onTap: () {
@@ -890,47 +1172,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     );
   }
 
-  void _setMuteDuration(int duration) {
-    _selectedMuteDuration = duration;
-    setState(() {
-      _isMuted = true;
-    });
-    
-    String label = '';
-    switch (duration) {
-      case 1:
-        label = '1 hour';
-        break;
-      case 2:
-        label = '2 hours';
-        break;
-      case 3:
-        label = '4 hours';
-        break;
-      case 4:
-        label = '8 hours';
-        break;
-      case 5:
-        label = '24 hours';
-        break;
-      case 6:
-        label = '7 days';
-        break;
-    }
-    
-    _showTopNotification('Notifications muted for $label');
-  }
-
-  void _toggleMuteNotifications() {
-    setState(() {
-      _isMuted = !_isMuted;
-      if (!_isMuted) {
-        _selectedMuteDuration = 0;
-      }
-    });
-    _showTopNotification(_isMuted ? 'Notifications muted' : 'Notifications unmuted');
-  }
-
   void _showMoreOptions() {
     showDialog(
       context: context,
@@ -968,6 +1209,25 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               ),
               const Divider(),
               ListTile(
+                leading: Icon(
+                  _isBlocked ? Icons.block : Icons.block_outlined,
+                  color: Colors.red,
+                ),
+                title: Text(
+                  _isBlocked ? 'Unblock User' : 'Block User',
+                  style: const TextStyle(color: Colors.red),
+                ),
+                trailing: const Icon(Icons.chevron_right, size: 16),
+                onTap: () {
+                  Navigator.pop(context);
+                  if (_isBlocked) {
+                    _showUnblockConfirmation();
+                  } else {
+                    _showBlockConfirmation();
+                  }
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.delete_outline, color: Colors.red),
                 title: const Text(
                   'Clear Chat',
@@ -980,15 +1240,15 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.block, color: Colors.red),
+                leading: const Icon(Icons.delete_forever, color: Colors.red),
                 title: const Text(
-                  'Block User',
+                  'Delete Conversation',
                   style: TextStyle(color: Colors.red),
                 ),
                 trailing: const Icon(Icons.chevron_right, size: 16),
                 onTap: () {
                   Navigator.pop(context);
-                  _showBlockConfirmation();
+                  _showDeleteConversationConfirmation();
                 },
               ),
             ],
@@ -997,6 +1257,8 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       },
     );
   }
+
+  // ─── Helper Functions ─────────────────────────────────────────────────
 
   String _formatTime(DateTime time) {
     final hour = time.hour > 12 ? time.hour - 12 : time.hour;
@@ -1020,6 +1282,94 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       return '${months[time.month - 1]} ${time.day}, ${time.year}';
     }
   }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  List<Message> _getSampleMessages() {
+    return [
+      Message(
+        id: 'm1',
+        conversationId: widget.conversationId,
+        senderId: widget.otherUserId,
+        senderRole: widget.otherUserRole,
+        msgText: 'Hello! How can I help you today? 👋',
+        sentAt: DateTime.now().subtract(const Duration(hours: 3)),
+        isRead: true,
+        readAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 55)),
+      ),
+      Message(
+        id: 'm2',
+        conversationId: widget.conversationId,
+        senderId: widget.customerId,
+        senderRole: UserRole.customer,
+        msgText: 'Hi! I need some help with my order.',
+        sentAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 50)),
+        isRead: true,
+        readAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 45)),
+      ),
+      Message(
+        id: 'm3',
+        conversationId: widget.conversationId,
+        senderId: widget.otherUserId,
+        senderRole: widget.otherUserRole,
+        msgText: 'Sure! What can I assist you with?',
+        sentAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 45)),
+        isRead: true,
+        readAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 40)),
+      ),
+      Message(
+        id: 'm4',
+        conversationId: widget.conversationId,
+        senderId: widget.customerId,
+        senderRole: UserRole.customer,
+        msgText: 'I want to check the status of my order.',
+        sentAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 40)),
+        isRead: true,
+        readAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 35)),
+      ),
+      Message(
+        id: 'm5',
+        conversationId: widget.conversationId,
+        senderId: widget.otherUserId,
+        senderRole: widget.otherUserRole,
+        msgText: 'Let me check that for you... 📋',
+        sentAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 35)),
+        isRead: true,
+        readAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 30)),
+      ),
+      Message(
+        id: 'm6',
+        conversationId: widget.conversationId,
+        senderId: widget.otherUserId,
+        senderRole: widget.otherUserRole,
+        msgText: 'Your order is being processed and will be shipped soon! 🚀',
+        sentAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 30)),
+        isRead: false,
+      ),
+      Message(
+        id: 'm7',
+        conversationId: widget.conversationId,
+        senderId: widget.customerId,
+        senderRole: UserRole.customer,
+        msgText: 'Thank you so much! 😊',
+        sentAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 25)),
+        isRead: true,
+        readAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 20)),
+      ),
+    ];
+  }
+
+  // ─── Build Methods ────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -1064,11 +1414,11 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const Text(
-                    'Online',
+                  Text(
+                    _isBlocked ? 'Blocked' : 'Online',
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.white70,
+                      color: _isBlocked ? Colors.red[300] : Colors.white70,
                     ),
                   ),
                 ],
@@ -1081,48 +1431,128 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
         actions: [
           IconButton(
             icon: Icon(
-              _isMuted ? Icons.notifications_off : Icons.more_vert,
+              _isBlocked ? Icons.block : Icons.more_vert,
               color: Colors.white,
             ),
-            onPressed: _showMoreOptions,
+            onPressed: _isBlocked ? _showUnblockConfirmation : _showMoreOptions,
           ),
         ],
       ),
-      body: Column(
+      body: _isBlocked 
+          ? _buildBlockedScreen()
+          : Column(
+              children: [
+                Expanded(
+                  child: _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF2C5C44),
+                          ),
+                        )
+                      : _messages.isEmpty
+                          ? _buildEmptyChat()
+                          : ListView.builder(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              itemCount: _messages.length + (_isTyping ? 1 : 0),
+                              itemBuilder: (context, index) {
+                                if (_isTyping && index == _messages.length) {
+                                  return _buildTypingIndicator();
+                                }
+                                final message = _messages[index];
+                                final isFromMe = message.senderId == widget.customerId;
+                                final bool showDate = index == 0 || 
+                                    _messages[index - 1].sentAt.day != message.sentAt.day;
+                                return Column(
+                                  children: [
+                                    if (showDate) _buildDateDivider(message.sentAt),
+                                    _buildMessageBubble(message, isFromMe),
+                                  ],
+                                );
+                              },
+                            ),
+                ),
+                
+                if (_replyingToMessageId != null)
+                  _buildReplyIndicator(),
+                
+                _buildMessageInput(),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildBlockedScreen() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Expanded(
-            child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF2C5C44),
-                    ),
-                  )
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    itemCount: _messages.length + (_isTyping ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (_isTyping && index == _messages.length) {
-                        return _buildTypingIndicator();
-                      }
-                      final message = _messages[index];
-                      final isFromMe = message.senderId == widget.customerId;
-                      final bool showDate = index == 0 || 
-                          _messages[index - 1].sentAt.day != message.sentAt.day;
-                      return Column(
-                        children: [
-                          if (showDate) _buildDateDivider(message.sentAt),
-                          _buildMessageBubble(message, isFromMe),
-                        ],
-                      );
-                    },
-                  ),
+          Icon(
+            Icons.block,
+            size: 80,
+            color: Colors.grey[400],
           ),
-          
-          if (_replyingToMessageId != null)
-            _buildReplyIndicator(),
-          
-          _buildMessageInput(),
+          const SizedBox(height: 16),
+          Text(
+            'You have blocked ${widget.otherUserName}',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'You will not receive messages from this user',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          OutlinedButton(
+            onPressed: _showUnblockConfirmation,
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Colors.green),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+            ),
+            child: const Text(
+              'Unblock User',
+              style: TextStyle(color: Colors.green),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyChat() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.chat_bubble_outline,
+            size: 64,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No messages yet',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Start a conversation with ${widget.otherUserName}',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[500],
+            ),
+          ),
         ],
       ),
     );
@@ -1191,6 +1621,46 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Reply indicator
+                if (message.replyToMessageId != null)
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    margin: const EdgeInsets.only(bottom: 6),
+                    decoration: BoxDecoration(
+                      color: isFromMe ? Colors.green[50] : Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border(
+                        left: BorderSide(
+                          color: isFromMe ? Colors.green : Colors.grey,
+                          width: 4,
+                        ),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          message.replyToSender ?? 'You',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isFromMe ? Colors.green : Colors.grey,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          message.replyToText ?? '',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.black87,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                
+                // Image
                 if (hasImage && !isDocument)
                   GestureDetector(
                     onTap: () => _showImageFullScreen(message.attachment!),
@@ -1213,6 +1683,8 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                       ),
                     ),
                   ),
+                
+                // Document
                 if (isDocument)
                   GestureDetector(
                     onTap: () {
@@ -1257,6 +1729,8 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                       ),
                     ),
                   ),
+                
+                // Text
                 if (hasText)
                   Text(
                     message.msgText,
@@ -1265,6 +1739,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                       color: Colors.black87,
                     ),
                   ),
+                
                 // Time and read receipt inside the bubble
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
@@ -1281,10 +1756,10 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                       ),
                       if (isFromMe) ...[
                         const SizedBox(width: 4),
-                        const Icon(
-                          Icons.done_all,
+                        Icon(
+                          message.isRead ? Icons.done_all : Icons.done,
                           size: 14,
-                          color: Colors.blue,
+                          color: message.isRead ? Colors.blue : Colors.grey,
                         ),
                       ],
                     ],
@@ -1443,6 +1918,22 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildMessageInput() {
+    if (_isBlocked) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        color: Colors.grey[200],
+        child: const Center(
+          child: Text(
+            'You cannot send messages to a blocked user',
+            style: TextStyle(
+              color: Colors.grey,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(

@@ -48,7 +48,9 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
     final isSmallScreen = screenWidth < 380;
     
     return Container(
-      height: MediaQuery.of(context).size.height * 0.92,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.92,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
@@ -126,9 +128,11 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 4),
 
-                  // Price for the currently selected color option
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                  // Price / delivery / stock badge — wraps instead of overflowing
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 12,
+                    runSpacing: 6,
                     children: [
                       Text(
                         _selectedOption != null
@@ -140,7 +144,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                           color: Color(0xFF2C5C44),
                         ),
                       ),
-                      const SizedBox(width: 12),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -156,7 +159,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                           ),
                         ],
                       ),
-                      const Spacer(),
                       if (!_inStock)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -230,37 +232,45 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                         size: 18,
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        widget.retailerName,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-
-                  // Blend Option with Material Type (100% Cotton)
-                  if (widget.product.materialType.isNotEmpty && widget.product.materialType != "N/A") ...[
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.texture,
-                          color: Color(0xFF2C5C44),
-                          size: 18,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '100% ${widget.product.materialType}',
+                      Expanded(
+                        child: Text(
+                          widget.retailerName,
                           style: const TextStyle(
                             fontSize: 14,
                             color: Colors.grey,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Material Blend Badge — pill style like the reference design,
+                  // shows the blend text from product.dart's materialDisplay
+                  if (widget.product.materialDisplay.isNotEmpty && widget.product.materialDisplay != "N/A") ...[
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.green[50],
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.green[100]!),
+                          ),
+                          child: Text(
+                            widget.product.materialDisplay,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF2C5C44),
+                            ),
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 16),
                   ],
 
                   // Quantity - Different label for fabric vs element
