@@ -12,8 +12,6 @@ class Conversation {
   final int unreadCount;
   final DateTime? lastReadAt;
   final bool isBlocked;
-  final bool isMuted;
-  final DateTime? mutedUntil;
   final DateTime? updatedAt;
   final bool isDeleted;
   final DateTime? deletedAt;
@@ -30,8 +28,6 @@ class Conversation {
     this.unreadCount = 0,
     this.lastReadAt,
     this.isBlocked = false,
-    this.isMuted = false,
-    this.mutedUntil,
     this.updatedAt,
     this.isDeleted = false,
     this.deletedAt,
@@ -48,8 +44,6 @@ class Conversation {
     int? unreadCount,
     DateTime? lastReadAt,
     bool? isBlocked,
-    bool? isMuted,
-    DateTime? mutedUntil,
     DateTime? updatedAt,
     bool? isDeleted,
     DateTime? deletedAt,
@@ -65,8 +59,6 @@ class Conversation {
       unreadCount: unreadCount ?? this.unreadCount,
       lastReadAt: lastReadAt ?? this.lastReadAt,
       isBlocked: isBlocked ?? this.isBlocked,
-      isMuted: isMuted ?? this.isMuted,
-      mutedUntil: mutedUntil ?? this.mutedUntil,
       updatedAt: updatedAt ?? this.updatedAt,
       isDeleted: isDeleted ?? this.isDeleted,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -86,8 +78,6 @@ class Conversation {
     'unreadCount': unreadCount,
     'lastReadAt': lastReadAt != null ? Timestamp.fromDate(lastReadAt!) : null,
     'isBlocked': isBlocked,
-    'isMuted': isMuted,
-    'mutedUntil': mutedUntil != null ? Timestamp.fromDate(mutedUntil!) : null,
     'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
     'isDeleted': isDeleted,
     'deletedAt': deletedAt != null ? Timestamp.fromDate(deletedAt!) : null,
@@ -115,8 +105,6 @@ class Conversation {
       unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
       lastReadAt: _parseDate(json['lastReadAt']),
       isBlocked: json['isBlocked'] ?? false,
-      isMuted: json['isMuted'] ?? false,
-      mutedUntil: _parseDate(json['mutedUntil']),
       updatedAt: _parseDate(json['updatedAt']),
       isDeleted: json['isDeleted'] ?? false,
       deletedAt: _parseDate(json['deletedAt']),

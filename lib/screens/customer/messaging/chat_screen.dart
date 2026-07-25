@@ -1,5 +1,4 @@
 // lib/screens/customer/messaging/chat_screen.dart
-import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -58,9 +57,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   
   // Conversation status
   bool _isBlocked = false;
-  bool _isMuted = false;
-  DateTime? _mutedUntil;
-  Timer? _muteTimer;
 
   // Overlay notification
   OverlayEntry? _notificationOverlay;
@@ -91,7 +87,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     _scrollController.dispose();
     _focusNode.dispose();
     _typingAnimationController.dispose();
-    _muteTimer?.cancel();
     _removeNotificationOverlay();
     _markConversationAsRead();
     super.dispose();
@@ -197,31 +192,12 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   Future<void> _loadConversationStatus() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final isMuted = prefs.getBool('muted_${widget.conversationId}') ?? false;
-      final mutedUntilStr = prefs.getString('mutedUntil_${widget.conversationId}');
       
       if (widget.isBlocked == null) {
         final isBlocked = prefs.getBool('blocked_${widget.conversationId}') ?? false;
         setState(() {
           _isBlocked = isBlocked;
         });
-      }
-      
-      if (isMuted && mutedUntilStr != null) {
-        final mutedUntil = DateTime.parse(mutedUntilStr);
-        if (DateTime.now().isAfter(mutedUntil)) {
-          setState(() {
-            _isMuted = false;
-            _mutedUntil = null;
-          });
-          await _saveMuteStatus(false, null);
-        } else {
-          setState(() {
-            _isMuted = true;
-            _mutedUntil = mutedUntil;
-          });
-          _startMuteTimer(mutedUntil.difference(DateTime.now()));
-        }
       }
       
     } catch (e) {
@@ -322,85 +298,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     }
   }
 
-  // ─── Mute Functions ─────────────────────────────────────────────────
-
-  Future<void> _saveMuteStatus(bool isMuted, DateTime? mutedUntil) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('muted_${widget.conversationId}', isMuted);
-      if (mutedUntil != null) {
-        await prefs.setString('mutedUntil_${widget.conversationId}', mutedUntil.toIso8601String());
-      } else {
-        await prefs.remove('mutedUntil_${widget.conversationId}');
-      }
-      
-    } catch (e) {
-      print('Error saving mute status: $e');
-    }
-  }
-
-  void _startMuteTimer(Duration duration) {
-    _muteTimer?.cancel();
-    _muteTimer = Timer(duration, () {
-      if (mounted) {
-        setState(() {
-          _isMuted = false;
-          _mutedUntil = null;
-        });
-        _saveMuteStatus(false, null);
-        _showTopNotification('🔔 Mute expired! Notifications are back.');
-      }
-    });
-  }
-
-  void _setMuteDuration(int duration) {
-    final durationMap = {
-      1: const Duration(hours: 1),
-      2: const Duration(hours: 2),
-      3: const Duration(hours: 4),
-      4: const Duration(hours: 8),
-      5: const Duration(hours: 24),
-      6: const Duration(days: 7),
-    };
-    
-    final muteDuration = durationMap[duration] ?? const Duration(hours: 1);
-    final mutedUntil = DateTime.now().add(muteDuration);
-    
-    setState(() {
-      _isMuted = true;
-      _mutedUntil = mutedUntil;
-    });
-    
-    _saveMuteStatus(true, mutedUntil);
-    _startMuteTimer(muteDuration);
-    
-    String label = '';
-    switch (duration) {
-      case 1: label = '1 hour'; break;
-      case 2: label = '2 hours'; break;
-      case 3: label = '4 hours'; break;
-      case 4: label = '8 hours'; break;
-      case 5: label = '24 hours'; break;
-      case 6: label = '7 days'; break;
-    }
-    
-    _showTopNotification('🔇 Notifications muted for $label');
-  }
-
-  void _toggleMuteNotifications() {
-    if (_isMuted) {
-      _muteTimer?.cancel();
-      setState(() {
-        _isMuted = false;
-        _mutedUntil = null;
-      });
-      _saveMuteStatus(false, null);
-      _showTopNotification('🔔 Notifications unmuted');
-    } else {
-      _showMuteOptions();
-    }
-  }
-
   // ─── Block Functions ─────────────────────────────────────────────────
 
   Future<void> _blockUser() async {
@@ -495,14 +392,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                       },
                     ),
                     _buildActionOption(
-                      icon: Icons.forward,
-                      label: 'Forward',
-                      onTap: () {
-                        Navigator.pop(context);
-                        _forwardMessage(message);
-                      },
-                    ),
-                    _buildActionOption(
                       icon: Icons.delete_outline,
                       label: 'Delete',
                       color: Colors.red,
@@ -584,60 +473,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     setState(() {
       _selectedMessageId = null;
     });
-  }
-
-  void _forwardMessage(Message message) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text('Forward Message'),
-          content: const Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Select a contact to forward this message to:'),
-              SizedBox(height: 16),
-              ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: Colors.green,
-                  child: Icon(Icons.person, color: Colors.white),
-                ),
-                title: Text('Contact 1'),
-                subtitle: Text('Tailor'),
-              ),
-              ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: Colors.blue,
-                  child: Icon(Icons.person, color: Colors.white),
-                ),
-                title: Text('Contact 2'),
-                subtitle: Text('Retailer'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _showTopNotification('Message forwarded!');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2C5C44),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Forward'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   void _showDeleteConfirmation(Message message) {
@@ -983,95 +818,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     );
   }
 
-  void _showMuteOptions() {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text(
-            'Mute notifications',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildMuteOptionDialog('1 hour', 1),
-              _buildMuteOptionDialog('2 hours', 2),
-              _buildMuteOptionDialog('4 hours', 3),
-              _buildMuteOptionDialog('8 hours', 4),
-              _buildMuteOptionDialog('24 hours', 5),
-              _buildMuteOptionDialog('7 days', 6),
-              if (_isMuted)
-                _buildMuteOptionDialog('Unmute', 0, isUnmute: true),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildMuteOptionDialog(String label, int duration, {bool isUnmute = false}) {
-    final isSelected = _mutedUntil != null && duration == 0;
-    
-    return GestureDetector(
-      onTap: () {
-        Navigator.pop(context);
-        if (isUnmute) {
-          _toggleMuteNotifications();
-        } else {
-          _setMuteDuration(duration);
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: Colors.grey[100]!, width: 1),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isUnmute ? Icons.notifications : Icons.notifications_off,
-              color: isUnmute ? Colors.green : Colors.grey,
-              size: 24,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isUnmute ? Colors.green : Colors.black,
-                ),
-              ),
-            ),
-            if (isSelected)
-              const Icon(
-                Icons.check,
-                color: Color(0xFF2C5C44),
-                size: 20,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _showMoreOptions() {
     showDialog(
       context: context,
@@ -1091,23 +837,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
-                leading: Icon(
-                  _isMuted ? Icons.notifications_off : Icons.notifications,
-                  color: const Color(0xFF2C5C44),
-                ),
-                title: Text(_isMuted ? 'Unmute Notifications' : 'Mute Notifications'),
-                trailing: const Icon(Icons.chevron_right, size: 16),
-                onTap: () {
-                  Navigator.pop(context);
-                  if (_isMuted) {
-                    _toggleMuteNotifications();
-                  } else {
-                    _showMuteOptions();
-                  }
-                },
-              ),
-              const Divider(),
               ListTile(
                 leading: Icon(
                   _isBlocked ? Icons.block : Icons.block_outlined,
