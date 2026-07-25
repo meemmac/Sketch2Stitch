@@ -12,6 +12,7 @@ class TailorOrderItem {
   final String color;
   final List<String>? measurementRefImages;
   final String? tailorInstructions;
+  final double productPrice;
   double servicePrice;
   DateTime? estimatedDeliveryDate;
   final bool canWash;
@@ -24,6 +25,7 @@ class TailorOrderItem {
     required this.quantity,
     required this.imagePath,
     required this.color,
+    required this.productPrice,
     required this.servicePrice,
     this.measurementRefImages,
     this.tailorInstructions,
@@ -65,6 +67,8 @@ class TailorOrder {
   });
 
   int get totalQuantity => items.fold(0, (sum, item) => sum + item.quantity);
+  double get totalServicePrice => items.fold(0, (sum, item) => sum + item.servicePrice);
+  double get totalProductPrice => items.fold(0, (sum, item) => sum + item.productPrice);
 }
 
 enum OrderFilterPreset { last3Months, last6Months, custom }
@@ -128,7 +132,8 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           quantity: 1,
           imagePath: "assets/images/fabrics_rolled.jpg",
           color: "Cream",
-          servicePrice: 1500,
+          productPrice: 1500,
+          servicePrice: 0,
           measurementRefImages: ["assets/images/ref1.jpg", "assets/images/ref2.jpg"],
           tailorInstructions: "Please ensure the length is precisely 42 inches. Follow the reference image for sleeve design.",
           canWash: true,
@@ -151,7 +156,8 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           quantity: 1,
           imagePath: "assets/images/silk.jpg",
           color: "Deep Blue",
-          servicePrice: 2200,
+          productPrice: 2200,
+          servicePrice: 0,
           measurementRefImages: ["assets/images/ref3.jpg"],
           tailorInstructions: "Slim fit cut with narrow trousers.",
           canWash: false,
@@ -174,7 +180,8 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           quantity: 2,
           imagePath: "assets/images/gorgeous.jpg",
           color: "Floral Blue",
-          servicePrice: 1600,
+          productPrice: 1600,
+          servicePrice: 1200,
           measurementRefImages: ["assets/images/ref2.jpg"],
           tailorInstructions: "Use the printed patterns for the sleeves as shown in the reference picture.",
           canBleach: true,
@@ -197,7 +204,8 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           quantity: 1,
           imagePath: "assets/images/fab.jpg",
           color: "Light Pink",
-          servicePrice: 1800,
+          productPrice: 1800,
+          servicePrice: 1000,
           measurementRefImages: ["assets/images/ref4.jpg"],
           tailorInstructions: "Follow standard measurement. Add piping to the neckline.",
           estimatedDeliveryDate: DateTime.now().add(const Duration(days: 3)),
@@ -222,7 +230,8 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           quantity: 1,
           imagePath: "assets/images/silk.jpg",
           color: "Magenta",
-          servicePrice: 4000,
+          productPrice: 4000,
+          servicePrice: 2500,
           measurementRefImages: ["assets/images/ref1.jpg", "assets/images/ref3.jpg", "assets/images/ref4.jpg"],
           tailorInstructions: "Please make a classic lehenga blouse with a high neck.",
           canWash: false,
@@ -690,7 +699,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 const SizedBox(width: 10),
                 _orderInfo(Icons.calendar_today_outlined, _formatDate(order.orderDate)),
                 const Spacer(),
-                Text("Tk ${order.totalAmount.toInt()}", style: TextStyle(color: Colors.green.shade900, fontSize: 16, fontWeight: FontWeight.w900)),
+                Text("Tk ${order.totalProductPrice.toInt()}", style: TextStyle(color: Colors.green.shade900, fontSize: 16, fontWeight: FontWeight.w900)),
               ],
             ),
           ],
@@ -846,7 +855,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 const SizedBox(height: 12),
                 _detailRow("Customer", order.customerName),
                 if (order.status != TailorOrderStatus.pending) ...[
-                  _detailRow("Stitching Earnings", "Tk ${order.totalAmount.toInt()}"),
+                  _detailRow("Stitching Earnings", "Tk ${order.totalServicePrice.toInt()}"),
                   _detailRow(
                     "Expected Delivery",
                     order.items.first.estimatedDeliveryDate != null ? _formatDate(order.items.first.estimatedDeliveryDate!) : "TBD",
@@ -982,7 +991,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   Text("Qty: ${item.quantity} | Color: ${item.color}", style: const TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w600)),
                 ]),
               ),
-              Text("Tk ${item.servicePrice.toInt()}", style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.w900)),
+              Text("Tk ${item.productPrice.toInt()}", style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.w900)),
             ],
           ),
           const SizedBox(height: 16),
