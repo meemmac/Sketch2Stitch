@@ -495,6 +495,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 24),
 
+                  // Add to Cart Button - only for customers
                   if (_isCustomer)
                     SizedBox(
                       width: double.infinity,
@@ -530,42 +531,8 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                       ),
                     ),
                   
-                  if (!_isCustomer) ...[
-                    SizedBox(
-                      width: double.infinity,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey[300]!),
-                        ),
-                        child: Center(
-                          child: Text(
-                            widget.userRole == AppUserRole.tailor 
-                                ? 'View product details'
-                                : 'Product information',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.userRole == AppUserRole.tailor
-                          ? 'You are viewing as a tailor. Contact the retailer for purchases.'
-                          : 'You are viewing as a retailer. Manage this product in your inventory.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                  ],
+                  // ❌ REMOVED: "View product details" button and text for Tailors/Retailers
+                  
                   const SizedBox(height: 30),
                 ],
               ),

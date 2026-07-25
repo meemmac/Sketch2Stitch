@@ -132,15 +132,21 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     );
   }
 
+  // ✅ FIXED: Pass userRole to BrowseShell
   void _openBrowseTab(int index) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => BrowseShell(initialIndex: index)),
+      MaterialPageRoute(
+        builder: (_) => BrowseShell(
+          initialIndex: index,
+          userRole: _currentRole,
+        ),
+      ),
     );
   }
 
+  // ✅ FIXED: Pass userRole to ProductDetailOverlay
   void _showProductOverlay(Product product) {
-    // Check if this product has material blends from fabric data
     List<String>? materialBlends;
     for (final fabricData in kHardcodedFabricData) {
       if (fabricData.product.id == product.id) {
@@ -158,24 +164,38 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         isFabric: true,
         retailerName: _getRetailerName(product.retailerId),
         materialBlends: materialBlends,
+        userRole: _currentRole,
       ),
     );
   }
 
+  // ✅ FIXED: Pass userRole to TailorDetailScreen
   void _openTailorDetail(Tailor tailor) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => TailorDetailScreen(tailor: tailor)),
+      MaterialPageRoute(
+        builder: (context) => TailorDetailScreen(
+          tailor: tailor,
+          userRole: _currentRole,
+        ),
+      ),
     );
   }
 
+  // ✅ FIXED: Pass userRole to RetailerDetailScreen
   void _openRetailerDetail(Retailer retailer) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => RetailerDetailScreen(retailer: retailer)),
+      MaterialPageRoute(
+        builder: (context) => RetailerDetailScreen(
+          retailer: retailer,
+          userRole: _currentRole,
+        ),
+      ),
     );
   }
 
+  // ✅ FIXED: Pass userRole to SeeAllGridScreen
   void _openSeeAllProducts(String title, List<Product> products) {
     Navigator.push(
       context,
@@ -184,11 +204,13 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           title: title,
           items: products,
           cardBuilder: (context, p) => _buildFabricCard(p),
+          userRole: _currentRole,
         ),
       ),
     );
   }
 
+  // ✅ FIXED: Pass userRole to SeeAllGridScreen
   void _openSeeAllTailors(String title, List<Tailor> tailors) {
     Navigator.push(
       context,
@@ -197,11 +219,13 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           title: title,
           items: tailors,
           cardBuilder: (context, t) => _buildTailorCard(t),
+          userRole: _currentRole,
         ),
       ),
     );
   }
 
+  // ✅ FIXED: Pass userRole to SeeAllGridScreen
   void _openSeeAllRetailers(String title, List<Retailer> retailers) {
     Navigator.push(
       context,
@@ -210,6 +234,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           title: title,
           items: retailers,
           cardBuilder: (context, r) => _buildRetailerCard(r),
+          userRole: _currentRole,
         ),
       ),
     );
@@ -237,7 +262,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      key: ValueKey(_currentRole), // Force rebuild when role changes
+      key: ValueKey(_currentRole),
       backgroundColor: const Color(0xFFF4F9F1),
       drawer: DashboardDrawer(
         initialRole: _currentRole,
@@ -268,12 +293,12 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     );
   }
 
-  // ---------------- Top bar (Role dropdown removed) ----------------
+  // ---------------- Top bar ----------------
   Widget _buildTopBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 20, 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween, // This spreads items
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Builder(
             builder: (context) => IconButton(
@@ -316,7 +341,6 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                 ),
             ],
           ),
-          // Track Order icon - only for customer
           if (_currentRole == AppUserRole.customer)
             IconButton(
               icon: const Icon(Icons.local_shipping_outlined, color: Colors.black87),
@@ -324,7 +348,6 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
               onPressed: _openOrderList,
               tooltip: 'My Orders',
             ),
-          // Show cart icon only for customer
           if (_currentRole == AppUserRole.customer)
             IconButton(
               icon: const Icon(Icons.shopping_cart_outlined, color: Colors.black87),
@@ -336,7 +359,6 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                 );
               },
             ),
-          // Role dropdown removed - no longer needed in top bar
         ],
       ),
     );
@@ -346,7 +368,6 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   Widget _buildSectionNavBar() {
     List<Widget> pills = [];
 
-    // Customer specific sections
     if (_currentRole == AppUserRole.customer) {
       pills.addAll([
         _navPill('Last Viewed', Icons.history_rounded, () => _scrollToSection(_lastViewedKey)),
@@ -356,7 +377,6 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
       ]);
     }
 
-    // Common sections for all roles
     pills.addAll([
       _navPill('Fabrics', Icons.texture_rounded, () => _scrollToSection(_exploreFabricsKey)),
       const SizedBox(width: 10),
@@ -522,7 +542,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     }
   }
 
-  // ---------------- Common sections (Fabrics, Elements, Retailers, Tailors) ----------------
+  // ---------------- Common sections ----------------
   Widget _buildCommonSections() {
     return Column(
       children: [
@@ -808,7 +828,6 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              // TODO: Navigate to inventory
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -1384,11 +1403,13 @@ class _SeeAllGridScreen<T> extends StatelessWidget {
   final String title;
   final List<T> items;
   final Widget Function(BuildContext, T) cardBuilder;
+  final AppUserRole userRole; // ✅ Added
 
   const _SeeAllGridScreen({
     required this.title,
     required this.items,
     required this.cardBuilder,
+    required this.userRole, // ✅ Required
   });
 
   @override
