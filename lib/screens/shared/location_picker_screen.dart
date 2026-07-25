@@ -63,6 +63,34 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     Navigator.pop(context, GeoPoint(_picked.latitude, _picked.longitude));
   }
 
+  void _showInfoDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.info_outline, color: Color(0xFF6C9985)),
+            SizedBox(width: 10),
+            Text('Why we need this'),
+          ],
+        ),
+        content: const Text(
+          'The location you pin here is used to estimate your delivery charge, '
+          'based on the distance from the retailer and tailor to you. '
+          'You can update this anytime from your profile.',
+          style: TextStyle(fontSize: 14, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -72,6 +100,11 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         foregroundColor: Colors.black87,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            tooltip: 'Why we need this',
+            onPressed: _showInfoDialog,
+          ),
           TextButton(
             onPressed: _confirm,
             child: const Text('Confirm', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -103,6 +136,43 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           const Padding(
             padding: EdgeInsets.only(bottom: 40), // offsets for the pin's visual tip
             child: Icon(Icons.location_pin, size: 46, color: Color(0xFF6C9985)),
+          ),
+          // Persistent info banner at top, explaining the pin's purpose
+          Positioned(
+            top: 12,
+            left: 16,
+            right: 16,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDFF2DF),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline, size: 18, color: Colors.black87),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This location is used to estimate your delivery charge. '
+                        'You can change it anytime from your profile.',
+                        style: TextStyle(fontSize: 12, color: Colors.black87, height: 1.3),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
