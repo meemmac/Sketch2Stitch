@@ -29,6 +29,8 @@ class TailoringSetupCallbacks {
   /// Orders.status = 'processing'; every Sub-orders.deliveryDestination = 'customer'.
   final Future<void> Function() onSkipTailoring;
 
+  final TextEditingController _instructionsController = TextEditingController();
+
   /// Orders.status = 'awaiting_tailor_search';
   /// tailorSelectionDeadline = orderDate + 72h.
   final Future<void> Function(DateTime tailorSelectionDeadline)
@@ -41,11 +43,12 @@ class TailoringSetupCallbacks {
   /// job id. Called once per tailor request (may be called again if a
   /// previous job was rejected and the customer picks another tailor).
   final Future<String> Function({
-    required String measurementId,
-    required List<String> designIds,
-    required String tailorId,
-  })
-  onCreateTailorJob;
+  required String measurementId,
+  required List<String> designIds,
+  required String tailorId,
+  required String instructions,
+})
+onCreateTailorJob;
 
   /// Payments.targetType = 'tailor' payment flow for a confirmed job.
   final Future<void> Function(String tailorJobId) onPayTailor;
@@ -322,43 +325,40 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   // for real.
   String get _stepPrefKey => 'tailoring_step_${widget.orderId}';
   String get _designsPrefKey => 'tailoring_designs_${widget.orderId}';
+  String get _instructionsPrefKey => 'tailoring_instructions_${widget.orderId}';
+  
 
   Future<void> _saveLocalProgress() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(_stepPrefKey, _currentStep);
-      await prefs.setStringList(
-        _designsPrefKey,
-        _designs.map((d) => d.path).toList(),
-      );
-    } catch (_) {
-      // Best-effort only — losing local resume state shouldn't block flow.
-    }
-  }
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_stepPrefKey, _currentStep);
+    await prefs.setStringList(_designsPrefKey, _designs.map((d) => d.path).toList());
+    await prefs.setString(_instructionsPrefKey, _instructionsController.text);
+  } catch (_) {}
+}
 
   Future<void> _clearLocalProgress() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_stepPrefKey);
-      await prefs.remove(_designsPrefKey);
-    } catch (_) {
-      // Nothing to clean up, or storage unavailable — either way, fine.
-    }
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_stepPrefKey);
+    await prefs.remove(_designsPrefKey);
+    await prefs.remove(_instructionsPrefKey);
+  } catch (_) {
+    // Nothing to clean up, or storage unavailable — either way, fine.
   }
+}
 
   Future<void> _loadLocalProgress() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final step = prefs.getInt(_stepPrefKey);
-      final designPaths = prefs.getStringList(_designsPrefKey);
-      if (step != null) _currentStep = step;
-      if (designPaths != null) {
-        _designs.addAll(designPaths.map((p) => DesignItem(path: p)));
-      }
-    } catch (_) {
-      // No local progress saved yet — fine, start fresh.
-    }
-  }
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final step = prefs.getInt(_stepPrefKey);
+    final designPaths = prefs.getStringList(_designsPrefKey);
+    final instructions = prefs.getString(_instructionsPrefKey);
+    if (step != null) _currentStep = step;
+    if (designPaths != null) _designs.addAll(designPaths.map((p) => DesignItem(path: p)));
+    if (instructions != null) _instructionsController.text = instructions;
+  } catch (_) {}
+}
 
   Future<void> _withLoading(Future<void> Function() action) async {
     setState(() => _loading = true);
@@ -381,12 +381,13 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   }
 
   @override
-  void dispose() {
-    for (final c in _measurementControllers.values) {
-      c.dispose();
-    }
-    super.dispose();
+void dispose() {
+  for (final c in _measurementControllers.values) {
+    c.dispose();
   }
+  _instructionsController.dispose();
+  super.dispose();
+}
 
   /// Read-only rehydration: if the customer already progressed past step 1
   /// on a previous visit (e.g. they requested a tailor, then closed the
@@ -529,6 +530,7 @@ Future<void> _requestTailorJob({required String tailorId}) async {
       measurementId: _selectedMeasurement?.id ?? '',
       designIds: _designs.map((d) => d.path).toList(),
       tailorId: tailorId,
+      instructions: _instructionsController.text.trim(),
     );
   });
   if (!mounted || jobId == null) return;

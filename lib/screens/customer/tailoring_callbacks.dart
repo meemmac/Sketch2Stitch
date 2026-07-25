@@ -15,6 +15,7 @@ TailoringSetupCallbacks buildTailoringCallbacks() {
       required measurementId,
       required designIds,
       required tailorId,
+      required instructions,
     }) async {
       session.createTailorJob(tailorId: tailorId);
       return session.tailorJobId!;
