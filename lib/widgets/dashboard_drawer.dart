@@ -66,14 +66,16 @@ class DrawerProfileData {
 }
 
 /// The main reusable Dashboard Drawer widget.
+///
+/// The role shown here is decided once, upstream — by whatever tells
+/// `UnifiedHomeScreen` who's logged in (real auth once that's wired up).
+/// This widget just renders that role; it no longer owns a role switcher.
 class DashboardDrawer extends StatefulWidget {
   final AppUserRole initialRole;
-  final ValueChanged<AppUserRole>? onRoleChanged;
 
   const DashboardDrawer({
     super.key,
     this.initialRole = AppUserRole.customer,
-    this.onRoleChanged,
   });
 
   @override
@@ -183,10 +185,6 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       child: SafeArea(
         child: Column(
           children: [
-            // Optional role toggle for testability
-            _buildRoleToggle(),
-            const Divider(height: 1),
-
             // Profile Section
             Expanded(
               child: CustomScrollView(
@@ -250,58 +248,6 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildRoleToggle() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text(
-            "Demo Role:",
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
-            ),
-          ),
-          DropdownButton<AppUserRole>(
-            value: _currentRole,
-            underline: const SizedBox(),
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1E392A),
-            ),
-            items: const [
-              DropdownMenuItem(
-                value: AppUserRole.customer,
-                child: Text("Customer"),
-              ),
-              DropdownMenuItem(
-                value: AppUserRole.tailor,
-                child: Text("Tailor"),
-              ),
-              DropdownMenuItem(
-                value: AppUserRole.retailer,
-                child: Text("Retailer"),
-              ),
-            ],
-            onChanged: (role) {
-              if (role != null) {
-                setState(() {
-                  _currentRole = role;
-                });
-                if (widget.onRoleChanged != null) {
-                  widget.onRoleChanged!(role);
-                }
-              }
-            },
-          ),
-        ],
       ),
     );
   }
