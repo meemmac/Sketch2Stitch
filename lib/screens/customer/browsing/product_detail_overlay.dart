@@ -6,12 +6,14 @@ class ProductDetailOverlay extends StatefulWidget {
   final Product product;
   final bool isFabric;
   final String retailerName;
+  final List<String>? materialBlends;
 
   const ProductDetailOverlay({
     super.key,
     required this.product,
     this.isFabric = true,
     this.retailerName = 'Unknown Retailer',
+    this.materialBlends,
   });
 
   @override
@@ -34,35 +36,29 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
 
   bool get _inStock => (_selectedOption?.stock ?? 0) > 0;
 
-  /// Get the material blend display text from materialType
-  /// Supports formats like:
-  /// - "100% Cotton"
-  /// - "70% Silk, 30% Viscose"
-  /// - "Cotton" (defaults to "100% Cotton")
   String get _materialBlendDisplay {
+    if (widget.materialBlends != null && widget.materialBlends!.isNotEmpty) {
+      return widget.materialBlends!.join(", ");
+    }
+
     final material = widget.product.materialType.trim();
     if (material.isEmpty || material == "N/A") {
       return "N/A";
     }
     
-    // Check if material already has percentage format
     if (material.contains('%')) {
       return material;
     }
     
-    // Check if it has multiple materials (comma separated)
     if (material.contains(',')) {
       final parts = material.split(',').map((s) => s.trim()).toList();
-      // Try to parse percentages if present
       final hasPercentages = parts.any((p) => p.contains('%'));
       if (hasPercentages) {
         return material;
       }
-      // If no percentages, add "100%" to first item and keep others as is
       return "100% $material";
     }
     
-    // Single material with no percentage
     return "100% $material";
   }
 
@@ -78,6 +74,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
     final bool isElement = !widget.isFabric;
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 380;
+    final materialBlendDisplay = _materialBlendDisplay;
     
     return Container(
       constraints: BoxConstraints(
@@ -160,7 +157,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 4),
 
-                  // Price / delivery / stock badge — wraps instead of overflowing
+                  // Price / delivery / stock badge
                   Wrap(
                     crossAxisAlignment: WrapCrossAlignment.center,
                     spacing: 12,
@@ -269,7 +266,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                           widget.retailerName,
                           style: const TextStyle(
                             fontSize: 14,
-                            color: Colors.grey,
+                            color: Color.fromARGB(255, 46, 45, 45),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -279,32 +276,28 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 10),
 
-                  // Material Blend Badge — shows like "70% Silk, 30% Viscose" or "100% Cotton"
-                  if (_materialBlendDisplay != "N/A") ...[
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.green[50],
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.green[100]!),
-                          ),
-                          child: Text(
-                            _materialBlendDisplay,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF2C5C44),
-                            ),
-                          ),
+                  // ─── Material Blend - Single line like the image ───
+                  if (widget.isFabric && materialBlendDisplay != "N/A") ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.green[50],
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.green[100]!),
+                      ),
+                      child: Text(
+                        materialBlendDisplay,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF2C5C44),
                         ),
-                      ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                   ],
 
-                  // Quantity - Different label for fabric vs element
+                  // Quantity
                   Text(
                     isElement ? 'Quantity (piece)' : 'Quantity (gauge)',
                     style: const TextStyle(
@@ -457,7 +450,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Care Instructions - Exactly like Inventory Page (5 care levels)
+                  // Care Instructions
                   if (widget.isFabric) ...[
                     const Text(
                       'Care Instructions',
@@ -662,7 +655,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
     );
   }
 
-  // ─── Care Info Helper Methods for Inventory Style ─────────────────────
+  // ─── Care Info Helper Methods ─────────────────────────────────────
 
   Widget _careInfoRow(
     IconData icon,

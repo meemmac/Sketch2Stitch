@@ -19,7 +19,7 @@ class ChatScreen extends StatefulWidget {
   final String? otherUserAvatar;
   final String? orderId;
   final Function(String)? onConversationRead;
-  final bool? isBlocked; // 🆕 Add this parameter
+  final bool? isBlocked;
 
   const ChatScreen({
     super.key,
@@ -31,7 +31,7 @@ class ChatScreen extends StatefulWidget {
     this.otherUserAvatar,
     this.orderId,
     this.onConversationRead,
-    this.isBlocked, // 🆕
+    this.isBlocked,
   });
 
   @override
@@ -63,14 +63,11 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   DateTime? _mutedUntil;
   Timer? _muteTimer;
 
-  // Overlay notification
-  OverlayEntry? _notificationOverlay;
-
   @override
   void initState() {
     super.initState();
     
-    // 🆕 Set initial blocked state from widget parameter
+    // Set initial blocked state from widget parameter
     _isBlocked = widget.isBlocked ?? false;
     
     _loadMessages();
@@ -94,9 +91,55 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     _focusNode.dispose();
     _typingAnimationController.dispose();
     _muteTimer?.cancel();
-    _removeNotificationOverlay();
     _markConversationAsRead();
     super.dispose();
+  }
+
+  // ─── Centered Notification ───────────────────────────────────────────
+
+  void _showCenteredNotification(String message, {bool isError = false}) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.transparent,
+      barrierDismissible: true,
+      builder: (context) {
+        return Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            decoration: BoxDecoration(
+              color: isError ? Colors.red[700] : const Color(0xFF2C5C44),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isError ? Icons.error_outline : Icons.check_circle,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  message,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   // ─── Load Data ──────────────────────────────────────────────────────
@@ -116,26 +159,17 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       
     } catch (e) {
       setState(() => _isLoading = false);
-      _showTopNotification('Failed to load messages', isError: true);
+      _showCenteredNotification('Failed to load messages', isError: true);
     }
   }
 
   Future<void> _loadConversationStatus() async {
     try {
-      // TODO: Replace with API call
-      // final response = await api.getConversation(widget.conversationId);
-      // final conversation = Conversation.fromJson(response.data);
-      // setState(() {
-      //   _isBlocked = conversation.isBlocked;
-      //   _isMuted = conversation.isMuted;
-      //   _mutedUntil = conversation.mutedUntil;
-      // });
-      
       final prefs = await SharedPreferences.getInstance();
       final isMuted = prefs.getBool('muted_${widget.conversationId}') ?? false;
       final mutedUntilStr = prefs.getString('mutedUntil_${widget.conversationId}');
       
-      // 🆕 Only load blocked status from prefs if not already set from widget
+      // Only load blocked status from prefs if not already set from widget
       if (widget.isBlocked == null) {
         final isBlocked = prefs.getBool('blocked_${widget.conversationId}') ?? false;
         setState(() {
@@ -195,7 +229,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     if (text.isEmpty) return;
 
     if (_isBlocked) {
-      _showTopNotification('You cannot send messages to a blocked user', isError: true);
+      _showCenteredNotification('You cannot send messages to a blocked user', isError: true);
       return;
     }
 
@@ -258,7 +292,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       setState(() {
         _messages.removeWhere((m) => m.id == newMessage.id);
       });
-      _showTopNotification('Failed to send message', isError: true);
+      _showCenteredNotification('Failed to send message', isError: true);
     }
   }
 
@@ -295,7 +329,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
           _mutedUntil = null;
         });
         _saveMuteStatus(false, null);
-        _showTopNotification('🔔 Mute expired! Notifications are back.');
+        _showCenteredNotification('🔔 Mute expired! Notifications are back.');
       }
     });
   }
@@ -331,7 +365,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       case 6: label = '7 days'; break;
     }
     
-    _showTopNotification('🔇 Notifications muted for $label');
+    _showCenteredNotification('🔇 Notifications muted for $label');
   }
 
   void _toggleMuteNotifications() {
@@ -342,7 +376,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
         _mutedUntil = null;
       });
       _saveMuteStatus(false, null);
-      _showTopNotification('🔔 Notifications unmuted');
+      _showCenteredNotification('🔔 Notifications unmuted');
     } else {
       _showMuteOptions();
     }
@@ -367,14 +401,19 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
         _isBlocked = true;
       });
       
-      _showTopNotification('${widget.otherUserName} has been blocked');
+      _showCenteredNotification('${widget.otherUserName} has been blocked');
+      
+      // Notify conversation screen that block status changed
+      if (widget.onConversationRead != null) {
+        widget.onConversationRead!(widget.conversationId);
+      }
       
       Future.delayed(const Duration(seconds: 1), () {
         Navigator.pop(context);
       });
       
     } catch (e) {
-      _showTopNotification('Failed to block user', isError: true);
+      _showCenteredNotification('Failed to block user', isError: true);
     }
   }
 
@@ -395,107 +434,19 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
         _isBlocked = false;
       });
       
-      _showTopNotification('${widget.otherUserName} has been unblocked');
+      _showCenteredNotification('${widget.otherUserName} has been unblocked');
+      
+      // Notify conversation screen that block status changed
+      if (widget.onConversationRead != null) {
+        widget.onConversationRead!(widget.conversationId);
+      }
       
     } catch (e) {
-      _showTopNotification('Failed to unblock user', isError: true);
-    }
-  }
-
-  Future<void> _deleteConversation() async {
-    try {
-      // TODO: Replace with API call
-      // await api.deleteConversation(widget.conversationId);
-      
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('blocked_${widget.conversationId}');
-      await prefs.remove('muted_${widget.conversationId}');
-      await prefs.remove('mutedUntil_${widget.conversationId}');
-      await prefs.remove('last_read_${widget.conversationId}');
-      await prefs.remove('unread_count_${widget.conversationId}');
-      
-      _showTopNotification('Conversation deleted');
-      Navigator.pop(context);
-      
-    } catch (e) {
-      _showTopNotification('Failed to delete conversation', isError: true);
+      _showCenteredNotification('Failed to unblock user', isError: true);
     }
   }
 
   // ─── Notification System ────────────────────────────────────────────
-
-  void _showTopNotification(String message, {bool isError = false}) {
-    _removeNotificationOverlay();
-    
-    final overlay = Overlay.of(context);
-    final entry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: 0,
-        left: 0,
-        right: 0,
-        child: SafeArea(
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: isError ? Colors.red[700] : const Color(0xFF2C5C44),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    isError ? Icons.error_outline : Icons.check_circle,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      message,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: _removeNotificationOverlay,
-                    child: const Icon(
-                      Icons.close,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    
-    overlay.insert(entry);
-    _notificationOverlay = entry;
-    
-    Future.delayed(const Duration(seconds: 3), () {
-      _removeNotificationOverlay();
-    });
-  }
-
-  void _removeNotificationOverlay() {
-    _notificationOverlay?.remove();
-    _notificationOverlay = null;
-  }
 
   // ─── Message Options ─────────────────────────────────────────────────
 
@@ -630,7 +581,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
   void _copyMessage(Message message) {
     Clipboard.setData(ClipboardData(text: message.msgText));
-    _showTopNotification('Message copied to clipboard');
+    _showCenteredNotification('Message copied to clipboard');
     setState(() {
       _selectedMessageId = null;
     });
@@ -676,7 +627,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-                _showTopNotification('Message forwarded!');
+                _showCenteredNotification('Message forwarded!');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2C5C44),
@@ -712,7 +663,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                   _messages.removeWhere((m) => m.id == message.id);
                   _selectedMessageId = null;
                 });
-                _showTopNotification('Message deleted');
+                _showCenteredNotification('Message deleted');
                 
                 // TODO: Call API to delete message
                 // await api.deleteMessage(message.id);
@@ -773,7 +724,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
   void _sendAttachment(String path, String type, {String? fileName}) {
     if (_isBlocked) {
-      _showTopNotification('Cannot send messages to blocked user', isError: true);
+      _showCenteredNotification('Cannot send messages to blocked user', isError: true);
       return;
     }
 
@@ -1027,7 +978,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                 setState(() {
                   _messages.clear();
                 });
-                _showTopNotification('Chat cleared');
+                _showCenteredNotification('Chat cleared');
                 
                 // TODO: Call API to clear chat
                 // await api.clearChat(widget.conversationId);
@@ -1035,40 +986,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               },
               child: const Text(
                 'Clear',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showDeleteConversationConfirmation() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text('Delete Conversation'),
-          content: Text(
-            'Are you sure you want to delete this conversation with ${widget.otherUserName}?\n\n'
-            'All messages will be permanently deleted.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _deleteConversation();
-              },
-              child: const Text(
-                'Delete',
                 style: TextStyle(color: Colors.red),
               ),
             ),
@@ -1234,18 +1151,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                   _showClearChatConfirmation();
                 },
               ),
-              ListTile(
-                leading: const Icon(Icons.delete_forever, color: Colors.red),
-                title: const Text(
-                  'Delete Conversation',
-                  style: TextStyle(color: Colors.red),
-                ),
-                trailing: const Icon(Icons.chevron_right, size: 16),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showDeleteConversationConfirmation();
-                },
-              ),
+              // ❌ Removed "Delete Conversation" option
             ],
           ),
         );
@@ -1410,7 +1316,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    _isBlocked ? 'Blocked' : 'Online',
+                    _isBlocked ? 'Blocked' : '',
                     style: TextStyle(
                       fontSize: 11,
                       color: _isBlocked ? Colors.red[300] : Colors.white70,
@@ -1683,7 +1589,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                 if (isDocument)
                   GestureDetector(
                     onTap: () {
-                      _showTopNotification('Opening document...');
+                      _showCenteredNotification('Opening document...');
                     },
                     child: Container(
                       margin: EdgeInsets.only(bottom: hasText ? 4 : 0),

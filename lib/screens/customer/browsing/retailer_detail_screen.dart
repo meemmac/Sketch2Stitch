@@ -33,8 +33,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   bool _isLoading = true;
   double _averageRating = 0.0;
   String _selectedFilter = "Top reviews";
-  final Map<String, int> _helpfulCounts = {};
-  final Map<String, bool> _isHelpful = {};
 
   final List<String> _customerNames = [
     'Priya Sharma', 'Amina Rahman', 'Nusrat Jahan', 'Tahsin Ahmed', 'Farhana Islam',
@@ -116,10 +114,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     setState(() {
       _reviews = sampleReviews;
       _isLoading = false;
-      for (final r in _reviews) {
-        _helpfulCounts[r.id] = 0;
-        _isHelpful[r.id] = false;
-      }
       if (_reviews.isNotEmpty) {
         final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
         _averageRating = sum / _reviews.length;
@@ -180,7 +174,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: _buildBottomBar(isSmallScreen),
     );
   }
 
@@ -591,70 +584,78 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   }
 
   // ─── Product Grid ──────────────────────────────────────────────────────
-Widget _buildProductGrid(List<Product> products, bool isSmallScreen, bool isMediumScreen) {
-  final displayProducts = _showAllProducts ? products : (products.length > 6 ? products.take(6).toList() : products);
-  final screenWidth = MediaQuery.of(context).size.width;
-  final spacing = isSmallScreen ? 10.0 : 12.0;
-  final horizontalPadding = 0.0; // No extra padding since parent already has padding
-  
-  // Calculate card width based on available space
-  final cardWidth = (screenWidth - (spacing * 3)) / 2; // 2 columns with spacing
-  final cardHeight = isSmallScreen ? 210.0 : 240.0;
-  final imageHeight = isSmallScreen ? 130.0 : 150.0;
-  final contentPadding = isSmallScreen ? 8.0 : 10.0;
 
-  return GridView.builder(
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: 2,
-      childAspectRatio: cardWidth / cardHeight,
-      crossAxisSpacing: spacing,
-      mainAxisSpacing: spacing,
-    ),
-    itemCount: displayProducts.length,
-    itemBuilder: (context, index) {
-      final product = displayProducts[index];
-      final coverImage = product.colorOptions.isNotEmpty
-          ? product.colorOptions.first.image
-          : null;
-      final bool outOfStock =
-          product.colorOptions.every((c) => c.stock <= 0);
-      final bool isElement = _isElement(product);
+  Widget _buildProductGrid(List<Product> products, bool isSmallScreen, bool isMediumScreen) {
+    final displayProducts = _showAllProducts ? products : (products.length > 6 ? products.take(6).toList() : products);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final spacing = isSmallScreen ? 10.0 : 12.0;
+    
+    final cardWidth = (screenWidth - (spacing * 3)) / 2;
+    final cardHeight = isSmallScreen ? 220.0 : 240.0;
+    final imageHeight = isSmallScreen ? 130.0 : 150.0;
+    final contentPadding = isSmallScreen ? 8.0 : 10.0;
 
-      return GestureDetector(
-        onTap: () => _showProductDetailOverlay(context, product),
-        child: Container(
-          decoration: BoxDecoration(
-            color: kCardBg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: kBorder, width: 0.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Image section with fixed height
-              Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-                    child: Container(
-                      width: double.infinity,
-                      height: imageHeight,
-                      color: Colors.grey[100],
-                      child: coverImage != null
-                          ? Image.asset(
-                              coverImage,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: cardWidth / cardHeight,
+        crossAxisSpacing: spacing,
+        mainAxisSpacing: spacing,
+      ),
+      itemCount: displayProducts.length,
+      itemBuilder: (context, index) {
+        final product = displayProducts[index];
+        final coverImage = product.colorOptions.isNotEmpty
+            ? product.colorOptions.first.image
+            : null;
+        final bool outOfStock =
+            product.colorOptions.every((c) => c.stock <= 0);
+        final bool isElement = _isElement(product);
+
+        return GestureDetector(
+          onTap: () => _showProductDetailOverlay(context, product),
+          child: Container(
+            decoration: BoxDecoration(
+              color: kCardBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: kBorder, width: 0.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Image section with fixed height
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                      child: Container(
+                        width: double.infinity,
+                        height: imageHeight,
+                        color: Colors.grey[100],
+                        child: coverImage != null
+                            ? Image.asset(
+                                coverImage,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => Container(
+                                  color: kSage.withValues(alpha: 0.12),
+                                  child: Icon(
+                                    isElement ? Icons.category : Icons.texture,
+                                    size: isSmallScreen ? 36 : 40,
+                                    color: kSageDark,
+                                  ),
+                                ),
+                              )
+                            : Container(
                                 color: kSage.withValues(alpha: 0.12),
                                 child: Icon(
                                   isElement ? Icons.category : Icons.texture,
@@ -662,59 +663,19 @@ Widget _buildProductGrid(List<Product> products, bool isSmallScreen, bool isMedi
                                   color: kSageDark,
                                 ),
                               ),
-                            )
-                          : Container(
-                              color: kSage.withValues(alpha: 0.12),
-                              child: Icon(
-                                isElement ? Icons.category : Icons.texture,
-                                size: isSmallScreen ? 36 : 40,
-                                color: kSageDark,
-                              ),
-                            ),
-                    ),
-                  ),
-                  // Category Badge - Top Right
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isSmallScreen ? 6 : 8, 
-                        vertical: isSmallScreen ? 3 : 4
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.7),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          width: 0.3,
-                        ),
-                      ),
-                      child: Text(
-                        product.category,
-                        style: TextStyle(
-                          fontSize: isSmallScreen ? 9 : 10,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.3,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
                       ),
                     ),
-                  ),
-                  // Out of Stock Badge - Top Left
-                  if (outOfStock)
+                    // Category Badge - Top Right
                     Positioned(
                       top: 8,
-                      left: 8,
+                      right: 8,
                       child: Container(
                         padding: EdgeInsets.symmetric(
                           horizontal: isSmallScreen ? 6 : 8, 
                           vertical: isSmallScreen ? 3 : 4
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.red.withValues(alpha: 0.85),
+                          color: Colors.black.withValues(alpha: 0.7),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: Colors.white.withValues(alpha: 0.2),
@@ -722,66 +683,98 @@ Widget _buildProductGrid(List<Product> products, bool isSmallScreen, bool isMedi
                           ),
                         ),
                         child: Text(
-                          'Out of Stock',
+                          product.category,
                           style: TextStyle(
                             fontSize: isSmallScreen ? 9 : 10,
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
+                            letterSpacing: 0.3,
                           ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       ),
                     ),
-                ],
-              ),
-              // Content section with constrained width
-              Padding(
-                padding: EdgeInsets.all(contentPadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      product.productName,
-                      style: TextStyle(
-                        fontSize: isSmallScreen ? 11 : 12,
-                        fontWeight: FontWeight.w600,
-                        height: 1.2,
+                    // Out of Stock Badge - Top Left
+                    if (outOfStock)
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isSmallScreen ? 6 : 8, 
+                            vertical: isSmallScreen ? 3 : 4
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.85),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              width: 0.3,
+                            ),
+                          ),
+                          child: Text(
+                            'Out of Stock',
+                            style: TextStyle(
+                              fontSize: isSmallScreen ? 9 : 10,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    SizedBox(height: isSmallScreen ? 4 : 6),
-                    Text(
-                      product.priceRange,
-                      style: TextStyle(
-                        fontSize: isSmallScreen ? 11 : 12,
-                        fontWeight: FontWeight.w700,
-                        color: kSageDark,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (!outOfStock && product.colorOptions.isNotEmpty) ...[
-                      SizedBox(height: isSmallScreen ? 4 : 6),
-                      Wrap(
-                        spacing: isSmallScreen ? 2 : 3,
-                        runSpacing: 2,
-                        children: product.colorOptions
-                            .take(4)
-                            .map((option) => _colorDot(option, isSmallScreen))
-                            .toList(),
-                      ),
-                    ],
                   ],
                 ),
-              ),
-            ],
+                // Content section with constrained width
+                Padding(
+                  padding: EdgeInsets.all(contentPadding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        product.productName,
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 11 : 12,
+                          fontWeight: FontWeight.w600,
+                          height: 1.2,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      SizedBox(height: isSmallScreen ? 4 : 6),
+                      Text(
+                        product.priceRange,
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 11 : 12,
+                          fontWeight: FontWeight.w700,
+                          color: kSageDark,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (!outOfStock && product.colorOptions.isNotEmpty) ...[
+                        SizedBox(height: isSmallScreen ? 4 : 6),
+                        Wrap(
+                          spacing: isSmallScreen ? 2 : 3,
+                          runSpacing: 2,
+                          children: product.colorOptions
+                              .take(4)
+                              .map((option) => _colorDot(option, isSmallScreen))
+                              .toList(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
+
   Widget _colorDot(ColorOption option, bool isSmall) {
     final color = _resolveColor(option.color);
     final bool outOfStock = option.stock <= 0;
@@ -1052,8 +1045,6 @@ Widget _buildProductGrid(List<Product> products, bool isSmallScreen, bool isMedi
     final productNames = widget.retailer.products?.map((p) => p.productName).toList() ?? [];
     final productPrices = widget.retailer.products?.map((p) => p.minPrice).toList() ?? [];
     final products = _getReviewProducts(index, productNames, productPrices);
-    final helpfulCount = _helpfulCounts[review.id] ?? 0;
-    final isHelpful = _isHelpful[review.id] ?? false;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1111,39 +1102,7 @@ Widget _buildProductGrid(List<Product> products, bool isSmallScreen, bool isMedi
               ),
             ),
           ],
-          const SizedBox(height: 16),
-          InkWell(
-            onTap: () {
-              setState(() {
-                if (isHelpful) {
-                  _helpfulCounts[review.id] = helpfulCount - 1;
-                  _isHelpful[review.id] = false;
-                } else {
-                  _helpfulCounts[review.id] = helpfulCount + 1;
-                  _isHelpful[review.id] = true;
-                }
-              });
-            },
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  isHelpful ? Icons.thumb_up_alt : Icons.thumb_up_alt_outlined,
-                  size: 16,
-                  color: isHelpful ? Colors.orange : Colors.grey,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  helpfulCount > 0 ? "Helpful $helpfulCount" : "Helpful",
-                  style: TextStyle(
-                    color: isHelpful ? Colors.orange : Colors.grey,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          // ❌ REMOVED: Helpful section
         ],
       ),
     );
@@ -1236,73 +1195,6 @@ Widget _buildProductGrid(List<Product> products, bool isSmallScreen, bool isMedi
         product: product,
         isFabric: _isFabric(product),
         retailerName: widget.retailer.shopName,
-      ),
-    );
-  }
-
-  // ─── Bottom Bar ────────────────────────────────────────────────────────
-
-  Widget _buildBottomBar(bool isSmallScreen) {
-    final padding = isSmallScreen ? 12.0 : 16.0;
-    final verticalPadding = isSmallScreen ? 10.0 : 14.0;
-    final fontSize = isSmallScreen ? 13.0 : 15.0;
-    
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: padding, vertical: verticalPadding),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: ElevatedButton(
-              onPressed: _navigateToOrder,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2C5C44),
-                padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 10.0 : 14.0),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                textStyle: TextStyle(
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              child: Text(
-                isSmallScreen ? 'Order' : 'Order Now',
-                style: TextStyle(
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─── Navigation Methods ──────────────────────────────────────────────
-
-  void _navigateToOrder() {
-    if (widget.onRetailerSelected != null) {
-      widget.onRetailerSelected!(widget.retailer.id);
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Order from ${widget.retailer.shopName}'),
-        backgroundColor: const Color(0xFF2C5C44),
-        duration: const Duration(seconds: 2),
       ),
     );
   }

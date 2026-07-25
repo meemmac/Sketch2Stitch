@@ -4,7 +4,7 @@ import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_fabrics_screen.dart' show kHardcodedProducts;
+import 'package:sketch2stitch/screens/customer/browsing/browse_fabrics_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_tailors_screen.dart' show kHardcodedTailors;
 import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.dart' show kHardcodedRetailers;
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
@@ -51,23 +51,54 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   String _favoritesFilter = 'Fabric and elements';
   bool _hasUnreadNotifications = true;
 
-  // TODO: replace with the signed-in user's real "last viewed" history
-  List<Product> get _lastViewedProducts => kHardcodedProducts.take(3).toList();
+  // ─── Get all fabric products from kHardcodedFabricData ──────────────
 
-  // TODO: replace with the signed-in user's real saved favorites
-  List<Product> get _favoriteFabricProducts => kHardcodedProducts.skip(2).take(3).toList();
+  List<Product> get _allFabricProducts {
+    return kHardcodedFabricData.map((fabricData) => fabricData.product).toList();
+  }
+
+  List<Product> get _allElementProducts => kHardcodedElements;
+
+  // ─── Last Viewed ──────────────────────────────────────────────────────
+
+  List<Product> get _lastViewedProducts {
+    final fabrics = _allFabricProducts;
+    return fabrics.isNotEmpty ? fabrics.take(3).toList() : [];
+  }
+
+  // ─── Favorites ────────────────────────────────────────────────────────
+
+  List<Product> get _favoriteFabricProducts {
+    final fabrics = _allFabricProducts;
+    return fabrics.length > 2 ? fabrics.skip(2).take(3).toList() : fabrics;
+  }
+
   List<Tailor> get _favoriteTailors => kHardcodedTailors.take(3).toList();
   List<Retailer> get _favoriteRetailers => kHardcodedRetailers.take(3).toList();
 
-  List<Product> get _fabricSectionProducts => kHardcodedProducts
-      .where((p) => ['Cotton', 'Silk', 'Wool', 'Linen'].contains(p.category))
-      .take(6)
-      .toList();
+  // ─── Section Products ────────────────────────────────────────────────
 
-  List<Product> get _elementSectionProducts => kHardcodedProducts
-      .where((p) => ['Lace', 'Embroidery'].contains(p.category))
-      .take(6)
-      .toList();
+  List<Product> get _fabricSectionProducts {
+    final fabrics = _allFabricProducts;
+    return fabrics
+        .where((p) => ['Cotton', 'Silk', 'Wool', 'Linen'].contains(p.category))
+        .take(6)
+        .toList();
+  }
+
+  List<Product> get _elementSectionProducts {
+    final elements = _allElementProducts;
+    return elements
+        .where((p) => ['Lace', 'Embroidery', 'Fasteners', 'Buttons', 'Threads', 'Trims', 'Ribbons'].contains(p.category))
+        .take(6)
+        .toList();
+  }
+
+  // ─── Get Retailer Name ───────────────────────────────────────────────
+
+  String _getRetailerName(String retailerId) {
+    return retailerNameMap[retailerId] ?? 'Unknown Retailer';
+  }
 
   @override
   void initState() {
@@ -109,11 +140,25 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   }
 
   void _showProductOverlay(Product product) {
+    // Check if this product has material blends from fabric data
+    List<String>? materialBlends;
+    for (final fabricData in kHardcodedFabricData) {
+      if (fabricData.product.id == product.id) {
+        materialBlends = fabricData.materialBlendList;
+        break;
+      }
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => ProductDetailOverlay(product: product),
+      builder: (context) => ProductDetailOverlay(
+        product: product,
+        isFabric: true,
+        retailerName: _getRetailerName(product.retailerId),
+        materialBlends: materialBlends,
+      ),
     );
   }
 

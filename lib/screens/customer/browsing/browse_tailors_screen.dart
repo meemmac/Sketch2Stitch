@@ -539,14 +539,14 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                         Icon(
                           Icons.directions_bike,
                           size: isSmall ? 12 : 14,
-                          color: kSage,
+                          color: const Color.fromARGB(255, 107, 106, 106),
                         ),
                         const SizedBox(width: 4),
                         Text(
                           "Tk ${tailor.deliveryCharge.toInt()}",
                           style: TextStyle(
                             fontSize: 11,
-                            color: kSage,
+                            color: const Color.fromARGB(255, 107, 106, 106),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
