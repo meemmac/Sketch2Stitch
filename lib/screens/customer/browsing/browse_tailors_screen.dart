@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/portfolio.dart';
+import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
 
-/// Hardcoded sample tailors with multiple portfolio images.
+/// Hardcoded sample tailors
 final List<Tailor> kHardcodedTailors = [
   Tailor(
     id: 't1',
@@ -16,7 +17,6 @@ final List<Tailor> kHardcodedTailors = [
     address: '5 Banani Road, Banani, Dhaka',
     rating: 4.9,
     profilePicture: 'assets/images/fab.jpg',
-    deliveryCharge: 80,
     about: 'Formal and informal wear specialist with 12 years experience.',
     portfolio: [
       Portfolio(
@@ -47,7 +47,6 @@ final List<Tailor> kHardcodedTailors = [
     address: '22 Gulshan Avenue, Gulshan, Dhaka',
     rating: 4.7,
     profilePicture: 'assets/images/silk.jpg',
-    deliveryCharge: 60,
     about: 'Traditional and ethnic wear specialist with 15 years experience.',
     portfolio: [
       Portfolio(
@@ -78,7 +77,6 @@ final List<Tailor> kHardcodedTailors = [
     address: 'Kotwali, Chittagong',
     rating: 4.4,
     profilePicture: 'assets/images/textile.jpg',
-    deliveryCharge: 50,
     about: 'Casual and daily wear specialist with quick turnaround.',
     portfolio: [
       Portfolio(
@@ -103,7 +101,6 @@ final List<Tailor> kHardcodedTailors = [
     address: '3 Dhanmondi 27, Dhanmondi, Dhaka',
     rating: 4.8,
     profilePicture: 'assets/images/lace.jpg',
-    deliveryCharge: 100,
     about: 'Bridal and formal wear specialist with custom embroidery.',
     portfolio: [
       Portfolio(
@@ -134,7 +131,6 @@ final List<Tailor> kHardcodedTailors = [
     address: '15 Mirpur Road, Mirpur, Dhaka',
     rating: 4.6,
     profilePicture: 'assets/images/fab2.jpg',
-    deliveryCharge: 70,
     about: 'Quick stitching and alterations for all types of garments.',
     portfolio: [
       Portfolio(
@@ -159,18 +155,18 @@ final List<Tailor> kHardcodedTailors = [
   ),
 ];
 
-/// The actual tailors tab content, rendered as one page inside the shared
-/// [BrowseShell] PageView.
 class TailorsPageBody extends StatefulWidget {
   final ValueNotifier<String> searchQuery;
   final TailorsFilterData filterData;
   final void Function(String tailorId)? onTailorSelected;
+  final AppUserRole userRole;
 
   const TailorsPageBody({
     super.key,
     required this.searchQuery,
     required this.filterData,
     this.onTailorSelected,
+    this.userRole = AppUserRole.customer,
   });
 
   @override
@@ -192,18 +188,13 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
       builder: (context, searchQuery, _) {
         final filteredTailors = _tailors.where((t) {
           final matchesSearch = t.name.toLowerCase().contains(searchQuery.toLowerCase());
-          
-          // Rating filter from shell
           final matchesRating = t.rating >= widget.filterData.minRating;
-          
-          // Location filter from shell
           final matchesLocation = widget.filterData.location == 'All' ||
               t.address.toLowerCase().contains(widget.filterData.location.toLowerCase());
           
           return matchesSearch && matchesRating && matchesLocation;
         }).toList();
 
-        // Sort by rating based on filterData.sortBy
         if (widget.filterData.sortBy == 'ratingHighToLow') {
           filteredTailors.sort((a, b) => b.rating.compareTo(a.rating));
         } else if (widget.filterData.sortBy == 'ratingLowToHigh') {
@@ -219,8 +210,6 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
       },
     );
   }
-
-  // ─── Hero Section ─────────────────────────────────────────────────────────
 
   Widget _buildHeroSection() {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -295,8 +284,6 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
     );
   }
 
-  // ─── Tailors Grid ──────────────────────────────────────────────────────
-
   Widget _buildTailorsGrid(List<Tailor> tailors) {
     if (tailors.isEmpty) {
       return Center(
@@ -353,21 +340,6 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
 
   Widget _buildTailorCard(Tailor tailor, bool isSmall) {
     final bool isTopRated = tailor.rating >= 4.8;
-
-    // Get specialty from portfolio description
-    String specialty = 'Professional Tailoring';
-    if (tailor.portfolio != null && tailor.portfolio!.isNotEmpty) {
-      final desc = tailor.portfolio!.first.description ?? '';
-      if (desc.isNotEmpty) {
-        if (desc.length <= 30) {
-          specialty = desc;
-        } else {
-          specialty = desc.substring(0, 30) + '...';
-        }
-      }
-    }
-
-    // Get image from profilePicture or use fallback
     String imageUrl = tailor.profilePicture ?? 'assets/images/fab.jpg';
 
     return GestureDetector(
@@ -378,6 +350,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
             builder: (context) => TailorDetailScreen(
               tailor: tailor,
               onTailorSelected: widget.onTailorSelected,
+              userRole: widget.userRole,
             ),
           ),
         );
@@ -402,7 +375,6 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Image section with badges
             Flexible(
               flex: 5,
               child: Stack(
@@ -422,7 +394,6 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                       ),
                     ),
                   ),
-                  // Top Rated Badge
                   if (isTopRated)
                     Positioned(
                       top: 8,
@@ -450,7 +421,6 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                         ),
                       ),
                     ),
-                  // Rating Badge - Bottom Right
                   Positioned(
                     bottom: 8,
                     right: 8,
@@ -487,7 +457,6 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                 ],
               ),
             ),
-            // Content section
             Flexible(
               flex: 4,
               child: Padding(

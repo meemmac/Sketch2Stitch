@@ -1,18 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/models/product.dart';
+import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
 import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
 
-// ─── Element Categories ───────────────────────────────────────────────────
-
 final List<String> _elementCategories = [
   'Fasteners', 'Buttons', 'Threads', 'Embellishments', 'Trims', 'Ribbons'
 ];
-
-// ─── Sample Color Options ──────────────────────────────────────────────────
 
 ColorOption _createColorOption(int id, String color, String? image, double price, int stock, {String? video}) {
   return ColorOption(
@@ -25,10 +22,7 @@ ColorOption _createColorOption(int id, String color, String? image, double price
   );
 }
 
-// ─── Sample Element Products ─────────────────────────────────────────────
-
 final List<Product> _sampleElementProducts = [
-  // Elements for Dhaka Fabric House (r1)
   Product(
     id: 'e1',
     retailerId: 'r1',
@@ -57,8 +51,6 @@ final List<Product> _sampleElementProducts = [
     description: 'Elegant button sets in various sizes and finishes.',
     careSymbol: ['Hand wash', 'Do not bleach'],
   ),
-  
-  // Elements for Chowdhury Textiles (r2)
   Product(
     id: 'e3',
     retailerId: 'r2',
@@ -86,8 +78,6 @@ final List<Product> _sampleElementProducts = [
     description: 'Beautiful pearl embellishments for bridal and formal wear.',
     careSymbol: ['Dry clean only', 'Handle with care'],
   ),
-  
-  // Elements for Silk & Lace Emporium (r3)
   Product(
     id: 'e5',
     retailerId: 'r3',
@@ -115,8 +105,6 @@ final List<Product> _sampleElementProducts = [
     description: 'Versatile satin ribbons in various colors and widths.',
     careSymbol: ['Iron on low heat', 'Do not bleach'],
   ),
-  
-  // Elements for Bengal Cotton Co. (r4)
   Product(
     id: 'e7',
     retailerId: 'r4',
@@ -131,8 +119,6 @@ final List<Product> _sampleElementProducts = [
     description: 'Premium cotton thread for all your stitching needs.',
     careSymbol: ['Store in cool dry place'],
   ),
-  
-  // Elements for Heritage Weaves (r5)
   Product(
     id: 'e8',
     retailerId: 'r5',
@@ -162,10 +148,7 @@ final List<Product> _sampleElementProducts = [
   ),
 ];
 
-// ─── Sample Fabric Products ──────────────────────────────────────────────
-
 final List<Product> _sampleFabricProducts = [
-  // Products for Dhaka Fabric House (r1)
   Product(
     id: 'p1',
     retailerId: 'r1',
@@ -219,8 +202,6 @@ final List<Product> _sampleFabricProducts = [
     description: 'Beautiful printed cotton fabric for dresses and tops.',
     careSymbol: ['Machine Wash', 'Do Not Bleach'],
   ),
-  
-  // Products for Chowdhury Textiles (r2)
   Product(
     id: 'p5',
     retailerId: 'r2',
@@ -247,8 +228,6 @@ final List<Product> _sampleFabricProducts = [
     description: 'Light weight georgette chiffon for elegant drapes.',
     careSymbol: ['Dry Clean Only'],
   ),
-  
-  // Products for Silk & Lace Emporium (r3)
   Product(
     id: 'p7',
     retailerId: 'r3',
@@ -289,8 +268,6 @@ final List<Product> _sampleFabricProducts = [
     description: 'Luxurious velvet fabric for evening wear.',
     careSymbol: ['Dry Clean Only'],
   ),
-  
-  // Products for Bengal Cotton Co. (r4)
   Product(
     id: 'p10',
     retailerId: 'r4',
@@ -317,8 +294,6 @@ final List<Product> _sampleFabricProducts = [
     description: 'Premium denim fabric for jeans and jackets.',
     careSymbol: ['Machine Wash', 'Do Not Bleach'],
   ),
-  
-  // Products for Heritage Weaves (r5)
   Product(
     id: 'p12',
     retailerId: 'r5',
@@ -360,15 +335,12 @@ final List<Product> _sampleFabricProducts = [
   ),
 ];
 
-// ─── Helper to get products by retailer ID ──────────────────────────────────
-
 List<Product> _getProductsForRetailer(String retailerId) {
   final fabrics = _sampleFabricProducts.where((p) => p.retailerId == retailerId).toList();
   final elements = _sampleElementProducts.where((p) => p.retailerId == retailerId).toList();
   return [...fabrics, ...elements];
 }
 
-/// Hardcoded sample retailers with products (both fabrics and elements).
 final List<Retailer> kHardcodedRetailers = [
   Retailer(
     id: 'r1',
@@ -422,16 +394,16 @@ final List<Retailer> kHardcodedRetailers = [
   ),
 ];
 
-/// The actual retailers tab content, rendered as one page inside the
-/// shared [BrowseShell] PageView.
 class RetailersPageBody extends StatefulWidget {
   final ValueNotifier<String> searchQuery;
   final RetailersFilterData filterData;
+  final AppUserRole userRole;
 
   const RetailersPageBody({
     super.key,
     required this.searchQuery,
     required this.filterData,
+    this.userRole = AppUserRole.customer,
   });
 
   @override
@@ -453,11 +425,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
       builder: (context, searchQuery, _) {
         final filteredRetailers = _retailers.where((r) {
           final matchesSearch = r.shopName.toLowerCase().contains(searchQuery.toLowerCase());
-          
-          // Rating filter from shell
           final matchesRating = r.rating >= widget.filterData.minRating;
-          
-          // Location filter from shell
           final matchesLocation = widget.filterData.location == 'All' ||
               r.address.toLowerCase().contains(widget.filterData.location.toLowerCase());
           
@@ -473,8 +441,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
       },
     );
   }
-
-  // ─── Hero Section ─────────────────────────────────────────────────────────
 
   Widget _buildHeroSection() {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -549,8 +515,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
     );
   }
 
-  // ─── Retailers Grid ──────────────────────────────────────────────────────
-
   Widget _buildRetailersGrid(List<Retailer> retailers) {
     if (retailers.isEmpty) {
       return Center(
@@ -607,14 +571,19 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
 
   Widget _buildRetailerCard(Retailer retailer, bool isSmall) {
     final bool isTopRated = retailer.rating >= 4.8;
-
-    // Get image from profilePicture or use fallback
     String imageUrl = retailer.profilePicture ?? 'assets/images/fab.jpg';
 
     return GestureDetector(
       onTap: () {
-        // Navigate to retailer detail
-        _navigateToRetailerDetail(retailer);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RetailerDetailScreen(
+              retailer: retailer,
+              userRole: widget.userRole,
+            ),
+          ),
+        );
       },
       child: Container(
         decoration: BoxDecoration(
@@ -633,7 +602,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Image section with badges - UNCHANGED
             Flexible(
               flex: 5,
               child: Stack(
@@ -653,7 +621,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                       ),
                     ),
                   ),
-                  // Top Rated Badge
                   if (isTopRated)
                     Positioned(
                       top: 8,
@@ -681,7 +648,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                         ),
                       ),
                     ),
-                  // Rating Badge - Bottom Right
                   Positioned(
                     bottom: 8,
                     right: 8,
@@ -718,7 +684,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                 ],
               ),
             ),
-            // Content section - UNCHANGED (No element chips shown here)
             Flexible(
               flex: 4,
               child: Padding(
@@ -783,7 +748,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                         ),
                       ],
                     ),
-                    // Show product count if available
                     if (retailer.products != null && retailer.products!.isNotEmpty)
                       Padding(
                         padding: EdgeInsets.only(top: isSmall ? 2 : 4),
@@ -801,19 +765,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  // ─── Navigation Method ──────────────────────────────────────────────────
-
-  void _navigateToRetailerDetail(Retailer retailer) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => RetailerDetailScreen(
-          retailer: retailer,
         ),
       ),
     );

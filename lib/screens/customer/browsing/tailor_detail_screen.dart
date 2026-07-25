@@ -1,19 +1,20 @@
-// lib/screens/customer/browsing/tailor_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/review.dart';
+import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/messaging/conversations_screen.dart';
-import 'package:sketch2stitch/models/user_role.dart';
 
 class TailorDetailScreen extends StatefulWidget {
   final Tailor tailor;
   final void Function(String tailorId)? onTailorSelected;
-  
+  final AppUserRole userRole;
+
   const TailorDetailScreen({
     super.key,
     required this.tailor,
     this.onTailorSelected,
+    this.userRole = AppUserRole.customer,
   });
 
   @override
@@ -32,6 +33,8 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     'Rahul Ahmed', 'Sadia Rahman', 'Kamal Hossain', 'Tania Akhter', 'Shahid Khan',
     'Nadia Islam', 'Faisal Ahmed'
   ];
+
+  bool get _isCustomer => widget.userRole == AppUserRole.customer;
 
   @override
   void initState() {
@@ -108,8 +111,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
 
   String _getCustomerName(int index) => _customerNames[index % _customerNames.length];
 
-  // ─── Portfolio Overlay ─────────────────────────────────────────────────
-
   void _showPortfolioOverlay(dynamic portfolioItem) {
     final imagePath = portfolioItem.image ?? '';
     final description = portfolioItem.description ?? 'No description available.';
@@ -129,7 +130,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         ),
         child: Column(
           children: [
-            // Handle bar
             Container(
               margin: const EdgeInsets.only(top: 12),
               width: 40,
@@ -140,7 +140,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            // Close button
             Align(
               alignment: Alignment.centerRight,
               child: IconButton(
@@ -157,7 +156,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Image
                     ClipRRect(
                       borderRadius: BorderRadius.circular(20),
                       child: SizedBox(
@@ -187,7 +185,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    // Description Title
                     const Text(
                       "Description",
                       style: TextStyle(
@@ -196,7 +193,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    // Description Text - Larger font size
                     Text(
                       description,
                       style: const TextStyle(
@@ -215,8 +211,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       ),
     );
   }
-
-  // ─── Navigate to Conversations ─────────────────────────────────────────
 
   void _startConversation() {
     Navigator.push(
@@ -255,11 +249,8 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: _buildBottomBar(isSmallScreen),
     );
   }
-
-  // ─── App Bar ───────────────────────────────────────────────────────────
 
   SliverAppBar _buildAppBar(bool isSmallScreen) {
     final ratingSize = isSmallScreen ? 12.0 : 14.0;
@@ -398,29 +389,31 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withValues(alpha: 0.3),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.directions_bike, size: 10, color: Colors.white),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '1.8 km • Tk 40',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
+                            if (_isCustomer) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withValues(alpha: 0.3),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.directions_bike, size: 10, color: Colors.white),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '1.8 km • Tk 40',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
+                            ],
                           ],
                         ),
                       ),
@@ -450,7 +443,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
           ],
         ),
       ),
-      actions: [
+      actions: _isCustomer ? [
         IconButton(
           icon: Icon(
             Icons.chat_bubble_outline,
@@ -467,11 +460,9 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
           ),
           onPressed: () => setState(() => _isFavorite = !_isFavorite),
         ),
-      ],
+      ] : [],
     );
   }
-
-  // ─── Cover Image ──────────────────────────────────────────────────────
 
   Widget _buildCoverImage() {
     String imageUrl = 'assets/images/fab.jpg';
@@ -493,8 +484,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       ),
     );
   }
-
-  // ─── About Section ──────────────────────────────────────────────────────
 
   Widget _buildAboutSection(bool isSmallScreen) {
     String description = widget.tailor.about ?? 'Professional tailoring services with years of experience.';
@@ -527,8 +516,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       ],
     );
   }
-
-  // ─── Portfolio Section ─────────────────────────────────────────────────
 
   Widget _buildPortfolioSection(bool isSmallScreen, bool isMediumScreen) {
     final portfolioItems = widget.tailor.portfolio ?? [];
@@ -651,8 +638,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       ],
     );
   }
-
-  // ─── Reviews Page (matches TailorReviewsScreen) ────────────────────────
 
   void _showReviewsOverlay(BuildContext context) {
     Navigator.push(
@@ -1012,72 +997,5 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     }
     
     return products;
-  }
-
-  // ─── Bottom Bar ────────────────────────────────────────────────────────
-
-  Widget _buildBottomBar(bool isSmallScreen) {
-    final padding = isSmallScreen ? 12.0 : 16.0;
-    final verticalPadding = isSmallScreen ? 10.0 : 14.0;
-    final fontSize = isSmallScreen ? 13.0 : 15.0;
-    
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: padding, vertical: verticalPadding),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: ElevatedButton(
-              onPressed: _navigateToBooking,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2C5C44),
-                padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 10.0 : 14.0),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                textStyle: TextStyle(
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              child: Text(
-                isSmallScreen ? 'Book' : 'Book Now',
-                style: TextStyle(
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─── Navigation Methods ──────────────────────────────────────────────
-
-  void _navigateToBooking() {
-    if (widget.onTailorSelected != null) {
-      Navigator.pop(context, widget.tailor.id);
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Book appointment with ${widget.tailor.name}'),
-        backgroundColor: const Color(0xFF2C5C44),
-        duration: const Duration(seconds: 2),
-      ),
-    );
   }
 }

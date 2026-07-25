@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
+import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
 import '../../../widgets/video_preview_player.dart';
 
-// ─── Material Blend Class (Same as Inventory) ─────────────────────────
+// ─── Material Blend Class ─────────────────────────────────────────────
 
 class FabricMaterialBlend {
   String material;
@@ -65,7 +66,7 @@ class FabricProductData {
   }
 }
 
-/// Hardcoded sample fabrics with assets images and material blends
+/// Hardcoded sample fabrics
 final List<FabricProductData> kHardcodedFabricData = [
   FabricProductData(
     product: Product(
@@ -80,7 +81,7 @@ final List<FabricProductData> kHardcodedFabricData = [
         ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/fabric_waves.jpg', video: 'assets/images/Videos/vid3.mp4', price: 700, stock: 15),
         ColorOption(optionId: 4, color: 'Black', image: 'assets/images/textile.jpg', price: 700, stock: 0),
       ],
-      description: 'Soft, breathable Egyptian cotton perfect for shirts and casual wear. Pre-shrunk and colorfast, holds its shape wash after wash.',
+      description: 'Soft, breathable Egyptian cotton perfect for shirts and casual wear.',
       careSymbol: ['Machine wash cold', 'Do not bleach', 'Tumble dry low'],
     ),
     materialBlends: [
@@ -100,7 +101,7 @@ final List<FabricProductData> kHardcodedFabricData = [
         ColorOption(optionId: 3, color: 'Green', image: 'assets/images/gorgeous.jpg', video: 'assets/images/Videos/vid1.mp4', price: 1750, stock: 5),
         ColorOption(optionId: 4, color: 'White', image: 'assets/images/gorgette.jpg', price: 1700, stock: 12),
       ],
-      description: 'Luxurious mulberry silk with a natural sheen, ideal for formal wear and sarees. Lightweight with a smooth, cool feel against the skin.',
+      description: 'Luxurious mulberry silk with a natural sheen.',
       careSymbol: ['Dry clean only', 'Iron on low heat'],
     ),
     materialBlends: [
@@ -120,7 +121,7 @@ final List<FabricProductData> kHardcodedFabricData = [
         ColorOption(optionId: 2, color: 'Black', image: 'assets/images/textile.jpg', video: 'assets/images/Videos/vid2.mp4', price: 950, stock: 20),
         ColorOption(optionId: 3, color: 'Beige', image: 'assets/images/fabric_waves.jpg', price: 900, stock: 0),
       ],
-      description: 'Warm merino wool blend suited for winter jackets and blazers. Resists wrinkles and retains heat without feeling heavy.',
+      description: 'Warm merino wool blend suited for winter jackets and blazers.',
       careSymbol: ['Hand wash cold', 'Dry flat'],
     ),
     materialBlends: [
@@ -140,7 +141,7 @@ final List<FabricProductData> kHardcodedFabricData = [
         ColorOption(optionId: 2, color: 'Beige', image: 'assets/images/fab.jpg', video: 'assets/images/Videos/vid2.mp4', price: 780, stock: 22),
         ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/fabric_waves.jpg', price: 820, stock: 14),
       ],
-      description: 'Classic Irish linen with a crisp hand-feel, great for summer shirts and trousers. Naturally breathable and gets softer with every wash.',
+      description: 'Classic Irish linen with a crisp hand-feel.',
       careSymbol: ['Machine wash cold', 'Iron while damp'],
     ),
     materialBlends: [
@@ -159,7 +160,7 @@ final List<FabricProductData> kHardcodedFabricData = [
         ColorOption(optionId: 2, color: 'Black', image: 'assets/images/lace2.jpg', price: 1200, stock: 4),
         ColorOption(optionId: 3, color: 'Pink', image: 'assets/images/embroidery.jpg', price: 1250, stock: 0),
       ],
-      description: 'Delicate floral Chantilly lace, hand-finished scalloped edges. Popular for bridal wear and formal blouses.',
+      description: 'Delicate floral Chantilly lace, hand-finished scalloped edges.',
       careSymbol: ['Dry clean only', 'Do not bleach'],
     ),
     materialBlends: [
@@ -178,7 +179,7 @@ final List<FabricProductData> kHardcodedFabricData = [
         ColorOption(optionId: 2, color: 'Green', image: 'assets/images/design.jpg', price: 3200, stock: 2),
         ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/crochet.jpg', price: 3400, stock: 0),
       ],
-      description: 'Hand-embroidered zardozi work with metallic thread and sequins, crafted for statement pieces like lehengas and formal jackets.',
+      description: 'Hand-embroidered zardozi work with metallic thread and sequins.',
       careSymbol: ['Dry clean only'],
     ),
     materialBlends: [
@@ -197,7 +198,7 @@ final List<FabricProductData> kHardcodedFabricData = [
         ColorOption(optionId: 1, color: 'White', image: 'assets/images/tassel.jpg', price: 550, stock: 35),
         ColorOption(optionId: 2, color: 'Blue', image: 'assets/images/drawing_fabric.jpg', price: 600, stock: 20),
       ],
-      description: 'Beautiful tassel fabric with intricate detailing. Perfect for curtains, upholstery, and decorative items.',
+      description: 'Beautiful tassel fabric with intricate detailing.',
       careSymbol: ['Dry clean only', 'Do not iron directly'],
     ),
     materialBlends: [
@@ -215,7 +216,7 @@ final List<FabricProductData> kHardcodedFabricData = [
         ColorOption(optionId: 1, color: 'White', image: 'assets/images/textile.jpg', price: 850, stock: 15),
         ColorOption(optionId: 2, color: 'Beige', image: 'assets/images/fabric_waves.jpg', price: 850, stock: 10),
       ],
-      description: 'Handwoven textile with traditional patterns. Each piece is unique with slight variations that add to its charm.',
+      description: 'Handwoven textile with traditional patterns.',
       careSymbol: ['Hand wash', 'Do not bleach', 'Air dry'],
     ),
     materialBlends: [
@@ -233,7 +234,7 @@ final List<FabricProductData> kHardcodedFabricData = [
         ColorOption(optionId: 1, color: 'Gold', image: 'assets/images/gorgeous.jpg', price: 2500, stock: 5),
         ColorOption(optionId: 2, color: 'Blue', image: 'assets/images/design.jpg', price: 2800, stock: 3),
       ],
-      description: 'Luxurious designer silk blend with a unique texture and finish. Perfect for high-end fashion and special occasions.',
+      description: 'Luxurious designer silk blend with a unique texture.',
       careSymbol: ['Dry clean only', 'Store in a cool place'],
     ),
     materialBlends: [
@@ -253,7 +254,7 @@ final List<FabricProductData> kHardcodedFabricData = [
         ColorOption(optionId: 2, color: 'Blue', image: 'assets/images/fab2.jpg', price: 500, stock: 30),
         ColorOption(optionId: 3, color: 'Green', image: 'assets/images/fabric_waves.jpg', price: 550, stock: 20),
       ],
-      description: 'Classic cotton weave fabric with a soft, comfortable feel. Ideal for everyday wear and casual outfits.',
+      description: 'Classic cotton weave fabric with a soft, comfortable feel.',
       careSymbol: ['Machine wash warm', 'Tumble dry', 'Iron medium'],
     ),
     materialBlends: [
@@ -275,7 +276,7 @@ final List<Product> kHardcodedElements = [
       ColorOption(optionId: 2, color: 'Black', image: 'assets/images/buttons.jpg', price: 80, stock: 150),
       ColorOption(optionId: 3, color: 'Gold', image: 'assets/images/buttons.jpg', price: 100, stock: 100),
     ],
-    description: 'Elegant button sets in various sizes and finishes. Suitable for shirts, blazers, and decorative purposes.',
+    description: 'Elegant button sets in various sizes and finishes.',
     careSymbol: ['Hand wash', 'Do not bleach'],
   ),
   Product(
@@ -289,7 +290,7 @@ final List<Product> kHardcodedElements = [
       ColorOption(optionId: 2, color: 'Black', image: 'assets/images/thread.jpg', price: 45, stock: 250),
       ColorOption(optionId: 3, color: 'Beige', image: 'assets/images/thread.jpg', price: 45, stock: 200),
     ],
-    description: 'Premium quality sewing thread in essential colors. Strong and durable for all your stitching needs.',
+    description: 'Premium quality sewing thread in essential colors.',
     careSymbol: ['Store in cool dry place'],
   ),
   Product(
@@ -302,7 +303,7 @@ final List<Product> kHardcodedElements = [
       ColorOption(optionId: 1, color: 'White', image: 'assets/images/pearls.jpg', price: 200, stock: 80),
       ColorOption(optionId: 2, color: 'Pink', image: 'assets/images/pearls.jpg', price: 220, stock: 60),
     ],
-    description: 'Beautiful pearl embellishments for bridal and formal wear. Adds elegance to any garment or accessory.',
+    description: 'Beautiful pearl embellishments for bridal and formal wear.',
     careSymbol: ['Dry clean only', 'Handle with care'],
   ),
   Product(
@@ -315,7 +316,7 @@ final List<Product> kHardcodedElements = [
       ColorOption(optionId: 1, color: 'White', image: 'assets/images/lace_trim.jpg', price: 180, stock: 40),
       ColorOption(optionId: 2, color: 'Black', image: 'assets/images/lace_trim.jpg', price: 180, stock: 35),
     ],
-    description: 'Fine lace trim with delicate patterns. Perfect for adding feminine touches to garments.',
+    description: 'Fine lace trim with delicate patterns.',
     careSymbol: ['Hand wash', 'Do not bleach'],
   ),
   Product(
@@ -329,7 +330,7 @@ final List<Product> kHardcodedElements = [
       ColorOption(optionId: 2, color: 'Gold', image: 'assets/images/ribbon.jpg', price: 70, stock: 120),
       ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/ribbon.jpg', price: 65, stock: 100),
     ],
-    description: 'Versatile satin ribbons in various colors and widths. Ideal for gift wrapping, bows, and garment decoration.',
+    description: 'Versatile satin ribbons in various colors and widths.',
     careSymbol: ['Iron on low heat', 'Do not bleach'],
   ),
 ];
@@ -350,12 +351,14 @@ class FabricsPageBody extends StatefulWidget {
   final ValueNotifier<String> searchQuery;
   final ProductFilterData filterData;
   final bool showFabrics;
+  final AppUserRole userRole;
 
   const FabricsPageBody({
     super.key,
     required this.searchQuery,
     required this.filterData,
     this.showFabrics = true,
+    this.userRole = AppUserRole.customer,
   });
 
   @override
@@ -377,7 +380,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       valueListenable: widget.searchQuery,
       builder: (context, searchQuery, _) {
         if (widget.showFabrics) {
-          // Filter fabrics with material blends
           final filteredFabrics = _fabrics.where((fabricData) {
             final product = fabricData.product;
             final matchesSearch = product.productName
@@ -386,10 +388,10 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
             final productMinPrice = product.minPrice;
             final matchesPrice = productMinPrice >= widget.filterData.minPrice &&
                 productMinPrice <= widget.filterData.maxPrice;
-            final matchesColor = widget.filterData.color == 'All' || 
-                product.colorOptions.any((c) => c.color == widget.filterData.color);
             
-            // Updated material matching using the new method
+            final productColors = product.colorOptions.map((c) => c.color).toList();
+            final matchesColor = widget.filterData.matchesColor(productColors);
+            
             final matchesMaterial = widget.filterData.matchesMaterial(
               product.materialType,
               fabricData.materialBlendList,
@@ -399,7 +401,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                    matchesColor && matchesMaterial;
           }).toList();
 
-          // Sort based on filterData.sortBy
           if (widget.filterData.sortBy == 'lowToHigh') {
             filteredFabrics.sort((a, b) => a.product.minPrice.compareTo(b.product.minPrice));
           } else if (widget.filterData.sortBy == 'highToLow') {
@@ -415,7 +416,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
             ],
           );
         } else {
-          // Filter elements
           final filteredElements = _elements.where((product) {
             final matchesSearch = product.productName
                 .toLowerCase()
@@ -423,10 +423,10 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
             final productMinPrice = product.minPrice;
             final matchesPrice = productMinPrice >= widget.filterData.minPrice &&
                 productMinPrice <= widget.filterData.maxPrice;
-            final matchesColor = widget.filterData.color == 'All' || 
-                product.colorOptions.any((c) => c.color == widget.filterData.color);
             
-            // For elements, check materialType against selected types
+            final productColors = product.colorOptions.map((c) => c.color).toList();
+            final matchesColor = widget.filterData.matchesColor(productColors);
+            
             final matchesMaterial = widget.filterData.materialTypes.isEmpty ||
                 widget.filterData.materialTypes.contains('All') ||
                 widget.filterData.materialTypes.any((type) =>
@@ -436,7 +436,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                    matchesColor && matchesMaterial;
           }).toList();
 
-          // Sort based on filterData.sortBy
           if (widget.filterData.sortBy == 'lowToHigh') {
             filteredElements.sort((a, b) => a.minPrice.compareTo(b.minPrice));
           } else if (widget.filterData.sortBy == 'highToLow') {
@@ -455,8 +454,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       },
     );
   }
-
-  // ─── Hero Section ─────────────────────────────────────────────────────────
 
   Widget _buildHeroSection(String type) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -530,8 +527,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       ),
     );
   }
-
-  // ─── Fabric Grid ──────────────────────────────────────────────────────
 
   Widget _buildFabricGrid(List<FabricProductData> fabrics) {
     if (fabrics.isEmpty) {
@@ -614,7 +609,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Image section
                 Flexible(
                   flex: 5,
                   child: Stack(
@@ -647,7 +641,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                                 ),
                         ),
                       ),
-                      // Material Blend Badge - Top Right (only for fabrics)
                       if (materialDisplay != "N/A")
                         Positioned(
                           top: 8,
@@ -678,7 +671,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                             ),
                           ),
                         ),
-                      // Out of Stock Badge - Top Left
                       if (outOfStock)
                         Positioned(
                           top: 8,
@@ -709,7 +701,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                     ],
                   ),
                 ),
-                // Content section
                 Flexible(
                   flex: 4,
                   child: Padding(
@@ -756,7 +747,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                           overflow: TextOverflow.ellipsis,
                         ),
                         SizedBox(height: isSmallScreen ? 6 : 8),
-                        // Color dots + delivery chip
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -803,8 +793,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       },
     );
   }
-
-  // ─── Element Grid ──────────────────────────────────────────────────────
 
   Widget _buildElementGrid(List<Product> elements) {
     if (elements.isEmpty) {
@@ -917,9 +905,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                                 ),
                         ),
                       ),
-                      // ─── Category Badge REMOVED from top-right ───
-                      // No badge for elements - just the image and content
-                      
                       if (outOfStock)
                         Positioned(
                           top: 8,
@@ -1094,6 +1079,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         isFabric: true,
         retailerName: _getRetailerName(fabricData.product.retailerId),
         materialBlends: fabricData.materialBlendList,
+        userRole: widget.userRole,
       ),
     );
   }
@@ -1107,6 +1093,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         product: product,
         isFabric: false,
         retailerName: _getRetailerName(product.retailerId),
+        userRole: widget.userRole,
       ),
     );
   }

@@ -6,12 +6,20 @@ import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
 import 'package:sketch2stitch/screens/customer/cart_screen.dart';
+import 'package:sketch2stitch/widgets/dashboard_drawer.dart'; // ✅ Import AppUserRole
 
 /// Shared shell for the four "Browse" tabs (Fabrics, Elements, Tailors, Retailers)
 class BrowseShell extends StatefulWidget {
   final int initialIndex;
   final void Function(String tailorId)? onTailorSelected;
-  const BrowseShell({super.key, this.initialIndex = 0, this.onTailorSelected});
+  final AppUserRole userRole;
+
+  const BrowseShell({
+    super.key,
+    this.initialIndex = 0,
+    this.onTailorSelected,
+    this.userRole = AppUserRole.customer,
+  });
 
   @override
   State<BrowseShell> createState() => _BrowseShellState();
@@ -66,25 +74,25 @@ class _BrowseShellState extends State<BrowseShell> {
 
   // ─── Tab-Specific Filter Values ──────────────────────────────────────
 
-  // Fabrics Filters (Price, Color, Material Types - Multi-select)
+  // Fabrics Filters
   double _fabricsMinPrice = 0;
   double _fabricsMaxPrice = 5000;
-  String _fabricsSelectedColor = 'All';
+  List<String> _fabricsSelectedColors = ['All'];
   List<String> _fabricsSelectedMaterials = ['All'];
   String _fabricsSortBy = 'default';
 
-  // Elements Filters (Price, Color ONLY - No Material Type)
+  // Elements Filters
   double _elementsMinPrice = 0;
   double _elementsMaxPrice = 5000;
-  String _elementsSelectedColor = 'All';
+  List<String> _elementsSelectedColors = ['All'];
   String _elementsSortBy = 'default';
 
-  // Tailors Filters (Rating, Location)
+  // Tailors Filters
   double _tailorsMinRating = 0;
   String _tailorsSelectedLocation = 'All';
   String _tailorsSortBy = 'default';
 
-  // Retailers Filters (Rating, Location)
+  // Retailers Filters
   double _retailersMinRating = 0;
   String _retailersSelectedLocation = 'All';
   String _retailersSortBy = 'default';
@@ -148,13 +156,13 @@ class _BrowseShellState extends State<BrowseShell> {
     setState(() {
       _fabricsMinPrice = 0;
       _fabricsMaxPrice = 5000;
-      _fabricsSelectedColor = 'All';
+      _fabricsSelectedColors = ['All'];
       _fabricsSelectedMaterials = ['All'];
       _fabricsSortBy = 'default';
 
       _elementsMinPrice = 0;
       _elementsMaxPrice = 5000;
-      _elementsSelectedColor = 'All';
+      _elementsSelectedColors = ['All'];
       _elementsSortBy = 'default';
 
       _tailorsMinRating = 0;
@@ -176,13 +184,13 @@ class _BrowseShellState extends State<BrowseShell> {
     if (currentIndex == 0) {
       return _fabricsMinPrice > 0 ||
           _fabricsMaxPrice < 5000 ||
-          _fabricsSelectedColor != 'All' ||
+          (_fabricsSelectedColors.isNotEmpty && !_fabricsSelectedColors.contains('All')) ||
           (_fabricsSelectedMaterials.isNotEmpty && !_fabricsSelectedMaterials.contains('All')) ||
           _fabricsSortBy != 'default';
     } else if (currentIndex == 1) {
       return _elementsMinPrice > 0 ||
           _elementsMaxPrice < 5000 ||
-          _elementsSelectedColor != 'All' ||
+          (_elementsSelectedColors.isNotEmpty && !_elementsSelectedColors.contains('All')) ||
           _elementsSortBy != 'default';
     } else if (currentIndex == 2) {
       return _tailorsMinRating > 0 ||
@@ -198,22 +206,21 @@ class _BrowseShellState extends State<BrowseShell> {
   @override
   Widget build(BuildContext context) {
     final currentIndex = _page.round().clamp(0, _tabLabels.length - 1);
+    final isCustomer = widget.userRole == AppUserRole.customer;
 
-    // Create tab-specific filter data
     final fabricsFilterData = FabricsFilterData(
       minPrice: _fabricsMinPrice,
       maxPrice: _fabricsMaxPrice,
-      color: _fabricsSelectedColor,
+      colors: _fabricsSelectedColors,
       materialTypes: _fabricsSelectedMaterials,
       sortBy: _fabricsSortBy,
     );
 
-    // Elements filter data - no material types
     final elementsFilterData = ElementsFilterData(
       minPrice: _elementsMinPrice,
       maxPrice: _elementsMaxPrice,
-      color: _elementsSelectedColor,
-      materialTypes: ['All'], // Always 'All' since elements don't use material types
+      colors: _elementsSelectedColors,
+      materialTypes: ['All'],
       sortBy: _elementsSortBy,
     );
 
@@ -239,7 +246,7 @@ class _BrowseShellState extends State<BrowseShell> {
           children: [
             Column(
               children: [
-                _buildHeader(),
+                _buildHeader(isCustomer),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Container(
@@ -271,20 +278,24 @@ class _BrowseShellState extends State<BrowseShell> {
                         searchQuery: _searchNotifier,
                         filterData: fabricsFilterData,
                         showFabrics: true,
+                        userRole: widget.userRole,
                       ),
                       FabricsPageBody(
                         searchQuery: _searchNotifier,
                         filterData: elementsFilterData,
                         showFabrics: false,
+                        userRole: widget.userRole,
                       ),
                       TailorsPageBody(
                         searchQuery: _searchNotifier,
                         filterData: tailorsFilterData,
                         onTailorSelected: widget.onTailorSelected,
+                        userRole: widget.userRole,
                       ),
                       RetailersPageBody(
                         searchQuery: _searchNotifier,
                         filterData: retailersFilterData,
+                        userRole: widget.userRole,
                       ),
                     ],
                   ),
@@ -325,9 +336,7 @@ class _BrowseShellState extends State<BrowseShell> {
     );
   }
 
-  // ─── Header ────────────────────────────────────────────────────────────
-
-  Widget _buildHeader() {
+  Widget _buildHeader(bool isCustomer) {
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 8,
@@ -371,55 +380,83 @@ class _BrowseShellState extends State<BrowseShell> {
             },
           ),
           const Spacer(),
-          Stack(
-            children: [
-              IconButton(
-                onPressed: _toggleFilterOverlay,
-                icon: Icon(
-                  Icons.filter_list,
-                  color: _showFilterOverlay || _hasActiveFilters ? kSage : Colors.black87,
-                  size: 24,
+          if (!isCustomer)
+            Stack(
+              children: [
+                IconButton(
+                  onPressed: _toggleFilterOverlay,
+                  icon: Icon(
+                    Icons.filter_list,
+                    color: _showFilterOverlay || _hasActiveFilters ? kSage : Colors.black87,
+                    size: 24,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-              if (_hasActiveFilters)
-                Positioned(
-                  top: 2,
-                  right: 2,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
+                if (_hasActiveFilters)
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
                     ),
                   ),
-                ),
-            ],
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CartScreen()),
-              );
-            },
-            icon: const Icon(
-              Icons.shopping_cart_outlined,
-              color: Colors.black87,
-              size: 24,
+              ],
             ),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
+          if (isCustomer) ...[
+            Stack(
+              children: [
+                IconButton(
+                  onPressed: _toggleFilterOverlay,
+                  icon: Icon(
+                    Icons.filter_list,
+                    color: _showFilterOverlay || _hasActiveFilters ? kSage : Colors.black87,
+                    size: 24,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                if (_hasActiveFilters)
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CartScreen()),
+                );
+              },
+              icon: const Icon(
+                Icons.shopping_cart_outlined,
+                color: Colors.black87,
+                size: 24,
+              ),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
         ],
       ),
     );
   }
-
-  // ─── Filter Panel ──────────────────────────────────────────────────────
 
   Widget _buildFilterPanel(int currentTab) {
     if (currentTab == 0) {
@@ -432,8 +469,6 @@ class _BrowseShellState extends State<BrowseShell> {
       return _buildRetailersFilterPanel();
     }
   }
-
-  // ─── Fabrics Filter Panel ─────────────────────────────────────────────
 
   Widget _buildFabricsFilterPanel() {
     final allMaterials = MaterialFilterOptions.getMaterialOptions();
@@ -476,7 +511,6 @@ class _BrowseShellState extends State<BrowseShell> {
             ),
             const SizedBox(height: 12),
 
-            // Price Range
             const Text(
               'Price Range',
               style: TextStyle(
@@ -518,7 +552,6 @@ class _BrowseShellState extends State<BrowseShell> {
             ),
             const SizedBox(height: 6),
 
-            // Sort by Price
             const Text(
               'Sort by Price',
               style: TextStyle(
@@ -544,9 +577,8 @@ class _BrowseShellState extends State<BrowseShell> {
             ),
             const SizedBox(height: 12),
 
-            // Color Filter
             const Text(
-              'Color',
+              'Color (Select multiple)',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -557,11 +589,23 @@ class _BrowseShellState extends State<BrowseShell> {
               spacing: 4,
               runSpacing: 4,
               children: _colorOptions.map((color) {
-                final isSelected = _fabricsSelectedColor == color;
+                final isSelected = _fabricsSelectedColors.contains(color);
                 return GestureDetector(
                   onTap: () {
                     setState(() {
-                      _fabricsSelectedColor = color;
+                      if (color == 'All') {
+                        _fabricsSelectedColors = ['All'];
+                      } else {
+                        _fabricsSelectedColors.remove('All');
+                        if (_fabricsSelectedColors.contains(color)) {
+                          _fabricsSelectedColors.remove(color);
+                          if (_fabricsSelectedColors.isEmpty) {
+                            _fabricsSelectedColors.add('All');
+                          }
+                        } else {
+                          _fabricsSelectedColors.add(color);
+                        }
+                      }
                     });
                   },
                   child: Container(
@@ -604,7 +648,6 @@ class _BrowseShellState extends State<BrowseShell> {
             ),
             const SizedBox(height: 12),
 
-            // Material Types - Multi-select (from MaterialFilterOptions)
             const Text(
               'Material Types (Select multiple)',
               style: TextStyle(
@@ -688,8 +731,6 @@ class _BrowseShellState extends State<BrowseShell> {
     );
   }
 
-  // ─── Elements Filter Panel (NO MATERIAL TYPE) ────────────────────────
-
   Widget _buildElementsFilterPanel() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -729,7 +770,6 @@ class _BrowseShellState extends State<BrowseShell> {
             ),
             const SizedBox(height: 12),
 
-            // Price Range
             const Text(
               'Price Range',
               style: TextStyle(
@@ -771,7 +811,6 @@ class _BrowseShellState extends State<BrowseShell> {
             ),
             const SizedBox(height: 6),
 
-            // Sort by Price
             const Text(
               'Sort by Price',
               style: TextStyle(
@@ -797,9 +836,8 @@ class _BrowseShellState extends State<BrowseShell> {
             ),
             const SizedBox(height: 12),
 
-            // Color Filter
             const Text(
-              'Color',
+              'Color (Select multiple)',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -810,11 +848,23 @@ class _BrowseShellState extends State<BrowseShell> {
               spacing: 4,
               runSpacing: 4,
               children: _colorOptions.map((color) {
-                final isSelected = _elementsSelectedColor == color;
+                final isSelected = _elementsSelectedColors.contains(color);
                 return GestureDetector(
                   onTap: () {
                     setState(() {
-                      _elementsSelectedColor = color;
+                      if (color == 'All') {
+                        _elementsSelectedColors = ['All'];
+                      } else {
+                        _elementsSelectedColors.remove('All');
+                        if (_elementsSelectedColors.contains(color)) {
+                          _elementsSelectedColors.remove(color);
+                          if (_elementsSelectedColors.isEmpty) {
+                            _elementsSelectedColors.add('All');
+                          }
+                        } else {
+                          _elementsSelectedColors.add(color);
+                        }
+                      }
                     });
                   },
                   child: Container(
@@ -855,8 +905,6 @@ class _BrowseShellState extends State<BrowseShell> {
                 );
               }).toList(),
             ),
-            // ─── Material Type Filter REMOVED for Elements ─────────────
-
             const SizedBox(height: 14),
 
             SizedBox(
@@ -886,8 +934,6 @@ class _BrowseShellState extends State<BrowseShell> {
       ),
     );
   }
-
-  // ─── Sort Chips ──────────────────────────────────────────────────────
 
   Widget _buildFabricsSortChip({
     required String label,
@@ -1069,8 +1115,6 @@ class _BrowseShellState extends State<BrowseShell> {
     );
   }
 
-  // ─── Tailors Filter Panel ─────────────────────────────────────────────
-
   Widget _buildTailorsFilterPanel() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1246,8 +1290,6 @@ class _BrowseShellState extends State<BrowseShell> {
       ),
     );
   }
-
-  // ─── Retailers Filter Panel ───────────────────────────────────────────
 
   Widget _buildRetailersFilterPanel() {
     return Container(
@@ -1453,8 +1495,6 @@ class _BrowseShellState extends State<BrowseShell> {
         return Colors.grey[300]!;
     }
   }
-
-  // ─── Navigation Row ──────────────────────────────────────────────────────
 
   Widget _buildNavigationRow() {
     return SizedBox(

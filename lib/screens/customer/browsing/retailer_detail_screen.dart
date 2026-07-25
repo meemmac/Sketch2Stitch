@@ -1,24 +1,25 @@
-// lib/screens/customer/browsing/retailer_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/review.dart';
+import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/messaging/conversations_screen.dart';
-import 'package:sketch2stitch/models/user_role.dart';
 
 class RetailerDetailScreen extends StatefulWidget {
   final Retailer retailer;
   final VoidCallback? onBackPressed;
   final void Function(String retailerId)? onRetailerSelected;
-  
+  final AppUserRole userRole;
+
   const RetailerDetailScreen({
     super.key,
     required this.retailer,
     this.onBackPressed,
     this.onRetailerSelected,
+    this.userRole = AppUserRole.customer,
   });
 
   @override
@@ -47,6 +48,8 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   final List<String> _elementCategories = [
     'Fasteners', 'Buttons', 'Threads', 'Embellishments', 'Trims', 'Ribbons'
   ];
+
+  bool get _isCustomer => widget.userRole == AppUserRole.customer;
 
   @override
   void initState() {
@@ -132,8 +135,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   List<Product> get _fabrics => widget.retailer.products?.where((p) => _isFabric(p)).toList() ?? [];
   List<Product> get _elements => widget.retailer.products?.where((p) => _isElement(p)).toList() ?? [];
 
-  // ─── Navigate to Conversations ─────────────────────────────────────────
-
   void _startConversation() {
     Navigator.push(
       context,
@@ -176,8 +177,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
       ),
     );
   }
-
-  // ─── Category Toggle ──────────────────────────────────────────────
 
   Widget _buildCategoryToggle(bool isSmallScreen) {
     return Container(
@@ -242,8 +241,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
       ),
     );
   }
-
-  // ─── App Bar ───────────────────────────────────────────────────────────
 
   SliverAppBar _buildAppBar(bool isSmallScreen) {
     final ratingSize = isSmallScreen ? 12.0 : 14.0;
@@ -388,29 +385,31 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withValues(alpha: 0.3),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.directions_bike, size: 10, color: Colors.white),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '2.5 km • Tk 50',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
+                            if (_isCustomer) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withValues(alpha: 0.3),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.directions_bike, size: 10, color: Colors.white),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '2.5 km • Tk 50',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
+                            ],
                           ],
                         ),
                       ),
@@ -440,7 +439,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
           ],
         ),
       ),
-      actions: [
+      actions: _isCustomer ? [
         IconButton(
           icon: Icon(
             Icons.chat_bubble_outline,
@@ -457,7 +456,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
           ),
           onPressed: () => setState(() => _isFavorite = !_isFavorite),
         ),
-      ],
+      ] : [],
     );
   }
 
@@ -485,8 +484,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     );
   }
 
-  // ─── About Section ──────────────────────────────────────────────────────
-
   Widget _buildAboutSection(bool isSmallScreen) {
     String description = widget.retailer.about ?? 'Quality products with excellent customer service.';
     
@@ -512,8 +509,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
       ],
     );
   }
-
-  // ─── Products Section ─────────────────────────────────────────────────
 
   Widget _buildProductsSection(bool isSmallScreen, bool isMediumScreen) {
     final products = _showFabrics ? _fabrics : _elements;
@@ -583,8 +578,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     );
   }
 
-  // ─── Product Grid ──────────────────────────────────────────────────────
-
   Widget _buildProductGrid(List<Product> products, bool isSmallScreen, bool isMediumScreen) {
     final displayProducts = _showAllProducts ? products : (products.length > 6 ? products.take(6).toList() : products);
     final screenWidth = MediaQuery.of(context).size.width;
@@ -633,7 +626,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Image section with fixed height
                 Stack(
                   children: [
                     ClipRRect(
@@ -665,7 +657,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                               ),
                       ),
                     ),
-                    // Category Badge - Top Right
                     Positioned(
                       top: 8,
                       right: 8,
@@ -695,7 +686,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                         ),
                       ),
                     ),
-                    // Out of Stock Badge - Top Left
                     if (outOfStock)
                       Positioned(
                         top: 8,
@@ -725,7 +715,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                       ),
                   ],
                 ),
-                // Content section with constrained width
                 Padding(
                   padding: EdgeInsets.all(contentPadding),
                   child: Column(
@@ -819,8 +808,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         return Colors.grey[300]!;
     }
   }
-
-  // ─── Reviews Page ─────────────────────────────────────────────────────
 
   void _showReviewsOverlay(BuildContext context) {
     Navigator.push(
@@ -1102,7 +1089,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
               ),
             ),
           ],
-          // ❌ REMOVED: Helpful section
         ],
       ),
     );
@@ -1184,8 +1170,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     return products;
   }
 
-  // ─── Product Detail Overlay ──────────────────────────────────────────
-
   void _showProductDetailOverlay(BuildContext context, Product product) {
     showModalBottomSheet(
       context: context,
@@ -1195,6 +1179,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         product: product,
         isFabric: _isFabric(product),
         retailerName: widget.retailer.shopName,
+        userRole: widget.userRole,
       ),
     );
   }

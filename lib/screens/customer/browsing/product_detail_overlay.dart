@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
+import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
 import '../../../widgets/video_preview_player.dart';
 
 class ProductDetailOverlay extends StatefulWidget {
@@ -7,6 +8,7 @@ class ProductDetailOverlay extends StatefulWidget {
   final bool isFabric;
   final String retailerName;
   final List<String>? materialBlends;
+  final AppUserRole userRole;
 
   const ProductDetailOverlay({
     super.key,
@@ -14,6 +16,7 @@ class ProductDetailOverlay extends StatefulWidget {
     this.isFabric = true,
     this.retailerName = 'Unknown Retailer',
     this.materialBlends,
+    this.userRole = AppUserRole.customer,
   });
 
   @override
@@ -35,6 +38,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
   }
 
   bool get _inStock => (_selectedOption?.stock ?? 0) > 0;
+  bool get _isCustomer => widget.userRole == AppUserRole.customer;
 
   String get _materialBlendDisplay {
     if (widget.materialBlends != null && widget.materialBlends!.isNotEmpty) {
@@ -86,7 +90,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
       ),
       child: Column(
         children: [
-          // Handle bar
           Container(
             margin: const EdgeInsets.only(top: 12),
             width: 40,
@@ -97,7 +100,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
             ),
           ),
           const SizedBox(height: 8),
-          // Close button
           Align(
             alignment: Alignment.centerRight,
             child: IconButton(
@@ -114,11 +116,9 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Product Image
                   _buildProductImage(),
                   const SizedBox(height: 16),
 
-                  // Title and Favorite
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -132,32 +132,32 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                           ),
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: IconButton(
-                          icon: Icon(
-                            _isFavorite ? Icons.favorite : Icons.favorite_border,
-                            color: _isFavorite ? Colors.red : Colors.grey,
-                            size: 28,
+                      if (_isCustomer)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: IconButton(
+                            icon: Icon(
+                              _isFavorite ? Icons.favorite : Icons.favorite_border,
+                              color: _isFavorite ? Colors.red : Colors.grey,
+                              size: 28,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _isFavorite = !_isFavorite;
+                              });
+                            },
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 44,
+                              minHeight: 44,
+                            ),
+                            visualDensity: VisualDensity.compact,
                           ),
-                          onPressed: () {
-                            setState(() {
-                              _isFavorite = !_isFavorite;
-                            });
-                          },
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 44,
-                            minHeight: 44,
-                          ),
-                          visualDensity: VisualDensity.compact,
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 4),
 
-                  // Price / delivery / stock badge
                   Wrap(
                     crossAxisAlignment: WrapCrossAlignment.center,
                     spacing: 12,
@@ -252,7 +252,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 10),
 
-                  // Retailer Name
                   Row(
                     children: [
                       const Icon(
@@ -266,7 +265,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                           widget.retailerName,
                           style: const TextStyle(
                             fontSize: 14,
-                            color: Color.fromARGB(255, 46, 45, 45),
+                            color: Colors.grey,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -276,7 +275,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 10),
 
-                  // ─── Material Blend - Single line like the image ───
                   if (widget.isFabric && materialBlendDisplay != "N/A") ...[
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -297,65 +295,65 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                     const SizedBox(height: 16),
                   ],
 
-                  // Quantity
-                  Text(
-                    isElement ? 'Quantity (piece)' : 'Quantity (gauge)',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                  if (_isCustomer) ...[
+                    Text(
+                      isElement ? 'Quantity (piece)' : 'Quantity (gauge)',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[300]!),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.remove, size: 20),
-                          onPressed: !_inStock
-                              ? null
-                              : () {
-                                  setState(() {
-                                    if (_quantity > 1) _quantity--;
-                                  });
-                                },
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                        ),
-                        Container(
-                          width: 40,
-                          alignment: Alignment.center,
-                          child: Text(
-                            '$_quantity',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey[300]!),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.remove, size: 20),
+                            onPressed: !_inStock
+                                ? null
+                                : () {
+                                    setState(() {
+                                      if (_quantity > 1) _quantity--;
+                                    });
+                                  },
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                          ),
+                          Container(
+                            width: 40,
+                            alignment: Alignment.center,
+                            child: Text(
+                              '$_quantity',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.add, size: 20),
-                          onPressed: !_inStock
-                              ? null
-                              : () {
-                                  setState(() {
-                                    final maxStock = _selectedOption?.stock ?? 1;
-                                    if (_quantity < maxStock) _quantity++;
-                                  });
-                                },
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                        ),
-                      ],
+                          IconButton(
+                            icon: const Icon(Icons.add, size: 20),
+                            onPressed: !_inStock
+                                ? null
+                                : () {
+                                    setState(() {
+                                      final maxStock = _selectedOption?.stock ?? 1;
+                                      if (_quantity < maxStock) _quantity++;
+                                    });
+                                  },
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 24),
+                  ],
 
-                  // Available Colors
                   const Text(
                     'Available Colors',
                     style: TextStyle(
@@ -450,7 +448,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Care Instructions
                   if (widget.isFabric) ...[
                     const Text(
                       'Care Instructions',
@@ -480,7 +477,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                     const SizedBox(height: 24),
                   ],
 
-                  // Product Description
                   const Text(
                     'Product Description',
                     style: TextStyle(
@@ -499,40 +495,77 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Add to Cart Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: !_inStock
-                          ? null
-                          : () {
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Added to cart!'),
-                                  backgroundColor: Color(0xFF4E8B6F),
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                            },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF2C5C44),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        side: const BorderSide(color: Color(0xFF2C5C44)),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  if (_isCustomer)
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: !_inStock
+                            ? null
+                            : () {
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Added to cart!'),
+                                    backgroundColor: Color(0xFF4E8B6F),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF2C5C44),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          side: const BorderSide(color: Color(0xFF2C5C44)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                      ),
-                      child: const Text(
-                        'Add to Cart',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF2C5C44),
+                        child: const Text(
+                          'Add to Cart',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF2C5C44),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  
+                  if (!_isCustomer) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: Center(
+                          child: Text(
+                            widget.userRole == AppUserRole.tailor 
+                                ? 'View product details'
+                                : 'Product information',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      widget.userRole == AppUserRole.tailor
+                          ? 'You are viewing as a tailor. Contact the retailer for purchases.'
+                          : 'You are viewing as a retailer. Manage this product in your inventory.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 30),
                 ],
               ),
@@ -654,8 +687,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
       ],
     );
   }
-
-  // ─── Care Info Helper Methods ─────────────────────────────────────
 
   Widget _careInfoRow(
     IconData icon,
