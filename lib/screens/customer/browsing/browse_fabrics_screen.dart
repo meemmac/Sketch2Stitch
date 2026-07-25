@@ -265,20 +265,6 @@ final List<FabricProductData> kHardcodedFabricData = [
 /// Hardcoded sample elements
 final List<Product> kHardcodedElements = [
   Product(
-    id: 'e1',
-    retailerId: 'r1',
-    productName: 'Premium Zipper',
-    category: 'Fasteners',
-    materialType: 'Metal',
-    colorOptions: [
-      ColorOption(optionId: 1, color: 'Silver', image: 'assets/images/zipper.jpg', price: 120, stock: 100),
-      ColorOption(optionId: 2, color: 'Gold', image: 'assets/images/zipper_gold.jpg', price: 150, stock: 50),
-      ColorOption(optionId: 3, color: 'Black', image: 'assets/images/zipper.jpg', price: 130, stock: 75),
-    ],
-    description: 'High-quality metal zippers with smooth operation. Perfect for jackets, bags, and formal wear.',
-    careSymbol: ['Do not iron directly', 'Clean with damp cloth'],
-  ),
-  Product(
     id: 'e2',
     retailerId: 'r1',
     productName: 'Decorative Buttons Set',
@@ -402,9 +388,13 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                 productMinPrice <= widget.filterData.maxPrice;
             final matchesColor = widget.filterData.color == 'All' || 
                 product.colorOptions.any((c) => c.color == widget.filterData.color);
-            final matchesMaterial = widget.filterData.materialType == 'All' || 
-                product.category == widget.filterData.materialType ||
-                product.materialType == widget.filterData.materialType;
+            
+            // Updated material matching using the new method
+            final matchesMaterial = widget.filterData.matchesMaterial(
+              product.materialType,
+              fabricData.materialBlendList,
+            );
+            
             return matchesSearch && matchesPrice && 
                    matchesColor && matchesMaterial;
           }).toList();
@@ -435,9 +425,13 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                 productMinPrice <= widget.filterData.maxPrice;
             final matchesColor = widget.filterData.color == 'All' || 
                 product.colorOptions.any((c) => c.color == widget.filterData.color);
-            final matchesMaterial = widget.filterData.materialType == 'All' || 
-                product.category == widget.filterData.materialType ||
-                product.materialType == widget.filterData.materialType;
+            
+            // For elements, check materialType against selected types
+            final matchesMaterial = widget.filterData.materialTypes.isEmpty ||
+                widget.filterData.materialTypes.contains('All') ||
+                widget.filterData.materialTypes.any((type) =>
+                    product.materialType.toLowerCase().contains(type.toLowerCase()));
+            
             return matchesSearch && matchesPrice && 
                    matchesColor && matchesMaterial;
           }).toList();
@@ -599,8 +593,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
             product.colorOptions.every((c) => c.stock <= 0);
 
         final retailerName = _getRetailerName(product.retailerId);
-        
-        // Get the material blend display for the top-right badge
         final materialDisplay = fabricData.materialDisplay;
 
         return GestureDetector(
@@ -655,7 +647,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                                 ),
                         ),
                       ),
-                      // 🔥 Material Blend Badge - Top Right (replaces category)
+                      // Material Blend Badge - Top Right (only for fabrics)
                       if (materialDisplay != "N/A")
                         Positioned(
                           top: 8,
@@ -902,7 +894,8 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                         child: SizedBox(
                           width: double.infinity,
                           height: double.infinity,
-                          child: coverImage != null                              ? Image.asset(
+                          child: coverImage != null
+                              ? Image.asset(
                                   coverImage,
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) => Container(
@@ -924,34 +917,9 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                                 ),
                         ),
                       ),
-                      // Category Badge - Top Right for elements
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isSmallScreen ? 8 : 10, 
-                            vertical: isSmallScreen ? 4 : 5
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.7),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              width: 0.3,
-                            ),
-                          ),
-                          child: Text(
-                            product.category,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ),
-                      ),
+                      // ─── Category Badge REMOVED from top-right ───
+                      // No badge for elements - just the image and content
+                      
                       if (outOfStock)
                         Positioned(
                           top: 8,

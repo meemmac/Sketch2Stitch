@@ -70,7 +70,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   void initState() {
     super.initState();
     
-    // Set initial blocked state from widget parameter
     _isBlocked = widget.isBlocked ?? false;
     
     _loadMessages();
@@ -117,7 +116,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: isError ? Colors.red[700] : const Color.fromARGB(255, 45, 141, 61), // Orange/amber color for better visibility
+                color: isError ? Colors.red[700] : const Color.fromARGB(255, 45, 141, 61), 
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
@@ -131,7 +130,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                 children: [
                   Icon(
                     isError ? Icons.error_outline : Icons.notifications_active,
-                    color: const Color.fromARGB(255, 14, 13, 13),
+                    color: Colors.white,
                     size: 20,
                   ),
                   const SizedBox(width: 12),
@@ -202,7 +201,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       final isMuted = prefs.getBool('muted_${widget.conversationId}') ?? false;
       final mutedUntilStr = prefs.getString('mutedUntil_${widget.conversationId}');
       
-      // Only load blocked status from prefs if not already set from widget
       if (widget.isBlocked == null) {
         final isBlocked = prefs.getBool('blocked_${widget.conversationId}') ?? false;
         setState(() {
@@ -236,9 +234,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
   Future<void> _markConversationAsRead() async {
     try {
-      // TODO: Replace with API call
-      // await api.markConversationAsRead(widget.conversationId);
-      
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
         'last_read_${widget.conversationId}',
@@ -289,7 +284,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     _scrollToBottom();
 
     try {
-      // TODO: Replace with API call
       setState(() => _isTyping = true);
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) {
@@ -333,13 +327,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
   Future<void> _saveMuteStatus(bool isMuted, DateTime? mutedUntil) async {
     try {
-      // TODO: Replace with API call
-      // await api.updateConversation(
-      //   widget.conversationId,
-      //   isMuted: isMuted,
-      //   mutedUntil: mutedUntil,
-      // );
-      
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('muted_${widget.conversationId}', isMuted);
       if (mutedUntil != null) {
@@ -419,14 +406,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
   Future<void> _blockUser() async {
     try {
-      // TODO: Replace with API call
-      // await api.updateConversation(
-      //   widget.conversationId,
-      //   isBlocked: true,
-      //   blockedBy: widget.customerId,
-      //   blockedAt: DateTime.now(),
-      // );
-      
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('blocked_${widget.conversationId}', true);
       
@@ -436,7 +415,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       
       _showTopNotification('${widget.otherUserName} has been blocked');
       
-      // Notify conversation screen that block status changed
       if (widget.onConversationRead != null) {
         widget.onConversationRead!(widget.conversationId);
       }
@@ -452,14 +430,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
   Future<void> _unblockUser() async {
     try {
-      // TODO: Replace with API call
-      // await api.updateConversation(
-      //   widget.conversationId,
-      //   isBlocked: false,
-      //   blockedBy: null,
-      //   blockedAt: null,
-      // );
-      
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('blocked_${widget.conversationId}');
       
@@ -469,33 +439,12 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       
       _showTopNotification('${widget.otherUserName} has been unblocked');
       
-      // Notify conversation screen that block status changed
       if (widget.onConversationRead != null) {
         widget.onConversationRead!(widget.conversationId);
       }
       
     } catch (e) {
       _showTopNotification('Failed to unblock user', isError: true);
-    }
-  }
-
-  Future<void> _deleteConversation() async {
-    try {
-      // TODO: Replace with API call
-      // await api.deleteConversation(widget.conversationId);
-      
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('blocked_${widget.conversationId}');
-      await prefs.remove('muted_${widget.conversationId}');
-      await prefs.remove('mutedUntil_${widget.conversationId}');
-      await prefs.remove('last_read_${widget.conversationId}');
-      await prefs.remove('unread_count_${widget.conversationId}');
-      
-      _showTopNotification('Conversation deleted');
-      Navigator.pop(context);
-      
-    } catch (e) {
-      _showTopNotification('Failed to delete conversation', isError: true);
     }
   }
 
@@ -715,10 +664,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                   _selectedMessageId = null;
                 });
                 _showTopNotification('Message deleted');
-                
-                // TODO: Call API to delete message
-                // await api.deleteMessage(message.id);
-                
               },
               child: const Text(
                 'Delete',
@@ -796,9 +741,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       _messages.add(newMessage);
     });
     _scrollToBottom();
-
-    // TODO: Upload attachment and send message via API
-    // await api.sendAttachment(...);
   }
 
   void _showAttachmentOptions() {
@@ -1030,47 +972,9 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                   _messages.clear();
                 });
                 _showTopNotification('Chat cleared');
-                
-                // TODO: Call API to clear chat
-                // await api.clearChat(widget.conversationId);
-                
               },
               child: const Text(
                 'Clear',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showDeleteConversationConfirmation() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text('Delete Conversation'),
-          content: Text(
-            'Are you sure you want to delete this conversation with ${widget.otherUserName}?\n\n'
-            'All messages will be permanently deleted.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _deleteConversation();
-              },
-              child: const Text(
-                'Delete',
                 style: TextStyle(color: Colors.red),
               ),
             ),
@@ -1236,18 +1140,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                   _showClearChatConfirmation();
                 },
               ),
-              ListTile(
-                leading: const Icon(Icons.delete_forever, color: Colors.red),
-                title: const Text(
-                  'Delete Conversation',
-                  style: TextStyle(color: Colors.red),
-                ),
-                trailing: const Icon(Icons.chevron_right, size: 16),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showDeleteConversationConfirmation();
-                },
-              ),
+              // ─── Delete Conversation REMOVED ──────────────────────
             ],
           ),
         );

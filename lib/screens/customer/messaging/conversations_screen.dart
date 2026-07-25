@@ -87,7 +87,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: isError ? Colors.red[700] : const Color(0xFFE67E22),
+                color: isError ? Colors.red[700] : const Color.fromARGB(255, 45, 141, 61),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
@@ -446,21 +446,21 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         'isAnonymous': false,
       },
       'anonymous_1': {
-        'name': 'Unknown',
+        'name': '01611111111', // Phone number as name
         'phone': '01611111111',
         'avatar': 'assets/images/fab.jpg',
         'role': UserRole.customer,
         'isAnonymous': true,
       },
       'anonymous_2': {
-        'name': 'Unknown',
+        'name': '01622222222', // Phone number as name
         'phone': '01622222222',
         'avatar': 'assets/images/fab2.jpg',
         'role': UserRole.customer,
         'isAnonymous': true,
       },
       'anonymous_3': {
-        'name': 'Unknown',
+        'name': '01633333333', // Phone number as name
         'phone': '01633333333',
         'avatar': 'assets/images/fab.jpg',
         'role': UserRole.retailer,
@@ -514,8 +514,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   String _getOtherUserName(Conversation conversation) {
     final userData = _userCache[conversation.otherId];
     if (userData != null) {
+      // For anonymous users, return the phone number
       if (userData['isAnonymous'] == true) {
-        return userData['phone'] ?? 'Unknown';
+        return userData['phone'] ?? conversation.otherId;
       }
       return userData['name'] ?? conversation.otherId;
     }
@@ -870,10 +871,10 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           profilePicture: 'assets/images/lace.jpg',
         ),
       },
-      // Anonymous contacts - name shows as "Tailor" or "Retailer"
+      // Anonymous contacts - phone numbers only
       {
         'id': 'anonymous_4',
-        'name': 'Tailor',
+        'name': '01644444444', // Phone number as name
         'phone': '01644444444',
         'role': UserRole.tailor,
         'avatar': 'assets/images/fab.jpg',
@@ -882,7 +883,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       },
       {
         'id': 'anonymous_5',
-        'name': 'Retailer',
+        'name': '01655555555', // Phone number as name
         'phone': '01655555555',
         'role': UserRole.retailer,
         'avatar': 'assets/images/fab2.jpg',
@@ -891,7 +892,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       },
       {
         'id': 'anonymous_6',
-        'name': 'Tailor',
+        'name': '01666666666', // Phone number as name
         'phone': '01666666666',
         'role': UserRole.tailor,
         'avatar': 'assets/images/textile.jpg',
@@ -900,7 +901,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       },
       {
         'id': 'anonymous_7',
-        'name': 'Retailer',
+        'name': '01677777777', // Phone number as name
         'phone': '01677777777',
         'role': UserRole.retailer,
         'avatar': 'assets/images/lace.jpg',
@@ -1028,9 +1029,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                               final isAnonymous = contact['isAnonymous'] == true;
                               final roleDisplay = contact['roleDisplay'] ?? (isTailor ? 'Tailor' : 'Retailer');
                               
-                              // For anonymous users, show the role as the name (Tailor/Retailer)
+                              // For anonymous users, show the phone number as name
                               String displayName = contact['name'];
-                              
+
                               return ListTile(
                                 leading: CircleAvatar(
                                   backgroundImage: AssetImage(contact['avatar']),
@@ -1068,40 +1069,24 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    if (isAnonymous)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey.shade100,
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          'Unknown',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.grey.shade600,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      )
-                                    else
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: isTailor 
-                                              ? Colors.green.shade50 
-                                              : Colors.blue.shade50,
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          isTailor ? 'Tailor' : 'Retailer',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: isTailor ? Colors.green.shade700 : Colors.blue.shade700,
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                    // Role badge (Tailor/Retailer) - removed "Unknown" label
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: isTailor 
+                                            ? Colors.green.shade50 
+                                            : Colors.blue.shade50,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        isTailor ? 'Tailor' : 'Retailer',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: isTailor ? Colors.green.shade700 : Colors.blue.shade700,
+                                          fontWeight: FontWeight.w600,
                                         ),
                                       ),
+                                    ),
                                   ],
                                 ),
                                 trailing: const Icon(Icons.chevron_right, color: Colors.grey),
@@ -1125,8 +1110,11 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                     ),
                                   );
 
+                                  // For anonymous users, store phone number as name
+                                  final userName = isAnonymous ? contact['phone'] : displayName;
+
                                   _userCache[contactId] = {
-                                    'name': displayName,
+                                    'name': userName,
                                     'phone': contact['phone'],
                                     'avatar': contact['avatar'],
                                     'role': contact['role'],
@@ -1148,7 +1136,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                         conversationId: existingConv.id,
                                         customerId: widget.customerId,
                                         otherUserId: existingConv.otherId,
-                                        otherUserName: displayName,
+                                        otherUserName: userName,
                                         otherUserRole: existingConv.otherRole,
                                         otherUserAvatar: contact['avatar'],
                                         orderId: existingConv.orderId,
@@ -1491,14 +1479,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            if (isAnonymous) ...[
-                              const SizedBox(width: 4),
-                              Icon(
-                                Icons.help_outline,
-                                size: 12,
-                                color: Colors.grey[400],
-                              ),
-                            ],
                             if (isMuted && !isBlocked) ...[
                               const SizedBox(width: 4),
                               Icon(
@@ -1949,14 +1929,6 @@ class _ConversationSearchDelegate extends SearchDelegate {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                if (isAnonymous) ...[
-                                  const SizedBox(width: 4),
-                                  Icon(
-                                    Icons.help_outline,
-                                    size: 12,
-                                    color: Colors.grey[400],
-                                  ),
-                                ],
                                 if (conversation.isMuted && !isBlocked) ...[
                                   const SizedBox(width: 4),
                                   Icon(
