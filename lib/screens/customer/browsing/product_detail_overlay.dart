@@ -580,7 +580,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: VideoPreviewPlayer(
-                videoPath: videoUrl!,
+                videoPath: videoUrl,
                 height: imageHeight,
                 width: imageWidth,
               ),

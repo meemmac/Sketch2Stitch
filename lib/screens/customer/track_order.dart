@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../widgets/dashboard_drawer.dart';
-import 'home_screen.dart';
 
 // TODO(backend): Replace static `events` list with data fetched from Firestore.
 // Each TrackEventType below maps 1:1 to a backend status value, so building

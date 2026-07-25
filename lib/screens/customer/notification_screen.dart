@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
-import 'package:image_picker/image_picker.dart';
 // ============= CUSTOMER NOTIFICATION =============
 enum NotificationType { confirmed, delivered, cancelled, paymentDue }
 
@@ -264,10 +263,6 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
           break;
       }
     });
-  }
-
-  void _goBack() {
-    Navigator.pop(context, false);
   }
 
   int get _notificationCount {

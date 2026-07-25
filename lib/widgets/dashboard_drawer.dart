@@ -8,12 +8,12 @@ import '../screens/retailer/orders_screen.dart';
 import '../screens/customer/measurement_screen.dart';
 import '../models/measurement.dart';
 import '../screens/shared/welcome_screen.dart';
-import '../screens/shared/about_us_screen.dart';
 import '../screens/shared/location_picker_screen.dart';
 import '../screens/tailor/portfolio_screen.dart';
 import '../screens/tailor/orders_screen.dart';
 import '../screens/customer/cart_screen.dart';
 import '../screens/customer/orders/order_detail_screen.dart';
+import '../screens/customer/messaging/conversations_screen.dart';
 
 /// Enum representing the three user roles.
 enum AppUserRole { customer, tailor, retailer }
@@ -564,6 +564,15 @@ class DrawerNavigationSection extends StatelessWidget {
                     builder: (_) => const TailorPortfolioScreen(),
                   ),
                 );
+              } else if (item['title'] == 'Messages') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ConversationsScreen(
+                      customerId: 'current_customer_id',
+                    ),
+                  ),
+                );
               } else {
                 debugPrint("Navigation clicked: ${item['title']}");
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -853,9 +862,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 _profilePicturePath!.isNotEmpty
                             ? FileImage(File(_profilePicturePath!))
                                   as ImageProvider
-                            : const AssetImage(
-                                'assets/images/fab.jpg',
-                              ),
+                            : const AssetImage('assets/images/fab.jpg'),
                       ),
                       Positioned(
                         bottom: 0,

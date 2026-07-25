@@ -40,11 +40,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   double _deliveryChargeFor(String retailerId) =>
       widget.retailers[retailerId]?.deliveryCharge ?? 0;
 
-  double _payableFor(String retailerId, List<CartLine> lines) {
-    final subtotal = lines.fold<double>(0, (sum, l) => sum + l.lineTotal);
-    return subtotal + _deliveryChargeFor(retailerId);
-  }
-
   bool get _allPaid {
     final ids = _groupedByRetailer.keys;
     if (ids.isEmpty) return false;

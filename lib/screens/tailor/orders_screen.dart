@@ -254,18 +254,6 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     return DateTime(today.year, today.month, today.day, 23, 59, 59);
   }
 
-  String get _filterLabel {
-    switch (_filterPreset) {
-      case OrderFilterPreset.last3Months:
-        return "Last 3 months";
-      case OrderFilterPreset.last6Months:
-        return "Last 6 months";
-      case OrderFilterPreset.custom:
-        if (_customStartDate == null || _customEndDate == null) return "Custom dates";
-        return "${_formatDate(_customStartDate!)} - ${_formatDate(_customEndDate!)}";
-    }
-  }
-
   List<TailorOrder> get _filteredOrders {
     return _orders.where((order) {
       final date = order.orderDate;
@@ -551,15 +539,6 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _filterOptionTile(String title, bool selected, VoidCallback onTap) {
-    return ListTile(
-      onTap: onTap,
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(selected ? Icons.radio_button_checked : Icons.radio_button_off, color: primaryGreen),
-      title: Text(title, style: TextStyle(fontWeight: selected ? FontWeight.bold : FontWeight.normal)),
     );
   }
 
