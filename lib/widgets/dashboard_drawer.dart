@@ -317,24 +317,22 @@ class DrawerProfileSection extends StatelessWidget {
               CircleAvatar(
                 radius: 28,
                 backgroundColor: themeColor.withValues(alpha: 0.15),
-                backgroundImage:
-                    profile.profilePicture != null &&
-                        profile.profilePicture!.isNotEmpty
-                    ? FileImage(File(profile.profilePicture!))
-                    : null,
+                backgroundImage: isCustomer
+                    ? (profile.profilePicture != null &&
+                              profile.profilePicture!.isNotEmpty
+                          ? FileImage(File(profile.profilePicture!))
+                          : null)
+                    : (profile.profilePicture != null &&
+                              profile.profilePicture!.isNotEmpty
+                          ? FileImage(File(profile.profilePicture!))
+                                as ImageProvider
+                          : const AssetImage('assets/images/fab.jpg')),
                 child:
-                    profile.profilePicture != null &&
-                        profile.profilePicture!.isNotEmpty
-                    ? null
-                    : Icon(
-                        isCustomer
-                            ? Icons.person_rounded
-                            : (role == AppUserRole.tailor
-                                  ? Icons.design_services_rounded
-                                  : Icons.storefront_rounded),
-                        color: themeColor,
-                        size: 32,
-                      ),
+                    isCustomer &&
+                        (profile.profilePicture == null ||
+                            profile.profilePicture!.isEmpty)
+                    ? Icon(Icons.person_rounded, color: themeColor, size: 32)
+                    : null,
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -742,7 +740,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       text: widget.initialProfile.about ?? '',
     );
     _profilePicturePath = widget.initialProfile.profilePicture;
-    _selectedLocation = widget.initialProfile.location;
+    _selectedLocation =
+        widget.initialProfile.location ??
+        const GeoPoint(23.8103, 90.4125); // dummy Dhaka coordinates for now
   }
 
   Future<void> _pickImage() async {
@@ -852,18 +852,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             _profilePicturePath != null &&
                                 _profilePicturePath!.isNotEmpty
                             ? FileImage(File(_profilePicturePath!))
-                            : null,
-                        child:
-                            _profilePicturePath == null ||
-                                _profilePicturePath!.isEmpty
-                            ? Icon(
-                                isRetailer
-                                    ? Icons.storefront_rounded
-                                    : Icons.design_services_rounded,
-                                size: 46,
-                                color: Colors.grey.shade600,
-                              )
-                            : null,
+                                  as ImageProvider
+                            : const AssetImage(
+                                'assets/images/fab.jpg',
+                              ),
                       ),
                       Positioned(
                         bottom: 0,
