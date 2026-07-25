@@ -699,7 +699,8 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 const SizedBox(width: 10),
                 _orderInfo(Icons.calendar_today_outlined, _formatDate(order.orderDate)),
                 const Spacer(),
-                Text("Tk ${order.totalProductPrice.toInt()}", style: TextStyle(color: Colors.green.shade900, fontSize: 16, fontWeight: FontWeight.w900)),
+                if (order.status != TailorOrderStatus.pending)
+                  Text("Tk ${order.totalServicePrice.toInt()}", style: TextStyle(color: Colors.green.shade900, fontSize: 16, fontWeight: FontWeight.w900)),
               ],
             ),
           ],
