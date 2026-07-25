@@ -1149,7 +1149,7 @@ void _onTailorRejected() {
   // ─── Step 3 ────────────────────────────────────────────────────────
 
   Widget _buildDesignStep() {
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1240,28 +1240,65 @@ void _onTailorRejected() {
             ),
             const SizedBox(height: 10),
           ],
-          Expanded(
-            child: _designs.isEmpty
-                ? Center(
+          _designs.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
                     child: Text(
                       "No references added — that's okay, you can skip this.",
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.grey.shade500),
                     ),
-                  )
-                : GridView.builder(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                        ),
-                    itemCount: _designs.length,
-                    itemBuilder: (context, index) =>
-                        _buildDesignThumb(_designs[index]),
                   ),
+                )
+              : GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                        childAspectRatio: 1,
+                      ),
+                  itemCount: _designs.length,
+                  itemBuilder: (context, index) =>
+                      _buildDesignThumb(_designs[index]),
+                ),
+          const SizedBox(height: 18),
+          const Text(
+            "Instructions for your tailor",
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            "Optional — describe any changes, fit preferences, or details you want followed.",
+            style: TextStyle(color: Colors.black54, fontSize: 12, height: 1.3),
           ),
           const SizedBox(height: 10),
+          TextField(
+            controller: _instructionsController,
+            maxLines: 4,
+            minLines: 3,
+            decoration: InputDecoration(
+              hintText: "e.g. Slightly loose fit around the waist, full sleeves, no embroidery on the collar…",
+              hintStyle: const TextStyle(fontSize: 12.5, color: Colors.black38),
+              filled: true,
+              fillColor: Colors.grey.shade50,
+              contentPadding: const EdgeInsets.all(14),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: Colors.grey.shade200),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: Colors.green.shade800),
+              ),
+            ),
+            style: const TextStyle(fontSize: 13),
+            onChanged: (_) => _saveLocalProgress(),
+          ),
+          const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
