@@ -186,11 +186,16 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
       valueListenable: widget.searchQuery,
       builder: (context, searchQuery, _) {
         final filteredTailors = _tailors.where((t) {
-          final matchesSearch = t.name.toLowerCase().contains(searchQuery.toLowerCase());
+          final matchesSearch = t.name.toLowerCase().contains(
+            searchQuery.toLowerCase(),
+          );
           final matchesRating = t.rating >= widget.filterData.minRating;
-          final matchesLocation = widget.filterData.location == 'All' ||
-              t.address.toLowerCase().contains(widget.filterData.location.toLowerCase());
-          
+          final matchesLocation =
+              widget.filterData.location == 'All' ||
+              t.address.toLowerCase().contains(
+                widget.filterData.location.toLowerCase(),
+              );
+
           return matchesSearch && matchesRating && matchesLocation;
         }).toList();
 
@@ -213,9 +218,12 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
   Widget _buildHeroSection() {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 400;
-    
+
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: isSmallScreen ? 12 : 16, vertical: 8),
+      margin: EdgeInsets.symmetric(
+        horizontal: isSmallScreen ? 12 : 16,
+        vertical: 8,
+      ),
       padding: EdgeInsets.all(isSmallScreen ? 14 : 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -260,7 +268,10 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
 
   Widget _buildHeroChip(IconData icon, String label, bool isSmall) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: isSmall ? 10 : 12, vertical: isSmall ? 4 : 5),
+      padding: EdgeInsets.symmetric(
+        horizontal: isSmall ? 10 : 12,
+        vertical: isSmall ? 4 : 5,
+      ),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(16),
@@ -289,11 +300,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.search_off_rounded,
-              size: 64,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.search_off_rounded, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
               'No tailors found',
@@ -307,10 +314,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
             const SizedBox(height: 8),
             Text(
               'Try adjusting your filters or search terms',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey[500],
-              ),
+              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
             ),
           ],
         ),
@@ -319,7 +323,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
 
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    
+
     final isSmallScreen = screenWidth < 400;
     final spacing = isSmallScreen ? 10.0 : 12.0;
     final cardAspectRatio = screenHeight < 700 ? 0.72 : 0.78;
@@ -333,7 +337,8 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
         mainAxisSpacing: spacing,
       ),
       itemCount: tailors.length,
-      itemBuilder: (context, index) => _buildTailorCard(tailors[index], isSmallScreen),
+      itemBuilder: (context, index) =>
+          _buildTailorCard(tailors[index], isSmallScreen),
     );
   }
 
@@ -379,7 +384,9 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
               child: Stack(
                 children: [
                   ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(14),
+                    ),
                     child: SizedBox(
                       width: double.infinity,
                       height: double.infinity,
@@ -388,7 +395,11 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
                           color: kSage.withValues(alpha: 0.12),
-                          child: Icon(Icons.person, size: isSmall ? 36 : 40, color: kSageDark),
+                          child: Icon(
+                            Icons.person,
+                            size: isSmall ? 36 : 40,
+                            color: kSageDark,
+                          ),
                         ),
                       ),
                     ),
@@ -505,17 +516,39 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                     Row(
                       children: [
                         Icon(
-                          Icons.directions_bike,
+                          Icons.location_on,
                           size: isSmall ? 12 : 14,
-                          color: const Color.fromARGB(255, 107, 106, 106),
+                          color: Colors.grey[600],
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          "Tk 40",
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: const Color.fromARGB(255, 107, 106, 106),
-                            fontWeight: FontWeight.w600,
+                        Expanded(
+                          child: Text(
+                            tailor.generalArea,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[600],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '1.8 km',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.green.shade800,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
