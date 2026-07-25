@@ -328,8 +328,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
           children: [
             _buildHeader(),
             const SizedBox(height: 20),
-            _buildStepsList(),
-            const SizedBox(height: 32),
             _buildDesignReferences(),
             const SizedBox(height: 28),
             _buildAppearanceProfile(),
@@ -433,83 +431,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // ── Steps list ─────────────────────────────────────────────────────────────
-  Widget _buildStepsList() {
-    final steps = [
-      (
-        'Upload design reference images (garments, fabrics, sketches…)',
-        _referenceImages.isNotEmpty
-      ),
-      (
-        'Configure your AI model appearance profile',
-        _profileConfigured,
-      ),
-      (
-        'Review body measurements if needed',
-        _measurementsReviewed,
-      ),
-      (
-        'Choose style preferences',
-        _selectedStyles.isNotEmpty
-      ),
-      (
-        'Generate AI Preview',
-        _generatedImageBytes != null
-      ),
-    ];
-
-    return _sectionCard(
-      title: 'Getting Started',
-      icon: Icons.checklist_rounded,
-      child: Column(
-        children: steps.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final (text, done) = entry.value;
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: done ? _sage : Colors.grey.shade200,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: done
-                        ? const Icon(Icons.check,
-                            size: 14, color: Colors.white)
-                        : Text(
-                            '${idx + 1}',
-                            style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black54),
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    text,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: done ? _ink : Colors.black54,
-                      fontWeight:
-                          done ? FontWeight.w600 : FontWeight.w400,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
       ),
     );
   }
