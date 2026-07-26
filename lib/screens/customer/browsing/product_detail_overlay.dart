@@ -496,43 +496,45 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   const SizedBox(height: 24),
 
                   // Add to Cart Button - only for customers
+                  // Add to Cart Button - only for customers
                   if (_isCustomer)
                     SizedBox(
                       width: double.infinity,
-                      child: OutlinedButton(
+                      child: ElevatedButton(
                         onPressed: !_inStock
                             ? null
                             : () {
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Added to cart!'),
-                                    backgroundColor: Color(0xFF4E8B6F),
-                                    duration: Duration(seconds: 2),
-                                  ),
-                                );
-                              },
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF2C5C44),
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Added to cart!'),
+                              backgroundColor: Color(0xFF4E8B6F),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2C5C44), // ✅ Dark green background
+                          foregroundColor: Colors.white, // ✅ White text
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          side: const BorderSide(color: Color(0xFF2C5C44)),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
+                          elevation: 2, // ✅ Slight elevation for better visibility
                         ),
                         child: const Text(
                           'Add to Cart',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF2C5C44),
+                            color: Colors.white,
                           ),
                         ),
                       ),
                     ),
-                  
+
                   // ❌ REMOVED: "View product details" button and text for Tailors/Retailers
-                  
+
                   const SizedBox(height: 30),
                 ],
               ),
