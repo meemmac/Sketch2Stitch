@@ -32,26 +32,17 @@ TailoringSetupCallbacks buildTailoringCallbacks(String orderId) {
       );
       return job.tailorJobId;
     },
-    onConfirmTailorJob: ({
-      required double quoteAmount,
-      required DateTime estimatedDeliveryDate,
-      double deliverCharge = 0,
-    }) async {
-      // Both quoteAmount and estimatedDeliveryDate are required params on
-      // the store method itself, so this can't be called without a real
-      // price and delivery estimate — see order_session.dart.
-      store.confirmTailorJob(
-        orderId,
-        quoteAmount: quoteAmount,
-        estimatedDeliveryDate: estimatedDeliveryDate,
-        deliverCharge: deliverCharge,
-      );
+    onConfirmTailorJob: () async {
+      // No values passed in — the customer is accepting whatever the
+      // tailor already quoted via submitTailorQuote(), not supplying
+      // their own numbers. The store reads quoteAmount /
+      // estimatedDeliveryDate straight off the existing job.
+      store.confirmTailorJob(orderId);
     },
-    onRejectTailorJob: (reason) async {
-      // NOTE: previously the screen mutated local state directly on
-      // rejection with no backend call at all — this callback closes
-      // that gap so a reject actually reaches the store.
-      store.rejectTailorJob(orderId, reason);
+    onRejectTailorJob: () async {
+      // No reason required — the customer can simply decline a quote
+      // without justifying it.
+      store.rejectTailorJob(orderId);
     },
     onPayTailor: () async {
       // No tailorJobId param needed — there's exactly one job per order
@@ -76,7 +67,7 @@ TailoringSetupCallbacks buildTailoringCallbacks(String orderId) {
         quoteAmount: job?.quoteAmount,
         deliverCharge: job?.deliverCharge,
         estimatedDeliveryDate: job?.estimatedDeliveryDate,
-        rejectionReason: job?.rejectionReason,
+        // rejectionReason removed — no longer collected.
       );
     },
   );
