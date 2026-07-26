@@ -753,8 +753,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   Icons.cancel_outlined,
                   Colors.red,
                   () {
-                    setState(() => order.status = TailorOrderStatus.cancelled);
-                    Navigator.pop(context);
+                    _showCancellationDialog(order, context, () => Navigator.pop(context));
                   },
                 ),
               ],
@@ -968,8 +967,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
         Expanded(
           child: OutlinedButton(
             onPressed: () {
-              setState(() => order.status = TailorOrderStatus.cancelled);
-              Navigator.pop(modalContext);
+              _showCancellationDialog(order, modalContext, () => Navigator.pop(modalContext));
             },
             style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.red), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             child: const Text("Decline", style: TextStyle(fontWeight: FontWeight.bold)),
@@ -1214,6 +1212,80 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 icon: const Icon(Icons.straighten, size: 14),
                 label: const Text("View Customer Measurements", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                 style: TextButton.styleFrom(padding: EdgeInsets.zero, foregroundColor: primaryGreen, minimumSize: const Size(0, 0), tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCancellationDialog(TailorOrder order, BuildContext context, [VoidCallback? onDone]) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Reason for Cancellation", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("Please tell us why you're declining this request. This feedback helps customers understand.", style: TextStyle(color: Colors.black54, fontSize: 12)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              maxLines: 3,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: "Write reason here...",
+                hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.red.shade200)),
+              ),
+            ),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(foregroundColor: Colors.grey.shade600, padding: const EdgeInsets.symmetric(vertical: 12)),
+                  child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    if (controller.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please provide a reason")));
+                      return;
+                    }
+                    setState(() {
+                      order.status = TailorOrderStatus.cancelled;
+                    });
+                    Navigator.pop(context);
+                    if (onDone != null) onDone();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFCC3333),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: Color(0xFF8B0000), width: 1.5),
+                    ),
+                  ),
+                  child: const Text("Submit", style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
               ),
             ],
           ),

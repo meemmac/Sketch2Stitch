@@ -72,6 +72,7 @@ class CustomerOrder {
   final double? tailorRating;
   final String deliveryAddress;
   final Map<String, double> deliveryCharges;
+  final String? tailorCancellationReason;
 
   CustomerOrder({
     required this.id,
@@ -89,6 +90,7 @@ class CustomerOrder {
     this.retailerRatings,
     this.tailorReview,
     this.tailorRating,
+    this.tailorCancellationReason,
   });
 
   String get _allRetailerNames {
@@ -366,6 +368,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       deliveryCharges: {"Zaroon Fabrics": 50.0},
       retailerReviews: {},
       retailerRatings: {},
+      tailorCancellationReason: "Overloaded with orders currently.",
       items: [
         const OrderItem(
           name: "Embroidered Lawn",
@@ -1147,6 +1150,29 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   const Text("Products", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   ...currentOrder.items.map((item) => _itemPreviewCard(item)),
+                  if (currentOrder.tailorCancellationReason != null) ...[
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.red.shade100),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.red.shade800, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "Cancellation Reason: ${currentOrder.tailorCancellationReason}",
+                              style: TextStyle(color: Colors.red.shade900, fontSize: 13, height: 1.4, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   if (currentOrder.items.any((i) => i.destination == OrderDeliveryDestination.tailor)) ...[
                     const SizedBox(height: 30),
                     const Text("Tailor Customization Details", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -1276,6 +1302,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                   retailerRatings: updatedRatings,
                                   tailorReview: currentOrder.tailorReview,
                                   tailorRating: currentOrder.tailorRating,
+                                  tailorCancellationReason: currentOrder.tailorCancellationReason,
                                 );
                               }
                             });
@@ -1316,6 +1343,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                   retailerRatings: currentOrder.retailerRatings,
                                   tailorReview: tailorController.text,
                                   tailorRating: tempTailorRating,
+                                  tailorCancellationReason: currentOrder.tailorCancellationReason,
                                 );
                               }
                             });
@@ -1420,7 +1448,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 runSpacing: 4,
                 alignment: WrapAlignment.end,
                 children: [
-                  if (item.tailorStatus != null && !isDelivered)
+                  if (item.tailorStatus != null && !isDelivered && item.tailorStatus != TailorStatus.notAssigned && item.tailorStatus != TailorStatus.cancelled)
                     _tailorStatusBadge(item.tailorStatus!),
                 ],
               ),
