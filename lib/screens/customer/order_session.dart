@@ -207,18 +207,25 @@ class OrderStore {
     // the customer just needs to browse another tailor or skip.
   }
 
-  /// Customer accepts the tailor's already-submitted quote as-is. Both
-  /// quoteAmount and estimatedDeliveryDate must already be present on
-  /// the job (i.e. the job must be 'quoted') — this does NOT accept new
-  /// values from the customer, it only locks in what the tailor sent.
+  /// Customer accepts the tailor's already-submitted quote as-is AND
+  /// pays in the same action — confirm and pay are atomic in the
+  /// current flow, there is no confirmed-but-unpaid in-between state.
+  /// Both quoteAmount and estimatedDeliveryDate must already be present
+  /// on the job (i.e. the job must be 'quoted').
   void confirmTailorJob(String orderId) {
-    final job = _orders[orderId]?.tailorJob;
-    if (job == null || job.quoteAmount == null || job.estimatedDeliveryDate == null) {
+    final o = _orders[orderId];
+    final job = o?.tailorJob;
+    if (o == null ||
+        job == null ||
+        job.quoteAmount == null ||
+        job.estimatedDeliveryDate == null) {
       return;
     }
     job.status = 'confirmed';
     job.confirmedAt = DateTime.now();
     job.quoteStatus = 'accepted';
+    job.tailorPaymentStatus = 'paid';
+    o.orderStatus = 'completed'; // terminal — resolved the instant it's confirmed
   }
 
   /// Customer declines the tailor's quote. No reason required — this is
@@ -228,33 +235,6 @@ class OrderStore {
     if (job == null) return;
     job.status = 'rejected';
     job.quoteStatus = 'declined';
-  }
-
-  /// Whether the order's tailor job (if any) is resolved: confirmed +
-  /// paid, or expired. Orders with no tailor job at all are resolved only
-  /// via setSkippedTailoring (handled separately, not through this path).
-  bool _isTailorJobResolved(OrderRecord o) {
-    final job = o.tailorJob;
-    if (job == null) return false;
-    final resolvedViaTailor =
-        job.status == 'confirmed' && job.tailorPaymentStatus == 'paid';
-    final resolvedViaExpiry = job.status == 'expired';
-    return resolvedViaTailor || resolvedViaExpiry;
-  }
-
-  /// Marks the order's tailor job as paid, then completes the ORDER if
-  /// the job is now resolved (confirmed + paid).
-  void payTailorJob(String orderId) {
-    final o = _orders[orderId];
-    if (o == null) return;
-    final job = o.tailorJob;
-    if (job == null) return;
-
-    job.tailorPaymentStatus = 'paid';
-
-    if (_isTailorJobResolved(o)) {
-      o.orderStatus = 'completed';
-    }
   }
 
   void completeOrder(String orderId) {
@@ -285,12 +265,24 @@ class OrderStore {
   /// the "Continue Your Order" bug, only to free memory.
   void remove(String orderId) => _orders.remove(orderId);
 
-  /// Debug-only seed: one order per UI state, so every card/status in
-  /// TailoringSetupScreen and RunningOrdersScreen can be exercised without
-  /// manually clicking through the whole flow. Runs once, automatically,
-  /// the first time OrderStore.instance is created.
+  /// Debug-only seed: exactly ONE order per distinct UI state that
+  /// TailoringSetupScreen can render, no redundant duplicates. Runs once,
+  /// automatically, the first time OrderStore.instance is created.
+  ///
+  /// Active states (5) — shown in Running Orders, customer still has
+  /// something to do:
+  ///   1. No tailor job yet               → _buildNoTailorCard
+  ///   2. Job pending (no quote yet)       → _buildPendingCard
+  ///   3. Job quoted                       → _buildQuotedCard
+  ///   4. Job rejected by customer         → _buildRejectedCard
+  ///   5. Job declined by tailor           → _buildTailorDeclinedCard
+  ///
+  /// Terminal states (3) — NOT in Running Orders, nothing left to do:
+  ///   6. Skipped tailoring                → order.isActive == false
+  ///   7. Tailor-selection window expired   → order.isActive == false
+  ///   8. Confirmed + paid (atomic now)     → order.isActive == false
   void _seedDebugData() {
-    // 1. Awaiting tailor search — no job yet, deadline still open.
+    // 1. No tailor job yet — deadline still open.
     final o1 = startOrder([
       SubOrder(
         id: 'RET001',
@@ -303,7 +295,7 @@ class OrderStore {
     ]);
     setAwaitingTailorSearch(o1.orderId, DateTime.now().add(const Duration(hours: 60)));
 
-    // 2. Pending tailor job — request sent, tailor hasn't quoted yet.
+    // 2. Job pending — request sent, tailor hasn't responded yet.
     // Two sub-orders, ONE job covers both.
     final o2 = startOrder([
       SubOrder(
@@ -326,9 +318,9 @@ class OrderStore {
     setAwaitingTailorSearch(o2.orderId, DateTime.now().add(const Duration(hours: 40)));
     createTailorJob(orderId: o2.orderId, tailorId: 'TAILOR_A');
 
-    // 2b. Quoted tailor job — tailor responded with a price, customer
-    // still needs to Confirm/Reject.
-    final o2b = startOrder([
+    // 3. Job quoted — tailor responded with a price, customer still
+    // needs to Confirm/Reject.
+    final o3 = startOrder([
       SubOrder(
         id: 'RET001',
         orderId: '',
@@ -338,38 +330,16 @@ class OrderStore {
         deliveryCharge: 70,
       ),
     ]);
-    setAwaitingTailorSearch(o2b.orderId, DateTime.now().add(const Duration(hours: 36)));
-    createTailorJob(orderId: o2b.orderId, tailorId: 'TAILOR_E');
+    setAwaitingTailorSearch(o3.orderId, DateTime.now().add(const Duration(hours: 36)));
+    createTailorJob(orderId: o3.orderId, tailorId: 'TAILOR_B');
     submitTailorQuote(
-      o2b.orderId,
+      o3.orderId,
       quoteAmount: 3800,
       estimatedDeliveryDate: DateTime.now().add(const Duration(days: 9)),
       deliverCharge: 100,
     );
 
-    // 3. Confirmed, unpaid tailor job — customer still needs to pay.
-    // Tailor quotes first, customer then confirms the same numbers.
-    final o3 = startOrder([
-      SubOrder(
-        id: 'RET001',
-        orderId: '',
-        retailerId: 'RET001',
-        status: SubOrderStatus.preparing,
-        itemsSubtotal: 1300,
-        deliveryCharge: 80,
-      ),
-    ]);
-    setAwaitingTailorSearch(o3.orderId, DateTime.now().add(const Duration(hours: 20)));
-    createTailorJob(orderId: o3.orderId, tailorId: 'TAILOR_B');
-    submitTailorQuote(
-      o3.orderId,
-      quoteAmount: 4500,
-      estimatedDeliveryDate: DateTime.now().add(const Duration(days: 10)),
-      deliverCharge: 150,
-    );
-    confirmTailorJob(o3.orderId);
-
-    // 4. Rejected tailor job — customer needs to pick another tailor.
+    // 4. Job rejected by customer — customer needs to pick another tailor.
     final o4 = startOrder([
       SubOrder(
         id: 'RET002',
@@ -390,58 +360,8 @@ class OrderStore {
     );
     rejectTailorJob(o4.orderId);
 
-    // 5. Skipped tailoring — TERMINAL, must NOT show in Running Orders.
+    // 5. Job declined by tailor outright — no quote ever sent.
     final o5 = startOrder([
-      SubOrder(
-        id: 'RET001',
-        orderId: '',
-        retailerId: 'RET001',
-        status: SubOrderStatus.preparing,
-        itemsSubtotal: 2000,
-        deliveryCharge: 80,
-      ),
-    ]);
-    setSkippedTailoring(o5.orderId);
-
-    // 6. Deadline expired, no job ever created — TERMINAL.
-    final o6 = startOrder([
-      SubOrder(
-        id: 'RET002',
-        orderId: '',
-        retailerId: 'RET002',
-        status: SubOrderStatus.preparing,
-        itemsSubtotal: 700,
-        deliveryCharge: 120,
-      ),
-    ]);
-    setAwaitingTailorSearch(o6.orderId, DateTime.now().subtract(const Duration(hours: 1)));
-    expireTailorSearch(o6.orderId);
-
-    // 7. Fully completed order — confirmed tailor job, paid — TERMINAL.
-    final o7 = startOrder([
-      SubOrder(
-        id: 'RET001',
-        orderId: '',
-        retailerId: 'RET001',
-        status: SubOrderStatus.preparing,
-        itemsSubtotal: 1500,
-        deliveryCharge: 80,
-      ),
-    ]);
-    
-    setAwaitingTailorSearch(o7.orderId, DateTime.now().add(const Duration(hours: 30)));
-    createTailorJob(orderId: o7.orderId, tailorId: 'TAILOR_D');
-    submitTailorQuote(
-      o7.orderId,
-      quoteAmount: 3000,
-      estimatedDeliveryDate: DateTime.now().add(const Duration(days: 7)),
-      deliverCharge: 80,
-    );
-    confirmTailorJob(o7.orderId);
-    payTailorJob(o7.orderId); // marks paid + completes since job is resolved
-
-    // 8. Tailor declined outright — no quote ever sent.
-    final o8 = startOrder([
       SubOrder(
         id: 'RET001',
         orderId: '',
@@ -451,15 +371,64 @@ class OrderStore {
         deliveryCharge: 90,
       ),
     ]);
-    setAwaitingTailorSearch(o8.orderId, DateTime.now().add(const Duration(hours: 15)));
-    createTailorJob(orderId: o8.orderId, tailorId: 'TAILOR_F');
-    tailorDeclinesJob(o8.orderId, reason: "Fully booked this week");
+    setAwaitingTailorSearch(o5.orderId, DateTime.now().add(const Duration(hours: 15)));
+    createTailorJob(orderId: o5.orderId, tailorId: 'TAILOR_F');
+    tailorDeclinesJob(o5.orderId, reason: "Fully booked this week");
+
+    // 6. Skipped tailoring — TERMINAL, must NOT show in Running Orders.
+    final o6 = startOrder([
+      SubOrder(
+        id: 'RET001',
+        orderId: '',
+        retailerId: 'RET001',
+        status: SubOrderStatus.preparing,
+        itemsSubtotal: 2000,
+        deliveryCharge: 80,
+      ),
+    ]);
+    setSkippedTailoring(o6.orderId);
+
+    // 7. Tailor-selection window expired, no job ever confirmed — TERMINAL.
+    final o7 = startOrder([
+      SubOrder(
+        id: 'RET002',
+        orderId: '',
+        retailerId: 'RET002',
+        status: SubOrderStatus.preparing,
+        itemsSubtotal: 700,
+        deliveryCharge: 120,
+      ),
+    ]);
+    setAwaitingTailorSearch(o7.orderId, DateTime.now().subtract(const Duration(hours: 1)));
+    expireTailorSearch(o7.orderId);
+
+    // 8. Confirmed + paid — TERMINAL. Confirm and pay are atomic now, so
+    // this is the only "successfully arranged" end state; there is no
+    // confirmed-but-unpaid state to seed separately.
+    final o8 = startOrder([
+      SubOrder(
+        id: 'RET001',
+        orderId: '',
+        retailerId: 'RET001',
+        status: SubOrderStatus.preparing,
+        itemsSubtotal: 1500,
+        deliveryCharge: 80,
+      ),
+    ]);
+    setAwaitingTailorSearch(o8.orderId, DateTime.now().add(const Duration(hours: 30)));
+    createTailorJob(orderId: o8.orderId, tailorId: 'TAILOR_D');
+    submitTailorQuote(
+      o8.orderId,
+      quoteAmount: 3000,
+      estimatedDeliveryDate: DateTime.now().add(const Duration(days: 7)),
+      deliverCharge: 80,
+    );
+    confirmTailorJob(o8.orderId); // now sets paid + completed atomically
 
     assert(
-      activeOrders.length == 6,
-      'Expected 6 active orders after seeding, got ${activeOrders.length}. '
+      activeOrders.length == 5,
+      'Expected 5 active orders after seeding, got ${activeOrders.length}. '
       'isActive logic may have regressed.',
     );
-    
   }
 }

@@ -51,11 +51,11 @@ TailoringSetupCallbacks buildTailoringCallbacks(String orderId) {
       // tailor's quote without justifying it.
       store.rejectTailorJob(orderId);
     },
-    onPayTailor: () async {
-      // No tailorJobId param needed — there's exactly one job per order
-      // now, so the store already knows which job this order's payment
-      // applies to.
-      store.payTailorJob(orderId);
+   onPayTailor: () async {
+      // No-op now — OrderStore.confirmTailorJob() sets payment to 'paid'
+      // and completes the order atomically. This callback stays wired
+      // in case any code path still calls it, but there's nothing left
+      // for it to do against the store.
     },
     onTailorSearchExpired: () async {
       store.expireTailorSearch(orderId);
