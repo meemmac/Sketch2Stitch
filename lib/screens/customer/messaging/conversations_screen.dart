@@ -1838,21 +1838,43 @@ class _ConversationSearchDelegate extends SearchDelegate {
     );
   }
 
+  // ✅ Fixed: Properly filter results based on query
   @override
   Widget buildResults(BuildContext context) {
-    final results = conversations.where((conv) {
+    final results = _getFilteredResults(query);
+    return _buildResultsList(results);
+  }
+
+  // ✅ Fixed: Suggestions also show filtered results
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    final results = _getFilteredResults(query);
+    return _buildResultsList(results);
+  }
+
+  // ✅ Helper: Get filtered results based on search query
+  List<Conversation> _getFilteredResults(String searchQuery) {
+    if (searchQuery.isEmpty) {
+      return conversations.where((conv) => !conv.isDeleted).toList();
+    }
+
+    return conversations.where((conv) {
       if (conv.isDeleted) return false;
+
       final userData = userCache[conv.otherId];
       final userName = userData?['name']?.toString().toLowerCase() ?? '';
       final userPhone = userData?['phone']?.toString().toLowerCase() ?? '';
       final lastMessage = getLastMessage(conv).toLowerCase();
-      final searchQuery = query.toLowerCase();
-      
-      return userName.contains(searchQuery) ||
-          userPhone.contains(searchQuery) ||
-          lastMessage.contains(searchQuery);
-    }).toList();
+      final query = searchQuery.toLowerCase();
 
+      return userName.contains(query) ||
+          userPhone.contains(query) ||
+          lastMessage.contains(query);
+    }).toList();
+  }
+
+  // ✅ Helper: Build the results list
+  Widget _buildResultsList(List<Conversation> results) {
     if (results.isEmpty) {
       return Center(
         child: Column(
@@ -1865,12 +1887,24 @@ class _ConversationSearchDelegate extends SearchDelegate {
             ),
             const SizedBox(height: 16),
             Text(
-              'No conversations found',
+              query.isEmpty
+                  ? 'Type to search conversations'
+                  : 'No conversations found',
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey[600],
               ),
             ),
+            if (query.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Try searching by name or phone number',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey[500],
+                ),
+              ),
+            ],
           ],
         ),
       );
@@ -1888,6 +1922,7 @@ class _ConversationSearchDelegate extends SearchDelegate {
         final unreadCount = conversation.unreadCount;
         final isBlocked = conversation.isBlocked;
         final isAnonymous = userCache[conversation.otherId]?['isAnonymous'] == true;
+        final isCustomer = conversation.otherRole == UserRole.customer;
 
         return GestureDetector(
           onTap: () {
@@ -1903,7 +1938,7 @@ class _ConversationSearchDelegate extends SearchDelegate {
                     title: const Text('User Blocked'),
                     content: Text(
                       '$otherName is blocked.\n\n'
-                      'You need to unblock this user to send messages.',
+                          'You need to unblock this user to send messages.',
                     ),
                     actions: [
                       TextButton(
@@ -1946,12 +1981,22 @@ class _ConversationSearchDelegate extends SearchDelegate {
               children: [
                 Stack(
                   children: [
+                    // ✅ For Customer: show first letter, no profile picture
                     CircleAvatar(
                       radius: 28,
-                      backgroundColor: isAnonymous ? Colors.grey[300] : Colors.grey[200],
-                      backgroundImage: AssetImage(otherAvatar),
-                      child: isAnonymous
-                          ? const Icon(Icons.person_outline, color: Colors.grey, size: 24)
+                      backgroundColor: isCustomer ? Colors.grey[300] : Colors.grey[200],
+                      backgroundImage: (!isCustomer && otherAvatar != null && otherAvatar.isNotEmpty)
+                          ? AssetImage(otherAvatar)
+                          : null,
+                      child: isCustomer
+                          ? Text(
+                        otherName.isNotEmpty ? otherName[0].toUpperCase() : '?',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[700],
+                        ),
+                      )
                           : null,
                     ),
                     if (isBlocked)
@@ -1987,10 +2032,10 @@ class _ConversationSearchDelegate extends SearchDelegate {
                                   otherName,
                                   style: TextStyle(
                                     fontSize: 16,
-                                    fontWeight: isAnonymous 
-                                        ? FontWeight.normal 
+                                    fontWeight: isAnonymous
+                                        ? FontWeight.normal
                                         : (unreadCount > 0 ? FontWeight.bold : FontWeight.w600),
-                                    color: isAnonymous ? Colors.grey[600] : null,
+                                    color: isCustomer ? Colors.grey[700] : Colors.black,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -2029,7 +2074,7 @@ class _ConversationSearchDelegate extends SearchDelegate {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          if (conversation.messages != null && 
+                          if (conversation.messages != null &&
                               conversation.messages!.isNotEmpty &&
                               conversation.messages!.last.senderId != customerId &&
                               conversation.messages!.last.isRead)
@@ -2038,7 +2083,7 @@ class _ConversationSearchDelegate extends SearchDelegate {
                               size: 14,
                               color: Colors.blue,
                             ),
-                          if (conversation.messages != null && 
+                          if (conversation.messages != null &&
                               conversation.messages!.isNotEmpty &&
                               conversation.messages!.last.senderId != customerId &&
                               !conversation.messages!.last.isRead)
@@ -2047,7 +2092,7 @@ class _ConversationSearchDelegate extends SearchDelegate {
                               size: 14,
                               color: Colors.grey,
                             ),
-                          if (conversation.messages != null && 
+                          if (conversation.messages != null &&
                               conversation.messages!.isNotEmpty &&
                               conversation.messages!.last.senderId != customerId)
                             const SizedBox(width: 4),
@@ -2074,11 +2119,6 @@ class _ConversationSearchDelegate extends SearchDelegate {
         );
       },
     );
-  }
-
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    return buildResults(context);
   }
 
   String _getTimeAgo(DateTime time) {

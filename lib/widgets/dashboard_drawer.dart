@@ -611,6 +611,7 @@ class DrawerNavigationSection extends StatelessWidget {
         return [
           {'title': 'Orders', 'icon': Icons.receipt_long_rounded},
           {'title': 'Inventory', 'icon': Icons.inventory_2_outlined},
+          {'title': 'Messages', 'icon': Icons.chat_bubble_outline_rounded},
         ];
     }
   }
