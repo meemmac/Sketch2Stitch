@@ -13,6 +13,7 @@ import 'messaging/chat_screen.dart'; // adjust path to match your folder structu
 // right step if the customer navigates away before a tailor job exists.
 // Add `shared_preferences` to pubspec.yaml if it isn't already a dependency.
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../services/bkash_service.dart';
 
 // TODO: point this at your real Measurement model
 // (the same one used by MeasurementScreen / DashboardDrawer).
@@ -189,6 +190,12 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   /// requested. Covers every sub-order listed below.
   TailorJob? _tailorJob;
 
+  // bKash: hold payment context between browser launch and app resume.
+  String? _pendingBkashPaymentID;
+  String? _pendingBkashToken;
+
+  late final AppLifecycleListener _lifecycleListener;
+
   /// Has the order reached a resolved state? Drives the auto-complete
   /// dialog. Resolved = job confirmed+paid, or job expired, or every
   /// sub-order is going direct-to-customer anyway.
@@ -336,6 +343,9 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     }
     _initMeasurementControllers();
     _resumeFromBackend();
+    _lifecycleListener = AppLifecycleListener(
+      onResume: _onTailorPaymentResumed,
+    );
   }
 
   @override
@@ -344,6 +354,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
       c.dispose();
     }
     _instructionsController.dispose();
+    _lifecycleListener.dispose();
     super.dispose();
   }
 
@@ -595,10 +606,64 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   Future<void> _confirmTailorJob() async {
     final job = _tailorJob;
     if (job == null) return;
+
+    final amount = job.totalAmount;
+    if (amount == null || amount <= 0) {
+      // No amount on job — fall back to legacy no-payment confirm.
+      await _withLoading(() async {
+        await widget.callbacks.onConfirmTailorJob();
+        await widget.callbacks.onPayTailor();
+      });
+      if (!mounted) return;
+      setState(() {
+        _tailorJob = job.copyWith(
+          status: TailorJobStatus.confirmed,
+          tailorPaymentStatus: TailorPaymentStatus.paid,
+        );
+      });
+      _checkResolvedAndMaybeComplete();
+      return;
+    }
+
+    // bKash payment flow:
+    // Step 1+2+3: grant token, create payment, open bKash browser.
     await _withLoading(() async {
+      final pending = await BkashService.instance.initiatePayment(
+        amount: amount,
+        invoicePrefix: 'TAILOR_${widget.orderId.replaceAll(RegExp(r"[^A-Za-z0-9]"), "")}',
+      );
+      _pendingBkashPaymentID = pending.paymentID;
+      _pendingBkashToken = pending.idToken;
+    });
+    // Loading spinner is now off; bKash browser is open.
+    // _onTailorPaymentResumed will fire when the user returns.
+  }
+
+  /// Called when the user returns to the app after completing (or
+  /// abandoning) the bKash payment page for the tailor job.
+  Future<void> _onTailorPaymentResumed() async {
+    final paymentID = _pendingBkashPaymentID;
+    final token = _pendingBkashToken;
+    if (paymentID == null || token == null) return;
+
+    // Clear immediately to prevent double-execution on subsequent resumes.
+    _pendingBkashPaymentID = null;
+    _pendingBkashToken = null;
+
+    final job = _tailorJob;
+    if (job == null) return;
+
+    await _withLoading(() async {
+      // Step 4: execute — confirms the bKash transaction.
+      await BkashService.instance.executePayment(
+        paymentID: paymentID,
+        idToken: token,
+      );
+      // Mark confirmed + paid in the store.
       await widget.callbacks.onConfirmTailorJob();
       await widget.callbacks.onPayTailor();
     });
+
     if (!mounted) return;
     setState(() {
       _tailorJob = job.copyWith(

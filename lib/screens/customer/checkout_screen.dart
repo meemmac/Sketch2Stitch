@@ -5,6 +5,7 @@ import '../../models/measurement.dart';
 import 'order_session.dart';
 import 'tailoring_callbacks.dart';
 import '../../models/sub_order.dart';
+import '../../services/bkash_service.dart';
 
 /// ─── Checkout Screen ────────────────────────────────────────────────────
 ///
@@ -37,6 +38,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final Set<String> _paidRetailers = {};
   String? _payingRetailerId;
 
+  // bKash: hold payment context between browser launch and app resume.
+  String? _pendingPaymentID;
+  String? _pendingToken;
+  String? _pendingRetailerId;
+
+  late final AppLifecycleListener _lifecycleListener;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycleListener = AppLifecycleListener(
+      onResume: _onAppResumed,
+    );
+  }
+
+  @override
+  void dispose() {
+    _lifecycleListener.dispose();
+    super.dispose();
+  }
+
   Map<String, List<CartLine>> get _groupedByRetailer {
     final Map<String, List<CartLine>> grouped = {};
     for (final line in widget.cartLines) {
@@ -56,18 +78,85 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _payRetailer(String retailerId) async {
     setState(() => _payingRetailerId = retailerId);
+    try {
+      final subtotal = widget.cartLines
+          .where((l) => l.retailerId == retailerId)
+          .fold<double>(0, (sum, l) => sum + l.lineTotal);
+      final amount = subtotal + _deliveryChargeFor(retailerId);
 
-    // TODO: real Payments write, targetType = 'retailer', targetId = retailerId
-    // amount should be itemsAmount + deliveryAmount (see
-    // Payments.itemsAmount / Payments.deliveryAmount in the schema) —
-    // itemsAmount = subtotal, deliveryAmount = _deliveryChargeFor(retailerId).
-    await Future.delayed(const Duration(seconds: 1));
+      // Step 1 + 2 + 3: grant token, create payment, open bKash browser.
+      final pending = await BkashService.instance.initiatePayment(
+        amount: amount,
+        invoicePrefix: 'RET_${retailerId.replaceAll(RegExp(r'[^A-Za-z0-9]'), '')}',
+      );
 
-    if (!mounted) return;
-    setState(() {
-      _paidRetailers.add(retailerId);
-      _payingRetailerId = null;
-    });
+      if (!mounted) return;
+      // Store context so _onAppResumed knows which retailer to mark paid.
+      _pendingPaymentID = pending.paymentID;
+      _pendingToken = pending.idToken;
+      _pendingRetailerId = retailerId;
+    } on BkashException catch (e) {
+      if (!mounted) return;
+      _showPaymentError(e.message);
+    } catch (e) {
+      if (!mounted) return;
+      _showPaymentError('Payment could not be initiated. Please try again.');
+    } finally {
+      if (mounted) setState(() => _payingRetailerId = null);
+    }
+  }
+
+  /// Called when the user returns to the app after completing (or
+  /// abandoning) the bKash browser payment page.
+  Future<void> _onAppResumed() async {
+    final paymentID = _pendingPaymentID;
+    final token = _pendingToken;
+    final retailerId = _pendingRetailerId;
+    if (paymentID == null || token == null || retailerId == null) return;
+
+    // Clear so a second resume doesn't re-execute.
+    _pendingPaymentID = null;
+    _pendingToken = null;
+    _pendingRetailerId = null;
+
+    setState(() => _payingRetailerId = retailerId);
+    try {
+      // Step 4: execute payment — confirms the transaction.
+      await BkashService.instance.executePayment(
+        paymentID: paymentID,
+        idToken: token,
+      );
+      if (!mounted) return;
+      setState(() {
+        _paidRetailers.add(retailerId);
+        _payingRetailerId = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment successful ✅'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    } on BkashException catch (e) {
+      if (!mounted) return;
+      setState(() => _payingRetailerId = null);
+      _showPaymentError(e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _payingRetailerId = null);
+      _showPaymentError('Payment verification failed. Please contact support.');
+    }
+  }
+
+  void _showPaymentError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red.shade700,
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   /// Clears the cart, starts exactly ONE new order from this checkout's
