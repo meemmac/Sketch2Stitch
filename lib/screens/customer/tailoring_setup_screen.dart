@@ -328,10 +328,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     super.dispose();
   }
 
-  /// Read-only rehydration: if the customer already progressed past step 1
-  /// on a previous visit, pick this screen back up at the right step and
-  /// state instead of starting over. Makes no writes.
-  Future<void> _resumeFromBackend() async {
+Future<void> _resumeFromBackend() async {
     await _loadLocalProgress();
 
     try {
@@ -366,6 +363,16 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
           }
         }
       });
+
+      // NEW — a resumed job may already be resolved (confirmed = paid,
+      // or expired). _isResolved won't have had a chance to trigger the
+      // completion dialog yet since this is the first setState after
+      // load, so check explicitly and surface it after this frame.
+      if (_isResolved) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _checkResolvedAndMaybeComplete();
+        });
+      }
     } finally {
       if (mounted) setState(() => _resuming = false);
     }
@@ -648,80 +655,6 @@ Future<void> _confirmTailorJob() async {
     _checkResolvedAndMaybeComplete();
   }
 
-  void _promptTailorPayment() {
-    final job = _tailorJob;
-    if (job == null) return;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text("Pay Tailor"),
-        content: Text(
-         "Your tailor confirmed the job. You're paying Tk "
-          "${job.totalAmount?.toStringAsFixed(0) ?? '0'} in total "
-          "(quote + delivery). Complete payment to continue.",
-        ),
-        actions: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade800,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () async {
-              Navigator.pop(context);
-              // No tailorJobId param needed — there's exactly one job per
-              // order, so the store already knows which job this
-              // payment applies to.
-              await _withLoading(() => widget.callbacks.onPayTailor());
-              if (!mounted) return;
-              setState(() {
-                _tailorJob =
-                    job.copyWith(tailorPaymentStatus: TailorPaymentStatus.paid);
-              });
-              _checkResolvedAndMaybeComplete();
-            },
-            child: const Text("Confirm & Pay"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Lets the customer back out of a CONFIRMED-but-unpaid job and pick a
-  /// different tailor for the whole order. Only clears the job locally —
-  /// the order itself is NOT terminal (it's still awaiting_tailor_search)
-  /// and the customer stays on this screen, per the dialog's own copy.
-  void _promptCancelConfirmedJob() {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text("Cancel this tailor?"),
-        content: const Text(
-          "The tailor confirmed this job, but you haven't paid yet. "
-          "Cancelling will let you browse and request a different tailor.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Keep This Tailor"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade700,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() => _tailorJob = null);
-            },
-            child: const Text("Cancel Job"),
-          ),
-        ],
-      ),
-    );
-  }
 
   /// Checks whether the order has now reached a resolved state and, if
   /// so, surfaces the order-complete dialog.
@@ -1523,7 +1456,7 @@ Future<void> _confirmTailorJob() async {
       case TailorJobStatus.quoted:
         return _buildQuotedCard(job);
       case TailorJobStatus.confirmed:
-        return _buildConfirmedCard(job);
+        return _buildFinalizingCard();
       case TailorJobStatus.rejected:
         return _buildRejectedCard(job);
       case TailorJobStatus.tailorDeclined:
@@ -1778,52 +1711,7 @@ Future<void> _confirmTailorJob() async {
     );
   }
 
-  Widget _buildConfirmedCard(TailorJob job) {
-    return _statusCard(
-      icon: Icons.check_circle_rounded,
-      iconBg: Colors.green.shade50,
-      iconColor: Colors.green.shade800,
-      title: "Tailor confirmed!",
-      subtitle: "Complete payment to lock in your job.",
-      children: [
-        const SizedBox(height: 18),
-        _infoRow(icon: Icons.payments_outlined, label: "Total Cost",
-            value: "Tk ${job.totalAmount?.toStringAsFixed(0) ?? '-'}"),
-        if (job.estimatedDeliveryDate != null) ...[
-          const SizedBox(height: 10),
-          _infoRow(
-            icon: Icons.event_available_outlined,
-            label: "Est. Delivery",
-            value: _formatDateTime(job.estimatedDeliveryDate!),
-          ),
-        ],
-        const SizedBox(height: 22),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _promptTailorPayment,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade800,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-            ),
-            child: Text("Pay Now · Tk ${job.totalAmount?.toStringAsFixed(0) ?? '0'}",
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-          ),
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          child: TextButton(
-            onPressed: _promptCancelConfirmedJob,
-            child: Text("Not this tailor? Cancel", style: TextStyle(color: Colors.red.shade600)),
-          ),
-        ),
-      ],
-    );
-  }
-
+  
   /// No specific reason is shown — rejection is a plain "no thanks" from
   /// the customer, no rejectionReason field exists on the job anymore.
   Widget _buildRejectedCard(TailorJob job) {
@@ -1851,6 +1739,22 @@ Future<void> _confirmTailorJob() async {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildFinalizingCard() {
+    return _card(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(color: Color(0xFF2E7D32)),
+          const SizedBox(height: 16),
+          const Text(
+            "Finalizing your order...",
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
     );
   }
 
