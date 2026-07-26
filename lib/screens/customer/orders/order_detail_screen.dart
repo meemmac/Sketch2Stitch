@@ -30,6 +30,7 @@ class OrderItem {
   final List<String>? measurementRefImages;
   final String? tailorInstructions;
   final TailorStatus? tailorStatus;
+  final DateTime? tailorDeliveryDate;
 
   const OrderItem({
     required this.name,
@@ -51,6 +52,7 @@ class OrderItem {
     this.measurementRefImages,
     this.tailorInstructions,
     this.tailorStatus,
+    this.tailorDeliveryDate,
   });
 }
 
@@ -267,11 +269,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   String _getTailorStatusText(TailorStatus status) {
     switch (status) {
       case TailorStatus.notAssigned:
-        return "Tailor not assigned";
       case TailorStatus.pending:
-        return "Not yet confirmed by tailor";
       case TailorStatus.cancelled:
-        return "Cancelled by tailor";
+        return "Sent to Tailor";
       case TailorStatus.confirmed:
         return "Confirmed";
     }
@@ -287,6 +287,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         return Colors.red.shade800;
       case TailorStatus.confirmed:
         return primaryGreen;
+    }
+  }
+
+  Color _getOrderStatusColor(String status, bool isDelivered) {
+    if (isDelivered) return primaryGreen;
+    switch (status) {
+      case "Cancelled by tailor":
+        return Colors.red.shade800;
+      case "Not yet confirmed by tailor":
+        return Colors.orange.shade800;
+      case "Tailor not assigned":
+        return Colors.grey.shade600;
+      case "Need Confirmation":
+        return Colors.blue.shade800;
+      default:
+        return Colors.blueAccent;
     }
   }
 
@@ -312,11 +328,39 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   late final List<CustomerOrder> _orders = <CustomerOrder>[
     CustomerOrder(
+      id: "ORD-9112",
+      retailerName: "Silk & Cotton",
+      tailorName: "Master Stitch",
+      amount: 3200,
+      orderDate: DateTime.now().subtract(const Duration(days: 1)),
+      status: "Need Confirmation",
+      isDelivered: false,
+      deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
+      deliveryCharges: {"Silk & Cotton": 50.0},
+      retailerReviews: {},
+      retailerRatings: {},
+      items: [
+        OrderItem(
+          name: "Silk Saree",
+          quantity: 1,
+          price: 3200,
+          tailorPrice: 2500,
+          imagePath: "assets/images/silk.jpg",
+          color: "Royal Blue",
+          destination: OrderDeliveryDestination.tailor,
+          tailorStatus: TailorStatus.confirmed,
+          tailorDeliveryDate: DateTime.now().add(const Duration(days: 10)),
+          measurementRefImages: ["assets/images/ref1.jpg"],
+          tailorInstructions: "High neck blouse design with full sleeves.",
+        ),
+      ],
+    ),
+    CustomerOrder(
       id: "ORD-9654",
       retailerName: "Zaroon Fabrics",
       amount: 4500,
       orderDate: DateTime.now().subtract(const Duration(days: 2)),
-      status: "On Hold",
+      status: "Cancelled by tailor",
       isDelivered: false,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
       deliveryCharges: {"Zaroon Fabrics": 50.0},
@@ -350,7 +394,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       retailerRatings: {},
       items: [
         const OrderItem(
-          name: "Premium Cotton",
+          name: "Denim Shirt",
           quantity: 2,
           price: 3200,
           imagePath: "assets/images/denim.jpg",
@@ -366,7 +410,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       tailorName: "Fine Cut Tailors",
       amount: 4500,
       orderDate: DateTime.now().subtract(const Duration(days: 5)),
-      status: "Preparing",
+      status: "Not yet confirmed by tailor",
       isDelivered: false,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
       deliveryCharges: {"Zaroon Fabrics": 45.0, "Thread & Co.": 45.0},
@@ -402,7 +446,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       retailerName: "Heritage Silk",
       amount: 8200,
       orderDate: DateTime.now().subtract(const Duration(days: 20)),
-      status: "Packed",
+      status: "Tailor not assigned",
       isDelivered: false,
       deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
       deliveryCharges: {"Heritage Silk": 50.0},
@@ -751,7 +795,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: ["All", "On Hold", "Processing", "Preparing", "Packed", "Delivered"].map((status) {
+                  children: [
+                    "All",
+                    "Tailor not assigned",
+                    "Not yet confirmed by tailor",
+                    "Cancelled by tailor",
+                    "Need Confirmation",
+                    "Processing",
+                    "Delivered"
+                  ].map((status) {
                     return _filterChip(status, _selectedStatus == status, () {
                       setSheetState(() => _selectedStatus = status);
                       setState(() => _selectedStatus = status);
@@ -888,7 +940,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _orderCard(CustomerOrder order) {
-    final statusColor = order.isDelivered ? primaryGreen : Colors.blueAccent;
+    final statusColor = _getOrderStatusColor(order.status, order.isDelivered);
 
     return GestureDetector(
       onTap: () => _showOrderDetail(order),
@@ -1077,8 +1129,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ),
                       _infoBadge(
                         currentOrder.status,
-                        currentOrder.isDelivered ? primaryGreen.withOpacity(0.1) : Colors.blueAccent.withOpacity(0.1),
-                        currentOrder.isDelivered ? primaryGreen : Colors.blueAccent,
+                        _getOrderStatusColor(currentOrder.status, currentOrder.isDelivered).withOpacity(0.1),
+                        _getOrderStatusColor(currentOrder.status, currentOrder.isDelivered),
                       ),
                     ],
                   ),
@@ -1359,28 +1411,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 runSpacing: 4,
                 alignment: WrapAlignment.end,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      "Send to Tailor",
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.orange.shade900,
-                      ),
-                    ),
-                  ),
-                  if (item.tailorStatus != null)
+                  if (item.tailorStatus != null && !isDelivered)
                     _tailorStatusBadge(item.tailorStatus!),
                 ],
               ),
             ],
           ),
-          if (item.tailorStatus != null) ...[
+          if (item.tailorStatus != null && !isDelivered) ...[
             if (item.tailorStatus == TailorStatus.pending)
               Container(
                 margin: const EdgeInsets.only(top: 16),
@@ -1390,39 +1427,61 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.blue.shade100),
                 ),
+                child: Row(
+                  children: [
+                    Icon(Icons.timer_outlined, color: Colors.blue.shade900, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "Tailor will accept or reject your request within 24 hours.",
+                        style: TextStyle(color: Colors.blue.shade900, fontSize: 13, height: 1.4, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else if (item.tailorStatus == TailorStatus.confirmed)
+              Container(
+                margin: const EdgeInsets.only(top: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green.shade100),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Icon(Icons.timer_outlined, color: Colors.blue.shade900, size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            "Tailor will accept or reject your request within 24 hours. You can manually cancel the request before then.",
-                            style: TextStyle(color: Colors.blue.shade900, fontSize: 13, height: 1.4, fontWeight: FontWeight.w600),
-                          ),
-                        ),
+                        const Text("Stitching Price:", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        Text("Tk ${item.tailorPrice?.toInt() ?? 0}", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: primaryGreen)),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Tailor request cancelled successfully.")),
-                          );
-                          Navigator.pop(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red.shade50,
-                          foregroundColor: Colors.red.shade800,
-                          elevation: 0,
-                          side: BorderSide(color: Colors.red.shade100),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: const Text("Cancel Tailor Request", style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Est. Delivery Date:", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        Text(item.tailorDeliveryDate != null ? _formatDate(item.tailorDeliveryDate!) : "TBD", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: primaryGreen)),
+                      ],
+                    ),
+                    const Divider(height: 20),
+                    RichText(
+                      text: TextSpan(
+                        style: const TextStyle(color: Colors.black87, fontSize: 13, height: 1.4, fontWeight: FontWeight.w600),
+                        children: [
+                          const TextSpan(text: "If you want to confirm or reject "),
+                          TextSpan(
+                            text: "go to Checkout",
+                            style: TextStyle(
+                              color: primaryGreen,
+                              fontWeight: FontWeight.w900,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
