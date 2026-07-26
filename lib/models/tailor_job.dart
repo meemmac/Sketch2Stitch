@@ -47,14 +47,18 @@ enum TailorPaymentStatus {
       TailorPaymentStatus.values.byName(v);
 }
 
+/// One tailor job per ORDER — covers every sub-order (every retailer's
+/// items) in that order under a single tailor, single quote, single
+/// estimated delivery date. Matches the DB schema: `Tailor-jobs` has an
+/// `orderId` field but no `subOrderId` field.
+///
+/// REMOVED: `subOrderId`. It was previously added to let one order have
+/// multiple independent per-retailer tailor jobs, but that's not how the
+/// schema or the product flow actually work — a customer picks ONE
+/// tailor for the whole order, not one per retailer.
 class TailorJob {
   final String id;
   final String orderId;
-  // NEW: which Sub-orders doc (i.e. which retailer's slice of the order)
-  // this job belongs to. Lets one Order have multiple simultaneous,
-  // independent tailor jobs — one per retailer — instead of a single
-  // order-wide job.
-  final String subOrderId;
   final String tailorId;
   final String measurementId;
   final List<String> designIds;
@@ -81,7 +85,6 @@ class TailorJob {
   TailorJob({
     required this.id,
     required this.orderId,
-    required this.subOrderId,
     required this.tailorId,
     required this.measurementId,
     this.designIds = const [],
@@ -150,7 +153,6 @@ class TailorJob {
   TailorJob copyWith({
     String? id,
     String? orderId,
-    String? subOrderId,
     String? tailorId,
     String? measurementId,
     List<String>? designIds,
@@ -176,7 +178,6 @@ class TailorJob {
     return TailorJob(
       id: id ?? this.id,
       orderId: orderId ?? this.orderId,
-      subOrderId: subOrderId ?? this.subOrderId,
       tailorId: tailorId ?? this.tailorId,
       measurementId: measurementId ?? this.measurementId,
       designIds: designIds ?? this.designIds,
@@ -204,7 +205,6 @@ class TailorJob {
   Map<String, dynamic> toJson() => {
     'id': id,
     'orderId': orderId,
-    'subOrderId': subOrderId,
     'tailorId': tailorId,
     'measurementId': measurementId,
     'designIds': designIds,
@@ -230,7 +230,6 @@ class TailorJob {
     return TailorJob(
       id: json['id'] ?? '',
       orderId: json['orderId'] ?? '',
-      subOrderId: json['subOrderId'] ?? '',
       tailorId: json['tailorId'] ?? '',
       measurementId: json['measurementId'] ?? '',
       designIds: List<String>.from(json['designIds'] ?? []),

@@ -4,12 +4,19 @@ import 'tailoring_setup_screen.dart';
 import '../../models/measurement.dart';
 import 'order_session.dart';
 import 'tailoring_callbacks.dart';
+import '../../models/sub_order.dart';
 
+/// ─── Checkout Screen ────────────────────────────────────────────────────
+///
+/// Pays each retailer for the CURRENT cart snapshot, then starts exactly
+/// one brand-new OrderRecord and hands off to TailoringSetupScreen for
+/// THAT order. Never touches any other existing order.
 class CheckoutScreen extends StatefulWidget {
   final List<CartLine> cartLines;
   final Map<String, RetailerInfo> retailers;
   final double grandTotal;
   final Measurement measurement;
+  final List<SubOrder> subOrders;
   final VoidCallback onOrderPlaced;
 
   const CheckoutScreen({
@@ -18,6 +25,7 @@ class CheckoutScreen extends StatefulWidget {
     required this.retailers,
     required this.grandTotal,
     required this.measurement,
+    required this.subOrders,
     required this.onOrderPlaced,
   });
 
@@ -62,23 +70,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
   }
 
+  /// Clears the cart, starts exactly ONE new order from this checkout's
+  /// sub-orders, and navigates into that order's tailoring setup. This is
+  /// the only place a new OrderRecord gets created.
   void _continueToTailoring() {
-  widget.onOrderPlaced(); // clears the cart
+    widget.onOrderPlaced(); // clears the cart
 
-  OrderSession.instance.startOrder();
+    final order = OrderStore.instance.startOrder(widget.subOrders);
 
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(
-      builder: (_) => TailoringSetupScreen(
-        orderId: OrderSession.instance.orderId!,
-        orderDate: OrderSession.instance.orderDate!,
-        savedMeasurements: [widget.measurement],
-        callbacks: buildTailoringCallbacks(),
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TailoringSetupScreen(
+          orderId: order.orderId,
+          orderDate: order.orderDate,
+          savedMeasurements: [widget.measurement],
+          subOrders: order.subOrders, // the stamped copies, not widget.subOrders
+          callbacks: buildTailoringCallbacks(order.orderId),
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -171,8 +183,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ],
           ),
           const SizedBox(height: 14),
-          // Subtotal / delivery / payable breakdown so the per-retailer
-          // "Pay" amount isn't a mystery number.
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
@@ -185,9 +195,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 const SizedBox(height: 4),
                 _breakdownRow(
                   "Delivery charge",
-                  deliveryCharge == 0
-                      ? "Free"
-                      : "Tk ${deliveryCharge.toStringAsFixed(0)}",
+                  deliveryCharge == 0 ? "Free" : "Tk ${deliveryCharge.toStringAsFixed(0)}",
                   icon: Icons.local_shipping_outlined,
                 ),
               ],
@@ -217,8 +225,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green.shade800,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor:
-                        isPaid ? Colors.green.shade100 : Colors.grey.shade300,
+                    disabledBackgroundColor: isPaid ? Colors.green.shade100 : Colors.grey.shade300,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
