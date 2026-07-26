@@ -10,10 +10,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ConversationsScreen extends StatefulWidget {
   final String customerId;
+  final UserRole currentUserRole;
 
   const ConversationsScreen({
     super.key,
     required this.customerId,
+    this.currentUserRole = UserRole.customer,
   });
 
   @override
@@ -38,22 +40,34 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    final tabCount = widget.currentUserRole == UserRole.customer ? 4 : 2;
+    _tabController = TabController(length: tabCount, vsync: this);
     _tabController.addListener(() {
       setState(() {
-        switch (_tabController.index) {
-          case 0:
-            _selectedTab = "All";
-            break;
-          case 1:
-            _selectedTab = "Unread";
-            break;
-          case 2:
-            _selectedTab = "Tailors";
-            break;
-          case 3:
-            _selectedTab = "Retailers";
-            break;
+        if (widget.currentUserRole == UserRole.customer) {
+          switch (_tabController.index) {
+            case 0:
+              _selectedTab = "All";
+              break;
+            case 1:
+              _selectedTab = "Unread";
+              break;
+            case 2:
+              _selectedTab = "Tailors";
+              break;
+            case 3:
+              _selectedTab = "Retailers";
+              break;
+          }
+        } else {
+          switch (_tabController.index) {
+            case 0:
+              _selectedTab = "All";
+              break;
+            case 1:
+              _selectedTab = "Unread";
+              break;
+          }
         }
         _applyFilter();
       });
@@ -466,6 +480,15 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
       // Exclude deleted conversations
       filtered = filtered.where((conv) => !conv.isDeleted).toList();
+      // Role-based visibility — customers only talk to tailors/retailers,
+      // tailors/retailers only talk to customers.
+      filtered = filtered.where((conv) {
+        if (widget.currentUserRole == UserRole.customer) {
+          return conv.otherRole == UserRole.tailor || conv.otherRole == UserRole.retailer;
+        } else {
+          return conv.otherRole == UserRole.customer;
+        }
+      }).toList();
 
       // Search filter
       if (_searchQuery.isNotEmpty) {
@@ -718,7 +741,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   }
 
   void _showNewConversationDialog() {
-    final List<Map<String, dynamic>> contacts = [
+    final List<Map<String, dynamic>> tailorRetailerContacts = [
       {
         'id': 't3',
         'name': 'Fatima Noor',
@@ -859,6 +882,29 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         'isAnonymous': true,
       },
     ];
+final List<Map<String, dynamic>> customerContacts = [
+{
+'id': 'c1',
+'name': 'Sarah Ahmed',
+'phone': '01511111111',
+'role': UserRole.customer,
+'avatar': 'assets/images/fab.jpg',
+'roleDisplay': 'Customer',
+},
+{
+'id': 'c2',
+'name': 'Fatima Khan',
+'phone': '01522222222',
+'role': UserRole.customer,
+'avatar': 'assets/images/fab2.jpg',
+'roleDisplay': 'Customer',
+},
+];
+
+final List<Map<String, dynamic>> contacts =
+widget.currentUserRole == UserRole.customer
+? tailorRetailerContacts
+: customerContacts;
 
     showModalBottomSheet(
       context: context,
@@ -1209,11 +1255,16 @@ class _ConversationsScreenState extends State<ConversationsScreen>
               indicatorWeight: 3,
               labelColor: Colors.white,
               unselectedLabelColor: Colors.white70,
-              tabs: const [
+              tabs: widget.currentUserRole == UserRole.customer
+                  ? const [
                 Tab(text: 'All'),
                 Tab(text: 'Unread'),
                 Tab(text: 'Tailors'),
                 Tab(text: 'Retailers'),
+              ]
+                  : const [
+                Tab(text: 'All'),
+                Tab(text: 'Unread'),
               ],
             ),
           ),

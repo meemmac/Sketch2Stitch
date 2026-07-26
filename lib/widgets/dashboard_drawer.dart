@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:sketch2stitch/models/user_role.dart';
 import '../screens/customer/virtual_trial_screen.dart';
 import '../screens/retailer/inventory_screen.dart';
 import '../screens/retailer/orders_screen.dart';
@@ -568,8 +569,9 @@ class DrawerNavigationSection extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const ConversationsScreen(
+                    builder: (_) => ConversationsScreen(
                       customerId: 'current_customer_id',
+                      currentUserRole: _mapToUserRole(role),
                     ),
                   ),
                 );
@@ -610,6 +612,17 @@ class DrawerNavigationSection extends StatelessWidget {
           {'title': 'Orders', 'icon': Icons.receipt_long_rounded},
           {'title': 'Inventory', 'icon': Icons.inventory_2_outlined},
         ];
+    }
+  }
+
+  UserRole _mapToUserRole(AppUserRole appRole) {
+    switch (appRole) {
+      case AppUserRole.customer:
+        return UserRole.customer;
+      case AppUserRole.tailor:
+        return UserRole.tailor;
+      case AppUserRole.retailer:
+        return UserRole.retailer;
     }
   }
 }
