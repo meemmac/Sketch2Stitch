@@ -7,6 +7,8 @@ import 'package:flutter/rendering.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../models/sub_order.dart';
 import '../../models/tailor_job.dart';
+import 'package:sketch2stitch/models/user_role.dart';
+import 'messaging/chat_screen.dart'; // adjust path to match your folder structure
 // Local-only progress memory (no DB writes) so the screen can resume at the
 // right step if the customer navigates away before a tailor job exists.
 // Add `shared_preferences` to pubspec.yaml if it isn't already a dependency.
@@ -438,6 +440,8 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     _saveLocalProgress();
   }
 
+  
+
   // ─── Step 4 actions ────────────────────────────────────────────────
 
   /// Single order-level "Find Tailor" flow — no subOrderId involved.
@@ -488,6 +492,22 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   /// / deliverCharge (via OrderStore.submitTailorQuote on their own
   /// screen) — the customer is only accepting what's already on the job,
   /// so this is a plain confirm dialog with no input fields.
+  /// 
+  void _openChatWithTailor(String tailorId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          conversationId: '${widget.orderId}_$tailorId', // TODO: use real conversation id if you generate one elsewhere
+          customerId: '', // TODO: current logged-in customer's id
+          otherUserId: tailorId,
+          otherUserName: 'Your Tailor', // TODO: look up tailor's real name
+          otherUserRole: UserRole.tailor,
+          orderId: widget.orderId,
+        ),
+      ),
+    );
+  }
   void _promptConfirmTailorJob() {
     final job = _tailorJob;
     if (job == null) return;
@@ -501,8 +521,9 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              "Your tailor sent the following quote. Confirm to lock it in.",
+           const Text(
+              "Your tailor sent the following quote. Confirming will charge "
+              "you the total amount immediately.",
               style: TextStyle(color: Colors.black54, fontSize: 13),
             ),
             const SizedBox(height: 16),
@@ -535,7 +556,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
               Navigator.pop(dialogContext);
               _confirmTailorJob();
             },
-            child: const Text("Confirm"),
+            child: const Text("Confirm & Pay"),
           ),
         ],
       ),
@@ -637,9 +658,9 @@ Future<void> _confirmTailorJob() async {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Text("Pay Tailor"),
         content: Text(
-          "Your tailor sent the following quote. Confirming will charge you "
-  "the total amount immediately.",
-  style: TextStyle(color: Colors.black54, fontSize: 13),
+         "Your tailor confirmed the job. You're paying Tk "
+          "${job.totalAmount?.toStringAsFixed(0) ?? '0'} in total "
+          "(quote + delivery). Complete payment to continue.",
         ),
         actions: [
           ElevatedButton(
@@ -1623,6 +1644,21 @@ Future<void> _confirmTailorJob() async {
       subtitle: "Browse tailors and send one job request that covers your whole order.",
       children: [
         const SizedBox(height: 22),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _findTailor,
+            icon: const Icon(Icons.storefront_rounded),
+            label: const Text("Find Tailor",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade800,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            ),
+          ),
+        ),
         const SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
@@ -1654,6 +1690,8 @@ Future<void> _confirmTailorJob() async {
     );
   }
 
+  
+
   Widget _buildQuotedCard(TailorJob job) {
     return _statusCard(
       icon: Icons.receipt_long_rounded,
@@ -1662,6 +1700,19 @@ Future<void> _confirmTailorJob() async {
       title: "Tailor sent a quote",
       subtitle: "Review the price and delivery date below.",
       children: [
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => _openChatWithTailor(job.tailorId),
+            icon: Icon(Icons.chat_bubble_outline_rounded,
+                color: Colors.green.shade800, size: 18),
+            label: Text("Chat with Tailor",
+                style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.w600)),
+            style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0)),
+          ),
+        ),
+        const SizedBox(height: 6),
         const SizedBox(height: 18),
         _infoRow(
           icon: Icons.payments_outlined,
@@ -1784,18 +1835,19 @@ Future<void> _confirmTailorJob() async {
       subtitle: "You rejected this tailor's quote. You can request another tailor below.",
       children: [
         const SizedBox(height: 22),
+        const SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: _findTailor,
-            icon: const Icon(Icons.storefront_rounded),
-            label: const Text("Find Another Tailor", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade800,
-              foregroundColor: Colors.white,
+          child: OutlinedButton(
+            onPressed: _skipTailoring,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.black87,
+              side: BorderSide(color: Colors.grey.shade300),
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
             ),
+            child: const Text("Skip Tailoring",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           ),
         ),
       ],
@@ -1914,7 +1966,6 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
       _strokes.last.points.add(details.localPosition);
     });
   }
-
   void _undo() {
     if (_strokes.isEmpty) return;
     setState(() => _strokes.removeLast());
