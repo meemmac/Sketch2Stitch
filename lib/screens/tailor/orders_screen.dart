@@ -336,7 +336,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: _sectionToggle(
-                    label: "Current Work",
+                    label: "Ongoing",
                     isSelected: _selectedTabIndex == 1,
                     count: _currentWorkOrders.length,
                     onTap: () => setState(() => _selectedTabIndex = 1),
@@ -1032,7 +1032,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                         ),
                         onChanged: (val) {
                           setModalState(() {
-                            item.servicePrice = double.tryParse(val) ?? item.servicePrice;
+                            item.servicePrice = double.tryParse(val) ?? 0;
                           });
                           setState(() {});
                         },
@@ -1097,7 +1097,18 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   children: [
                     const Text("Price", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
                     const SizedBox(height: 2),
-                    Text("Tk ${item.servicePrice.toInt()}", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        Text("Tk ${item.servicePrice.toInt()}", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        if (order.status == TailorOrderStatus.inProgress || order.status == TailorOrderStatus.confirmed) ...[
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () => _showPriceEditDialog(item, setModalState),
+                            child: Icon(Icons.edit, size: 14, color: primaryGreen),
+                          ),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
                 Column(
@@ -1194,6 +1205,39 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 style: TextButton.styleFrom(padding: EdgeInsets.zero, foregroundColor: primaryGreen, minimumSize: const Size(0, 0), tapTargetSize: MaterialTapTargetSize.shrinkWrap),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPriceEditDialog(TailorOrderItem item, StateSetter setModalState) {
+    final controller = TextEditingController(text: item.servicePrice > 0 ? item.servicePrice.toInt().toString() : "");
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Edit Stitching Price", style: TextStyle(fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: "Price (Tk)",
+            hintText: "e.g. 1500",
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          ElevatedButton(
+            onPressed: () {
+              setModalState(() {
+                item.servicePrice = double.tryParse(controller.text) ?? item.servicePrice;
+              });
+              setState(() {});
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: primaryGreen),
+            child: const Text("Save", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

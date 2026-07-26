@@ -327,23 +327,6 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
             "\"${review.comment}\"",
             style: const TextStyle(fontSize: 14, height: 1.5, fontStyle: FontStyle.italic),
           ),
-          if (review.products.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            const Text(
-              "Reviewed Work",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 70,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: review.products.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 12),
-                itemBuilder: (context, index) => _buildProductMiniCard(review.products[index]),
-              ),
-            ),
-          ],
         ],
       ),
     );
