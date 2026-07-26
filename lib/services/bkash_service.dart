@@ -124,7 +124,9 @@ class BkashService {
     required double amount,
     required String merchantInvoiceNo,
     required String idToken,
-    String callbackURL = 'https://sketch2stitch.example.com/bkash/callback',
+    // Deep-link scheme: Android closes the browser tab and resumes the app
+    // automatically when bKash redirects here — no "site not found" page.
+    String callbackURL = 'sketch2stitch://bkash/callback',
     String currency = 'BDT',
     String intent = 'sale',
   }) async {
