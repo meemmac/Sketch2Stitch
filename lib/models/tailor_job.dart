@@ -8,12 +8,28 @@ enum TailorJobStatus {
   quoted,
   confirmed,
   expired,
-  cancelled;
+  cancelled,
+  tailorDeclined;
 
-  String get toValue => name;
+  String get toValue => const {
+    TailorJobStatus.pending: 'pending',
+    TailorJobStatus.rejected: 'rejected',
+    TailorJobStatus.quoted: 'quoted',
+    TailorJobStatus.confirmed: 'confirmed',
+    TailorJobStatus.expired: 'expired',
+    TailorJobStatus.cancelled: 'cancelled',
+    TailorJobStatus.tailorDeclined: 'tailor_declined',
+  }[this]!;
 
-  static TailorJobStatus fromValue(String v) =>
-      TailorJobStatus.values.byName(v);
+  static TailorJobStatus fromValue(String v) => const {
+    'pending': TailorJobStatus.pending,
+    'rejected': TailorJobStatus.rejected,
+    'quoted': TailorJobStatus.quoted,
+    'confirmed': TailorJobStatus.confirmed,
+    'expired': TailorJobStatus.expired,
+    'cancelled': TailorJobStatus.cancelled,
+    'tailor_declined': TailorJobStatus.tailorDeclined,
+  }[v] ?? TailorJobStatus.pending;
 }
 
 enum QuoteStatus {
@@ -125,6 +141,8 @@ class TailorJob {
         return 'Expired';
       case TailorJobStatus.cancelled:
         return 'Cancelled';
+          case TailorJobStatus.tailorDeclined:
+      return 'Declined by Tailor';
     }
   }
 
