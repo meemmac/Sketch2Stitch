@@ -74,9 +74,10 @@ TailoringSetupCallbacks buildTailoringCallbacks(String orderId) {
         quoteAmount: job?.quoteAmount,
         deliverCharge: job?.deliverCharge,
         estimatedDeliveryDate: job?.estimatedDeliveryDate,
-        // rejectionReason removed from TailorJobRecord in the second
-        // order_session.dart — no longer collected, so nothing to map here.
+        rejectionReason: job?.rejectionReason,
       );
     },
   );
 }
+
+

@@ -49,19 +49,21 @@ class TailorJobRecord {
   final List<String> designIds;
   final String specialInstructions;
 
-  String status; // pending | quoted | confirmed | rejected | expired | cancelled
+  String status; // pending | quoted | confirmed | rejected | tailor_declined | expired | cancelled
   final DateTime requestedAt;
   DateTime? confirmedAt;
 
   double? quoteAmount;
-  double? deliverCharge; // field name matches schema spelling
+  double? deliverCharge;
   DateTime? estimatedDeliveryDate;
-  // NOTE: rejectionReason removed — the customer isn't required (or
-  // asked) to give a reason when declining a tailor's quote. Rejection
-  // is a plain "no thanks", not a justified decision.
 
-  String quoteStatus; // notSent | sent | accepted | declined
-  String tailorPaymentStatus; // unpaid | paid
+  // Set only by tailorDeclinesJob() — the tailor's reason for declining
+  // outright, before ever sending a quote. NOT used for customer
+  // rejection of a quote, which stays reason-less by design.
+  String? rejectionReason;
+
+  String quoteStatus;
+  String tailorPaymentStatus;
 
   TailorJobRecord({
     required this.tailorJobId,
@@ -76,6 +78,7 @@ class TailorJobRecord {
     this.quoteAmount,
     this.deliverCharge,
     this.estimatedDeliveryDate,
+    this.rejectionReason,
     this.quoteStatus = 'notSent',
     this.tailorPaymentStatus = 'unpaid',
   });
@@ -189,6 +192,19 @@ class OrderStore {
     job.estimatedDeliveryDate = estimatedDeliveryDate;
     job.deliverCharge = deliverCharge;
     job.quoteStatus = 'sent';
+  }
+
+  /// TAILOR-SIDE ACTION: the tailor declines the job outright, before
+  /// ever sending a quote. Only valid from 'pending' — once a quote has
+  /// gone out, declining is the customer's call via rejectTailorJob(),
+  /// not the tailor's.
+  void tailorDeclinesJob(String orderId, {String? reason}) {
+    final job = _orders[orderId]?.tailorJob;
+    if (job == null || job.status != 'pending') return;
+    job.status = 'tailor_declined';
+    job.rejectionReason = reason;
+    // orderStatus stays 'tailor_pending' — the order is still active,
+    // the customer just needs to browse another tailor or skip.
   }
 
   /// Customer accepts the tailor's already-submitted quote as-is. Both
@@ -412,6 +428,7 @@ class OrderStore {
         deliveryCharge: 80,
       ),
     ]);
+    
     setAwaitingTailorSearch(o7.orderId, DateTime.now().add(const Duration(hours: 30)));
     createTailorJob(orderId: o7.orderId, tailorId: 'TAILOR_D');
     submitTailorQuote(
@@ -423,10 +440,26 @@ class OrderStore {
     confirmTailorJob(o7.orderId);
     payTailorJob(o7.orderId); // marks paid + completes since job is resolved
 
+    // 8. Tailor declined outright — no quote ever sent.
+    final o8 = startOrder([
+      SubOrder(
+        id: 'RET001',
+        orderId: '',
+        retailerId: 'RET001',
+        status: SubOrderStatus.preparing,
+        itemsSubtotal: 1200,
+        deliveryCharge: 90,
+      ),
+    ]);
+    setAwaitingTailorSearch(o8.orderId, DateTime.now().add(const Duration(hours: 15)));
+    createTailorJob(orderId: o8.orderId, tailorId: 'TAILOR_F');
+    tailorDeclinesJob(o8.orderId, reason: "Fully booked this week");
+
     assert(
-      activeOrders.length == 5,
-      'Expected 5 active orders after seeding, got ${activeOrders.length}. '
+      activeOrders.length == 6,
+      'Expected 6 active orders after seeding, got ${activeOrders.length}. '
       'isActive logic may have regressed.',
     );
+    
   }
 }

@@ -542,15 +542,23 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     );
   }
 
-  Future<void> _confirmTailorJob() async {
-    final job = _tailorJob;
-    if (job == null) return;
-    await _withLoading(() => widget.callbacks.onConfirmTailorJob());
-    if (!mounted) return;
-    setState(() {
-      _tailorJob = job.copyWith(status: TailorJobStatus.confirmed);
-    });
-  }
+  // REPLACE _confirmTailorJob with this:
+Future<void> _confirmTailorJob() async {
+  final job = _tailorJob;
+  if (job == null) return;
+  await _withLoading(() async {
+    await widget.callbacks.onConfirmTailorJob();
+    await widget.callbacks.onPayTailor();
+  });
+  if (!mounted) return;
+  setState(() {
+    _tailorJob = job.copyWith(
+      status: TailorJobStatus.confirmed,
+      tailorPaymentStatus: TailorPaymentStatus.paid,
+    );
+  });
+  _checkResolvedAndMaybeComplete();
+}
 
   /// No reason required — the customer can simply decline the tailor's
   /// quote without justifying it.
@@ -629,9 +637,9 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Text("Pay Tailor"),
         content: Text(
-          "Your tailor confirmed the job. You're paying Tk "
-          "${job.totalAmount?.toStringAsFixed(0) ?? '0'} in total "
-          "(quote + delivery). Complete payment to continue.",
+          "Your tailor sent the following quote. Confirming will charge you "
+  "the total amount immediately.",
+  style: TextStyle(color: Colors.black54, fontSize: 13),
         ),
         actions: [
           ElevatedButton(
@@ -652,7 +660,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
               });
               _checkResolvedAndMaybeComplete();
             },
-            child: const Text("Pay Now"),
+            child: const Text("Confirm & Pay"),
           ),
         ],
       ),
@@ -918,6 +926,51 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildTailorDeclinedCard(TailorJob job) {
+    return _statusCard(
+      icon: Icons.cancel_outlined,
+      iconBg: Colors.red.shade50,
+      iconColor: Colors.red.shade700,
+      title: "Tailor declined this job",
+      subtitle: job.rejectionReason?.isNotEmpty == true
+          ? "Reason: ${job.rejectionReason}"
+          : "Your tailor wasn't able to take this job.",
+      children: [
+        const SizedBox(height: 22),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _findTailor,
+            icon: const Icon(Icons.storefront_rounded),
+            label: const Text("Browse Another Tailor",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade800,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: _skipTailoring,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.black87,
+              side: BorderSide(color: Colors.grey.shade300),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            ),
+            child: const Text("Skip Tailoring",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1445,12 +1498,15 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
 
     switch (job.status) {
       case TailorJobStatus.pending:
-      case TailorJobStatus.quoted:
         return _buildPendingCard(job);
+      case TailorJobStatus.quoted:
+        return _buildQuotedCard(job);
       case TailorJobStatus.confirmed:
         return _buildConfirmedCard(job);
       case TailorJobStatus.rejected:
         return _buildRejectedCard(job);
+      case TailorJobStatus.tailorDeclined:
+        return _buildTailorDeclinedCard(job);
       case TailorJobStatus.expired:
       case TailorJobStatus.cancelled:
         return _buildExpiredCard();
@@ -1567,18 +1623,19 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
       subtitle: "Browse tailors and send one job request that covers your whole order.",
       children: [
         const SizedBox(height: 22),
+        const SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: _findTailor,
-            icon: const Icon(Icons.storefront_rounded),
-            label: const Text("Find Tailor", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade800,
-              foregroundColor: Colors.white,
+          child: OutlinedButton(
+            onPressed: _skipTailoring,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.black87,
+              side: BorderSide(color: Colors.grey.shade300),
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
             ),
+            child: const Text("Skip Tailoring",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           ),
         ),
       ],
@@ -1591,8 +1648,47 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
       iconBg: Colors.blue.shade50,
       iconColor: Colors.blue.shade700,
       title: "Waiting for tailor response",
-      subtitle: "Requested ${job.requestedAt != null ? _formatDateTime(job.requestedAt!) : ''}.",
+      subtitle:
+          "Requested ${job.requestedAt != null ? _formatDateTime(job.requestedAt!) : ''}. "
+          "You'll be able to review a quote here once your tailor responds.",
+    );
+  }
+
+  Widget _buildQuotedCard(TailorJob job) {
+    return _statusCard(
+      icon: Icons.receipt_long_rounded,
+      iconBg: Colors.blue.shade50,
+      iconColor: Colors.blue.shade700,
+      title: "Tailor sent a quote",
+      subtitle: "Review the price and delivery date below.",
       children: [
+        const SizedBox(height: 18),
+        _infoRow(
+          icon: Icons.payments_outlined,
+          label: "Quote Amount",
+          value: "Tk ${job.quoteAmount?.toStringAsFixed(0) ?? '-'}",
+        ),
+        const SizedBox(height: 10),
+        _infoRow(
+          icon: Icons.local_shipping_outlined,
+          label: "Delivery Charge",
+          value: "Tk ${job.deliveryCharge?.toStringAsFixed(0) ?? '0'}",
+        ),
+        const SizedBox(height: 10),
+        _infoRow(
+          icon: Icons.summarize_outlined,
+          label: "Total Cost",
+          value: "Tk ${job.totalAmount?.toStringAsFixed(0) ?? '-'}",
+          emphasize: true,
+        ),
+        if (job.estimatedDeliveryDate != null) ...[
+          const SizedBox(height: 10),
+          _infoRow(
+            icon: Icons.event_available_outlined,
+            label: "Est. Delivery",
+            value: _formatDateTime(job.estimatedDeliveryDate!),
+          ),
+        ],
         const SizedBox(height: 22),
         Row(
           children: [
@@ -1603,9 +1699,11 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
                   foregroundColor: Colors.green.shade800,
                   side: BorderSide(color: Colors.green.shade300),
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text("Confirm", style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text("Confirm",
+                    style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
             const SizedBox(width: 10),
@@ -1616,9 +1714,11 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
                   foregroundColor: Colors.red.shade700,
                   side: BorderSide(color: Colors.red.shade200),
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text("Reject", style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text("Reject",
+                    style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
           ],
