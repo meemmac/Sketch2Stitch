@@ -41,14 +41,16 @@ import '../../widgets/dashboard_drawer.dart'; // AppUserRole is defined here
 /// onConfirmTailorJob and onRejectTailorJob both take no arguments.
 class TailoringSetupCallbacks {
   final Future<void> Function() onSkipTailoring;
-  final Future<void> Function(DateTime tailorSelectionDeadline) onContinueToTailor;
+  final Future<void> Function(DateTime tailorSelectionDeadline)
+  onContinueToTailor;
 
   final Future<String> Function({
     required String measurementId,
     required List<String> designIds,
     required String tailorId,
     required String instructions,
-  }) onCreateTailorJob;
+  })
+  onCreateTailorJob;
 
   final Future<void> Function() onConfirmTailorJob;
 
@@ -111,14 +113,24 @@ class OrderResumeState {
     this.deliverCharge,
     this.estimatedDeliveryDate,
     this.rejectionReason,
-     this.tailorPaymentStatus,
+    this.tailorPaymentStatus,
   });
 }
 
 String _formatDateTime(DateTime dt) {
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
   final period = dt.hour >= 12 ? 'PM' : 'AM';
@@ -183,7 +195,8 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   bool get _isResolved {
     final job = _tailorJob;
     if (job != null) {
-      final resolvedViaTailor = job.status == TailorJobStatus.confirmed &&
+      final resolvedViaTailor =
+          job.status == TailorJobStatus.confirmed &&
           job.tailorPaymentStatus == TailorPaymentStatus.paid;
       final resolvedViaExpiry = job.status == TailorJobStatus.expired;
       if (resolvedViaTailor || resolvedViaExpiry) return true;
@@ -276,7 +289,10 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_stepPrefKey, _currentStep);
-      await prefs.setStringList(_designsPrefKey, _designs.map((d) => d.path).toList());
+      await prefs.setStringList(
+        _designsPrefKey,
+        _designs.map((d) => d.path).toList(),
+      );
       await prefs.setString(_instructionsPrefKey, _instructionsController.text);
     } catch (_) {}
   }
@@ -297,7 +313,8 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
       final designPaths = prefs.getStringList(_designsPrefKey);
       final instructions = prefs.getString(_instructionsPrefKey);
       if (step != null) _currentStep = step;
-      if (designPaths != null) _designs.addAll(designPaths.map((p) => DesignItem(path: p)));
+      if (designPaths != null)
+        _designs.addAll(designPaths.map((p) => DesignItem(path: p)));
       if (instructions != null) _instructionsController.text = instructions;
     } catch (_) {}
   }
@@ -330,7 +347,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     super.dispose();
   }
 
-Future<void> _resumeFromBackend() async {
+  Future<void> _resumeFromBackend() async {
     await _loadLocalProgress();
 
     try {
@@ -451,8 +468,6 @@ Future<void> _resumeFromBackend() async {
     _saveLocalProgress();
   }
 
-  
-
   // ─── Step 4 actions ────────────────────────────────────────────────
 
   /// Single order-level "Find Tailor" flow — no subOrderId involved.
@@ -503,13 +518,14 @@ Future<void> _resumeFromBackend() async {
   /// / deliverCharge (via OrderStore.submitTailorQuote on their own
   /// screen) — the customer is only accepting what's already on the job,
   /// so this is a plain confirm dialog with no input fields.
-  /// 
+  ///
   void _openChatWithTailor(String tailorId) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ChatScreen(
-          conversationId: '${widget.orderId}_$tailorId', // TODO: use real conversation id if you generate one elsewhere
+          conversationId:
+              '${widget.orderId}_$tailorId', // TODO: use real conversation id if you generate one elsewhere
           customerId: '', // TODO: current logged-in customer's id
           otherUserId: tailorId,
           otherUserName: 'Your Tailor', // TODO: look up tailor's real name
@@ -519,6 +535,7 @@ Future<void> _resumeFromBackend() async {
       ),
     );
   }
+
   void _promptConfirmTailorJob() {
     final job = _tailorJob;
     if (job == null) return;
@@ -532,7 +549,7 @@ Future<void> _resumeFromBackend() async {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-           const Text(
+            const Text(
               "Your tailor sent the following quote. Confirming will charge "
               "you the total amount immediately.",
               style: TextStyle(color: Colors.black54, fontSize: 13),
@@ -575,22 +592,22 @@ Future<void> _resumeFromBackend() async {
   }
 
   // REPLACE _confirmTailorJob with this:
-Future<void> _confirmTailorJob() async {
-  final job = _tailorJob;
-  if (job == null) return;
-  await _withLoading(() async {
-    await widget.callbacks.onConfirmTailorJob();
-    await widget.callbacks.onPayTailor();
-  });
-  if (!mounted) return;
-  setState(() {
-    _tailorJob = job.copyWith(
-      status: TailorJobStatus.confirmed,
-      tailorPaymentStatus: TailorPaymentStatus.paid,
-    );
-  });
-  _checkResolvedAndMaybeComplete();
-}
+  Future<void> _confirmTailorJob() async {
+    final job = _tailorJob;
+    if (job == null) return;
+    await _withLoading(() async {
+      await widget.callbacks.onConfirmTailorJob();
+      await widget.callbacks.onPayTailor();
+    });
+    if (!mounted) return;
+    setState(() {
+      _tailorJob = job.copyWith(
+        status: TailorJobStatus.confirmed,
+        tailorPaymentStatus: TailorPaymentStatus.paid,
+      );
+    });
+    _checkResolvedAndMaybeComplete();
+  }
 
   /// No reason required — the customer can simply decline the tailor's
   /// quote without justifying it.
@@ -783,18 +800,24 @@ Future<void> _confirmTailorJob() async {
                   alignment: Alignment.center,
                   child: isDone
                       ? (index == _stepLabels.length - 1
-                          ? TweenAnimationBuilder<double>(
-                              key: const ValueKey('completed_check'),
-                              tween: Tween(begin: 0.0, end: 1.0),
-                              duration: const Duration(milliseconds: 600),
-                              curve: Curves.elasticOut,
-                              builder: (context, value, child) =>
-                                  Transform.scale(scale: value, child: child),
-                              child: const Icon(Icons.check,
-                                  size: 14, color: Colors.white),
-                            )
-                          : const Icon(Icons.check,
-                              size: 14, color: Colors.white))
+                            ? TweenAnimationBuilder<double>(
+                                key: const ValueKey('completed_check'),
+                                tween: Tween(begin: 0.0, end: 1.0),
+                                duration: const Duration(milliseconds: 600),
+                                curve: Curves.elasticOut,
+                                builder: (context, value, child) =>
+                                    Transform.scale(scale: value, child: child),
+                                child: const Icon(
+                                  Icons.check,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.check,
+                                size: 14,
+                                color: Colors.white,
+                              ))
                       : Text(
                           "${index + 1}",
                           style: TextStyle(
@@ -809,7 +832,9 @@ Future<void> _confirmTailorJob() async {
                     width: connectorWidth,
                     height: 2,
                     margin: const EdgeInsets.symmetric(horizontal: 4),
-                    color: isDone ? Colors.green.shade800 : Colors.grey.shade200,
+                    color: isDone
+                        ? Colors.green.shade800
+                        : Colors.grey.shade200,
                   ),
               ],
             );
@@ -851,8 +876,11 @@ Future<void> _confirmTailorJob() async {
                 color: Colors.green.shade50,
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.check_rounded,
-                  color: Colors.green.shade800, size: 40),
+              child: Icon(
+                Icons.check_rounded,
+                color: Colors.green.shade800,
+                size: 40,
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -881,13 +909,17 @@ Future<void> _confirmTailorJob() async {
           child: ElevatedButton.icon(
             onPressed: _findTailor,
             icon: const Icon(Icons.storefront_rounded),
-            label: const Text("Browse Another Tailor",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            label: const Text(
+              "Browse Another Tailor",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green.shade800,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
             ),
           ),
         ),
@@ -900,10 +932,14 @@ Future<void> _confirmTailorJob() async {
               foregroundColor: Colors.black87,
               side: BorderSide(color: Colors.grey.shade300),
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
             ),
-            child: const Text("Skip Tailoring",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            child: const Text(
+              "Skip Tailoring",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
           ),
         ),
       ],
@@ -1054,8 +1090,11 @@ Future<void> _confirmTailorJob() async {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.straighten_rounded,
-                    size: 14, color: Colors.green.shade800),
+                Icon(
+                  Icons.straighten_rounded,
+                  size: 14,
+                  color: Colors.green.shade800,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   "All measurements are in inches",
@@ -1106,10 +1145,14 @@ Future<void> _confirmTailorJob() async {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 14),
+                            horizontal: 12,
+                            vertical: 14,
+                          ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: Colors.green.shade800),
+                            borderSide: BorderSide(
+                              color: Colors.green.shade800,
+                            ),
                           ),
                         ),
                         style: const TextStyle(fontSize: 13),
@@ -1165,7 +1208,11 @@ Future<void> _confirmTailorJob() async {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.straighten_rounded, size: 40, color: Colors.green.shade200),
+          Icon(
+            Icons.straighten_rounded,
+            size: 40,
+            color: Colors.green.shade200,
+          ),
           const SizedBox(height: 12),
           const Text(
             "No saved measurement profile yet.",
@@ -1289,8 +1336,7 @@ Future<void> _confirmTailorJob() async {
               : GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 3,
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 10,
@@ -1316,7 +1362,8 @@ Future<void> _confirmTailorJob() async {
             maxLines: 4,
             minLines: 3,
             decoration: InputDecoration(
-              hintText: "e.g. Slightly loose fit around the waist, full sleeves, no embroidery on the collar…",
+              hintText:
+                  "e.g. Slightly loose fit around the waist, full sleeves, no embroidery on the collar…",
               hintStyle: const TextStyle(fontSize: 12.5, color: Colors.black38),
               filled: true,
               fillColor: Colors.grey.shade50,
@@ -1420,7 +1467,9 @@ Future<void> _confirmTailorJob() async {
               style: TextStyle(color: Colors.black54, fontSize: 12),
             ),
             const SizedBox(height: 10),
-            ...widget.subOrders.map((subOrder) => _buildSubOrderVisibilityRow(subOrder)),
+            ...widget.subOrders.map(
+              (subOrder) => _buildSubOrderVisibilityRow(subOrder),
+            ),
           ],
         ],
       ),
@@ -1463,7 +1512,11 @@ Future<void> _confirmTailorJob() async {
       ),
       child: Row(
         children: [
-          Icon(Icons.storefront_rounded, size: 16, color: Colors.green.shade800),
+          Icon(
+            Icons.storefront_rounded,
+            size: 16,
+            color: Colors.green.shade800,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -1493,8 +1546,11 @@ Future<void> _confirmTailorJob() async {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.access_time_rounded,
-              color: Colors.amber.shade800, size: 20),
+          Icon(
+            Icons.access_time_rounded,
+            color: Colors.amber.shade800,
+            size: 20,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -1556,7 +1612,8 @@ Future<void> _confirmTailorJob() async {
       iconBg: Colors.green.shade50,
       iconColor: Colors.green.shade800,
       title: "You haven't selected a tailor yet",
-      subtitle: "Browse tailors and send one job request that covers your whole order.",
+      subtitle:
+          "Browse tailors and send one job request that covers your whole order.",
       children: [
         const SizedBox(height: 22),
         SizedBox(
@@ -1564,13 +1621,17 @@ Future<void> _confirmTailorJob() async {
           child: ElevatedButton.icon(
             onPressed: _findTailor,
             icon: const Icon(Icons.storefront_rounded),
-            label: const Text("Find Tailor",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            label: const Text(
+              "Find Tailor",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green.shade800,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
             ),
           ),
         ),
@@ -1583,10 +1644,14 @@ Future<void> _confirmTailorJob() async {
               foregroundColor: Colors.black87,
               side: BorderSide(color: Colors.grey.shade300),
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
             ),
-            child: const Text("Skip Tailoring",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            child: const Text(
+              "Skip Tailoring",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
           ),
         ),
       ],
@@ -1605,8 +1670,6 @@ Future<void> _confirmTailorJob() async {
     );
   }
 
-  
-
   Widget _buildQuotedCard(TailorJob job) {
     return _statusCard(
       icon: Icons.receipt_long_rounded,
@@ -1620,11 +1683,22 @@ Future<void> _confirmTailorJob() async {
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
             onPressed: () => _openChatWithTailor(job.tailorId),
-            icon: Icon(Icons.chat_bubble_outline_rounded,
-                color: Colors.green.shade800, size: 18),
-            label: Text("Chat with Tailor",
-                style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.w600)),
-            style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0)),
+            icon: Icon(
+              Icons.chat_bubble_outline_rounded,
+              color: Colors.green.shade800,
+              size: 18,
+            ),
+            label: Text(
+              "Chat with Tailor",
+              style: TextStyle(
+                color: Colors.green.shade800,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 0),
+            ),
           ),
         ),
         const SizedBox(height: 6),
@@ -1666,10 +1740,13 @@ Future<void> _confirmTailorJob() async {
                   side: BorderSide(color: Colors.green.shade300),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: const Text("Confirm",
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text(
+                  "Confirm",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -1681,10 +1758,13 @@ Future<void> _confirmTailorJob() async {
                   side: BorderSide(color: Colors.red.shade200),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: const Text("Reject",
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text(
+                  "Reject",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ),
           ],
@@ -1693,7 +1773,6 @@ Future<void> _confirmTailorJob() async {
     );
   }
 
-  
   /// No specific reason is shown — rejection is a plain "no thanks" from
   /// the customer, no rejectionReason field exists on the job anymore.
   Widget _buildRejectedCard(TailorJob job) {
@@ -1701,8 +1780,9 @@ Future<void> _confirmTailorJob() async {
       icon: Icons.cancel_outlined,
       iconBg: Colors.red.shade50,
       iconColor: Colors.red.shade700,
-      title: "You declined this quote", 
-      subtitle: "You rejected this tailor's quote. You can request another tailor below.",
+      title: "You declined this quote",
+      subtitle:
+          "You rejected this tailor's quote. You can request another tailor below.",
       children: [
         const SizedBox(height: 22),
         SizedBox(
@@ -1710,13 +1790,17 @@ Future<void> _confirmTailorJob() async {
           child: ElevatedButton.icon(
             onPressed: _findTailor,
             icon: const Icon(Icons.storefront_rounded),
-            label: const Text("Find Another Tailor",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            label: const Text(
+              "Find Another Tailor",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green.shade800,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
             ),
           ),
         ),
@@ -1729,10 +1813,14 @@ Future<void> _confirmTailorJob() async {
               foregroundColor: Colors.black87,
               side: BorderSide(color: Colors.grey.shade300),
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
             ),
-            child: const Text("Skip Tailoring",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            child: const Text(
+              "Skip Tailoring",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
           ),
         ),
       ],
@@ -1867,6 +1955,7 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
       _strokes.last.points.add(details.localPosition);
     });
   }
+
   void _undo() {
     if (_strokes.isEmpty) return;
     setState(() => _strokes.removeLast());
