@@ -99,6 +99,7 @@ class OrderResumeState {
   final double? deliverCharge;
   final DateTime? estimatedDeliveryDate;
   final String? rejectionReason;
+  final String? tailorPaymentStatus;
 
   const OrderResumeState({
     this.tailorSelectionDeadline,
@@ -110,6 +111,7 @@ class OrderResumeState {
     this.deliverCharge,
     this.estimatedDeliveryDate,
     this.rejectionReason,
+     this.tailorPaymentStatus,
   });
 }
 
@@ -354,7 +356,9 @@ Future<void> _resumeFromBackend() async {
               estimatedDeliveryDate: resume.estimatedDeliveryDate,
               rejectionReason: resume.rejectionReason,
               quoteStatus: QuoteStatus.notSent,
-              tailorPaymentStatus: TailorPaymentStatus.unpaid,
+              tailorPaymentStatus: resume.tailorPaymentStatus != null
+                  ? TailorPaymentStatus.fromValue(resume.tailorPaymentStatus!)
+                  : TailorPaymentStatus.unpaid,
             );
           }
 
@@ -633,28 +637,6 @@ Future<void> _confirmTailorJob() async {
       _tailorJob = job.copyWith(status: TailorJobStatus.rejected);
     });
   }
-
-  Future<void> _simulateDeadlineExpired() async {
-    await _withLoading(() => widget.callbacks.onTailorSearchExpired());
-    if (!mounted) return;
-    setState(() {
-      final existing = _tailorJob;
-      _tailorJob = (existing ??
-              TailorJob(
-                id: '',
-                orderId: widget.orderId,
-                tailorId: '',
-                measurementId: _selectedMeasurement?.id ?? '',
-                status: TailorJobStatus.expired,
-                requestedAt: DateTime.now(),
-                quoteStatus: QuoteStatus.notSent,
-                tailorPaymentStatus: TailorPaymentStatus.unpaid,
-              ))
-          .copyWith(status: TailorJobStatus.expired);
-    });
-    _checkResolvedAndMaybeComplete();
-  }
-
 
   /// Checks whether the order has now reached a resolved state and, if
   /// so, surfaces the order-complete dialog.
@@ -1719,7 +1701,7 @@ Future<void> _confirmTailorJob() async {
       icon: Icons.cancel_outlined,
       iconBg: Colors.red.shade50,
       iconColor: Colors.red.shade700,
-      title: "Tailor declined this job",
+      title: "You declined this quote", 
       subtitle: "You rejected this tailor's quote. You can request another tailor below.",
       children: [
         const SizedBox(height: 22),

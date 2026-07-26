@@ -74,7 +74,8 @@ TailoringSetupCallbacks buildTailoringCallbacks(String orderId) {
         quoteAmount: job?.quoteAmount,
         deliverCharge: job?.deliverCharge,
         estimatedDeliveryDate: job?.estimatedDeliveryDate,
-        rejectionReason: job?.rejectionReason,
+        rejectionReason: job?.rejectionReason, 
+        tailorPaymentStatus: job?.tailorPaymentStatus, // NEW
       );
     },
   );
