@@ -95,6 +95,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _pendingPaymentID = pending.paymentID;
       _pendingToken = pending.idToken;
       _pendingRetailerId = retailerId;
+
+      // Inform the user to return after completing payment.
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Complete your payment in bKash, then return to this screen.',
+            ),
+            backgroundColor: Colors.green.shade900,
+            duration: const Duration(seconds: 8),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
     } on BkashException catch (e) {
       if (!mounted) return;
       _showPaymentError(e.message);
@@ -131,13 +148,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _paidRetailers.add(retailerId);
         _payingRetailerId = null;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Payment successful ✅'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 3),
-        ),
-      );
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: const Text('Payment confirmed successfully'),
+            backgroundColor: const Color(0xFF1B5E20), // deep app green
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
     } on BkashException catch (e) {
       if (!mounted) return;
       setState(() => _payingRetailerId = null);
@@ -150,13 +173,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _showPaymentError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red.shade700,
-        duration: const Duration(seconds: 4),
-      ),
-    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red.shade800,
+          duration: const Duration(seconds: 5),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
   }
 
   /// Clears the cart, starts exactly ONE new order from this checkout's

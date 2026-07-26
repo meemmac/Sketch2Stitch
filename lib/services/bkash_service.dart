@@ -124,9 +124,9 @@ class BkashService {
     required double amount,
     required String merchantInvoiceNo,
     required String idToken,
-    // Deep-link scheme: Android closes the browser tab and resumes the app
-    // automatically when bKash redirects here — no "site not found" page.
-    String callbackURL = 'sketch2stitch://bkash/callback',
+    // After payment, bKash redirects here. Using google.com avoids the
+    // "site not found" error while we await a real backend callback URL.
+    String callbackURL = 'https://www.google.com',
     String currency = 'BDT',
     String intent = 'sale',
   }) async {
