@@ -264,15 +264,16 @@ class BkashService {
 
   // ── Full Payment Flow ──────────────────────────────────────────────
 
-  /// Convenience method: grant token → create payment → launch browser.
-  /// Returns the [paymentID] and [idToken] you need to call
-  /// [executePayment] after the user returns to the app.
+  /// Convenience method: grant token → create payment.
+  /// Returns [paymentID], [idToken], and [bkashURL] so the caller can
+  /// open [BkashPaymentScreen] (in-app WebView) and then call
+  /// [executePayment] after the WebView auto-closes.
   ///
   /// [invoicePrefix] is prepended to a timestamp to form a unique invoice.
-  Future<({String paymentID, String idToken})> initiatePayment({
+  Future<({String paymentID, String idToken, String bkashURL})> initiatePayment({
     required double amount,
     String invoicePrefix = 'INV',
-    String callbackURL = 'https://sketch2stitch.example.com/bkash/callback',
+    String callbackURL = 'https://www.google.com',
   }) async {
     final invoiceNo =
         '${invoicePrefix}_${DateTime.now().millisecondsSinceEpoch}';
@@ -285,12 +286,11 @@ class BkashService {
       callbackURL: callbackURL,
     );
 
-    final launched = await launchBkashUrl(paymentResult.bkashURL);
-    if (!launched) {
-      throw const BkashException('Could not open bKash payment page');
-    }
-
-    return (paymentID: paymentResult.paymentID, idToken: tokenResult.idToken);
+    return (
+      paymentID: paymentResult.paymentID,
+      idToken: tokenResult.idToken,
+      bkashURL: paymentResult.bkashURL,
+    );
   }
 
   // ── Helpers ────────────────────────────────────────────────────────
