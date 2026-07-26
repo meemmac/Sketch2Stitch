@@ -7,6 +7,13 @@ import 'tailoring_setup_screen.dart';
 ///
 /// One tailor job per ORDER (not per sub-order) — matches the Tailor-jobs
 /// schema, which has an orderId field but no subOrderId field.
+///
+/// Matches the "tailor submits quote" workflow: the TAILOR calls
+/// OrderStore.submitTailorQuote() from their own screen to set
+/// quoteAmount / estimatedDeliveryDate / deliverCharge on the job. The
+/// CUSTOMER only ever accepts or declines what's already there — neither
+/// onConfirmTailorJob nor onRejectTailorJob takes any values from the
+/// customer anymore.
 TailoringSetupCallbacks buildTailoringCallbacks(String orderId) {
   final store = OrderStore.instance;
 
@@ -33,15 +40,15 @@ TailoringSetupCallbacks buildTailoringCallbacks(String orderId) {
       return job.tailorJobId;
     },
     onConfirmTailorJob: () async {
-      // No values passed in — the customer is accepting whatever the
-      // tailor already quoted via submitTailorQuote(), not supplying
-      // their own numbers. The store reads quoteAmount /
-      // estimatedDeliveryDate straight off the existing job.
+      // No values passed in — the tailor already submitted quoteAmount /
+      // estimatedDeliveryDate / deliverCharge via submitTailorQuote() on
+      // their own screen. The customer is only locking in what's already
+      // on the job; confirmTailorJob(orderId) reads it straight off.
       store.confirmTailorJob(orderId);
     },
     onRejectTailorJob: () async {
-      // No reason required — the customer can simply decline a quote
-      // without justifying it.
+      // No reason required — the customer can simply decline the
+      // tailor's quote without justifying it.
       store.rejectTailorJob(orderId);
     },
     onPayTailor: () async {
@@ -67,7 +74,8 @@ TailoringSetupCallbacks buildTailoringCallbacks(String orderId) {
         quoteAmount: job?.quoteAmount,
         deliverCharge: job?.deliverCharge,
         estimatedDeliveryDate: job?.estimatedDeliveryDate,
-        // rejectionReason removed — no longer collected.
+        // rejectionReason removed from TailorJobRecord in the second
+        // order_session.dart — no longer collected, so nothing to map here.
       );
     },
   );

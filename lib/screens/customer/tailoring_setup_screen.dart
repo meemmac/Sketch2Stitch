@@ -7,8 +7,6 @@ import 'package:flutter/rendering.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../models/sub_order.dart';
 import '../../models/tailor_job.dart';
-import 'messaging/chat_screen.dart';
-import '../../models/user_role.dart';
 // Local-only progress memory (no DB writes) so the screen can resume at the
 // right step if the customer navigates away before a tailor job exists.
 // Add `shared_preferences` to pubspec.yaml if it isn't already a dependency.
@@ -33,27 +31,26 @@ import '../../widgets/dashboard_drawer.dart'; // AppUserRole is defined here
 /// schema, which has an orderId field but no subOrderId field. The
 /// customer picks ONE tailor for the whole order, covering every
 /// sub-order/retailer in it.
+///
+/// "Tailor submits quote" workflow: the TAILOR sets quoteAmount /
+/// estimatedDeliveryDate / deliverCharge on the job (via
+/// OrderStore.submitTailorQuote() on their own screen — not this one).
+/// The CUSTOMER only ever accepts or declines what's already there —
+/// onConfirmTailorJob and onRejectTailorJob both take no arguments.
 class TailoringSetupCallbacks {
   final Future<void> Function() onSkipTailoring;
-  final Future<void> Function(DateTime tailorSelectionDeadline)
-  onContinueToTailor;
+  final Future<void> Function(DateTime tailorSelectionDeadline) onContinueToTailor;
 
   final Future<String> Function({
     required String measurementId,
     required List<String> designIds,
     required String tailorId,
     required String instructions,
-  })
-  onCreateTailorJob;
+  }) onCreateTailorJob;
 
-  final Future<void> Function({
-    required double quoteAmount,
-    required DateTime estimatedDeliveryDate,
-    double deliverCharge,
-  })
-  onConfirmTailorJob;
+  final Future<void> Function() onConfirmTailorJob;
 
-  final Future<void> Function(String reason) onRejectTailorJob;
+  final Future<void> Function() onRejectTailorJob;
 
   final Future<void> Function() onPayTailor;
   final Future<void> Function() onTailorSearchExpired;
@@ -85,6 +82,11 @@ class DesignItem {
 /// names deliberately mirror the Tailor-jobs / Orders schema so mapping
 /// your Firestore doc into this is a straight copy. One instance per
 /// ORDER now (not one per sub-order).
+///
+/// rejectionReason is no longer collected (rejection is a plain "no
+/// thanks" from the customer) — the field stays here only so older
+/// resume payloads that still send it don't break deserialization; it's
+/// never read by this screen anymore.
 class OrderResumeState {
   final DateTime? tailorSelectionDeadline;
   final String? tailorJobId;
@@ -111,18 +113,8 @@ class OrderResumeState {
 
 String _formatDateTime(DateTime dt) {
   const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
   final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
   final period = dt.hour >= 12 ? 'PM' : 'AM';
@@ -187,8 +179,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   bool get _isResolved {
     final job = _tailorJob;
     if (job != null) {
-      final resolvedViaTailor =
-          job.status == TailorJobStatus.confirmed &&
+      final resolvedViaTailor = job.status == TailorJobStatus.confirmed &&
           job.tailorPaymentStatus == TailorPaymentStatus.paid;
       final resolvedViaExpiry = job.status == TailorJobStatus.expired;
       if (resolvedViaTailor || resolvedViaExpiry) return true;
@@ -281,10 +272,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_stepPrefKey, _currentStep);
-      await prefs.setStringList(
-        _designsPrefKey,
-        _designs.map((d) => d.path).toList(),
-      );
+      await prefs.setStringList(_designsPrefKey, _designs.map((d) => d.path).toList());
       await prefs.setString(_instructionsPrefKey, _instructionsController.text);
     } catch (_) {}
   }
@@ -305,8 +293,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
       final designPaths = prefs.getStringList(_designsPrefKey);
       final instructions = prefs.getString(_instructionsPrefKey);
       if (step != null) _currentStep = step;
-      if (designPaths != null)
-        _designs.addAll(designPaths.map((p) => DesignItem(path: p)));
+      if (designPaths != null) _designs.addAll(designPaths.map((p) => DesignItem(path: p)));
       if (instructions != null) _instructionsController.text = instructions;
     } catch (_) {}
   }
@@ -454,7 +441,10 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   // ─── Step 4 actions ────────────────────────────────────────────────
 
   /// Single order-level "Find Tailor" flow — no subOrderId involved.
-  /// One tailor is picked to cover every sub-order in this order.
+  /// One tailor is picked to cover every sub-order in this order. If the
+  /// customer backs out of BrowseShell without picking anyone,
+  /// selectedTailorId is null and this is a no-op — no job is created,
+  /// no backend call happens, and they stay in awaiting_tailor_search.
   Future<void> _findTailor() async {
     final selectedTailorId = await Navigator.push<String>(
       context,
@@ -494,168 +484,88 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     });
   }
 
-  /// Requires BOTH a quote amount and an estimated delivery date before a
-  /// job can be marked confirmed — no more hardcoded simulated values.
+  /// The tailor has already submitted quoteAmount / estimatedDeliveryDate
+  /// / deliverCharge (via OrderStore.submitTailorQuote on their own
+  /// screen) — the customer is only accepting what's already on the job,
+  /// so this is a plain confirm dialog with no input fields.
   void _promptConfirmTailorJob() {
     final job = _tailorJob;
     if (job == null) return;
 
-    final amountController = TextEditingController();
-    final deliveryChargeController = TextEditingController(text: '0');
-    DateTime? pickedDate;
-
     showDialog(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text("Confirm Tailor Job"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Your tailor sent the following quote. Confirm to lock it in.",
+              style: TextStyle(color: Colors.black54, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            _infoRow(
+              icon: Icons.payments_outlined,
+              label: "Total Cost",
+              value: "Tk ${job.totalAmount?.toStringAsFixed(0) ?? '-'}",
+            ),
+            if (job.estimatedDeliveryDate != null) ...[
+              const SizedBox(height: 10),
+              _infoRow(
+                icon: Icons.event_available_outlined,
+                label: "Est. Delivery",
+                value: _formatDateTime(job.estimatedDeliveryDate!),
               ),
-              title: const Text("Confirm Tailor Job"),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "Enter the quote your tailor gave you and the date "
-                      "they estimated for delivery.",
-                      style: TextStyle(color: Colors.black54, fontSize: 13),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: amountController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: "Quote amount (Tk)",
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: deliveryChargeController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: "Delivery charge (Tk, optional)",
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        final now = DateTime.now();
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: now.add(const Duration(days: 7)),
-                          firstDate: now,
-                          lastDate: now.add(const Duration(days: 180)),
-                        );
-                        if (picked != null) {
-                          setDialogState(() => pickedDate = picked);
-                        }
-                      },
-                      icon: const Icon(Icons.calendar_today_outlined),
-                      label: Text(
-                        pickedDate == null
-                            ? "Select estimated delivery date"
-                            : _formatDateTime(pickedDate!),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text("Cancel"),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green.shade800,
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: () {
-                    final amount = double.tryParse(
-                      amountController.text.trim(),
-                    );
-                    final deliveryCharge =
-                        double.tryParse(deliveryChargeController.text.trim()) ??
-                        0;
-                    if (amount == null || amount <= 0 || pickedDate == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            "Enter a valid quote amount and pick a delivery date.",
-                          ),
-                        ),
-                      );
-                      return;
-                    }
-                    Navigator.pop(dialogContext);
-                    _confirmTailorJob(
-                      quoteAmount: amount,
-                      estimatedDeliveryDate: pickedDate!,
-                      deliverCharge: deliveryCharge,
-                    );
-                  },
-                  child: const Text("Confirm"),
-                ),
-              ],
-            );
-          },
-        );
-      },
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade800,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _confirmTailorJob();
+            },
+            child: const Text("Confirm"),
+          ),
+        ],
+      ),
     );
   }
 
-  Future<void> _confirmTailorJob({
-    required double quoteAmount,
-    required DateTime estimatedDeliveryDate,
-    double deliverCharge = 0,
-  }) async {
+  Future<void> _confirmTailorJob() async {
     final job = _tailorJob;
     if (job == null) return;
-    await _withLoading(
-      () => widget.callbacks.onConfirmTailorJob(
-        quoteAmount: quoteAmount,
-        estimatedDeliveryDate: estimatedDeliveryDate,
-        deliverCharge: deliverCharge,
-      ),
-    );
+    await _withLoading(() => widget.callbacks.onConfirmTailorJob());
     if (!mounted) return;
     setState(() {
-      _tailorJob = job.copyWith(
-        status: TailorJobStatus.confirmed,
-        quoteAmount: quoteAmount,
-        deliveryCharge: deliverCharge,
-        estimatedDeliveryDate: estimatedDeliveryDate,
-      );
+      _tailorJob = job.copyWith(status: TailorJobStatus.confirmed);
     });
   }
 
+  /// No reason required — the customer can simply decline the tailor's
+  /// quote without justifying it.
   void _promptRejectTailorJob() {
     final job = _tailorJob;
     if (job == null) return;
-    final reasonController = TextEditingController();
 
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Text("Reject this job?"),
-        content: TextField(
-          controller: reasonController,
-          decoration: const InputDecoration(
-            labelText: "Reason (optional)",
-            border: OutlineInputBorder(),
-          ),
-          maxLines: 2,
+        content: const Text(
+          "You're declining this tailor's quote. You can browse and "
+          "request a different tailor afterward.",
         ),
         actions: [
           TextButton(
@@ -668,11 +578,8 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
               foregroundColor: Colors.white,
             ),
             onPressed: () {
-              final reason = reasonController.text.trim().isEmpty
-                  ? "No reason given."
-                  : reasonController.text.trim();
               Navigator.pop(dialogContext);
-              _rejectTailorJob(reason);
+              _rejectTailorJob();
             },
             child: const Text("Reject"),
           ),
@@ -681,18 +588,13 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     );
   }
 
-  Future<void> _rejectTailorJob(String reason) async {
+  Future<void> _rejectTailorJob() async {
     final job = _tailorJob;
     if (job == null) return;
-    // FIX: previously this button mutated local state directly with no
-    // backend call at all. Now it goes through onRejectTailorJob first.
-    await _withLoading(() => widget.callbacks.onRejectTailorJob(reason));
+    await _withLoading(() => widget.callbacks.onRejectTailorJob());
     if (!mounted) return;
     setState(() {
-      _tailorJob = job.copyWith(
-        status: TailorJobStatus.rejected,
-        rejectionReason: reason,
-      );
+      _tailorJob = job.copyWith(status: TailorJobStatus.rejected);
     });
   }
 
@@ -701,38 +603,20 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     if (!mounted) return;
     setState(() {
       final existing = _tailorJob;
-      _tailorJob =
-          (existing ??
-                  TailorJob(
-                    id: '',
-                    orderId: widget.orderId,
-                    tailorId: '',
-                    measurementId: _selectedMeasurement?.id ?? '',
-                    status: TailorJobStatus.expired,
-                    requestedAt: DateTime.now(),
-                    quoteStatus: QuoteStatus.notSent,
-                    tailorPaymentStatus: TailorPaymentStatus.unpaid,
-                  ))
-              .copyWith(status: TailorJobStatus.expired);
+      _tailorJob = (existing ??
+              TailorJob(
+                id: '',
+                orderId: widget.orderId,
+                tailorId: '',
+                measurementId: _selectedMeasurement?.id ?? '',
+                status: TailorJobStatus.expired,
+                requestedAt: DateTime.now(),
+                quoteStatus: QuoteStatus.notSent,
+                tailorPaymentStatus: TailorPaymentStatus.unpaid,
+              ))
+          .copyWith(status: TailorJobStatus.expired);
     });
     _checkResolvedAndMaybeComplete();
-  }
-
-  void _messageTailor(TailorJob job) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ChatScreen(
-          conversationId: 'current_customer_id_${job.tailorId}',
-          customerId: 'current_customer_id',
-          otherUserId: job.tailorId,
-          otherUserName:
-              job.tailorId, // TODO: swap for real tailor name once fetched
-          otherUserRole: UserRole.tailor,
-          otherUserAvatar: null,
-        ),
-      ),
-    );
   }
 
   void _promptTailorPayment() {
@@ -763,9 +647,8 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
               await _withLoading(() => widget.callbacks.onPayTailor());
               if (!mounted) return;
               setState(() {
-                _tailorJob = job.copyWith(
-                  tailorPaymentStatus: TailorPaymentStatus.paid,
-                );
+                _tailorJob =
+                    job.copyWith(tailorPaymentStatus: TailorPaymentStatus.paid);
               });
               _checkResolvedAndMaybeComplete();
             },
@@ -956,24 +839,18 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
                   alignment: Alignment.center,
                   child: isDone
                       ? (index == _stepLabels.length - 1
-                            ? TweenAnimationBuilder<double>(
-                                key: const ValueKey('completed_check'),
-                                tween: Tween(begin: 0.0, end: 1.0),
-                                duration: const Duration(milliseconds: 600),
-                                curve: Curves.elasticOut,
-                                builder: (context, value, child) =>
-                                    Transform.scale(scale: value, child: child),
-                                child: const Icon(
-                                  Icons.check,
-                                  size: 14,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(
-                                Icons.check,
-                                size: 14,
-                                color: Colors.white,
-                              ))
+                          ? TweenAnimationBuilder<double>(
+                              key: const ValueKey('completed_check'),
+                              tween: Tween(begin: 0.0, end: 1.0),
+                              duration: const Duration(milliseconds: 600),
+                              curve: Curves.elasticOut,
+                              builder: (context, value, child) =>
+                                  Transform.scale(scale: value, child: child),
+                              child: const Icon(Icons.check,
+                                  size: 14, color: Colors.white),
+                            )
+                          : const Icon(Icons.check,
+                              size: 14, color: Colors.white))
                       : Text(
                           "${index + 1}",
                           style: TextStyle(
@@ -988,9 +865,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
                     width: connectorWidth,
                     height: 2,
                     margin: const EdgeInsets.symmetric(horizontal: 4),
-                    color: isDone
-                        ? Colors.green.shade800
-                        : Colors.grey.shade200,
+                    color: isDone ? Colors.green.shade800 : Colors.grey.shade200,
                   ),
               ],
             );
@@ -1032,11 +907,8 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
                 color: Colors.green.shade50,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Icons.check_rounded,
-                color: Colors.green.shade800,
-                size: 40,
-              ),
+              child: Icon(Icons.check_rounded,
+                  color: Colors.green.shade800, size: 40),
             ),
           ),
           const SizedBox(height: 16),
@@ -1193,11 +1065,8 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.straighten_rounded,
-                  size: 14,
-                  color: Colors.green.shade800,
-                ),
+                Icon(Icons.straighten_rounded,
+                    size: 14, color: Colors.green.shade800),
                 const SizedBox(width: 6),
                 Text(
                   "All measurements are in inches",
@@ -1248,14 +1117,10 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 14,
-                          ),
+                              horizontal: 12, vertical: 14),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(
-                              color: Colors.green.shade800,
-                            ),
+                            borderSide: BorderSide(color: Colors.green.shade800),
                           ),
                         ),
                         style: const TextStyle(fontSize: 13),
@@ -1311,11 +1176,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.straighten_rounded,
-            size: 40,
-            color: Colors.green.shade200,
-          ),
+          Icon(Icons.straighten_rounded, size: 40, color: Colors.green.shade200),
           const SizedBox(height: 12),
           const Text(
             "No saved measurement profile yet.",
@@ -1439,7 +1300,8 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
               : GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 3,
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 10,
@@ -1465,8 +1327,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
             maxLines: 4,
             minLines: 3,
             decoration: InputDecoration(
-              hintText:
-                  "e.g. Slightly loose fit around the waist, full sleeves, no embroidery on the collar…",
+              hintText: "e.g. Slightly loose fit around the waist, full sleeves, no embroidery on the collar…",
               hintStyle: const TextStyle(fontSize: 12.5, color: Colors.black38),
               filled: true,
               fillColor: Colors.grey.shade50,
@@ -1570,9 +1431,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
               style: TextStyle(color: Colors.black54, fontSize: 12),
             ),
             const SizedBox(height: 10),
-            ...widget.subOrders.map(
-              (subOrder) => _buildSubOrderVisibilityRow(subOrder),
-            ),
+            ...widget.subOrders.map((subOrder) => _buildSubOrderVisibilityRow(subOrder)),
           ],
         ],
       ),
@@ -1612,11 +1471,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.storefront_rounded,
-            size: 16,
-            color: Colors.green.shade800,
-          ),
+          Icon(Icons.storefront_rounded, size: 16, color: Colors.green.shade800),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -1646,11 +1501,8 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.access_time_rounded,
-            color: Colors.amber.shade800,
-            size: 20,
-          ),
+          Icon(Icons.access_time_rounded,
+              color: Colors.amber.shade800, size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -1712,8 +1564,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
       iconBg: Colors.green.shade50,
       iconColor: Colors.green.shade800,
       title: "You haven't selected a tailor yet",
-      subtitle:
-          "Browse tailors and send one job request that covers your whole order.",
+      subtitle: "Browse tailors and send one job request that covers your whole order.",
       children: [
         const SizedBox(height: 22),
         SizedBox(
@@ -1721,17 +1572,12 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
           child: ElevatedButton.icon(
             onPressed: _findTailor,
             icon: const Icon(Icons.storefront_rounded),
-            label: const Text(
-              "Find Tailor",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-            ),
+            label: const Text("Find Tailor", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green.shade800,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
             ),
           ),
         ),
@@ -1745,8 +1591,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
       iconBg: Colors.blue.shade50,
       iconColor: Colors.blue.shade700,
       title: "Waiting for tailor response",
-      subtitle:
-          "Requested ${job.requestedAt != null ? _formatDateTime(job.requestedAt!) : ''}.",
+      subtitle: "Requested ${job.requestedAt != null ? _formatDateTime(job.requestedAt!) : ''}.",
       children: [
         const SizedBox(height: 22),
         Row(
@@ -1758,14 +1603,9 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
                   foregroundColor: Colors.green.shade800,
                   side: BorderSide(color: Colors.green.shade300),
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text(
-                  "Confirm",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
+                child: const Text("Confirm", style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
             const SizedBox(width: 10),
@@ -1776,14 +1616,9 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
                   foregroundColor: Colors.red.shade700,
                   side: BorderSide(color: Colors.red.shade200),
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text(
-                  "Reject",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
+                child: const Text("Reject", style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -1801,11 +1636,8 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
       subtitle: "Complete payment to lock in your job.",
       children: [
         const SizedBox(height: 18),
-        _infoRow(
-          icon: Icons.payments_outlined,
-          label: "Total Cost",
-          value: "Tk ${job.totalAmount?.toStringAsFixed(0) ?? '-'}",
-        ),
+        _infoRow(icon: Icons.payments_outlined, label: "Total Cost",
+            value: "Tk ${job.totalAmount?.toStringAsFixed(0) ?? '-'}"),
         if (job.estimatedDeliveryDate != null) ...[
           const SizedBox(height: 10),
           _infoRow(
@@ -1823,40 +1655,10 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
               backgroundColor: Colors.green.shade800,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
             ),
-            child: Text(
-              "Pay Now · Tk ${job.totalAmount?.toStringAsFixed(0) ?? '0'}",
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () => _messageTailor(job),
-            icon: Icon(
-              Icons.chat_bubble_outline,
-              color: Colors.green.shade800,
-              size: 18,
-            ),
-            label: Text(
-              "Message Tailor",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.green.shade800,
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: Colors.green.shade300),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
+            child: Text("Pay Now · Tk ${job.totalAmount?.toStringAsFixed(0) ?? '0'}",
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           ),
         ),
         const SizedBox(height: 10),
@@ -1864,23 +1666,22 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
           width: double.infinity,
           child: TextButton(
             onPressed: _promptCancelConfirmedJob,
-            child: Text(
-              "Not this tailor? Cancel",
-              style: TextStyle(color: Colors.red.shade600),
-            ),
+            child: Text("Not this tailor? Cancel", style: TextStyle(color: Colors.red.shade600)),
           ),
         ),
       ],
     );
   }
 
+  /// No specific reason is shown — rejection is a plain "no thanks" from
+  /// the customer, no rejectionReason field exists on the job anymore.
   Widget _buildRejectedCard(TailorJob job) {
     return _statusCard(
       icon: Icons.cancel_outlined,
       iconBg: Colors.red.shade50,
       iconColor: Colors.red.shade700,
       title: "Tailor declined this job",
-      subtitle: job.rejectionReason ?? "No reason was given.",
+      subtitle: "You rejected this tailor's quote. You can request another tailor below.",
       children: [
         const SizedBox(height: 22),
         SizedBox(
@@ -1888,17 +1689,12 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
           child: ElevatedButton.icon(
             onPressed: _findTailor,
             icon: const Icon(Icons.storefront_rounded),
-            label: const Text(
-              "Find Another Tailor",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-            ),
+            label: const Text("Find Another Tailor", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green.shade800,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
             ),
           ),
         ),
