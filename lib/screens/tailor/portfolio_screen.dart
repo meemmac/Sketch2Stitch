@@ -226,7 +226,7 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
                       ),
                     ),
                     Text(
-                      item == null ? "Add Portfolio Item" : "Edit Portfolio Item",
+                      item == null ? "Add Work Item" : "Edit Work Item",
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
@@ -353,7 +353,7 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
                           Navigator.of(context).pop();
                         },
                         child: Text(
-                          item == null ? "Add Item" : "Save Changes",
+                          item == null ? "Add" : "Save Changes",
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,
@@ -399,7 +399,7 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
         backgroundColor: Colors.green.shade800,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text(
-          "Add Portfolio",
+          "Add Work",
           style: TextStyle(color: Colors.white),
         ),
       ),
