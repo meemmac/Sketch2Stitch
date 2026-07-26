@@ -8,6 +8,8 @@ import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../models/customer.dart';
+
 class ConversationsScreen extends StatefulWidget {
   final String customerId;
   final UserRole currentUserRole;
@@ -162,10 +164,11 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     setState(() => _isLoading = true);
     await Future.delayed(const Duration(milliseconds: 800));
 
-    // Initialize user cache
     _initUserCache();
 
-    final sampleConversations = [
+    // ✅ All conversations (both Tailor/Retailer and Customer)
+    final allConversations = [
+      // Tailor conversations
       Conversation(
         id: 'conv_1',
         customerId: widget.customerId,
@@ -197,6 +200,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           ),
         ],
       ),
+      // Retailer conversation
       Conversation(
         id: 'conv_2',
         customerId: widget.customerId,
@@ -219,6 +223,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           ),
         ],
       ),
+      // Another Tailor conversation
       Conversation(
         id: 'conv_3',
         customerId: widget.customerId,
@@ -259,6 +264,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           ),
         ],
       ),
+      // Another Retailer conversation
       Conversation(
         id: 'conv_4',
         customerId: widget.customerId,
@@ -291,91 +297,101 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           ),
         ],
       ),
-      // Anonymous contacts (phone numbers only, no name)
+      // ✅ Customer to Customer conversation (for Tailor/Retailer view)
+      // ✅ Multiple Customer conversations
       Conversation(
         id: 'conv_5',
         customerId: widget.customerId,
-        otherId: 'anonymous_1',
+        otherId: 'c2',
         otherRole: UserRole.customer,
-        orderId: '',
-        unreadCount: 3,
+        orderId: 'ORD-005',
+        unreadCount: 1,
         isBlocked: false,
         updatedAt: DateTime.now().subtract(const Duration(hours: 1)),
         messages: [
           Message(
             id: 'm9',
             conversationId: 'conv_5',
-            senderId: 'anonymous_1',
+            senderId: 'c2',
             senderRole: UserRole.customer,
-            msgText: 'Hi, I got your number from a friend.',
+            msgText: 'Hi! I need help with my order.',
             sentAt: DateTime.now().subtract(const Duration(hours: 1)),
             isRead: false,
-          ),
-          Message(
-            id: 'm10',
-            conversationId: 'conv_5',
-            senderId: widget.customerId,
-            senderRole: UserRole.customer,
-            msgText: 'Hello! How can I help you?',
-            sentAt: DateTime.now().subtract(const Duration(hours: 50)),
-            isRead: true,
           ),
         ],
       ),
       Conversation(
         id: 'conv_6',
         customerId: widget.customerId,
-        otherId: 'anonymous_2',
+        otherId: 'c3',
         otherRole: UserRole.customer,
-        orderId: '',
-        unreadCount: 1,
+        orderId: 'ORD-006',
+        unreadCount: 0,
         isBlocked: false,
-        updatedAt: DateTime.now().subtract(const Duration(hours: 3)),
+        updatedAt: DateTime.now().subtract(const Duration(days: 1)),
         messages: [
           Message(
-            id: 'm11',
+            id: 'm10',
             conversationId: 'conv_6',
-            senderId: 'anonymous_2',
+            senderId: 'c3',
             senderRole: UserRole.customer,
-            msgText: 'Are you available for a quick call?',
-            sentAt: DateTime.now().subtract(const Duration(hours: 3)),
-            isRead: false,
+            msgText: 'Thank you for the amazing service!',
+            sentAt: DateTime.now().subtract(const Duration(days: 1)),
+            isRead: true,
           ),
         ],
       ),
       Conversation(
         id: 'conv_7',
         customerId: widget.customerId,
-        otherId: 'anonymous_3',
-        otherRole: UserRole.retailer,
-        orderId: '',
-        unreadCount: 0,
+        otherId: 'c4',
+        otherRole: UserRole.customer,
+        orderId: 'ORD-007',
+        unreadCount: 2,
         isBlocked: false,
-        updatedAt: DateTime.now().subtract(const Duration(days: 1)),
+        updatedAt: DateTime.now().subtract(const Duration(hours: 3)),
         messages: [
+          Message(
+            id: 'm11',
+            conversationId: 'conv_7',
+            senderId: 'c4',
+            senderRole: UserRole.customer,
+            msgText: 'When will my order be delivered?',
+            sentAt: DateTime.now().subtract(const Duration(hours: 3)),
+            isRead: false,
+          ),
           Message(
             id: 'm12',
             conversationId: 'conv_7',
-            senderId: 'anonymous_3',
-            senderRole: UserRole.retailer,
-            msgText: 'Your order is ready for pickup.',
-            sentAt: DateTime.now().subtract(const Duration(days: 1)),
-            isRead: true,
-            readAt: DateTime.now().subtract(const Duration(days: 1)),
+            senderId: 'c4',
+            senderRole: UserRole.customer,
+            msgText: 'Please let me know.',
+            sentAt: DateTime.now().subtract(const Duration(hours: 2)),
+            isRead: false,
           ),
         ],
       ),
     ];
 
+    // Filter based on role
+    List<Conversation> filteredConversations;
+    if (widget.currentUserRole == UserRole.customer) {
+      filteredConversations = allConversations.where((conv) =>
+      conv.otherRole == UserRole.tailor || conv.otherRole == UserRole.retailer).toList();
+    } else {
+      // Tailor/Retailer: ONLY Customer
+      filteredConversations = allConversations.where((conv) =>
+      conv.otherRole == UserRole.customer).toList();
+    }
+
     setState(() {
-      _conversations = sampleConversations;
-      _filteredConversations = sampleConversations;
+      _conversations = filteredConversations;
+      _filteredConversations = filteredConversations;
       _isLoading = false;
     });
   }
-
   void _initUserCache() {
-    // Tailors (with names)
+    // Tailors
     final tailor1 = Tailor(
       id: 't1',
       name: 'Abdul Karim',
@@ -385,7 +401,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       rating: 4.8,
       profilePicture: 'assets/images/fab.jpg',
     );
-    
+
     final tailor2 = Tailor(
       id: 't2',
       name: 'Rehana Begum',
@@ -396,7 +412,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       profilePicture: 'assets/images/silk.jpg',
     );
 
-    // Retailers (with names/shop names)
+    // Retailers
     final retailer1 = Retailer(
       id: 'r1',
       shopName: 'Dhaka Fabric House',
@@ -417,15 +433,67 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       profilePicture: 'assets/images/textile.jpg',
     );
 
+    // ✅ Multiple Customers (no profile picture)
+    final customer2 = Customer(
+      id: 'c2',
+      name: 'Fatima Khan',
+      email: 'fatima@example.com',
+      phone: '01522222222',
+      address: 'Dhaka',
+    );
+    final customer3 = Customer(
+      id: 'c3',
+      name: 'Aisha Rahman',
+      email: 'aisha@example.com',
+      phone: '01533333333',
+      address: 'Dhaka',
+    );
+    final customer4 = Customer(
+      id: 'c4',
+      name: 'Nadia Hasan',
+      email: 'nadia@example.com',
+      phone: '01544444444',
+      address: 'Dhaka',
+    );
+    final customer5 = Customer(
+      id: 'c5',
+      name: 'Zara Malik',
+      email: 'zara@example.com',
+      phone: '01555555555',
+      address: 'Dhaka',
+    );
+    final customer6 = Customer(
+      id: 'c6',
+      name: 'Mariam Ali',
+      email: 'mariam@example.com',
+      phone: '01566666666',
+      address: 'Dhaka',
+    );
+    final customer7 = Customer(
+      id: 'c7',
+      name: 'Hassan Raza',
+      email: 'hassan@example.com',
+      phone: '01577777777',
+      address: 'Dhaka',
+    );
+    final customer8 = Customer(
+      id: 'c8',
+      name: 'Sana Khan',
+      email: 'sana@example.com',
+      phone: '01588888888',
+      address: 'Dhaka',
+    );
+
     _userCache.addAll({
-      't1': {
-        'name': tailor1.name,
-        'phone': tailor1.phone,
-        'avatar': tailor1.profilePicture ?? 'assets/images/fab.jpg',
-        'role': UserRole.tailor,
-        'model': tailor1,
-        'isAnonymous': false,
-      },
+      // ... Tailors and Retailers (same as before)
+'t1': {
+  'name': tailor1.name,
+  'phone': tailor1.phone,
+  'avatar': tailor1.profilePicture ?? 'assets/images/fab.jpg',
+  'role': UserRole.tailor,
+  'model': tailor1,
+  'isAnonymous': false,
+},
       't2': {
         'name': tailor2.name,
         'phone': tailor2.phone,
@@ -450,26 +518,62 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         'model': retailer2,
         'isAnonymous': false,
       },
-      'anonymous_1': {
-        'name': '01611111111', // Phone number as name
-        'phone': '01611111111',
-        'avatar': 'assets/images/fab.jpg',
+      // ✅ All Customers
+      'c2': {
+        'name': customer2.name,
+        'phone': customer2.phone,
+        'avatar': null,
         'role': UserRole.customer,
-        'isAnonymous': true,
+        'model': customer2,
+        'isAnonymous': false,
       },
-      'anonymous_2': {
-        'name': '01622222222', // Phone number as name
-        'phone': '01622222222',
-        'avatar': 'assets/images/fab2.jpg',
+      'c3': {
+        'name': customer3.name,
+        'phone': customer3.phone,
+        'avatar': null,
         'role': UserRole.customer,
-        'isAnonymous': true,
+        'model': customer3,
+        'isAnonymous': false,
       },
-      'anonymous_3': {
-        'name': '01633333333', // Phone number as name
-        'phone': '01633333333',
-        'avatar': 'assets/images/fab.jpg',
-        'role': UserRole.retailer,
-        'isAnonymous': true,
+      'c4': {
+        'name': customer4.name,
+        'phone': customer4.phone,
+        'avatar': null,
+        'role': UserRole.customer,
+        'model': customer4,
+        'isAnonymous': false,
+      },
+      'c5': {
+        'name': customer5.name,
+        'phone': customer5.phone,
+        'avatar': null,
+        'role': UserRole.customer,
+        'model': customer5,
+        'isAnonymous': false,
+      },
+      'c6': {
+        'name': customer6.name,
+        'phone': customer6.phone,
+        'avatar': null,
+        'role': UserRole.customer,
+        'model': customer6,
+        'isAnonymous': false,
+      },
+      'c7': {
+        'name': customer7.name,
+        'phone': customer7.phone,
+        'avatar': null,
+        'role': UserRole.customer,
+        'model': customer7,
+        'isAnonymous': false,
+      },
+      'c8': {
+        'name': customer8.name,
+        'phone': customer8.phone,
+        'avatar': null,
+        'role': UserRole.customer,
+        'model': customer8,
+        'isAnonymous': false,
       },
     });
   }
@@ -810,101 +914,72 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           profilePicture: 'assets/images/fab2.jpg',
         ),
       },
+      // ✅ No anonymous contacts
+    ];
+
+    final List<Map<String, dynamic>> customerContacts = [
       {
-        'id': 't5',
-        'name': 'Mohammed Rafiq',
-        'phone': '01755555555',
-        'role': UserRole.tailor,
-        'avatar': 'assets/images/textile.jpg',
-        'roleDisplay': 'Tailor',
-        'model': Tailor(
-          id: 't5',
-          name: 'Mohammed Rafiq',
-          email: 'rafiq@tailor.com',
-          phone: '01755555555',
-          address: 'Dhaka',
-          rating: 4.2,
-          profilePicture: 'assets/images/textile.jpg',
-        ),
+        'id': 'c2',
+        'name': 'Fatima Khan',
+        'phone': '01522222222',
+        'role': UserRole.customer,
+        'avatar': null,
+        'roleDisplay': 'Customer',
       },
       {
-        'id': 'r5',
-        'name': 'Heritage Weaves',
-        'phone': '01955555555',
-        'role': UserRole.retailer,
-        'avatar': 'assets/images/lace.jpg',
-        'roleDisplay': 'Retailer',
-        'model': Retailer(
-          id: 'r5',
-          shopName: 'Heritage Weaves',
-          email: 'info@heritageweaves.com',
-          phone: '01955555555',
-          address: 'Dhaka',
-          rating: 4.6,
-          profilePicture: 'assets/images/lace.jpg',
-        ),
-      },
-      // Anonymous contacts - phone numbers only
-      {
-        'id': 'anonymous_4',
-        'name': '01644444444', // Phone number as name
-        'phone': '01644444444',
-        'role': UserRole.tailor,
-        'avatar': 'assets/images/fab.jpg',
-        'roleDisplay': 'Tailor',
-        'isAnonymous': true,
+        'id': 'c3',
+        'name': 'Aisha Rahman',
+        'phone': '01533333333',
+        'role': UserRole.customer,
+        'avatar': null,
+        'roleDisplay': 'Customer',
       },
       {
-        'id': 'anonymous_5',
-        'name': '01655555555', // Phone number as name
-        'phone': '01655555555',
-        'role': UserRole.retailer,
-        'avatar': 'assets/images/fab2.jpg',
-        'roleDisplay': 'Retailer',
-        'isAnonymous': true,
+        'id': 'c4',
+        'name': 'Nadia Hasan',
+        'phone': '01544444444',
+        'role': UserRole.customer,
+        'avatar': null,
+        'roleDisplay': 'Customer',
       },
       {
-        'id': 'anonymous_6',
-        'name': '01666666666', // Phone number as name
-        'phone': '01666666666',
-        'role': UserRole.tailor,
-        'avatar': 'assets/images/textile.jpg',
-        'roleDisplay': 'Tailor',
-        'isAnonymous': true,
+        'id': 'c5',
+        'name': 'Zara Malik',
+        'phone': '01555555555',
+        'role': UserRole.customer,
+        'avatar': null,
+        'roleDisplay': 'Customer',
       },
       {
-        'id': 'anonymous_7',
-        'name': '01677777777', // Phone number as name
-        'phone': '01677777777',
-        'role': UserRole.retailer,
-        'avatar': 'assets/images/lace.jpg',
-        'roleDisplay': 'Retailer',
-        'isAnonymous': true,
+        'id': 'c6',
+        'name': 'Mariam Ali',
+        'phone': '01566666666',
+        'role': UserRole.customer,
+        'avatar': null,
+        'roleDisplay': 'Customer',
+      },
+      {
+        'id': 'c7',
+        'name': 'Hassan Raza',
+        'phone': '01577777777',
+        'role': UserRole.customer,
+        'avatar': null,
+        'roleDisplay': 'Customer',
+      },
+      {
+        'id': 'c8',
+        'name': 'Sana Khan',
+        'phone': '01588888888',
+        'role': UserRole.customer,
+        'avatar': null,
+        'roleDisplay': 'Customer',
       },
     ];
-final List<Map<String, dynamic>> customerContacts = [
-{
-'id': 'c1',
-'name': 'Sarah Ahmed',
-'phone': '01511111111',
-'role': UserRole.customer,
-'avatar': 'assets/images/fab.jpg',
-'roleDisplay': 'Customer',
-},
-{
-'id': 'c2',
-'name': 'Fatima Khan',
-'phone': '01522222222',
-'role': UserRole.customer,
-'avatar': 'assets/images/fab2.jpg',
-'roleDisplay': 'Customer',
-},
-];
 
-final List<Map<String, dynamic>> contacts =
-widget.currentUserRole == UserRole.customer
-? tailorRetailerContacts
-: customerContacts;
+    final List<Map<String, dynamic>> contacts =
+    widget.currentUserRole == UserRole.customer
+        ? tailorRetailerContacts
+        : customerContacts;
 
     showModalBottomSheet(
       context: context,
@@ -1026,21 +1101,27 @@ widget.currentUserRole == UserRole.customer
                               
                               // For anonymous users, show the phone number as name
                               String displayName = contact['name'];
+                              bool hasAvatar = contact['avatar'] != null && contact['avatar'].toString().isNotEmpty;
 
                               return ListTile(
                                 leading: CircleAvatar(
-                                  backgroundImage: AssetImage(contact['avatar']),
                                   radius: 24,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: isTailor ? const Color(0xFF2C5C44) : Colors.blue,
-                                        width: 2,
-                                      ),
+                                  backgroundColor: contact['avatar'] != null ? Colors.grey[200] : Colors.grey[300],
+                                  backgroundImage: contact['avatar'] != null
+                                      ? AssetImage(contact['avatar'])
+                                      : null,
+                                  child: contact['avatar'] == null
+                                      ? Text(
+                                    contact['name'].isNotEmpty ? contact['name'][0].toUpperCase() : '?',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey[700],
                                     ),
-                                  ),
+                                  )
+                                      : null,
                                 ),
+
                                 title: Text(
                                   displayName,
                                   style: TextStyle(
@@ -1381,7 +1462,7 @@ widget.currentUserRole == UserRole.customer
     final lastTime = _getLastMessageTime(conversation);
     final unreadCount = conversation.unreadCount;
     final isBlocked = conversation.isBlocked;
-    final isAnonymous = _isAnonymous(conversation);
+    final isCustomer = conversation.otherRole == UserRole.customer;
 
     return GestureDetector(
       onTap: () {
@@ -1428,12 +1509,22 @@ widget.currentUserRole == UserRole.customer
           children: [
             Stack(
               children: [
+                // ✅ For Customer: show first letter, no profile picture
                 CircleAvatar(
                   radius: 28,
-                  backgroundColor: isAnonymous ? Colors.grey[300] : Colors.grey[200],
-                  backgroundImage: AssetImage(otherAvatar),
-                  child: isAnonymous
-                      ? const Icon(Icons.person_outline, color: Colors.grey, size: 24)
+                  backgroundColor: isCustomer ? Colors.grey[300] : Colors.grey[200],
+                  backgroundImage: (!isCustomer && otherAvatar != null && otherAvatar.isNotEmpty)
+                      ? AssetImage(otherAvatar)
+                      : null,
+                  child: isCustomer
+                      ? Text(
+                    otherName.isNotEmpty ? otherName[0].toUpperCase() : '?',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black54,
+                    ),
+                  )
                       : null,
                 ),
                 if (isBlocked)
@@ -1469,10 +1560,8 @@ widget.currentUserRole == UserRole.customer
                               otherName,
                               style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: isAnonymous 
-                                    ? FontWeight.normal 
-                                    : (unreadCount > 0 ? FontWeight.bold : FontWeight.w600),
-                                color: isAnonymous ? Colors.grey[600] : null,
+                                fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.w600,
+                                color: isCustomer ? Colors.grey[700] : Colors.black,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -1511,7 +1600,7 @@ widget.currentUserRole == UserRole.customer
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      if (conversation.messages != null && 
+                      if (conversation.messages != null &&
                           conversation.messages!.isNotEmpty &&
                           conversation.messages!.last.senderId != widget.customerId &&
                           conversation.messages!.last.isRead)
@@ -1520,7 +1609,7 @@ widget.currentUserRole == UserRole.customer
                           size: 14,
                           color: Colors.blue,
                         ),
-                      if (conversation.messages != null && 
+                      if (conversation.messages != null &&
                           conversation.messages!.isNotEmpty &&
                           conversation.messages!.last.senderId != widget.customerId &&
                           !conversation.messages!.last.isRead)
@@ -1529,7 +1618,7 @@ widget.currentUserRole == UserRole.customer
                           size: 14,
                           color: Colors.grey,
                         ),
-                      if (conversation.messages != null && 
+                      if (conversation.messages != null &&
                           conversation.messages!.isNotEmpty &&
                           conversation.messages!.last.senderId != widget.customerId)
                         const SizedBox(width: 4),
