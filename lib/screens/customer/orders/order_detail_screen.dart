@@ -649,7 +649,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     label: "Ongoing",
                     isSelected: _showOngoing,
                     count: _ongoingOrders.length,
-                    onTap: () => setState(() => _showOngoing = true),
+                    onTap: () => setState(() {
+                      _showOngoing = true;
+                      _selectedStatus = "All";
+                    }),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -658,7 +661,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     label: "Past Orders",
                     isSelected: !_showOngoing,
                     count: _deliveredOrders.length,
-                    onTap: () => setState(() => _showOngoing = false),
+                    onTap: () => setState(() {
+                      _showOngoing = false;
+                      _selectedStatus = "All";
+                    }),
                   ),
                 ),
               ],
@@ -790,27 +796,30 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                const Text("Status", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    "All",
-                    "Tailor not assigned",
-                    "Not yet confirmed by tailor",
-                    "Cancelled by tailor",
-                    "Need Confirmation",
-                    "Processing",
-                    "Delivered"
-                  ].map((status) {
-                    return _filterChip(status, _selectedStatus == status, () {
-                      setSheetState(() => _selectedStatus = status);
-                      setState(() => _selectedStatus = status);
-                    });
-                  }).toList(),
-                ),
-                const SizedBox(height: 32),
+                if (_showOngoing) ...[
+                  const Text("Status", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      "All",
+                      "Tailor not assigned",
+                      "Not yet confirmed by tailor",
+                      "Cancelled by tailor",
+                      "Need Confirmation",
+                      "Processing",
+                    ].map((status) {
+                      return _filterChip(status, _selectedStatus == status, () {
+                        setSheetState(() => _selectedStatus = status);
+                        setState(() => _selectedStatus = status);
+                      });
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 32),
+                ] else ...[
+                  const SizedBox(height: 8),
+                ],
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
