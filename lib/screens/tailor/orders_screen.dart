@@ -330,7 +330,10 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                     label: "Pending",
                     isSelected: _selectedTabIndex == 0,
                     count: _pendingOrders.length,
-                    onTap: () => setState(() => _selectedTabIndex = 0),
+                    onTap: () => setState(() {
+                      _selectedTabIndex = 0;
+                      _selectedStatus = "All";
+                    }),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -339,7 +342,10 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                     label: "Ongoing",
                     isSelected: _selectedTabIndex == 1,
                     count: _currentWorkOrders.length,
-                    onTap: () => setState(() => _selectedTabIndex = 1),
+                    onTap: () => setState(() {
+                      _selectedTabIndex = 1;
+                      _selectedStatus = "All";
+                    }),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -348,7 +354,10 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                     label: "Completed",
                     isSelected: _selectedTabIndex == 2,
                     count: _completedOrders.length,
-                    onTap: () => setState(() => _selectedTabIndex = 2),
+                    onTap: () => setState(() {
+                      _selectedTabIndex = 2;
+                      _selectedStatus = "All";
+                    }),
                   ),
                 ),
               ],
@@ -486,19 +495,21 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-                const Text("Status", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: ["All", "New Request", "Accepted", "Stitching", "Ready", "Finished", "Declined"].map((status) {
-                    return _filterChip(status, _selectedStatus == status, () {
-                      setSheetState(() => _selectedStatus = status);
-                      setState(() => _selectedStatus = status);
-                    });
-                  }).toList(),
-                ),
+                if (_selectedTabIndex == 0) ...[
+                  const SizedBox(height: 24),
+                  const Text("Status", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: ["All", "New Request", "Pending Customer"].map((status) {
+                      return _filterChip(status, _selectedStatus == status, () {
+                        setSheetState(() => _selectedStatus = status);
+                        setState(() => _selectedStatus = status);
+                      });
+                    }).toList(),
+                  ),
+                ],
                 const SizedBox(height: 32),
                 SizedBox(
                   width: double.infinity,
