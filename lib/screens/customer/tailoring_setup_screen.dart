@@ -5,17 +5,22 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../models/sub_order.dart';
+import '../../models/tailor_job.dart';
+import 'package:sketch2stitch/models/user_role.dart';
+import 'messaging/chat_screen.dart'; // adjust path to match your folder structure
 // Local-only progress memory (no DB writes) so the screen can resume at the
 // right step if the customer navigates away before a tailor job exists.
 // Add `shared_preferences` to pubspec.yaml if it isn't already a dependency.
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../services/bkash_service.dart';
+import 'bkash_payment_screen.dart';
 
 // TODO: point this at your real Measurement model
 // (the same one used by MeasurementScreen / DashboardDrawer).
 import '../../models/measurement.dart';
 import 'measurement_screen.dart';
 import 'browsing/browse_shell.dart';
-import 'order_session.dart';
 import 'track_order.dart';
 import '../../widgets/dashboard_drawer.dart'; // AppUserRole is defined here
 
@@ -25,51 +30,45 @@ import '../../widgets/dashboard_drawer.dart'; // AppUserRole is defined here
 /// state changes described in the workflow via `TailoringSetupCallbacks`,
 /// so whoever owns the Orders/Sub-orders/Tailor-jobs writes can plug them
 /// in without this screen needing to know about your backend client.
+///
+/// One tailor job per ORDER (not per sub-order) — matches the Tailor-jobs
+/// schema, which has an orderId field but no subOrderId field. The
+/// customer picks ONE tailor for the whole order, covering every
+/// sub-order/retailer in it.
+///
+/// "Tailor submits quote" workflow: the TAILOR sets quoteAmount /
+/// estimatedDeliveryDate / deliverCharge on the job (via
+/// OrderStore.submitTailorQuote() on their own screen — not this one).
+/// The CUSTOMER only ever accepts or declines what's already there —
+/// onConfirmTailorJob and onRejectTailorJob both take no arguments.
 class TailoringSetupCallbacks {
-  /// Orders.status = 'processing'; every Sub-orders.deliveryDestination = 'customer'.
   final Future<void> Function() onSkipTailoring;
-
-
-  /// Orders.status = 'awaiting_tailor_search';
-  /// tailorSelectionDeadline = orderDate + 72h.
   final Future<void> Function(DateTime tailorSelectionDeadline)
   onContinueToTailor;
 
-  /// Creates a Tailor-jobs doc (status='pending', quoteStatus='not_sent',
-  /// requestedAt=now, quoteResponseDeadline=now+72h) with
-  /// measurementId/designIds, then sets Orders.status = 'tailor_pending'
-  /// and every Sub-orders.deliveryDestination = 'tailor'. Returns the new
-  /// job id. Called once per tailor request (may be called again if a
-  /// previous job was rejected and the customer picks another tailor).
   final Future<String> Function({
-  required String measurementId,
-  required List<String> designIds,
-  required String tailorId,
-  required String instructions,
-})
-onCreateTailorJob;
+    required String measurementId,
+    required List<String> designIds,
+    required String tailorId,
+    required String instructions,
+  })
+  onCreateTailorJob;
 
-  /// Payments.targetType = 'tailor' payment flow for a confirmed job.
-  final Future<void> Function(String tailorJobId) onPayTailor;
+  final Future<void> Function() onConfirmTailorJob;
 
-  /// 72h deadline passed with no confirmed tailor: every
-  /// Sub-orders.deliveryDestination = 'customer'.
+  final Future<void> Function() onRejectTailorJob;
+
+  final Future<void> Function() onPayTailor;
   final Future<void> Function() onTailorSearchExpired;
 
-  /// Reads back the current state for this order so the screen can resume
-  /// correctly if the customer left and came back (app restart, backed out
-  /// of the flow, etc). Should look up:
-  ///   - Orders.tailorSelectionDeadline (for the deadline banner)
-  ///   - the most recent Tailor-jobs doc where orderId == this order
-  /// and map it onto `TailorJobSnapshot`. Return null if there's no
-  /// tailor job yet (e.g. customer hasn't reached step 4, or skipped
-  /// tailoring entirely). This performs no writes — read-only.
   final Future<OrderResumeState?> Function() onFetchResumeState;
 
   const TailoringSetupCallbacks({
     required this.onSkipTailoring,
     required this.onContinueToTailor,
     required this.onCreateTailorJob,
+    required this.onConfirmTailorJob,
+    required this.onRejectTailorJob,
     required this.onPayTailor,
     required this.onTailorSearchExpired,
     required this.onFetchResumeState,
@@ -85,26 +84,26 @@ class DesignItem {
   const DesignItem({required this.path});
 }
 
-/// Mirrors Tailor-jobs.status for the *current* job being tracked on this
-/// screen. The schema's Tailor-jobs.status enum has more granularity
-/// ("quoted", "in_progress", "completed", "cancelled", ...) than this
-/// screen currently renders distinct UI for — see `_mapSchemaStatus` for
-/// how each value collapses onto one of these four screen states.
-enum _JobStatus { pending, confirmed, rejected, expired }
-
 /// What `onFetchResumeState` hands back to rehydrate this screen. Field
 /// names deliberately mirror the Tailor-jobs / Orders schema so mapping
-/// your Firestore doc into this is a straight copy.
+/// your Firestore doc into this is a straight copy. One instance per
+/// ORDER now (not one per sub-order).
+///
+/// rejectionReason is no longer collected (rejection is a plain "no
+/// thanks" from the customer) — the field stays here only so older
+/// resume payloads that still send it don't break deserialization; it's
+/// never read by this screen anymore.
 class OrderResumeState {
-  final DateTime? tailorSelectionDeadline; // Orders.tailorSelectionDeadline
-  final String? tailorJobId; // Tailor-jobs doc id
-  final String? tailorId; // Tailor-jobs.tailorId
-  final String? status; // Tailor-jobs.status (raw schema value)
-  final DateTime? requestedAt; // Tailor-jobs.requestedAt
-  final double? quoteAmount; // Tailor-jobs.quoteAmount
-  final double? deliverCharge; // Tailor-jobs.deliverCharge
-  final DateTime? estimatedDeliveryDate; // Tailor-jobs.estimatedDeliveryDate
-  final String? rejectionReason; // Tailor-jobs.rejectionReason
+  final DateTime? tailorSelectionDeadline;
+  final String? tailorJobId;
+  final String? tailorId;
+  final String? status;
+  final DateTime? requestedAt;
+  final double? quoteAmount;
+  final double? deliverCharge;
+  final DateTime? estimatedDeliveryDate;
+  final String? rejectionReason;
+  final String? tailorPaymentStatus;
 
   const OrderResumeState({
     this.tailorSelectionDeadline,
@@ -116,88 +115,24 @@ class OrderResumeState {
     this.deliverCharge,
     this.estimatedDeliveryDate,
     this.rejectionReason,
+    this.tailorPaymentStatus,
   });
-}
-
-class _TailorJobState {
-  final String jobId;
-  final String tailorId;
-  final _JobStatus status;
-  final DateTime requestedAt;
-  final double? quoteAmount;
-  final double? deliverCharge;
-  final DateTime? estimatedDeliveryDate;
-  final String? rejectionReason;
-
-  const _TailorJobState({
-    required this.jobId,
-    required this.tailorId,
-    required this.status,
-    required this.requestedAt,
-    this.quoteAmount,
-    this.deliverCharge,
-    this.estimatedDeliveryDate,
-    this.rejectionReason,
-  });
-
-  /// Tailor-jobs.quoteAmount + Tailor-jobs.deliverCharge — what actually
-  /// gets charged in the Payments doc for this job.
-  double get totalPayable => (quoteAmount ?? 0) + (deliverCharge ?? 0);
-
-  _TailorJobState copyWith({
-    _JobStatus? status,
-    double? quoteAmount,
-    double? deliverCharge,
-    DateTime? estimatedDeliveryDate,
-    String? rejectionReason,
-  }) {
-    return _TailorJobState(
-      jobId: jobId,
-      tailorId: tailorId,
-      status: status ?? this.status,
-      requestedAt: requestedAt,
-      quoteAmount: quoteAmount ?? this.quoteAmount,
-      deliverCharge: deliverCharge ?? this.deliverCharge,
-      estimatedDeliveryDate:
-          estimatedDeliveryDate ?? this.estimatedDeliveryDate,
-      rejectionReason: rejectionReason ?? this.rejectionReason,
-    );
-  }
-}
-
-/// Maps the schema's Tailor-jobs.status enum
-/// ("pending" | "rejected" | "quoted" | "confirmed" | "in_progress" |
-///  "completed" | "expired" | "cancelled") onto the four states this
-/// screen currently has distinct UI for. "quoted" and "pending" both read
-/// as "waiting on tailor" here; "confirmed"/"in_progress"/"completed" all
-/// read as "confirmed" (payment already happened by the time a job is
-/// in_progress/completed, so the payment card is harmless to re-show
-/// briefly, but you may want to branch further once you add dedicated
-/// in-progress/completed UI). "cancelled" falls back to expired-style
-/// messaging since there's no dedicated card for it yet.
-_JobStatus _mapSchemaStatus(String raw) {
-  switch (raw) {
-    case 'pending':
-    case 'quoted':
-      return _JobStatus.pending;
-    case 'confirmed':
-    case 'in_progress':
-    case 'completed':
-      return _JobStatus.confirmed;
-    case 'rejected':
-      return _JobStatus.rejected;
-    case 'expired':
-    case 'cancelled':
-      return _JobStatus.expired;
-    default:
-      return _JobStatus.pending;
-  }
 }
 
 String _formatDateTime(DateTime dt) {
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
   final period = dt.hour >= 12 ? 'PM' : 'AM';
@@ -211,6 +146,7 @@ class TailoringSetupScreen extends StatefulWidget {
   final String orderId;
   final DateTime orderDate;
   final List<Measurement> savedMeasurements;
+  final List<SubOrder> subOrders;
   final TailoringSetupCallbacks callbacks;
 
   const TailoringSetupScreen({
@@ -218,6 +154,7 @@ class TailoringSetupScreen extends StatefulWidget {
     required this.orderId,
     required this.orderDate,
     required this.savedMeasurements,
+    required this.subOrders,
     required this.callbacks,
   });
 
@@ -234,7 +171,6 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     "Completed",
   ];
 
-  // (asset path, display label)
   static const List<(String, String)> _templates = [
     ('assets/images/templates/man_diagram.png', 'Man'),
     ('assets/images/templates/woman_diagram.png', 'Woman'),
@@ -250,14 +186,34 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   final List<DesignItem> _designs = [];
 
   DateTime? _tailorSelectionDeadline;
-  _TailorJobState? _tailorJob;
+
+  /// ONE tailor job for the whole order — null until a tailor is
+  /// requested. Covers every sub-order listed below.
+  TailorJob? _tailorJob;
+
+  /// Has the order reached a resolved state? Drives the auto-complete
+  /// dialog. Resolved = job confirmed+paid, or job expired, or every
+  /// sub-order is going direct-to-customer anyway.
+  bool get _isResolved {
+    final job = _tailorJob;
+    if (job != null) {
+      final resolvedViaTailor =
+          job.status == TailorJobStatus.confirmed &&
+          job.tailorPaymentStatus == TailorPaymentStatus.paid;
+      final resolvedViaExpiry = job.status == TailorJobStatus.expired;
+      if (resolvedViaTailor || resolvedViaExpiry) return true;
+    }
+    // No job at all, and every sub-order is direct-to-customer anyway.
+    if (job == null && widget.subOrders.isNotEmpty) {
+      return widget.subOrders.every(
+        (so) => so.deliveryDestination == SubOrderDeliveryDestination.customer,
+      );
+    }
+    return false;
+  }
+
   final TextEditingController _instructionsController = TextEditingController();
 
-  // ── Editable measurement grid (mirrors VirtualTrialScreen's layout) ──
-  // Field order/labels match the Measurement schema. Editing here is a
-  // local override for this order only — wire onCreateTailorJob (or a
-  // dedicated callback) to persist edits if you want them to update the
-  // saved profile.
   static const List<(String, String)> _measurementFields = [
     ('bustCircumference', 'Bust'),
     ('waist', 'Waist'),
@@ -327,48 +283,43 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     };
   }
 
-  // ── Local-only progress memory ──────────────────────────────────────
-  // Keys are scoped to this order so multiple in-flight orders don't
-  // collide. This is purely device-local (SharedPreferences) — no DB
-  // writes — so it only helps the *same device* resume; it's a stopgap
-  // until step/measurement/design state is written to Orders/Tailor-jobs
-  // for real.
   String get _stepPrefKey => 'tailoring_step_${widget.orderId}';
   String get _designsPrefKey => 'tailoring_designs_${widget.orderId}';
   String get _instructionsPrefKey => 'tailoring_instructions_${widget.orderId}';
-  
 
   Future<void> _saveLocalProgress() async {
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_stepPrefKey, _currentStep);
-    await prefs.setStringList(_designsPrefKey, _designs.map((d) => d.path).toList());
-    await prefs.setString(_instructionsPrefKey, _instructionsController.text);
-  } catch (_) {}
-}
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_stepPrefKey, _currentStep);
+      await prefs.setStringList(
+        _designsPrefKey,
+        _designs.map((d) => d.path).toList(),
+      );
+      await prefs.setString(_instructionsPrefKey, _instructionsController.text);
+    } catch (_) {}
+  }
 
   Future<void> _clearLocalProgress() async {
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_stepPrefKey);
-    await prefs.remove(_designsPrefKey);
-    await prefs.remove(_instructionsPrefKey);
-  } catch (_) {
-    // Nothing to clean up, or storage unavailable — either way, fine.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_stepPrefKey);
+      await prefs.remove(_designsPrefKey);
+      await prefs.remove(_instructionsPrefKey);
+    } catch (_) {}
   }
-}
 
   Future<void> _loadLocalProgress() async {
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final step = prefs.getInt(_stepPrefKey);
-    final designPaths = prefs.getStringList(_designsPrefKey);
-    final instructions = prefs.getString(_instructionsPrefKey);
-    if (step != null) _currentStep = step;
-    if (designPaths != null) _designs.addAll(designPaths.map((p) => DesignItem(path: p)));
-    if (instructions != null) _instructionsController.text = instructions;
-  } catch (_) {}
-}
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final step = prefs.getInt(_stepPrefKey);
+      final designPaths = prefs.getStringList(_designsPrefKey);
+      final instructions = prefs.getString(_instructionsPrefKey);
+      if (step != null) _currentStep = step;
+      if (designPaths != null)
+        _designs.addAll(designPaths.map((p) => DesignItem(path: p)));
+      if (instructions != null) _instructionsController.text = instructions;
+    } catch (_) {}
+  }
 
   Future<void> _withLoading(Future<void> Function() action) async {
     setState(() => _loading = true);
@@ -382,7 +333,6 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   @override
   void initState() {
     super.initState();
-    // Only one measurement profile per customer — pre-select it.
     if (widget.savedMeasurements.isNotEmpty) {
       _selectedMeasurement = widget.savedMeasurements.first;
     }
@@ -391,57 +341,61 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   }
 
   @override
-void dispose() {
-  for (final c in _measurementControllers.values) {
-    c.dispose();
+  void dispose() {
+    for (final c in _measurementControllers.values) {
+      c.dispose();
+    }
+    _instructionsController.dispose();
+    super.dispose();
   }
-  _instructionsController.dispose();
-  super.dispose();
-}
 
-  /// Read-only rehydration: if the customer already progressed past step 1
-  /// on a previous visit (e.g. they requested a tailor, then closed the
-  /// app before hearing back), pick this screen back up at the right step
-  /// and state instead of starting over. Makes no writes — if there's
-  /// nothing to resume, this is a no-op and the screen behaves exactly as
-  /// before (starts at step 0).
   Future<void> _resumeFromBackend() async {
-    // Local-only step memory first — this is what lets someone who never
-    // requested a tailor (so there's no Tailor-jobs doc yet) come back to
-    // wherever they left off, e.g. mid-way through Measurements or Design.
     await _loadLocalProgress();
 
     try {
       final resume = await widget.callbacks.onFetchResumeState();
       if (!mounted) return;
 
-      if (resume == null) return;
-
       setState(() {
-        if (resume.tailorSelectionDeadline != null) {
-          _tailorSelectionDeadline = resume.tailorSelectionDeadline;
-        }
+        if (resume != null) {
+          if (resume.tailorSelectionDeadline != null) {
+            _tailorSelectionDeadline = resume.tailorSelectionDeadline;
+          }
 
-        if (resume.tailorJobId != null && resume.status != null) {
-          _tailorJob = _TailorJobState(
-            jobId: resume.tailorJobId!,
-            tailorId: resume.tailorId ?? '',
-            status: _mapSchemaStatus(resume.status!),
-            requestedAt: resume.requestedAt ?? DateTime.now(),
-            quoteAmount: resume.quoteAmount,
-            deliverCharge: resume.deliverCharge,
-            estimatedDeliveryDate: resume.estimatedDeliveryDate,
-            rejectionReason: resume.rejectionReason,
-          );
-          // A tailor job only ever exists once the customer reached step 4
-          // — this overrides local step memory since a real backend job
-          // is more authoritative than "last step tapped on this device."
-          _currentStep = 3;
+          if (resume.tailorJobId != null && resume.status != null) {
+            _tailorJob = TailorJob(
+              id: resume.tailorJobId!,
+              orderId: widget.orderId,
+              tailorId: resume.tailorId ?? '',
+              measurementId: _selectedMeasurement?.id ?? '',
+              status: TailorJobStatus.fromValue(resume.status!),
+              requestedAt: resume.requestedAt,
+              quoteAmount: resume.quoteAmount,
+              deliveryCharge: resume.deliverCharge,
+              estimatedDeliveryDate: resume.estimatedDeliveryDate,
+              rejectionReason: resume.rejectionReason,
+              quoteStatus: QuoteStatus.notSent,
+              tailorPaymentStatus: resume.tailorPaymentStatus != null
+                  ? TailorPaymentStatus.fromValue(resume.tailorPaymentStatus!)
+                  : TailorPaymentStatus.unpaid,
+            );
+          }
+
+          if (_tailorJob != null) {
+            _currentStep = 3; // a job exists → jump to Find Tailor step
+          }
         }
-        // If there's no tailor job yet, we deliberately leave _currentStep
-        // as whatever _loadLocalProgress restored (or 0, if nothing was
-        // saved) rather than forcing step 3.
       });
+
+      // NEW — a resumed job may already be resolved (confirmed = paid,
+      // or expired). _isResolved won't have had a chance to trigger the
+      // completion dialog yet since this is the first setState after
+      // load, so check explicitly and surface it after this frame.
+      if (_isResolved) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _checkResolvedAndMaybeComplete();
+        });
+      }
     } finally {
       if (mounted) setState(() => _resuming = false);
     }
@@ -473,8 +427,6 @@ void dispose() {
   // ─── Step 2 actions ────────────────────────────────────────────────
 
   void _goToMeasurementScreen() {
-    // Reuses your existing Measurement screen for creating/editing profiles;
-    // returns here once the customer has one to pick from.
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -520,207 +472,299 @@ void dispose() {
 
   // ─── Step 4 actions ────────────────────────────────────────────────
 
+  /// Single order-level "Find Tailor" flow — no subOrderId involved.
+  /// One tailor is picked to cover every sub-order in this order. If the
+  /// customer backs out of BrowseShell without picking anyone,
+  /// selectedTailorId is null and this is a no-op — no job is created,
+  /// no backend call happens, and they stay in awaiting_tailor_search.
   Future<void> _findTailor() async {
-  final selectedTailorId = await Navigator.push<String>(
-    context,
-    MaterialPageRoute(
-      builder: (_) => BrowseShell(
-        initialIndex: 2,
-        onTailorSelected: (tailorId) => Navigator.pop(context, tailorId),
+    final selectedTailorId = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BrowseShell(
+          initialIndex: 2,
+          onTailorSelected: (tailorId) => Navigator.pop(context, tailorId),
+        ),
       ),
-    ),
-  );
-  if (!mounted || selectedTailorId == null) return;
-  await _requestTailorJob(tailorId: selectedTailorId);
-}
-
-Future<void> _requestTailorJob({required String tailorId}) async {
-  String? jobId;
-  await _withLoading(() async {
-    jobId = await widget.callbacks.onCreateTailorJob(
-      measurementId: _selectedMeasurement?.id ?? '',
-      designIds: _designs.map((d) => d.path).toList(),
-      tailorId: tailorId,
-      instructions: _instructionsController.text.trim(),
     );
-  });
-  if (!mounted || jobId == null) return;
-  setState(() {
-    _tailorJob = _TailorJobState(
-      jobId: jobId!,
-      tailorId: tailorId,
-      status: _JobStatus.pending,
-      requestedAt: DateTime.now(),
-    );
-  });
-}
+    if (!mounted || selectedTailorId == null) return;
+    await _requestTailorJob(tailorId: selectedTailorId);
+  }
 
-  void _onTailorConfirmed() {
-  if (_tailorJob == null) return;
-  final amount = 4500.0;
-  // Tailor-jobs.deliverCharge — separate from the quote itself, covers
-  // getting the finished garment from the tailor back to the customer.
-  final deliverCharge = 150.0;
-  final delivery = DateTime.now().add(const Duration(days: 10));
-  OrderSession.instance.setTailorConfirmed(amount: amount, estimatedDelivery: delivery);
-  setState(() {
-    _tailorJob = _tailorJob!.copyWith(
-      status: _JobStatus.confirmed,
-      quoteAmount: amount,
-      deliverCharge: deliverCharge,
-      estimatedDeliveryDate: delivery,
-    );
-  });
-}
-
-void _onTailorRejected() {
-  if (_tailorJob == null) return;
-  const reason = 'The tailor is fully booked this week.';
-  OrderSession.instance.setTailorRejected(reason);
-  setState(() {
-    _tailorJob = _tailorJob!.copyWith(
-      status: _JobStatus.rejected,
-      rejectionReason: reason,
-    );
-  });
-}
-
-  Future<void> _simulateDeadlineExpired() async {
-    await _withLoading(() => widget.callbacks.onTailorSearchExpired());
-    if (!mounted) return;
+  Future<void> _requestTailorJob({required String tailorId}) async {
+    String? jobId;
+    await _withLoading(() async {
+      jobId = await widget.callbacks.onCreateTailorJob(
+        measurementId: _selectedMeasurement?.id ?? '',
+        designIds: _designs.map((d) => d.path).toList(),
+        tailorId: tailorId,
+        instructions: _instructionsController.text.trim(),
+      );
+    });
+    if (!mounted || jobId == null) return;
     setState(() {
-      _tailorJob = (_tailorJob ??
-              _TailorJobState(
-                jobId: '',
-                tailorId: '',
-                status: _JobStatus.expired,
-                requestedAt: DateTime.now(),
-              ))
-          .copyWith(status: _JobStatus.expired);
+      _tailorJob = TailorJob(
+        id: jobId!,
+        orderId: widget.orderId,
+        tailorId: tailorId,
+        measurementId: _selectedMeasurement?.id ?? '',
+        status: TailorJobStatus.pending,
+        requestedAt: DateTime.now(),
+        quoteStatus: QuoteStatus.notSent,
+        tailorPaymentStatus: TailorPaymentStatus.unpaid,
+      );
     });
   }
 
-  void _promptTailorPayment(String tailorJobId) {
+  /// The tailor has already submitted quoteAmount / estimatedDeliveryDate
+  /// / deliverCharge (via OrderStore.submitTailorQuote on their own
+  /// screen) — the customer is only accepting what's already on the job,
+  /// so this is a plain confirm dialog with no input fields.
+  ///
+  void _openChatWithTailor(String tailorId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          conversationId:
+              '${widget.orderId}_$tailorId', // TODO: use real conversation id if you generate one elsewhere
+          customerId: '', // TODO: current logged-in customer's id
+          otherUserId: tailorId,
+          otherUserName: 'Your Tailor', // TODO: look up tailor's real name
+          otherUserRole: UserRole.tailor,
+          orderId: widget.orderId,
+        ),
+      ),
+    );
+  }
+
+  void _promptConfirmTailorJob() {
     final job = _tailorJob;
+    if (job == null) return;
+
     showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text("Pay Tailor"),
-        content: Text(
-          job == null
-              ? "Your tailor confirmed the job. Complete payment to continue."
-              : "Your tailor confirmed the job. You're paying Tk "
-                  "${job.totalPayable.toStringAsFixed(0)} in total "
-                  "(quote + delivery). Complete payment to continue.",
+        title: const Text("Confirm Tailor Job"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Your tailor sent the following quote. Confirming will charge "
+              "you the total amount immediately.",
+              style: TextStyle(color: Colors.black54, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            _infoRow(
+              icon: Icons.payments_outlined,
+              label: "Total Cost",
+              value: "Tk ${job.totalAmount?.toStringAsFixed(0) ?? '-'}",
+            ),
+            if (job.estimatedDeliveryDate != null) ...[
+              const SizedBox(height: 10),
+              _infoRow(
+                icon: Icons.event_available_outlined,
+                label: "Est. Delivery",
+                value: _formatDateTime(job.estimatedDeliveryDate!),
+              ),
+            ],
+          ],
         ),
         actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text("Cancel"),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green.shade800,
               foregroundColor: Colors.white,
             ),
-            onPressed: () async {
-              Navigator.pop(context);
-              await _withLoading(
-                () => widget.callbacks.onPayTailor(tailorJobId),
-              );
-              if (!mounted) return;
-              _showOrderCompleteDialog(
-                "Payment complete. Your tailor is on it.",
-              );
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _confirmTailorJob();
             },
-            child: const Text("Pay Now"),
+            child: const Text("Confirm & Pay"),
           ),
         ],
       ),
     );
   }
 
-  void _promptCancelConfirmedJob(_TailorJobState job) {
-  showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      title: const Text("Cancel this tailor?"),
-      content: const Text(
-        "The tailor confirmed this job, but you haven't paid yet. "
-        "Cancelling will let you browse and request a different tailor.",
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text("Keep This Tailor"),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red.shade700,
-            foregroundColor: Colors.white,
-          ),
-          onPressed: () {
-  Navigator.pop(context);
-  OrderSession.instance.cancelTailorJob();
-  setState(() => _tailorJob = null);
-},
-          child: const Text("Cancel Job"),
-        ),
-      ],
-    ),
-  );
-}
+  // REPLACE _confirmTailorJob with this:
+  Future<void> _confirmTailorJob() async {
+    final job = _tailorJob;
+    if (job == null) return;
 
-  /// Shown once the order has actually reached a terminal, "you're done
-  /// here" state (skipped tailoring, or paid a confirmed tailor). Surfaces
-  /// the order id and lets the customer jump straight to tracking instead
-  /// of just flashing a snackbar and popping immediately.
-  void _showOrderCompleteDialog(String message) {
-  _clearLocalProgress();
-  setState(() => _currentStep = 4);
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (_) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      title: const Text("Order Confirmed"),
-      content: Text(
-        "$message\n\nOrder ID: ${widget.orderId}",
-        style: const TextStyle(height: 1.5),
+    final amount = job.totalAmount;
+    if (amount == null || amount <= 0) {
+      // No amount on job — fall back to legacy no-payment confirm.
+      await _withLoading(() async {
+        await widget.callbacks.onConfirmTailorJob();
+        await widget.callbacks.onPayTailor();
+      });
+      if (!mounted) return;
+      setState(() {
+        _tailorJob = job.copyWith(
+          status: TailorJobStatus.confirmed,
+          tailorPaymentStatus: TailorPaymentStatus.paid,
+        );
+      });
+      _checkResolvedAndMaybeComplete();
+      return;
+    }
+
+    // bKash payment flow via in-app WebView:
+    // Step 1+2: grant token, create payment — get bkashURL.
+    late final String paymentID;
+    late final String idToken;
+    late final String bkashURL;
+
+    await _withLoading(() async {
+      final pending = await BkashService.instance.initiatePayment(
+        amount: amount,
+        invoicePrefix: 'TAILOR_${widget.orderId.replaceAll(RegExp(r"[^A-Za-z0-9]"), "")}',
+      );
+      paymentID = pending.paymentID;
+      idToken = pending.idToken;
+      bkashURL = pending.bkashURL;
+    });
+
+    if (!mounted) return;
+
+    // Step 3: open bKash in an in-app WebView (auto-closes on redirect).
+    final completed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BkashPaymentScreen(bkashURL: bkashURL),
       ),
-      actions: [
-        TextButton(
-          onPressed: () {
-            Navigator.pop(context); // close dialog only
-            OrderSession.instance.reset();
-            Navigator.of(context).pop(); // leave setup screen
-          },
-          child: const Text("Stay Here"),
+    );
+
+    if (!mounted || completed != true) return;
+
+    // Step 4: execute payment + mark confirmed.
+    await _withLoading(() async {
+      await BkashService.instance.executePayment(
+        paymentID: paymentID,
+        idToken: idToken,
+      );
+      await widget.callbacks.onConfirmTailorJob();
+      await widget.callbacks.onPayTailor();
+    });
+
+    if (!mounted) return;
+    setState(() {
+      _tailorJob = job.copyWith(
+        status: TailorJobStatus.confirmed,
+        tailorPaymentStatus: TailorPaymentStatus.paid,
+      );
+    });
+    _checkResolvedAndMaybeComplete();
+  }
+
+  /// No reason required — the customer can simply decline the tailor's
+  /// quote without justifying it.
+  void _promptRejectTailorJob() {
+    final job = _tailorJob;
+    if (job == null) return;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text("Reject this job?"),
+        content: const Text(
+          "You're declining this tailor's quote. You can browse and "
+          "request a different tailor afterward.",
         ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green.shade800,
-            foregroundColor: Colors.white,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text("Cancel"),
           ),
-          onPressed: () {
-            Navigator.pop(context); // close dialog
-            OrderSession.instance.reset();
-            Navigator.of(context).pop(); // leave setup screen
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => OrderTrackScreen(
-                  orderId: widget.orderId,
-                  userRole: AppUserRole.customer,
-                ),
-              ),
-            );
-          },
-          child: const Text("Track Order"),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _rejectTailorJob();
+            },
+            child: const Text("Reject"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _rejectTailorJob() async {
+    final job = _tailorJob;
+    if (job == null) return;
+    await _withLoading(() => widget.callbacks.onRejectTailorJob());
+    if (!mounted) return;
+    setState(() {
+      _tailorJob = job.copyWith(status: TailorJobStatus.rejected);
+    });
+  }
+
+  /// Checks whether the order has now reached a resolved state and, if
+  /// so, surfaces the order-complete dialog.
+  void _checkResolvedAndMaybeComplete() {
+    if (_isResolved) {
+      _showOrderCompleteDialog("Your order has been arranged.");
+    }
+  }
+
+  /// Shown once the order has actually reached a terminal state (skipped
+  /// tailoring, or job resolved).
+  void _showOrderCompleteDialog(String message) {
+    _clearLocalProgress();
+    setState(() => _currentStep = 4);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text("Order Confirmed"),
+        content: Text(
+          "$message\n\nOrder ID: ${widget.orderId}",
+          style: const TextStyle(height: 1.5),
         ),
-      ],
-    ),
-  );
-}
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // close dialog only
+              Navigator.of(context).pop(); // leave setup screen
+            },
+            child: const Text("Stay Here"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade800,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(context); // close dialog
+              Navigator.of(context).pop(); // leave setup screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => OrderTrackScreen(
+                    orderId: widget.orderId,
+                    userRole: AppUserRole.customer,
+                  ),
+                ),
+              );
+            },
+            child: const Text("Track Order"),
+          ),
+        ],
+      ),
+    );
+  }
 
   // ─── Build ─────────────────────────────────────────────────────────
 
@@ -782,70 +826,78 @@ void _onTailorRejected() {
   }
 
   Widget _buildStepIndicator() {
-  const double circleSize = 26;
-  const double connectorWidth = 36;
+    const double circleSize = 26;
+    const double connectorWidth = 36;
 
-  return Padding(
-    padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
-    child: Center(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: List.generate(_stepLabels.length, (index) {
-          final bool isActive = index == _currentStep;
-          final bool isLastStep = index == _stepLabels.length - 1;
-          final bool isDone =
-              index < _currentStep || (isLastStep && index <= _currentStep);
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 250),
-                width: circleSize,
-                height: circleSize,
-                decoration: BoxDecoration(
-                  color: isActive || isDone
-                      ? Colors.green.shade800
-                      : Colors.grey.shade200,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: isDone
-                    ? (index == _stepLabels.length - 1
-                        ? TweenAnimationBuilder<double>(
-                            key: const ValueKey('completed_check'),
-                            tween: Tween(begin: 0.0, end: 1.0),
-                            duration: const Duration(milliseconds: 600),
-                            curve: Curves.elasticOut,
-                            builder: (context, value, child) =>
-                                Transform.scale(scale: value, child: child),
-                            child: const Icon(Icons.check,
-                                size: 14, color: Colors.white),
-                          )
-                        : const Icon(Icons.check,
-                            size: 14, color: Colors.white))
-                    : Text(
-                        "${index + 1}",
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: isActive ? Colors.white : Colors.black45,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+      child: Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(_stepLabels.length, (index) {
+            final bool isActive = index == _currentStep;
+            final bool isLastStep = index == _stepLabels.length - 1;
+            final bool isDone =
+                index < _currentStep || (isLastStep && index <= _currentStep);
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  width: circleSize,
+                  height: circleSize,
+                  decoration: BoxDecoration(
+                    color: isActive || isDone
+                        ? Colors.green.shade800
+                        : Colors.grey.shade200,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: isDone
+                      ? (index == _stepLabels.length - 1
+                            ? TweenAnimationBuilder<double>(
+                                key: const ValueKey('completed_check'),
+                                tween: Tween(begin: 0.0, end: 1.0),
+                                duration: const Duration(milliseconds: 600),
+                                curve: Curves.elasticOut,
+                                builder: (context, value, child) =>
+                                    Transform.scale(scale: value, child: child),
+                                child: const Icon(
+                                  Icons.check,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.check,
+                                size: 14,
+                                color: Colors.white,
+                              ))
+                      : Text(
+                          "${index + 1}",
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: isActive ? Colors.white : Colors.black45,
+                          ),
                         ),
-                      ),
-              ),
-              if (!isLastStep)
-                Container(
-                  width: connectorWidth,
-                  height: 2,
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  color: isDone ? Colors.green.shade800 : Colors.grey.shade200,
                 ),
-            ],
-          );
-        }),
+                if (!isLastStep)
+                  Container(
+                    width: connectorWidth,
+                    height: 2,
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    color: isDone
+                        ? Colors.green.shade800
+                        : Colors.grey.shade200,
+                  ),
+              ],
+            );
+          }),
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildStepBody() {
     switch (_currentStep) {
@@ -879,8 +931,11 @@ void _onTailorRejected() {
                 color: Colors.green.shade50,
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.check_rounded,
-                  color: Colors.green.shade800, size: 40),
+              child: Icon(
+                Icons.check_rounded,
+                color: Colors.green.shade800,
+                size: 40,
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -890,6 +945,59 @@ void _onTailorRejected() {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildTailorDeclinedCard(TailorJob job) {
+    return _statusCard(
+      icon: Icons.cancel_outlined,
+      iconBg: Colors.red.shade50,
+      iconColor: Colors.red.shade700,
+      title: "Tailor declined this job",
+      subtitle: job.rejectionReason?.isNotEmpty == true
+          ? "Reason: ${job.rejectionReason}"
+          : "Your tailor wasn't able to take this job.",
+      children: [
+        const SizedBox(height: 22),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _findTailor,
+            icon: const Icon(Icons.storefront_rounded),
+            label: const Text(
+              "Browse Another Tailor",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade800,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: _skipTailoring,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.black87,
+              side: BorderSide(color: Colors.grey.shade300),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+            ),
+            child: const Text(
+              "Skip Tailoring",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -940,8 +1048,8 @@ void _onTailorRejected() {
             const SizedBox(height: 8),
             const Text(
               "We'll help you pick measurements, design references, and "
-              "match with a tailor. Or skip this and have items delivered "
-              "straight to you.",
+              "match with one tailor for this whole order. Or skip this "
+              "and have items delivered straight to you.",
               style: TextStyle(color: Colors.black54, height: 1.5),
             ),
             const SizedBox(height: 26),
@@ -1037,8 +1145,11 @@ void _onTailorRejected() {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.straighten_rounded,
-                    size: 14, color: Colors.green.shade800),
+                Icon(
+                  Icons.straighten_rounded,
+                  size: 14,
+                  color: Colors.green.shade800,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   "All measurements are in inches",
@@ -1066,8 +1177,6 @@ void _onTailorRejected() {
                 ),
               ],
             ),
-            // Same 2-column editable-field grid as VirtualTrialScreen's
-            // Advanced Measurements section.
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final cellWidth = (constraints.maxWidth - 10) / 2;
@@ -1091,10 +1200,14 @@ void _onTailorRejected() {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 14),
+                            horizontal: 12,
+                            vertical: 14,
+                          ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: Colors.green.shade800),
+                            borderSide: BorderSide(
+                              color: Colors.green.shade800,
+                            ),
                           ),
                         ),
                         style: const TextStyle(fontSize: 13),
@@ -1150,7 +1263,11 @@ void _onTailorRejected() {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.straighten_rounded, size: 40, color: Colors.green.shade200),
+          Icon(
+            Icons.straighten_rounded,
+            size: 40,
+            color: Colors.green.shade200,
+          ),
           const SizedBox(height: 12),
           const Text(
             "No saved measurement profile yet.",
@@ -1274,13 +1391,12 @@ void _onTailorRejected() {
               : GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
-                        childAspectRatio: 1,
-                      ),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 1,
+                  ),
                   itemCount: _designs.length,
                   itemBuilder: (context, index) =>
                       _buildDesignThumb(_designs[index]),
@@ -1301,7 +1417,8 @@ void _onTailorRejected() {
             maxLines: 4,
             minLines: 3,
             decoration: InputDecoration(
-              hintText: "e.g. Slightly loose fit around the waist, full sleeves, no embroidery on the collar…",
+              hintText:
+                  "e.g. Slightly loose fit around the waist, full sleeves, no embroidery on the collar…",
               hintStyle: const TextStyle(fontSize: 12.5, color: Colors.black38),
               filled: true,
               fillColor: Colors.grey.shade50,
@@ -1318,7 +1435,7 @@ void _onTailorRejected() {
             style: const TextStyle(fontSize: 13),
             onChanged: (_) {
               _saveLocalProgress();
-              setState(() {}); // re-evaluate Continue button enabled state
+              setState(() {});
             },
           ),
           const SizedBox(height: 20),
@@ -1381,28 +1498,91 @@ void _onTailorRejected() {
 
   // ─── Step 4 ────────────────────────────────────────────────────────
 
+  /// Single order-level tailor status card, plus a read-only list of the
+  /// sub-orders this job covers (for visibility only — not independently
+  /// assignable anymore).
   Widget _buildFindTailorStep() {
-    final job = _tailorJob;
-    final showDeadlineBanner = job == null ||
-        job.status == _JobStatus.pending ||
-        job.status == _JobStatus.rejected;
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (showDeadlineBanner) _buildDeadlineBanner(),
-          if (showDeadlineBanner) const SizedBox(height: 14),
-          if (job == null)
-            _buildNoTailorCard()
-          else
-            switch (job.status) {
-              _JobStatus.pending => _buildPendingCard(job),
-              _JobStatus.confirmed => _buildConfirmedCard(job),
-              _JobStatus.rejected => _buildRejectedCard(job),
-              _JobStatus.expired => _buildExpiredCard(),
-            },
+          _buildDeadlineBanner(),
+          const SizedBox(height: 14),
+          _buildTailorStatusCard(),
+          if (widget.subOrders.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            const Text(
+              "Items in this order",
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              "One tailor covers everything below.",
+              style: TextStyle(color: Colors.black54, fontSize: 12),
+            ),
+            const SizedBox(height: 10),
+            ...widget.subOrders.map(
+              (subOrder) => _buildSubOrderVisibilityRow(subOrder),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTailorStatusCard() {
+    final job = _tailorJob;
+
+    if (job == null) return _buildNoTailorCard();
+
+    switch (job.status) {
+      case TailorJobStatus.pending:
+        return _buildPendingCard(job);
+      case TailorJobStatus.quoted:
+        return _buildQuotedCard(job);
+      case TailorJobStatus.confirmed:
+        return _buildFinalizingCard();
+      case TailorJobStatus.rejected:
+        return _buildRejectedCard(job);
+      case TailorJobStatus.tailorDeclined:
+        return _buildTailorDeclinedCard(job);
+      case TailorJobStatus.expired:
+      case TailorJobStatus.cancelled:
+        return _buildExpiredCard();
+    }
+  }
+
+  /// Read-only row — just shows the retailer is part of this order. No
+  /// per-retailer actions live here anymore; everything routes through
+  /// the single order-level tailor card above.
+  Widget _buildSubOrderVisibilityRow(SubOrder subOrder) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.storefront_rounded,
+            size: 16,
+            color: Colors.green.shade800,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              "Retailer: ${subOrder.retailerId}",
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+          ),
+          Text(
+            "Tk ${(subOrder.itemsSubtotal + subOrder.deliveryCharge).toStringAsFixed(0)}",
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          ),
         ],
       ),
     );
@@ -1421,8 +1601,11 @@ void _onTailorRejected() {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.access_time_rounded,
-              color: Colors.amber.shade800, size: 20),
+          Icon(
+            Icons.access_time_rounded,
+            color: Colors.amber.shade800,
+            size: 20,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -1485,8 +1668,7 @@ void _onTailorRejected() {
       iconColor: Colors.green.shade800,
       title: "You haven't selected a tailor yet",
       subtitle:
-          "Browse tailors and send a job request. We'll show their quote "
-          "and estimated delivery date once they confirm.",
+          "Browse tailors and send one job request that covers your whole order.",
       children: [
         const SizedBox(height: 22),
         SizedBox(
@@ -1495,7 +1677,7 @@ void _onTailorRejected() {
             onPressed: _findTailor,
             icon: const Icon(Icons.storefront_rounded),
             label: const Text(
-              "Browse Tailors",
+              "Find Tailor",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
             ),
             style: ElevatedButton.styleFrom(
@@ -1508,226 +1690,11 @@ void _onTailorRejected() {
             ),
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildPendingCard(_TailorJobState job) {
-    return _statusCard(
-      icon: Icons.hourglass_top_rounded,
-      iconBg: Colors.blue.shade50,
-      iconColor: Colors.blue.shade700,
-      title: "Waiting for tailor response",
-      subtitle:
-          "Requested ${_formatDateTime(job.requestedAt)}. We'll update this "
-          "page as soon as the tailor responds — including if you come back "
-          "later.",
-      children: [
-        const SizedBox(height: 22),
-        Row(
-          children: [
-            Expanded(
-              child: Container(height: 1, color: Colors.grey.shade200),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Text(
-                "DEMO CONTROLS",
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.6,
-                  color: Colors.grey.shade400,
-                ),
-              ),
-            ),
-            Expanded(
-              child: Container(height: 1, color: Colors.grey.shade200),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _onTailorConfirmed,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.green.shade800,
-                  side: BorderSide(color: Colors.green.shade300),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text("Confirm",
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _onTailorRejected,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red.shade700,
-                  side: BorderSide(color: Colors.red.shade200),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text("Reject",
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          width: double.infinity,
-          child: TextButton(
-            onPressed: _simulateDeadlineExpired,
-            style: TextButton.styleFrom(foregroundColor: Colors.black45),
-            child: const Text("Simulate 72h deadline expired"),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildConfirmedCard(_TailorJobState job) {
-  return _statusCard(
-    icon: Icons.check_circle_rounded,
-    iconBg: Colors.green.shade50,
-    iconColor: Colors.green.shade800,
-    title: "Tailor confirmed!",
-    subtitle: "Complete payment to lock in your job.",
-    children: [
-      const SizedBox(height: 18),
-      _infoRow(
-        icon: Icons.content_cut_outlined,
-        label: "Tailoring Cost",
-        value: job.quoteAmount != null
-            ? "Tk ${job.quoteAmount!.toStringAsFixed(0)}"
-            : "—",
-      ),
-      const SizedBox(height: 10),
-      _infoRow(
-        icon: Icons.local_shipping_outlined,
-        label: "Delivery charge",
-        value: job.deliverCharge != null
-            ? (job.deliverCharge == 0
-                ? "Free"
-                : "Tk ${job.deliverCharge!.toStringAsFixed(0)}")
-            : "—",
-      ),
-      const SizedBox(height: 10),
-      _infoRow(
-        icon: Icons.payments_outlined,
-        label: "Total Cost",
-        value: "Tk ${job.totalPayable.toStringAsFixed(0)}",
-      ),
-      const SizedBox(height: 10),
-      _infoRow(
-        icon: Icons.event_available_outlined,
-        label: "Estimated delivery",
-        value: job.estimatedDeliveryDate != null
-            ? "28 July 2026"
-            : "—",
-      ),
-      const SizedBox(height: 22),
-      SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: () => _promptTailorPayment(job.jobId),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green.shade800,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-          ),
-          child: Text(
-            "Pay Now · Tk ${job.totalPayable.toStringAsFixed(0)}",
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-          ),
-        ),
-      ),
-      const SizedBox(height: 10),
-      SizedBox(
-        width: double.infinity,
-        child: OutlinedButton(
-          onPressed: () => _promptCancelConfirmedJob(job),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.red.shade700,
-            side: BorderSide(color: Colors.red.shade200),
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-          ),
-          child: const Text(
-            "Cancel",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-          ),
-        ),
-      ),
-    ],
-  );
-}
-
-  Widget _buildRejectedCard(_TailorJobState job) {
-    return _statusCard(
-      icon: Icons.cancel_outlined,
-      iconBg: Colors.red.shade50,
-      iconColor: Colors.red.shade700,
-      title: "Tailor declined this job",
-      subtitle: job.rejectionReason ?? "No reason was given.",
-      children: [
-        const SizedBox(height: 22),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: _findTailor,
-            icon: const Icon(Icons.storefront_rounded),
-            label: const Text(
-              "Browse More Tailors",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade800,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildExpiredCard() {
-    return _statusCard(
-      icon: Icons.timer_off_outlined,
-      iconBg: Colors.grey.shade200,
-      iconColor: Colors.black54,
-      title: "Tailor selection window closed",
-      subtitle:
-          "No tailor was confirmed within 72 hours, so this order will be "
-          "delivered directly to you instead.",
-      children: [
-        const SizedBox(height: 22),
+        const SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
           child: OutlinedButton(
-            onPressed: () {
-              _showOrderCompleteDialog(
-                "Your order was sent for direct delivery.",
-              );
-            },
+            onPressed: _skipTailoring,
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.black87,
               side: BorderSide(color: Colors.grey.shade300),
@@ -1737,12 +1704,207 @@ void _onTailorRejected() {
               ),
             ),
             child: const Text(
-              "Got it",
+              "Skip Tailoring",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPendingCard(TailorJob job) {
+    return _statusCard(
+      icon: Icons.hourglass_top_rounded,
+      iconBg: Colors.blue.shade50,
+      iconColor: Colors.blue.shade700,
+      title: "Waiting for tailor response",
+      subtitle:
+          "Requested ${job.requestedAt != null ? _formatDateTime(job.requestedAt!) : ''}. "
+          "You'll be able to review a quote here once your tailor responds.",
+    );
+  }
+
+  Widget _buildQuotedCard(TailorJob job) {
+    return _statusCard(
+      icon: Icons.receipt_long_rounded,
+      iconBg: Colors.blue.shade50,
+      iconColor: Colors.blue.shade700,
+      title: "Tailor sent a quote",
+      subtitle: "Review the price and delivery date below.",
+      children: [
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => _openChatWithTailor(job.tailorId),
+            icon: Icon(
+              Icons.chat_bubble_outline_rounded,
+              color: Colors.green.shade800,
+              size: 18,
+            ),
+            label: Text(
+              "Chat with Tailor",
+              style: TextStyle(
+                color: Colors.green.shade800,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 0),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        const SizedBox(height: 18),
+        _infoRow(
+          icon: Icons.payments_outlined,
+          label: "Quote Amount",
+          value: "Tk ${job.quoteAmount?.toStringAsFixed(0) ?? '-'}",
+        ),
+        const SizedBox(height: 10),
+        _infoRow(
+          icon: Icons.local_shipping_outlined,
+          label: "Delivery Charge",
+          value: "Tk ${job.deliveryCharge?.toStringAsFixed(0) ?? '0'}",
+        ),
+        const SizedBox(height: 10),
+        _infoRow(
+          icon: Icons.summarize_outlined,
+          label: "Total Cost",
+          value: "Tk ${job.totalAmount?.toStringAsFixed(0) ?? '-'}",
+          emphasize: true,
+        ),
+        if (job.estimatedDeliveryDate != null) ...[
+          const SizedBox(height: 10),
+          _infoRow(
+            icon: Icons.event_available_outlined,
+            label: "Est. Delivery",
+            value: _formatDateTime(job.estimatedDeliveryDate!),
+          ),
+        ],
+        const SizedBox(height: 22),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _promptConfirmTailorJob,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.green.shade800,
+                  side: BorderSide(color: Colors.green.shade300),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  "Confirm",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _promptRejectTailorJob,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red.shade700,
+                  side: BorderSide(color: Colors.red.shade200),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  "Reject",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// No specific reason is shown — rejection is a plain "no thanks" from
+  /// the customer, no rejectionReason field exists on the job anymore.
+  Widget _buildRejectedCard(TailorJob job) {
+    return _statusCard(
+      icon: Icons.cancel_outlined,
+      iconBg: Colors.red.shade50,
+      iconColor: Colors.red.shade700,
+      title: "You declined this quote",
+      subtitle:
+          "You rejected this tailor's quote. You can request another tailor below.",
+      children: [
+        const SizedBox(height: 22),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _findTailor,
+            icon: const Icon(Icons.storefront_rounded),
+            label: const Text(
+              "Find Another Tailor",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade800,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: _skipTailoring,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.black87,
+              side: BorderSide(color: Colors.grey.shade300),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+            ),
+            child: const Text(
+              "Skip Tailoring",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFinalizingCard() {
+    return _card(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(color: Color(0xFF2E7D32)),
+          const SizedBox(height: 16),
+          const Text(
+            "Finalizing your order...",
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExpiredCard() {
+    return _statusCard(
+      icon: Icons.timer_off_outlined,
+      iconBg: Colors.grey.shade200,
+      iconColor: Colors.black54,
+      title: "Tailor selection window closed",
+      subtitle: "This order will be delivered directly to you instead.",
     );
   }
 
@@ -1775,9 +1937,6 @@ void _onTailorRejected() {
             ),
           ),
           const SizedBox(width: 10),
-          // Value gets the rest of the row and wraps to a second line
-          // instead of being cut off — this is what was clipping the
-          // estimated delivery date before.
           Expanded(
             child: Text(
               value,
@@ -1987,7 +2146,6 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Row 1: tools + brush size
             Row(
               children: [
                 _toolButton(Icons.edit, _DrawTool.pencil, "Pencil"),
@@ -2007,8 +2165,6 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
               ],
             ),
             const SizedBox(height: 6),
-            // Row 2: color palette (own scrollable row so it can never
-            // collide with the action buttons on narrow screens)
             SizedBox(
               height: 34,
               child: ListView(
@@ -2041,7 +2197,6 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            // Row 3: action buttons, full width so they never get squeezed
             Row(
               children: [
                 Expanded(
@@ -2124,11 +2279,6 @@ class _SketchPainter extends CustomPainter {
         continue;
       }
 
-      // Graphite/pencil texture: a handful of semi-transparent, slightly
-      // jittered passes layered with multiply blending, so the stroke
-      // reads as grainy pencil shading rather than a flat marker line.
-      // The seed is derived from the stroke itself so a given stroke's
-      // texture stays stable across repaints instead of flickering.
       final seed = stroke.points.length * 7 + stroke.color.toARGB32();
       final rand = Random(seed);
 

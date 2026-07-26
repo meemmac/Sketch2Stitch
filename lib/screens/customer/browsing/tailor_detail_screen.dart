@@ -31,8 +31,13 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   String _selectedFilter = "All reviews";
 
   final List<String> _customerNames = [
-    'Rahul Ahmed', 'Sadia Rahman', 'Kamal Hossain', 'Tania Akhter', 'Shahid Khan',
-    'Nadia Islam', 'Faisal Ahmed'
+    'Rahul Ahmed',
+    'Sadia Rahman',
+    'Kamal Hossain',
+    'Tania Akhter',
+    'Shahid Khan',
+    'Nadia Islam',
+    'Faisal Ahmed',
   ];
 
   bool get _isCustomer => widget.userRole == AppUserRole.customer;
@@ -46,7 +51,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   Future<void> _loadReviews() async {
     setState(() => _isLoading = true);
     await Future.delayed(const Duration(milliseconds: 500));
-    
+
     final sampleReviews = [
       Review(
         id: 'R001',
@@ -55,7 +60,8 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         targetRole: ReviewTargetRole.tailor,
         orderId: 'O001',
         rating: 5.0,
-        comment: 'Excellent work! The suit fit perfectly and the quality was outstanding.',
+        comment:
+            'Excellent work! The suit fit perfectly and the quality was outstanding.',
         createdAt: DateTime.now().subtract(const Duration(days: 2)),
       ),
       Review(
@@ -65,7 +71,8 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         targetRole: ReviewTargetRole.tailor,
         orderId: 'O002',
         rating: 4.5,
-        comment: 'Very professional and timely delivery. Would recommend to friends.',
+        comment:
+            'Very professional and timely delivery. Would recommend to friends.',
         createdAt: DateTime.now().subtract(const Duration(days: 5)),
       ),
       Review(
@@ -104,18 +111,23 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       _reviews = sampleReviews;
       _isLoading = false;
       if (_reviews.isNotEmpty) {
-        final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
+        final sum = _reviews.fold(
+          0.0,
+          (total, review) => total + review.rating,
+        );
         _averageRating = sum / _reviews.length;
       }
     });
   }
 
-  String _getCustomerName(int index) => _customerNames[index % _customerNames.length];
+  String _getCustomerName(int index) =>
+      _customerNames[index % _customerNames.length];
 
   void _showPortfolioOverlay(dynamic portfolioItem) {
     final imagePath = portfolioItem.image ?? '';
-    final description = portfolioItem.description ?? 'No description available.';
-    
+    final description =
+        portfolioItem.description ?? 'No description available.';
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -166,14 +178,15 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                             ? Image.asset(
                                 imagePath,
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => Container(
-                                  color: Colors.green.shade50,
-                                  child: const Icon(
-                                    Icons.image_not_supported_outlined,
-                                    size: 48,
-                                    color: Colors.grey,
-                                  ),
-                                ),
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Container(
+                                      color: Colors.green.shade50,
+                                      child: const Icon(
+                                        Icons.image_not_supported_outlined,
+                                        size: 48,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
                               )
                             : Container(
                                 color: Colors.green.shade50,
@@ -214,28 +227,31 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   }
 
   void _startConversation() {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => ChatScreen(
-        conversationId: 'current_customer_id_${widget.tailor.id}',
-        customerId: 'current_customer_id',
-        otherUserId: widget.tailor.id,
-        otherUserName: widget.tailor.name,
-        otherUserRole: UserRole.tailor,
-        otherUserAvatar: widget.tailor.profilePicture,
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          conversationId: 'current_customer_id_${widget.tailor.id}',
+          customerId: 'current_customer_id',
+          otherUserId: widget.tailor.id,
+          otherUserName: widget.tailor.name,
+          otherUserRole: UserRole.tailor,
+          otherUserAvatar: widget.tailor.profilePicture,
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 380;
     final isMediumScreen = screenWidth >= 380 && screenWidth < 600;
-    
+
     return Scaffold(
+      bottomNavigationBar: (_isCustomer && widget.onTailorSelected != null)
+          ? _buildBookButton()
+          : null,
       body: CustomScrollView(
         slivers: [
           _buildAppBar(isSmallScreen),
@@ -261,7 +277,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   SliverAppBar _buildAppBar(bool isSmallScreen) {
     final ratingSize = isSmallScreen ? 12.0 : 14.0;
     final fontSize = isSmallScreen ? 20.0 : 22.0;
-    
+
     return SliverAppBar(
       expandedHeight: isSmallScreen ? 240 : 280,
       pinned: true,
@@ -275,7 +291,11 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
             color: Colors.black.withValues(alpha: 0.5),
             shape: BoxShape.circle,
           ),
-          child: Icon(Icons.arrow_back, color: Colors.white, size: isSmallScreen ? 18 : 22),
+          child: Icon(
+            Icons.arrow_back,
+            color: Colors.white,
+            size: isSmallScreen ? 18 : 22,
+          ),
         ),
         onPressed: () => Navigator.pop(context),
       ),
@@ -289,7 +309,10 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Colors.black.withValues(alpha: 0.8)],
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.8),
+                  ],
                 ),
               ),
             ),
@@ -317,7 +340,10 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                     alignment: WrapAlignment.start,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      RatingStars(rating: widget.tailor.rating, size: ratingSize),
+                      RatingStars(
+                        rating: widget.tailor.rating,
+                        size: ratingSize,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '${widget.tailor.rating}',
@@ -379,7 +405,11 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.location_on, size: isSmallScreen ? 14 : 16, color: Colors.white70),
+                      Icon(
+                        Icons.location_on,
+                        size: isSmallScreen ? 14 : 16,
+                        color: Colors.white70,
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Row(
@@ -398,7 +428,10 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                             if (_isCustomer) ...[
                               const SizedBox(width: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.green.withValues(alpha: 0.3),
                                   borderRadius: BorderRadius.circular(8),
@@ -406,7 +439,11 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.directions_bike, size: 10, color: Colors.white),
+                                    Icon(
+                                      Icons.directions_bike,
+                                      size: 10,
+                                      color: Colors.white,
+                                    ),
                                     const SizedBox(width: 4),
                                     Text(
                                       '1.8 km • Tk 40',
@@ -428,7 +465,11 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      Icon(Icons.phone, size: isSmallScreen ? 14 : 16, color: Colors.white70),
+                      Icon(
+                        Icons.phone,
+                        size: isSmallScreen ? 14 : 16,
+                        color: Colors.white70,
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
@@ -449,38 +490,42 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
           ],
         ),
       ),
-      actions: _isCustomer ? [
-        IconButton(
-          icon: Icon(
-            Icons.chat_bubble_outline,
-            color: Colors.white,
-            size: isSmallScreen ? 22 : 24,
-          ),
-          onPressed: _startConversation,
-        ),
-        IconButton(
-          icon: Icon(
-            _isFavorite ? Icons.favorite : Icons.favorite_border,
-            color: _isFavorite ? Colors.red : Colors.white,
-            size: isSmallScreen ? 22 : 24,
-          ),
-          onPressed: () => setState(() => _isFavorite = !_isFavorite),
-        ),
-      ] : [],
+      actions: _isCustomer
+          ? [
+              IconButton(
+                icon: Icon(
+                  Icons.chat_bubble_outline,
+                  color: Colors.white,
+                  size: isSmallScreen ? 22 : 24,
+                ),
+                onPressed: _startConversation,
+              ),
+              IconButton(
+                icon: Icon(
+                  _isFavorite ? Icons.favorite : Icons.favorite_border,
+                  color: _isFavorite ? Colors.red : Colors.white,
+                  size: isSmallScreen ? 22 : 24,
+                ),
+                onPressed: () => setState(() => _isFavorite = !_isFavorite),
+              ),
+            ]
+          : [],
     );
   }
 
   Widget _buildCoverImage() {
     String imageUrl = 'assets/images/fab.jpg';
-    
-    if (widget.tailor.portfolio != null && widget.tailor.portfolio!.isNotEmpty) {
-      imageUrl = widget.tailor.portfolio!.first.image ?? 'assets/images/fab.jpg';
+
+    if (widget.tailor.portfolio != null &&
+        widget.tailor.portfolio!.isNotEmpty) {
+      imageUrl =
+          widget.tailor.portfolio!.first.image ?? 'assets/images/fab.jpg';
     }
-    
+
     if (widget.tailor.profilePicture != null) {
       imageUrl = widget.tailor.profilePicture!;
     }
-    
+
     return Image.asset(
       imageUrl,
       fit: BoxFit.cover,
@@ -491,9 +536,51 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     );
   }
 
+  Widget _buildBookButton() {
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        12,
+        20,
+        MediaQuery.of(context).padding.bottom + 12,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, -3),
+          ),
+        ],
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: () => widget.onTailorSelected!(widget.tailor.id),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green.shade800,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+          ),
+          child: const Text(
+            "Book This Tailor",
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildAboutSection(bool isSmallScreen) {
-    String description = widget.tailor.about ?? 'Professional tailoring services with years of experience.';
-    if (widget.tailor.portfolio != null && widget.tailor.portfolio!.isNotEmpty) {
+    String description =
+        widget.tailor.about ??
+        'Professional tailoring services with years of experience.';
+    if (widget.tailor.portfolio != null &&
+        widget.tailor.portfolio!.isNotEmpty) {
       final desc = widget.tailor.portfolio!.first.description;
       if (desc != null && desc.isNotEmpty) {
         description = desc;
@@ -525,14 +612,16 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
 
   Widget _buildPortfolioSection(bool isSmallScreen, bool isMediumScreen) {
     final portfolioItems = widget.tailor.portfolio ?? [];
-    
+
     if (portfolioItems.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final displayItems = _showAllPortfolio 
-        ? portfolioItems 
-        : (portfolioItems.length > 4 ? portfolioItems.take(4).toList() : portfolioItems);
+    final displayItems = _showAllPortfolio
+        ? portfolioItems
+        : (portfolioItems.length > 4
+              ? portfolioItems.take(4).toList()
+              : portfolioItems);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -549,7 +638,8 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
             ),
             if (portfolioItems.length > 4)
               TextButton(
-                onPressed: () => setState(() => _showAllPortfolio = !_showAllPortfolio),
+                onPressed: () =>
+                    setState(() => _showAllPortfolio = !_showAllPortfolio),
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.symmetric(
                     horizontal: isSmallScreen ? 8.0 : 16.0,
@@ -560,9 +650,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                 ),
                 child: Text(
                   _showAllPortfolio ? 'Show Less' : 'See All',
-                  style: TextStyle(
-                    fontSize: isSmallScreen ? 12.0 : 14.0,
-                  ),
+                  style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
                 ),
               ),
           ],
@@ -601,27 +689,41 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                   children: [
                     Expanded(
                       child: ClipRRect(
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(12),
+                        ),
                         child: SizedBox(
                           width: double.infinity,
                           height: double.infinity,
-                          child: portfolio.image != null && portfolio.image!.isNotEmpty
+                          child:
+                              portfolio.image != null &&
+                                  portfolio.image!.isNotEmpty
                               ? Image.asset(
                                   portfolio.image!,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => Container(
-                                    color: Colors.grey[200],
-                                    child: const Icon(Icons.image, size: 32, color: Colors.grey),
-                                  ),
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Container(
+                                        color: Colors.grey[200],
+                                        child: const Icon(
+                                          Icons.image,
+                                          size: 32,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
                                 )
                               : Container(
                                   color: Colors.grey[200],
-                                  child: const Icon(Icons.image, size: 32, color: Colors.grey),
+                                  child: const Icon(
+                                    Icons.image,
+                                    size: 32,
+                                    color: Colors.grey,
+                                  ),
                                 ),
                         ),
                       ),
                     ),
-                    if (portfolio.description != null && portfolio.description!.isNotEmpty)
+                    if (portfolio.description != null &&
+                        portfolio.description!.isNotEmpty)
                       Padding(
                         padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
                         child: Text(
@@ -661,7 +763,11 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87, size: 20),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: Colors.black87,
+            size: 20,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         title: Column(
@@ -669,7 +775,11 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
           children: [
             const Text(
               "Customer Reviews",
-              style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             Text(
               widget.tailor.name,
@@ -693,7 +803,12 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
             _buildReviewsPageFilterChips(),
             const SizedBox(height: 16),
             if (_isLoading)
-              const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(40),
+                  child: CircularProgressIndicator(),
+                ),
+              )
             else if (_reviews.isEmpty)
               const Center(
                 child: Padding(
@@ -702,9 +817,19 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                     children: [
                       Icon(Icons.rate_review, size: 48, color: Colors.grey),
                       SizedBox(height: 8),
-                      Text('No reviews yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey)),
+                      Text(
+                        'No reviews yet',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey,
+                        ),
+                      ),
                       SizedBox(height: 4),
-                      Text('Be the first to review this tailor!', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                      Text(
+                        'Be the first to review this tailor!',
+                        style: TextStyle(fontSize: 13, color: Colors.grey),
+                      ),
                     ],
                   ),
                 ),
@@ -715,8 +840,10 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                 physics: const NeverScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: filtered.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 16),
-                itemBuilder: (context, index) => _buildReviewsPageItem(filtered[index], index),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 16),
+                itemBuilder: (context, index) =>
+                    _buildReviewsPageItem(filtered[index], index),
               ),
             const SizedBox(height: 32),
           ],
@@ -743,7 +870,10 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
               children: [
                 Text(
                   _averageRating.toStringAsFixed(1),
-                  style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w900),
+                  style: const TextStyle(
+                    fontSize: 42,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 Row(
                   children: List.generate(
@@ -751,7 +881,9 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                     (index) => Icon(
                       index < _averageRating.floor()
                           ? Icons.star
-                          : (index < _averageRating.ceil() ? Icons.star_half : Icons.star_border),
+                          : (index < _averageRating.ceil()
+                                ? Icons.star_half
+                                : Icons.star_border),
                       color: Colors.orange,
                       size: 18,
                     ),
@@ -795,7 +927,10 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          Text("$star", style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+          Text(
+            "$star",
+            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(width: 4),
           const Icon(Icons.star, color: Colors.orange, size: 10),
           const SizedBox(width: 8),
@@ -839,7 +974,9 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
-                side: BorderSide(color: isSelected ? Colors.transparent : Colors.grey.shade300),
+                side: BorderSide(
+                  color: isSelected ? Colors.transparent : Colors.grey.shade300,
+                ),
               ),
             ),
           );
@@ -859,7 +996,8 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     }
   }
 
-  int _getRatingCount(double rating) => _reviews.where((r) => r.rating == rating).length;
+  int _getRatingCount(double rating) =>
+      _reviews.where((r) => r.rating == rating).length;
 
   Widget _buildReviewsPageItem(Review review, int index) {
     final customerName = _getCustomerName(index);
@@ -881,7 +1019,10 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
               Expanded(
                 child: Text(
                   customerName,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -897,7 +1038,9 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
             children: List.generate(
               5,
               (starIndex) => Icon(
-                starIndex < review.rating.floor() ? Icons.star : Icons.star_border,
+                starIndex < review.rating.floor()
+                    ? Icons.star
+                    : Icons.star_border,
                 color: Colors.orange,
                 size: 14,
               ),
@@ -906,7 +1049,11 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
           const SizedBox(height: 12),
           Text(
             "\"${review.comment}\"",
-            style: const TextStyle(fontSize: 14, height: 1.5, fontStyle: FontStyle.italic),
+            style: const TextStyle(
+              fontSize: 14,
+              height: 1.5,
+              fontStyle: FontStyle.italic,
+            ),
           ),
           if (products.isNotEmpty) ...[
             const SizedBox(height: 16),
@@ -921,7 +1068,8 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                 scrollDirection: Axis.horizontal,
                 itemCount: products.length,
                 separatorBuilder: (context, index) => const SizedBox(width: 12),
-                itemBuilder: (context, i) => _buildReviewsPageProductCard(products[i]),
+                itemBuilder: (context, i) =>
+                    _buildReviewsPageProductCard(products[i]),
               ),
             ),
           ],
@@ -952,7 +1100,11 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                 width: 50,
                 height: 50,
                 color: Colors.grey[200],
-                child: const Icon(Icons.content_cut, size: 20, color: Colors.grey),
+                child: const Icon(
+                  Icons.content_cut,
+                  size: 20,
+                  color: Colors.grey,
+                ),
               ),
             ),
           ),
@@ -966,7 +1118,10 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                   product['name'],
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 const Text(
@@ -983,16 +1138,17 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
 
   List<Map<String, dynamic>> _getReviewProducts(int index) {
     final products = <Map<String, dynamic>>[];
-    
-    if (widget.tailor.portfolio != null && widget.tailor.portfolio!.isNotEmpty) {
+
+    if (widget.tailor.portfolio != null &&
+        widget.tailor.portfolio!.isNotEmpty) {
       final portfolioIndex = index % widget.tailor.portfolio!.length;
       final portfolioItem = widget.tailor.portfolio![portfolioIndex];
-      
+
       products.add({
         'name': portfolioItem.description ?? 'Portfolio Item',
         'image': portfolioItem.image ?? 'assets/images/fab.jpg',
       });
-      
+
       if (widget.tailor.portfolio!.length > portfolioIndex + 1) {
         final secondItem = widget.tailor.portfolio![portfolioIndex + 1];
         products.add({
@@ -1001,7 +1157,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         });
       }
     }
-    
+
     return products;
   }
 }

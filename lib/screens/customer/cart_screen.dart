@@ -3,8 +3,8 @@ import '../../models/measurement.dart';
 import 'package:sketch2stitch/screens/customer/checkout_screen.dart';
 import 'browsing/browse_shell.dart';
 import 'order_session.dart';
-import 'tailoring_setup_screen.dart';
-import 'tailoring_callbacks.dart';
+import 'running_orders_screen.dart';
+import '../../models/sub_order.dart';
 
 /// ─── Local Cart Models ──────────────────────────────────────────────────
 ///
@@ -59,6 +59,12 @@ class RetailerInfo {
 }
 
 /// ─── Cart Screen ────────────────────────────────────────────────────────
+///
+/// IMPORTANT: this screen NEVER blocks on existing orders. A customer can
+/// have any number of orders in progress (visible via the Running Orders
+/// entry point below) and still freely browse, add to cart, and check out
+/// a brand-new order at any time. Checkout always starts a NEW OrderRecord
+/// — it never redirects into an existing order's tailoring flow.
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -164,6 +170,28 @@ class _CartScreenState extends State<CartScreen> {
     return grouped;
   }
 
+  /// Sub-orders built from the CURRENT cart snapshot. `orderId` is left
+  /// blank here on purpose — it doesn't exist yet. OrderStore.startOrder()
+  /// stamps the real orderId onto a copy of these once checkout actually
+  /// creates the order.
+  List<SubOrder> get _subOrders {
+    return _groupedByRetailer.entries.map((entry) {
+      final retailerId = entry.key;
+      final lines = entry.value;
+      final subtotal = lines.fold<double>(0, (sum, l) => sum + l.lineTotal);
+      final deliveryCharge = _retailers[retailerId]?.deliveryCharge ?? 0;
+
+      return SubOrder(
+        id: retailerId, // placeholder key until real Sub-orders docs exist
+        orderId: '',
+        retailerId: retailerId,
+        status: SubOrderStatus.preparing,
+        itemsSubtotal: subtotal,
+        deliveryCharge: deliveryCharge,
+      );
+    }).toList();
+  }
+
   int get _totalItems =>
       _cartLines.fold(0, (sum, line) => sum + line.quantity);
 
@@ -194,171 +222,150 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void _addMore() {
-  Navigator.push(
-    context,
-    MaterialPageRoute(builder: (_) => const BrowseShell()),
-  );
-}
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const BrowseShell()),
+    );
+  }
 
   void _removeLine(CartLine line) {
     setState(() => _cartLines.remove(line));
   }
 
+  /// Always goes to CheckoutScreen for the CURRENT cart. Never redirects
+  /// into an existing order — that's what Running Orders is for.
   void _checkout() {
-  final session = OrderSession.instance;
-
-  if (session.hasActiveOrder) {
-    // Already paid / in progress — skip straight to the tailoring flow.
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => TailoringSetupScreen(
-          orderId: session.orderId!,
-          orderDate: session.orderDate!,
-          savedMeasurements: [_measurement],
-          callbacks: buildTailoringCallbacks(),
+        builder: (_) => CheckoutScreen(
+          cartLines: _cartLines,
+          retailers: _retailers,
+          grandTotal: _grandTotal,
+          measurement: _measurement,
+          subOrders: _subOrders,
+          onOrderPlaced: _clearCart,
         ),
       ),
     );
-    return;
   }
 
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => CheckoutScreen(
-        cartLines: _cartLines,
-        retailers: _retailers,
-        grandTotal: _grandTotal,
-        measurement: _measurement,
-        onOrderPlaced: _clearCart,
-      ),
-    ),
-  );
-}
+  void _openRunningOrders() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const RunningOrdersScreen()),
+    );
+  }
 
   @override
-Widget build(BuildContext context) {
-  final grouped = _groupedByRetailer;
-  final retailerIds = grouped.keys.toList();
-  final hasActiveOrder = OrderSession.instance.hasActiveOrder;
+  Widget build(BuildContext context) {
+    final grouped = _groupedByRetailer;
+    final retailerIds = grouped.keys.toList();
+    final activeOrderCount = OrderStore.instance.activeOrders.length;
 
-  return Scaffold(
-    backgroundColor: const Color(0xFFF9FBF9),
-    appBar: AppBar(
-      title: const Text(
-        "My Cart",
-        style: TextStyle(fontWeight: FontWeight.bold),
-      ),
-      centerTitle: true,
-      backgroundColor: Colors.white,
-      elevation: 0,
-      foregroundColor: Colors.black,
-    ),
-    body: hasActiveOrder
-        ? _buildActiveOrderState()
-        : (_cartLines.isEmpty
-            ? _buildEmptyState()
-            : Column(
-                children: [
-                  Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      itemCount: retailerIds.length,
-                      itemBuilder: (context, index) {
-                        final retailerId = retailerIds[index];
-                        final lines = grouped[retailerId]!;
-                        return _buildAnimatedRetailerSection(
-                          retailerId,
-                          lines,
-                          index,
-                        );
-                      },
+    return Scaffold(
+      backgroundColor: const Color(0xFFF9FBF9),
+      appBar: AppBar(
+        title: const Text(
+          "My Cart",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: Colors.black,
+        actions: [
+          // Entry point to Running Orders. Badge shows how many orders
+          // still need a customer decision (isActive == true). This never
+          // gates the cart — it's purely a navigation shortcut.
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  onPressed: _openRunningOrders,
+                  icon: const Icon(Icons.local_shipping_outlined),
+                  tooltip: "Running Orders",
+                ),
+                if (activeOrderCount > 0)
+                  Positioned(
+                    right: 4,
+                    top: 4,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.redAccent,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      child: Text(
+                        '$activeOrderCount',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
-                  _buildSummaryBar(),
-                ],
-              )),
-  );
-}
-Widget _buildEmptyState() {
-  return Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.shopping_cart_outlined,
-          size: 56,
-          color: Colors.green.shade200,
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          "Your cart is empty",
-          style: TextStyle(
-            color: Colors.black54,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-  
-
-Widget _buildActiveOrderState() {
-  final session = OrderSession.instance;
-  return Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.local_shipping_outlined, size: 56, color: Colors.green.shade300),
-          const SizedBox(height: 12),
-          const Text(
-            "You have an order in progress",
-            style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 15),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            "Order #${session.orderId}",
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            "Finish this order before adding a new one to your cart.",
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => TailoringSetupScreen(
-                    orderId: session.orderId!,
-                    orderDate: session.orderDate!,
-                    savedMeasurements: [_measurement],
-                    callbacks: buildTailoringCallbacks(),
-                  ),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade800,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              ],
             ),
-            child: const Text("Continue Your Order"),
           ),
         ],
       ),
-    ),
-  );
-}
+      // Cart body is ALWAYS the cart — never swapped for an "active order"
+      // blocking state. Existing orders are reachable only via the icon
+      // above, never by hijacking this screen.
+      body: _cartLines.isEmpty
+          ? _buildEmptyState()
+          : Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    itemCount: retailerIds.length,
+                    itemBuilder: (context, index) {
+                      final retailerId = retailerIds[index];
+                      final lines = grouped[retailerId]!;
+                      return _buildAnimatedRetailerSection(
+                        retailerId,
+                        lines,
+                        index,
+                      );
+                    },
+                  ),
+                ),
+                _buildSummaryBar(),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.shopping_cart_outlined,
+            size: 56,
+            color: Colors.green.shade200,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            "Your cart is empty",
+            style: TextStyle(
+              color: Colors.black54,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            "Have an order in progress? Check Running Orders above.",
+            style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildAnimatedRetailerSection(
     String retailerId,
@@ -406,7 +413,6 @@ Widget _buildActiveOrderState() {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Retailer header
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Row(
@@ -447,8 +453,6 @@ Widget _buildActiveOrderState() {
             ),
           ),
           const Divider(height: 1),
-
-          // Product lines
           ...lines.map(
             (line) => Column(
               children: [
@@ -458,10 +462,7 @@ Widget _buildActiveOrderState() {
               ],
             ),
           ),
-
           const Divider(height: 1),
-
-          // Retailer subtotal + delivery charge
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Column(
@@ -571,10 +572,8 @@ Widget _buildActiveOrderState() {
                       ),
                     )
                   : (line.isAsset
-                        ? Image.asset(line.image, fit: BoxFit.cover)
-                        // NOTE: swap to Image.network(line.image) once the
-                        // backend serves real product image URLs.
-                        : Image.network(line.image, fit: BoxFit.cover)),
+                      ? Image.asset(line.image, fit: BoxFit.cover)
+                      : Image.network(line.image, fit: BoxFit.cover)),
             ),
           ),
           const SizedBox(width: 12),
@@ -690,134 +689,137 @@ Widget _buildActiveOrderState() {
   }
 
   Widget _buildSummaryBar() {
-  return Container(
-    padding: EdgeInsets.fromLTRB(16, 14, 16, MediaQuery.of(context).padding.bottom + 14),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      boxShadow: [
-        BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, -3)),
-      ],
-    ),
-    child: SafeArea(
-      top: false,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Items / delivery breakdown so the grand total isn't opaque.
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Column(
+    return Container(
+      padding: EdgeInsets.fromLTRB(16, 14, 16, MediaQuery.of(context).padding.bottom + 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, -3)),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Items subtotal",
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                      Text(
+                        "Tk ${_itemsTotal.toStringAsFixed(0)}",
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Delivery (${_groupedByRetailer.length} ${_groupedByRetailer.length == 1 ? 'retailer' : 'retailers'})",
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                      Text(
+                        "Tk ${_deliveryTotal.toStringAsFixed(0)}",
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Row(
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "Items subtotal",
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                    ),
-                    Text(
-                      "Tk ${_itemsTotal.toStringAsFixed(0)}",
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
-                    ),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            "$_totalItems ${_totalItems == 1 ? 'item' : 'items'}",
+                            style: const TextStyle(fontSize: 12, color: Colors.black45, fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(width: 8),
+                          _addMoreChip(),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        "Tk ${_grandTotal.toStringAsFixed(0)}",
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.green.shade900),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "Delivery (${_groupedByRetailer.length} ${_groupedByRetailer.length == 1 ? 'retailer' : 'retailers'})",
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                    ),
-                    Text(
-                      "Tk ${_deliveryTotal.toStringAsFixed(0)}",
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
-                    ),
-                  ],
+                const SizedBox(width: 16),
+                // "Checkout" — always starts a NEW order from the current
+                // cart. Distinct in meaning (and can be styled distinctly)
+                // from RunningOrdersScreen's "Continue" button, which
+                // resumes an EXISTING order instead.
+                ElevatedButton(
+                  onPressed: _cartLines.isEmpty ? null : _checkout,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade800,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    elevation: 0,
+                  ),
+                  child: const Text("Checkout", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 ),
               ],
             ),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          "$_totalItems ${_totalItems == 1 ? 'item' : 'items'}",
-                          style: const TextStyle(fontSize: 12, color: Colors.black45, fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(width: 8),
-                        _addMoreChip(),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      "Tk ${_grandTotal.toStringAsFixed(0)}",
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.green.shade900),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              ElevatedButton(
-                onPressed: _cartLines.isEmpty ? null : _checkout,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade800,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                  elevation: 0,
-                ),
-                child: const Text("Checkout", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              ),
-            ],
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-Widget _addMoreChip() {
-  return GestureDetector(
-    onTap: _addMore,
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.green.shade700, Colors.green.shade900],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          ],
         ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.green.shade800.withValues(alpha: 0.3),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.add, size: 12, color: Colors.white),
-          SizedBox(width: 3),
-          Text(
-            "Add More",
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+    );
+  }
+
+  Widget _addMoreChip() {
+    return GestureDetector(
+      onTap: _addMore,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.green.shade700, Colors.green.shade900],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.green.shade800.withValues(alpha: 0.3),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
-          ),
-        ],
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.add, size: 12, color: Colors.white),
+            SizedBox(width: 3),
+            Text(
+              "Add More",
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

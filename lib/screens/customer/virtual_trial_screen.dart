@@ -21,6 +21,13 @@ const _cardBg = Color(0xFFFBFDF9);
 const _border = Color(0xFFDDEBE3);
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Virtual Trial quota (frontend-only placeholder for now)
+// TODO(backend): replace with real value pulled from Customer doc (Firestore).
+// Flat limit, no tiers — see kVirtualTrialMonthlyLimit.
+// ─────────────────────────────────────────────────────────────────────────────
+const int kVirtualTrialMonthlyLimit = 20;
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Style-preference chip data
 // ─────────────────────────────────────────────────────────────────────────────
 const _styleChips = [
@@ -120,13 +127,31 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   // will hold passed garment item parts, sketches, or measurements.
   // Example call: VirtualTrialScreen(prefillGarments: ['Kameez', 'Salwar'], measurements: ...)
   // =========================================================================
-  final List<String> _prefilledGarmentParts = []; 
+  final List<String> _prefilledGarmentParts = [];
+
+  // ── Virtual Trial quota state (frontend placeholder) ───────────────────────
+  // TODO(backend): load these three from the Customer doc on init, and
+  // persist `_vtUsed` + `_vtResetDate` server-side after each successful
+  // generation instead of mutating them locally.
+  int _vtUsed = 0;
+  DateTime? _vtResetDate;
+
+  int get _vtRemaining =>
+      (kVirtualTrialMonthlyLimit - _vtUsed).clamp(0, kVirtualTrialMonthlyLimit);
+  bool get _vtLimitReached => _vtUsed >= kVirtualTrialMonthlyLimit;
 
   @override
   void initState() {
     super.initState();
     // In future dev, bind these passed values to selection controllers:
     debugPrint('Autofill parts loaded: ${_prefilledGarmentParts.length}');
+
+    // TODO(backend): replace this mock initialisation with a real fetch,
+    // e.g. `final customer = await VtUsageService.loadAndResetIfNeeded(uid);`
+    // then setState _vtUsed = customer.vtUsed, _vtResetDate = customer.vtResetDate.
+    final now = DateTime.now();
+    _vtUsed = 5; // mock: change this to preview the "low" / "reached" states
+    _vtResetDate = DateTime(now.year, now.month + 1, 1);
   }
 
   // ── Generation state ────────────────────────────────────────────────────────
@@ -172,8 +197,28 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         .showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  String _formatDate(DateTime? d) {
+    if (d == null) return '';
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${d.day} ${months[d.month - 1]}';
+  }
+
   // ── Generation ─────────────────────────────────────────────────────────────
   Future<void> _generate() async {
+    // ── Quota guard ────────────────────────────────────────────────────────
+    // TODO(backend): re-check the real quota server-side too (don't trust
+    // client state alone), e.g. via a callable function or security rule.
+    if (_vtLimitReached) {
+      _showSnack(
+        'You\'ve used all $kVirtualTrialMonthlyLimit trials this month. '
+        'Your limit resets on ${_formatDate(_vtResetDate)}.',
+      );
+      return;
+    }
+
     const geminiKey = APIConfig.geminiApiKey;
     const hfToken = APIConfig.hfToken;
 
@@ -256,6 +301,11 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         _usedProfile = profileSnapshot;
         _isLoading = false;
         _statusMessage = '';
+
+        // ── Consume one trial on success ─────────────────────────────────
+        // TODO(backend): move this increment to after a confirmed successful
+        // server-side write, e.g. `await VtUsageService.incrementUsage(uid);`
+        _vtUsed += 1;
       });
       _resultAnim.forward();
 
@@ -325,6 +375,8 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildHeader(),
+            const SizedBox(height: 20),
+            _buildQuotaBanner(),
             const SizedBox(height: 20),
             _buildDesignReferences(),
             const SizedBox(height: 28),
@@ -426,6 +478,72 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
               color: Colors.white.withAlpha(220),
               fontSize: 13,
               height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Quota banner ─────────────────────────────────────────────────────────
+  Widget _buildQuotaBanner() {
+    final remaining = _vtRemaining;
+    final resetLabel = _formatDate(_vtResetDate);
+
+    if (_vtLimitReached) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.red.shade50,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.red.shade200),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.lock_clock_rounded, color: Colors.red.shade700, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Your monthly limit of $kVirtualTrialMonthlyLimit trials has ended. '
+                'It resets on $resetLabel.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.red.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final bool isLow = remaining <= 3;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isLow ? Colors.amber.shade50 : _sagePale,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: isLow ? Colors.amber.shade200 : _border),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.auto_awesome,
+            color: isLow ? Colors.amber.shade800 : _sage,
+            size: 16,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$remaining of $kVirtualTrialMonthlyLimit trial${remaining == 1 ? '' : 's'} left this month'
+              '${isLow ? ' — running low' : ''} · resets $resetLabel',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isLow ? Colors.amber.shade900 : _sageDark,
+              ),
             ),
           ),
         ],
@@ -1129,21 +1247,28 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
 
   // ── Generate button ─────────────────────────────────────────────────────────
   Widget _buildGenerateButton() {
+    final limitReached = _vtLimitReached;
+    final disabled = _isLoading || limitReached;
+
     return SizedBox(
       height: 54,
       child: ElevatedButton.icon(
         style: ElevatedButton.styleFrom(
-          backgroundColor: _isLoading ? _sage.withAlpha(120) : _sage,
+          backgroundColor: disabled ? _sage.withAlpha(120) : _sage,
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14)),
         ),
-        onPressed: _isLoading ? null : _generate,
-        icon: const Icon(Icons.auto_awesome_rounded,
-            color: Colors.white),
+        onPressed: disabled ? null : _generate,
+        icon: Icon(
+          limitReached ? Icons.lock_clock_rounded : Icons.auto_awesome_rounded,
+          color: Colors.white,
+        ),
         label: Text(
-          _isLoading ? 'Generating…' : 'Generate AI Preview',
+          limitReached
+              ? 'Limit Reached · Resets ${_formatDate(_vtResetDate)}'
+              : (_isLoading ? 'Generating…' : 'Generate AI Preview'),
           style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
