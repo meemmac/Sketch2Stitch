@@ -1723,6 +1723,21 @@ Future<void> _confirmTailorJob() async {
       subtitle: "You rejected this tailor's quote. You can request another tailor below.",
       children: [
         const SizedBox(height: 22),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _findTailor,
+            icon: const Icon(Icons.storefront_rounded),
+            label: const Text("Find Another Tailor",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade800,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            ),
+          ),
+        ),
         const SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
