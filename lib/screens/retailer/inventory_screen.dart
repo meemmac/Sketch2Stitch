@@ -283,6 +283,31 @@ class _InventoryScreenState extends State<InventoryScreen>
         ironLevel: "High",
       ),
       InventoryItem(
+        name: "Denim Shirt",
+        category: "Fabric",
+        materialType: "Denim",
+        sku: "DEN-006",
+        description: "Classic navy blue denim fabric, heavy-duty and stylish.",
+        materialBlends: [
+          FabricMaterialBlend(material: "Cotton", blend: "100%"),
+        ],
+        variants: [
+          ProductColorVariant(
+            colorName: "Navy Blue",
+            imagePaths: ['assets/images/denim.jpg'],
+            videoPaths: [],
+            isAsset: true,
+            price: 1200,
+            stock: 25,
+          ),
+        ],
+        canWash: true,
+        canBleach: false,
+        canDryClean: false,
+        canTumbleDry: true,
+        ironLevel: "Medium",
+      ),
+      InventoryItem(
         name: "Golden Silk Blend",
         category: "Fabric",
         materialType: "Silk",
@@ -325,11 +350,11 @@ class _InventoryScreenState extends State<InventoryScreen>
         ironLevel: "Low",
       ),
       InventoryItem(
-        name: "Denim Work Shirt",
+        name: "Tassel",
         category: "Element",
         materialType: "N/A",
         sku: "ACC-003",
-        description: "Durable denim shirt with a modern fit.",
+        description: "Decorative element to enhance the outfit.",
         materialBlends: [
           FabricMaterialBlend(material: "Cotton", blend: "98%"),
           FabricMaterialBlend(
@@ -339,19 +364,19 @@ class _InventoryScreenState extends State<InventoryScreen>
         ],
         variants: [
           ProductColorVariant(
-            colorName: "Indigo",
-            imagePaths: ['assets/images/fab.jpg'],
+            colorName: "Multi",
+            imagePaths: ['assets/images/tassel.jpg'],
             videoPaths: [],
             isAsset: true,
-            price: 920,
+            price: 220,
             stock: 28,
           ),
           ProductColorVariant(
-            colorName: "Washed Blue",
-            imagePaths: ['assets/images/fabric_waves.jpg'],
+            colorName: "Blue",
+            imagePaths: ['assets/images/Tassel2.jpg'],
             videoPaths: [],
             isAsset: true,
-            price: 980,
+            price: 180,
             stock: 7,
           ),
         ],
@@ -866,27 +891,32 @@ class _InventoryScreenState extends State<InventoryScreen>
                         Icons.wash,
                         "Machine Washable",
                         item.canWash,
+                        info: "Indicates whether the garment can be safely washed in a washing machine and the recommended washing conditions. Following these instructions helps maintain the fabric's quality, color, and shape.",
                       ),
                       _careInfoRow(
                         Icons.biotech,
                         "Bleach Allowed",
                         item.canBleach,
+                        info: "Indicates whether bleach can be safely used on the fabric. Some materials may fade, weaken, or become damaged when exposed to bleach.",
                       ),
                       _careInfoRow(
                         Icons.dry_cleaning,
                         "Dry Clean Only",
                         item.canDryClean,
+                        info: "Indicates whether the garment should be professionally cleaned using special solvents instead of water. This method is recommended for delicate fabrics or garments with special finishes.",
                       ),
                       _careInfoRow(
                         Icons.settings_input_component,
                         "Tumble Dry",
                         item.canTumbleDry,
+                        info: "Tumble drying is the process of drying clothes in a clothes dryer (dryer machine) instead of hanging them to air dry. It indicates whether the garment is suitable for tumble drying and the recommended heat setting. Using the wrong drying method may cause shrinking or fabric damage.",
                       ),
                       _careInfoRow(
                         Icons.iron,
                         "Iron Level",
                         true,
                         trailing: item.ironLevel,
+                        info: "Indicates the maximum ironing temperature that is safe for the fabric. Using excessive heat may damage, shrink, or burn the material.",
                       ),
                     ],
                     const SizedBox(height: 30),
@@ -930,13 +960,20 @@ class _InventoryScreenState extends State<InventoryScreen>
     String label,
     bool isOk, {
     String? trailing,
+    String? info,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
           Icon(icon, size: 20, color: isOk ? Colors.green : Colors.grey),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
+          if (info != null)
+            GestureDetector(
+              onTap: () => _showInfoDialog(label, info),
+              child: Icon(Icons.info_outline, size: 16, color: Colors.blue.shade300),
+            ),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               label,
@@ -957,6 +994,22 @@ class _InventoryScreenState extends State<InventoryScreen>
                 color: isOk ? Colors.green.shade800 : Colors.grey,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showInfoDialog(String title, String content) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: Text(content),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Got it"),
           ),
         ],
       ),
@@ -1215,56 +1268,81 @@ class _InventoryScreenState extends State<InventoryScreen>
                     ),
                     const SizedBox(height: 25),
 
-                    // 🏷 Category Selection Dropdown
-                    Align(
-                      alignment: Alignment.center,
-                      child: SizedBox(
-                        width: 250,
-                        child: DropdownButtonFormField<String>(
-                          value: category,
-                          style: TextStyle(
-                            color: Colors.green.shade900,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                          iconEnabledColor: Colors.green.shade800,
-                          decoration: InputDecoration(
-                            labelText: "Category",
-                            labelStyle: TextStyle(color: Colors.green.shade800),
-                            prefixIcon: Icon(
-                              Icons.category_outlined,
-                              color: Colors.green.shade700,
+                    // 🏷 Category Selection
+                    if (item == null)
+                      Align(
+                        alignment: Alignment.center,
+                        child: SizedBox(
+                          width: 250,
+                          child: DropdownButtonFormField<String>(
+                            value: category,
+                            style: TextStyle(
+                              color: Colors.green.shade900,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
                             ),
-                            filled: true,
-                            fillColor: Colors.green.shade50,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(15),
-                              borderSide: BorderSide(color: Colors.green.shade300),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(15),
-                              borderSide: BorderSide(color: Colors.green.shade100),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(15),
-                              borderSide: BorderSide(
-                                color: Colors.green.shade800,
-                                width: 2,
+                            iconEnabledColor: Colors.green.shade800,
+                            decoration: InputDecoration(
+                              labelText: "Category",
+                              labelStyle: TextStyle(color: Colors.green.shade800),
+                              prefixIcon: Icon(
+                                Icons.category_outlined,
+                                color: Colors.green.shade700,
+                              ),
+                              filled: true,
+                              fillColor: Colors.green.shade50,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                borderSide: BorderSide(color: Colors.green.shade300),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                borderSide: BorderSide(color: Colors.green.shade100),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                borderSide: BorderSide(
+                                  color: Colors.green.shade800,
+                                  width: 2,
+                                ),
                               ),
                             ),
+                            items: ["Fabric", "Element"]
+                                .map(
+                                  (cat) => DropdownMenuItem(
+                                    value: cat,
+                                    child: Text(cat),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) => setM(() => category = v!),
                           ),
-                          items: ["Fabric", "Element"]
-                              .map(
-                                (cat) => DropdownMenuItem(
-                                  value: cat,
-                                  child: Text(cat),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (v) => setM(() => category = v!),
+                        ),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: Colors.green.shade100),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.category, color: Colors.green.shade700, size: 20),
+                            const SizedBox(width: 10),
+                            Text(
+                              "Category: $category",
+                              style: TextStyle(
+                                color: Colors.green.shade900,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
                     const SizedBox(height: 25),
 
                     // 🌈 Multi-Color Variants Section
@@ -1566,39 +1644,54 @@ class _InventoryScreenState extends State<InventoryScreen>
                         "Machine Washable",
                         canWash,
                         (v) => setM(() => canWash = v),
+                        info: "Indicates whether the garment can be safely washed in a washing machine and the recommended washing conditions. Following these instructions helps maintain the fabric's quality, color, and shape.",
                       ),
                       _buildCareSwitch(
                         "Bleach Allowed",
                         canBleach,
                         (v) => setM(() => canBleach = v),
+                        info: "Indicates whether bleach can be safely used on the fabric. Some materials may fade, weaken, or become damaged when exposed to bleach.",
                       ),
                       _buildCareSwitch(
                         "Dry Clean Only",
                         canDryClean,
                         (v) => setM(() => canDryClean = v),
+                        info: "Indicates whether the garment should be professionally cleaned using special solvents instead of water. This method is recommended for delicate fabrics or garments with special finishes.",
                       ),
                       _buildCareSwitch(
                         "Tumble Dry",
                         canTumbleDry,
                         (v) => setM(() => canTumbleDry = v),
+                        info: "Tumble drying is the process of drying clothes in a clothes dryer (dryer machine) instead of hanging them to air dry. It indicates whether the garment is suitable for tumble drying and the recommended heat setting. Using the wrong drying method may cause shrinking or fabric damage.",
                       ),
                       const SizedBox(height: 10),
                       Align(
                         alignment: Alignment.centerLeft,
                         child: SizedBox(
-                          width: 220,
-                          child: DropdownButtonFormField(
-                            initialValue: ironLevel,
-                            items: ["None", "Low", "Medium", "High"]
-                                .map(
-                                  (e) => DropdownMenuItem(
-                                    value: e,
-                                    child: Text("Iron Level: $e"),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (v) => setM(() => ironLevel = v.toString()),
-                            decoration: const InputDecoration(labelText: "Ironing"),
+                          width: 260,
+                          child: Row(
+                            children: [
+                              GestureDetector(
+                                onTap: () => _showInfoDialog("Iron Level", "Indicates the maximum ironing temperature that is safe for the fabric. Using excessive heat may damage, shrink, or burn the material."),
+                                child: Icon(Icons.info_outline, size: 20, color: Colors.blue.shade300),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: DropdownButtonFormField(
+                                  initialValue: ironLevel,
+                                  items: ["None", "Low", "Medium", "High"]
+                                      .map(
+                                        (e) => DropdownMenuItem(
+                                          value: e,
+                                          child: Text("Iron Level: $e"),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (v) => setM(() => ironLevel = v.toString()),
+                                  decoration: const InputDecoration(labelText: "Ironing"),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -1739,13 +1832,26 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  Widget _buildCareSwitch(String label, bool value, Function(bool) onChanged) {
+  Widget _buildCareSwitch(String label, bool value, Function(bool) onChanged, {String? info}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 14, color: Colors.black54),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (info != null)
+              GestureDetector(
+                onTap: () => _showInfoDialog(label, info),
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: Icon(Icons.info_outline, size: 20, color: Colors.blue.shade300),
+                ),
+              ),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 14, color: Colors.black54),
+            ),
+          ],
         ),
         Switch(
           value: value,
