@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
 import '../../../widgets/video_preview_player.dart';
+import '../../../widgets/care_info_tooltip.dart';
 
 class ProductDetailOverlay extends StatefulWidget {
   final Product product;
@@ -449,16 +450,17 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   const SizedBox(height: 24),
 
                   if (widget.isFabric) ...[
+                    const SizedBox(height: 25),
                     const Text(
-                      'Care Instructions',
+                      "Care Instructions",
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 15),
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: Colors.grey[50],
                         borderRadius: BorderRadius.circular(12),
@@ -466,11 +468,37 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                       ),
                       child: Column(
                         children: [
-                          _careInfoRow(Icons.wash, 'Machine Washable', _canMachineWash()),
-                          _careInfoRow(Icons.biotech, 'Bleach Allowed', _canBleach()),
-                          _careInfoRow(Icons.dry_cleaning, 'Dry Clean Only', _canDryClean()),
-                          _careInfoRow(Icons.settings_input_component, 'Tumble Dry', _canTumbleDry()),
-                          _careInfoRow(Icons.iron, 'Iron Level', true, trailing: _getIronLevel()),
+                          CareInstructionRow(
+                            icon: Icons.wash,
+                            label: "Machine Washable",
+                            isOk: _canMachineWash(),
+                            info: "Indicates whether the garment can be safely washed in a washing machine and the recommended washing conditions. Following these instructions helps maintain the fabric's quality, color, and shape.",
+                          ),
+                          CareInstructionRow(
+                            icon: Icons.biotech,
+                            label: "Bleach Allowed",
+                            isOk: _canBleach(),
+                            info: "Indicates whether bleach can be safely used on the fabric. Some materials may fade, weaken, or become damaged when exposed to bleach.",
+                          ),
+                          CareInstructionRow(
+                            icon: Icons.dry_cleaning,
+                            label: "Dry Clean Only",
+                            isOk: _canDryClean(),
+                            info: "Indicates whether the garment should be professionally cleaned using special solvents instead of water. This method is recommended for delicate fabrics or garments with special finishes.",
+                          ),
+                          CareInstructionRow(
+                            icon: Icons.settings_input_component,
+                            label: "Tumble Dry",
+                            isOk: _canTumbleDry(),
+                            info: "Tumble drying is the process of drying clothes in a clothes dryer (dryer machine) instead of hanging them to air dry. It indicates whether the garment is suitable for tumble drying and the recommended heat setting. Using the wrong drying method may cause shrinking or fabric damage.",
+                          ),
+                          CareInstructionRow(
+                            icon: Icons.iron,
+                            label: "Iron Level",
+                            isOk: true,
+                            value: _getIronLevel(),
+                            info: "Indicates the maximum ironing temperature that is safe for the fabric. Using excessive heat may damage, shrink, or burn the material.",
+                          ),
                         ],
                       ),
                     ),
