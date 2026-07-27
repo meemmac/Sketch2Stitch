@@ -29,16 +29,12 @@ class CareInstructionRow extends StatelessWidget {
               height: 22,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: const Color(0xFF64B5F6),
-                  width: 1.8,
-                ),
               ),
               child: const Center(
                 child: Icon(
                   Icons.info_outline,
-                  size: 14,
-                  color: Color(0xFF64B5F6),
+                  size: 16,
+                  color:Color(0xFF64B5F6),
                 ),
               ),
             ),
