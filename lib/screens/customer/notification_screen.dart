@@ -46,7 +46,7 @@ final List<CustomerNotificationCardData> kCustomerDummyNotifications = [
     avatarImage: 'assets/images/fab.jpg',
     itemName: 'Salwar Kameez',
     partyLabel: 'confirmed by',
-    partyName: 'Rahman Tailors',
+    partyName: 'Rahman Readymade House',
     orderId: 'OR01',
     subOrderId: null,
     timeAgo: '2 hours ago',
@@ -79,7 +79,7 @@ final List<CustomerNotificationCardData> kCustomerDummyNotifications = [
     avatarImage: 'assets/images/lace.jpg',
     itemName: 'Wedding Sherwani',
     partyLabel: 'from',
-    partyName: 'Elegant Tailor',
+    partyName: 'Dhaka Fabric House',
     orderId: 'OR04',
     subOrderId: null,
     timeAgo: 'Yesterday',
@@ -98,7 +98,7 @@ final List<CustomerNotificationCardData> kCustomerDummyNotifications = [
 ];
 
 // ============= RETAILER NOTIFICATION =============
-enum RetailerNotificationType { orderPlaced, stockOut }
+enum RetailerNotificationType { orderPlaced, stockOut, tailorAssigned }
 
 class RetailerNotification {
   final RetailerNotificationType type;
@@ -110,6 +110,8 @@ class RetailerNotification {
   final String timeAgo;
   final bool isNew;
   final String? colorName;
+  final String? tailorName;
+  final String? deliveryDeadline;
 
   const RetailerNotification({
     required this.type,
@@ -121,6 +123,8 @@ class RetailerNotification {
     required this.timeAgo,
     this.isNew = false,
     this.colorName,
+    this.tailorName,
+    this.deliveryDeadline,
   });
 }
 
@@ -161,17 +165,40 @@ final List<RetailerNotification> kRetailerDummyNotifications = [
     orderId: 'PROD004',
     timeAgo: '1 day ago',
     colorName: 'Red',
+
+  ),
+  // ✅ New: Tailor Assigned notification
+  const RetailerNotification(
+    type: RetailerNotificationType.tailorAssigned,
+    avatarImage: 'assets/images/fab.jpg',
+    customerName: 'Sarah Ahmed',
+    itemName: 'Salwar Kameez',
+    orderId: 'OR001',
+    timeAgo: '1 hour ago',
+    isNew: true,
+    tailorName: 'Master Karim',
+    deliveryDeadline: '25 Dec 2026',
+  ),
+  RetailerNotification(
+    type: RetailerNotificationType.tailorAssigned,
+    avatarImage: 'assets/images/fab2.jpg',
+    customerName: 'Fatima Khan',
+    itemName: 'Bridal Lehenga',
+    orderId: 'OR002',
+    timeAgo: '2 hours ago',
+    isNew: true,
+    tailorName: 'Rehana Begum',
+    deliveryDeadline: '28 Dec 2026',
   ),
 ];
 
 // ============= TAILOR NOTIFICATION =============
-enum TailorNotificationType { newOrder, orderConfirmationReminder, deliveryDeadline }
+enum TailorNotificationType { newOrder, orderConfirmationReminder, deliveryDeadline,orderCancelledByCustomer }
 
 class TailorNotification {
   final TailorNotificationType type;
   final String avatarImage;
   final String customerName;
-  final String itemName;
   final String orderId;
   final String? subOrderId;
   final String timeAgo;
@@ -182,7 +209,6 @@ class TailorNotification {
     required this.type,
     required this.avatarImage,
     required this.customerName,
-    required this.itemName,
     required this.orderId,
     this.subOrderId,
     required this.timeAgo,
@@ -196,7 +222,6 @@ final List<TailorNotification> kTailorDummyNotifications = [
     type: TailorNotificationType.newOrder,
     avatarImage: 'assets/images/fab.jpg',
     customerName: 'Sarah Ahmed',
-    itemName: 'Salwar Kameez',
     orderId: 'OR001',
     timeAgo: '2 hours ago',
     isNew: true,
@@ -205,7 +230,6 @@ final List<TailorNotification> kTailorDummyNotifications = [
     type: TailorNotificationType.orderConfirmationReminder,
     avatarImage: 'assets/images/lace.jpg',
     customerName: 'Aisha Rahman',
-    itemName: 'Wedding Sherwani',
     orderId: 'OR003',
     timeAgo: '1 day ago',
   ),
@@ -213,11 +237,18 @@ final List<TailorNotification> kTailorDummyNotifications = [
     type: TailorNotificationType.deliveryDeadline,
     avatarImage: 'assets/images/textile.jpg',
     customerName: 'Zara Malik',
-    itemName: 'Premium Suit',
     orderId: 'OR005',
     timeAgo: '5 hours ago',
     isNew: true,
     deadlineDate: '2026-07-20',
+  ),
+  const TailorNotification(
+    type: TailorNotificationType.orderCancelledByCustomer,
+    avatarImage: 'assets/images/fab2.jpg',
+    customerName: 'Fatima Khan',
+    orderId: 'OR002',
+    timeAgo: '1 hour ago',
+    isNew: true,
   ),
 ];
 
@@ -357,7 +388,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                 ),
-                child: const Text('clear all', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12.5)),
+                child: const Text('Clear all', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12.5)),
               ),
             ],
           ),
@@ -405,6 +436,13 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   Widget _buildCustomerCard(CustomerNotificationCardData n) {
     final style = _customerStyleFor(n.type);
 
+    // ✅ Check if notification is from a retailer
+    bool isFromRetailer = n.partyName.contains('Fabric') ||
+        n.partyName.contains('House') ||
+        n.partyName.contains('Shop') ||
+        n.partyName.contains('Store') ||
+        n.partyLabel == 'from';
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -439,9 +477,24 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                             style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
                             children: [
                               TextSpan(text: '${style.messagePrefix} '),
-                              TextSpan(text: n.itemName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-                              TextSpan(text: ' ${n.partyLabel} '),
-                              TextSpan(text: n.partyName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                              if (isFromRetailer) ...[
+                                // ✅ Retailer: Show only retailer name
+                                TextSpan(
+                                  text: n.partyName,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                                ),
+                              ] else ...[
+                                // ✅ Tailor: Show product name + tailor name
+                                TextSpan(
+                                  text: n.itemName,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                                ),
+                                TextSpan(text: ' ${n.partyLabel} '),
+                                TextSpan(
+                                  text: n.partyName,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                                ),
+                              ],
                               if (style.messageSuffix.isNotEmpty) TextSpan(text: style.messageSuffix),
                             ],
                           ),
@@ -456,7 +509,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
               if (n.type == NotificationType.delivered)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: Text('Please review from orders', style: TextStyle(fontSize: 12, color: Colors.blue.shade700, fontWeight: FontWeight.w500)),
+                  child: Text('Please review on orders', style: TextStyle(fontSize: 12, color: Colors.blue.shade700, fontWeight: FontWeight.w500)),
                 ),
             ],
           ),
@@ -579,8 +632,9 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   Widget _buildRetailerCard(RetailerNotification n) {
     final style = _retailerStyleFor(n.type);
 
-    // For stockOut, show product icon. For orderPlaced, show first letter of customer name
     bool isStockOut = n.type == RetailerNotificationType.stockOut;
+    bool isTailorAssigned = n.type == RetailerNotificationType.tailorAssigned;
+
     String firstLetter = isStockOut ? '📦' : (n.customerName.isNotEmpty ? n.customerName[0].toUpperCase() : '?');
 
     return Material(
@@ -600,9 +654,13 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                   // Avatar - shows product emoji for stockOut, first letter for customer
                   CircleAvatar(
                     radius: 22,
-                    backgroundColor: isStockOut ? Colors.red.shade200 : style.iconColor.withOpacity(0.2),
+                    backgroundColor: isStockOut
+                        ? Colors.red.shade200
+                        : (isTailorAssigned ? Colors.blue.shade200 : style.iconColor.withOpacity(0.2)),
                     child: isStockOut
                         ? const Icon(Icons.inventory_2_outlined, color: Colors.red, size: 22)
+                        : isTailorAssigned
+                        ? Icon(Icons.design_services_rounded, color: Colors.blue.shade700, size: 22)
                         : Text(
                       firstLetter,
                       style: TextStyle(
@@ -631,7 +689,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                             style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
                             children: [
                               if (isStockOut) ...[
-                                TextSpan(text: '${n.customerName} '), // Product name
+                                TextSpan(text: '${n.customerName} '),
                                 TextSpan(text: style.messageMiddle),
                                 if (n.colorName != null) ...[
                                   TextSpan(text: ' (Color: '),
@@ -639,14 +697,27 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                                   TextSpan(text: ')'),
                                 ],
                                 TextSpan(text: style.messageSuffix),
+                              ] else if (isTailorAssigned) ...[
+                                TextSpan(text: 'Order #${n.orderId} '),
+                                TextSpan(text: style.messageMiddle),
+                                TextSpan(
+                                  text: n.tailorName ?? 'a tailor',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                                ),
+                                if (n.deliveryDeadline != null) ...[
+                                  TextSpan(text: ' with deadline: '),
+                                  TextSpan(
+                                    text: n.deliveryDeadline!,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+                                  ),
+                                  TextSpan(text: '. Please start delivery as soon as possible. '),
+                                ],
                               ] else ...[
                                 TextSpan(text: style.messagePrefix),
                                 TextSpan(text: n.customerName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
                                 TextSpan(text: style.messageMiddle),
                                 TextSpan(text: n.itemName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
                                 TextSpan(text: style.messageSuffix),
-                                TextSpan(text: ' ',),
-                                TextSpan(text: 'View Order Details', style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
                               ],
                             ],
                           ),
@@ -703,15 +774,27 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
           messageMiddle: ' is out of stock',
           messageSuffix: '.',
         );
+      case RetailerNotificationType.tailorAssigned:
+        return _RetailerNotificationStyle(
+          background: const Color(0xFFD3E9F7), // Blue background
+          icon: Icons.design_services_rounded,
+          iconColor: Colors.blue.shade700,
+          title: 'Tailor Assigned',
+          messagePrefix: '',
+          messageMiddle: ' assigned to ',
+          messageSuffix: ' for order ',
+        );
     }
   }
 
+  // ============= TAILOR CARD =============
   // ============= TAILOR CARD =============
   Widget _buildTailorCard(TailorNotification n) {
     final style = _tailorStyleFor(n.type);
 
     // Get first letter of customer name for avatar
     String firstLetter = n.customerName.isNotEmpty ? n.customerName[0].toUpperCase() : '?';
+    bool isCancelled = n.type == TailorNotificationType.orderCancelledByCustomer;
 
     return Material(
       color: Colors.transparent,
@@ -727,16 +810,18 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Avatar with first letter of customer name
+                  // ✅ Avatar with first letter of customer name (for cancellation too)
                   CircleAvatar(
                     radius: 22,
-                    backgroundColor: style.iconColor.withOpacity(0.2),
+                    backgroundColor: isCancelled
+                        ? Colors.red.shade100
+                        : style.iconColor.withOpacity(0.2),
                     child: Text(
                       firstLetter,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: style.iconColor,
+                        color: isCancelled ? Colors.red.shade700 : style.iconColor,
                       ),
                     ),
                   ),
@@ -755,28 +840,30 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                         ),
                         const SizedBox(height: 6),
                         RichText(
-                          text: TextSpan(
-                            style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
-                            children: [
-                              TextSpan(text: style.messagePrefix),
-                              TextSpan(text: n.customerName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-                              TextSpan(text: style.messageMiddle),
-                              TextSpan(text: n.itemName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-                              if (style.messageSuffix.isNotEmpty) TextSpan(text: style.messageSuffix),
-                              if (n.type == TailorNotificationType.deliveryDeadline && n.deadlineDate != null) ...[
-                                TextSpan(text: ' Deadline: ${n.deadlineDate}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-                              ],
-                              if (n.type == TailorNotificationType.newOrder) ...[
-                                TextSpan(text: ' ',),
-                                TextSpan(text: 'View Order', style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
-                              ],
-                              if (n.type == TailorNotificationType.orderConfirmationReminder) ...[
-                                TextSpan(text: ' ',),
-                                TextSpan(text: 'Confirm Now', style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
-                              ],
-                            ],
-                          ),
-                        ),
+  text: TextSpan(
+    style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
+    children: [
+      TextSpan(text: style.messagePrefix),
+      TextSpan(
+        text: n.customerName,
+        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+      ),
+      if (style.messageSuffix.isNotEmpty) TextSpan(text: style.messageSuffix),
+      if (n.type == TailorNotificationType.deliveryDeadline && n.deadlineDate != null) ...[
+        TextSpan(
+          text: ' Deadline: ${n.deadlineDate}',
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+        ),
+      ],
+      if (n.type == TailorNotificationType.newOrder) ...[
+        TextSpan(text: ' View Order from orders'),
+      ],
+      if (n.type == TailorNotificationType.orderConfirmationReminder) ...[
+        TextSpan(text: ' Confirm Now in orders'),
+      ],
+    ],
+  ),
+),
                       ],
                     ),
                   ),
@@ -790,7 +877,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
       ),
     );
   }
-
+  
   Widget _buildTailorFooter(TailorNotification n) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -808,15 +895,45 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   }
 
   _TailorNotificationStyle _tailorStyleFor(TailorNotificationType type) {
-    switch (type) {
-      case TailorNotificationType.newOrder:
-        return _TailorNotificationStyle(background: const Color(0xFFCDEFD3), icon: Icons.shopping_cart_rounded, iconColor: Colors.green.shade800, title: 'New Order Received', messagePrefix: '', messageMiddle: ' placed a new order for ', messageSuffix: '.');
-      case TailorNotificationType.orderConfirmationReminder:
-        return _TailorNotificationStyle(background: const Color(0xFFF7D6D6), icon: Icons.warning_rounded, iconColor: Colors.red.shade700, title: 'Confirm Order', messagePrefix: '', messageMiddle: '\'s order for ', messageSuffix: ' will be cancelled if not confirmed.');
-      case TailorNotificationType.deliveryDeadline:
-        return _TailorNotificationStyle(background: const Color(0xFFFBE7C0), icon: Icons.timer_rounded, iconColor: Colors.orange.shade800, title: 'Delivery Deadline Approaching', messagePrefix: 'Order from ', messageMiddle: ' for ', messageSuffix: ' is approaching deadline.');
-    }
+  switch (type) {
+    case TailorNotificationType.newOrder:
+      return _TailorNotificationStyle(
+        background: const Color(0xFFCDEFD3),
+        icon: Icons.shopping_cart_rounded,
+        iconColor: Colors.green.shade800,
+        title: 'New Order Received',
+        messagePrefix: '',
+        messageSuffix: ' placed a new order.',
+      );
+    case TailorNotificationType.orderConfirmationReminder:
+      return _TailorNotificationStyle(
+        background: const Color(0xFFF7D6D6),
+        icon: Icons.warning_rounded,
+        iconColor: Colors.red.shade700,
+        title: 'Confirm Order',
+        messagePrefix: '',
+        messageSuffix: '\'s order will be cancelled if not confirmed.',
+      );
+    case TailorNotificationType.deliveryDeadline:
+      return _TailorNotificationStyle(
+        background: const Color(0xFFFBE7C0),
+        icon: Icons.timer_rounded,
+        iconColor: Colors.orange.shade800,
+        title: 'Delivery Deadline Approaching',
+        messagePrefix: 'Order from ',
+        messageSuffix: ' is approaching deadline.',
+      );
+    case TailorNotificationType.orderCancelledByCustomer:
+      return _TailorNotificationStyle(
+        background: const Color(0xFFF7D6D6),
+        icon: Icons.cancel_rounded,
+        iconColor: Colors.red.shade700,
+        title: 'Order Cancelled by Customer',
+        messagePrefix: '',
+        messageSuffix: '\'s order has been cancelled.',
+      );
   }
+}
 }
 
 // ============= STYLE CLASSES =============
@@ -864,7 +981,6 @@ class _TailorNotificationStyle {
   final Color iconColor;
   final String title;
   final String messagePrefix;
-  final String messageMiddle;
   final String messageSuffix;
 
   const _TailorNotificationStyle({
@@ -873,7 +989,6 @@ class _TailorNotificationStyle {
     required this.iconColor,
     required this.title,
     required this.messagePrefix,
-    required this.messageMiddle,
     required this.messageSuffix,
   });
 }

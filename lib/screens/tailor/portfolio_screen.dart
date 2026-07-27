@@ -433,7 +433,7 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
                   ? Center(
                       child: Text(
                         _searchQuery.isEmpty
-                            ? "No portfolio items yet"
+                            ? "No items yet"
                             : "No items match your search",
                         style: const TextStyle(
                           color: Colors.black54,

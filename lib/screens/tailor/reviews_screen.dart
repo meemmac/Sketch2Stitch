@@ -1,26 +1,11 @@
 import 'package:flutter/material.dart';
 
-class ReviewProduct {
-  final String name;
-  final String image;
-  final double price;
-
-  const ReviewProduct({
-    required this.name,
-    required this.image,
-    required this.price,
-  });
-}
-
 class TailorReview {
   final String customerName;
   final double rating;
   final String dateLabel;
   final DateTime createdAt;
   final String comment;
-  final List<ReviewProduct> products;
-  final int helpfulCount;
-  final bool isHelpful;
 
   const TailorReview({
     required this.customerName,
@@ -28,26 +13,7 @@ class TailorReview {
     required this.dateLabel,
     required this.createdAt,
     required this.comment,
-    required this.products,
-    required this.helpfulCount,
-    this.isHelpful = false,
   });
-
-  TailorReview copyWith({
-    int? helpfulCount,
-    bool? isHelpful,
-  }) {
-    return TailorReview(
-      customerName: customerName,
-      rating: rating,
-      dateLabel: dateLabel,
-      createdAt: createdAt,
-      comment: comment,
-      products: products,
-      helpfulCount: helpfulCount ?? this.helpfulCount,
-      isHelpful: isHelpful ?? this.isHelpful,
-    );
-  }
 }
 
 class TailorReviewsScreen extends StatefulWidget {
@@ -69,10 +35,6 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
       dateLabel: "1 week ago",
       createdAt: DateTime.now().subtract(const Duration(days: 7)),
       comment: "The stitching is perfect and fits me exactly as I wanted. Highly recommended!",
-      helpfulCount: 2,
-      products: const [
-        ReviewProduct(name: "Stitching Service - Kurti", image: "assets/images/ref2.jpg", price: 1500),
-      ],
     ),
     TailorReview(
       customerName: "Nishat Tasnim",
@@ -80,10 +42,6 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
       dateLabel: "2 months ago",
       createdAt: DateTime.now().subtract(const Duration(days: 60)),
       comment: "Best tailor experience ever. The fit is top-notch.",
-      helpfulCount: 3,
-      products: const [
-        ReviewProduct(name: "Stitching Service - Lehenga", image: "assets/images/ref1.jpg", price: 4000),
-      ],
     ),
     TailorReview(
       customerName: "Israt Jahan",
@@ -91,10 +49,6 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
       dateLabel: "3 months ago",
       createdAt: DateTime.now().subtract(const Duration(days: 90)),
       comment: "Good work, but took a bit longer to deliver.",
-      helpfulCount: 1,
-      products: const [
-        ReviewProduct(name: "Stitching Service - Saree Blouse", image: "assets/images/ref3.jpg", price: 2000),
-      ],
     ),
   ];
 
@@ -189,7 +143,7 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
                 Row(
                   children: List.generate(
                     5,
-                    (index) => Icon(
+                        (index) => Icon(
                       index < 4 ? Icons.star : Icons.star_half,
                       color: Colors.orange,
                       size: 18,
@@ -315,7 +269,7 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
           Row(
             children: List.generate(
               5,
-              (index) => Icon(
+                  (index) => Icon(
                 index < review.rating.floor() ? Icons.star : Icons.star_border,
                 color: Colors.orange,
                 size: 14,
@@ -326,55 +280,6 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
           Text(
             "\"${review.comment}\"",
             style: const TextStyle(fontSize: 14, height: 1.5, fontStyle: FontStyle.italic),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProductMiniCard(ReviewProduct product) {
-    return Container(
-      width: 220,
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.asset(
-              product.image,
-              width: 50,
-              height: 50,
-              fit: BoxFit.cover,
-              errorBuilder: (_,__,___) => Container(
-                width: 50, height: 50, color: Colors.grey[200],
-                child: const Icon(Icons.content_cut, size: 20),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  "Service Tk ${product.price.toInt()}",
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
-                ),
-              ],
-            ),
           ),
         ],
       ),

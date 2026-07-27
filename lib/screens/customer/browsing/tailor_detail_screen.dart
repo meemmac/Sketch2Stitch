@@ -1001,7 +1001,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
 
   Widget _buildReviewsPageItem(Review review, int index) {
     final customerName = _getCustomerName(index);
-    final products = _getReviewProducts(index);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1055,109 +1054,8 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
               fontStyle: FontStyle.italic,
             ),
           ),
-          if (products.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            const Text(
-              "Reviewed Work",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 70,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: products.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 12),
-                itemBuilder: (context, i) =>
-                    _buildReviewsPageProductCard(products[i]),
-              ),
-            ),
-          ],
         ],
       ),
     );
-  }
-
-  Widget _buildReviewsPageProductCard(Map<String, dynamic> product) {
-    return Container(
-      width: 220,
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.asset(
-              product['image'],
-              width: 50,
-              height: 50,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                width: 50,
-                height: 50,
-                color: Colors.grey[200],
-                child: const Icon(
-                  Icons.content_cut,
-                  size: 20,
-                  color: Colors.grey,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product['name'],
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                const Text(
-                  "Portfolio Item",
-                  style: TextStyle(fontSize: 11, color: Colors.grey),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<Map<String, dynamic>> _getReviewProducts(int index) {
-    final products = <Map<String, dynamic>>[];
-
-    if (widget.tailor.portfolio != null &&
-        widget.tailor.portfolio!.isNotEmpty) {
-      final portfolioIndex = index % widget.tailor.portfolio!.length;
-      final portfolioItem = widget.tailor.portfolio![portfolioIndex];
-
-      products.add({
-        'name': portfolioItem.description ?? 'Portfolio Item',
-        'image': portfolioItem.image ?? 'assets/images/fab.jpg',
-      });
-
-      if (widget.tailor.portfolio!.length > portfolioIndex + 1) {
-        final secondItem = widget.tailor.portfolio![portfolioIndex + 1];
-        products.add({
-          'name': secondItem.description ?? 'Portfolio Item',
-          'image': secondItem.image ?? 'assets/images/fab.jpg',
-        });
-      }
-    }
-
-    return products;
   }
 }

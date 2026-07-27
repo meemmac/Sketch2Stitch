@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
 import '../../../widgets/video_preview_player.dart';
+import '../../../widgets/care_info_tooltip.dart';
 
 class ProductDetailOverlay extends StatefulWidget {
   final Product product;
@@ -449,16 +450,17 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   const SizedBox(height: 24),
 
                   if (widget.isFabric) ...[
+                    const SizedBox(height: 25),
                     const Text(
-                      'Care Instructions',
+                      "Care Instructions",
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 15),
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: Colors.grey[50],
                         borderRadius: BorderRadius.circular(12),
@@ -466,11 +468,32 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                       ),
                       child: Column(
                         children: [
-                          _careInfoRow(Icons.wash, 'Machine Washable', _canMachineWash()),
-                          _careInfoRow(Icons.biotech, 'Bleach Allowed', _canBleach()),
-                          _careInfoRow(Icons.dry_cleaning, 'Dry Clean Only', _canDryClean()),
-                          _careInfoRow(Icons.settings_input_component, 'Tumble Dry', _canTumbleDry()),
-                          _careInfoRow(Icons.iron, 'Iron Level', true, trailing: _getIronLevel()),
+                          CareInstructionRow(
+                            label: "Machine Washable",
+                            isOk: _canMachineWash(),
+                            info: "Indicates whether the garment can be safely washed in a washing machine and the recommended washing conditions. Following these instructions helps maintain the fabric's quality, color, and shape.",
+                          ),
+                          CareInstructionRow(
+                            label: "Bleach Allowed",
+                            isOk: _canBleach(),
+                            info: "Indicates whether bleach can be safely used on the fabric. Some materials may fade, weaken, or become damaged when exposed to bleach.",
+                          ),
+                          CareInstructionRow(
+                            label: "Dry Clean Only",
+                            isOk: _canDryClean(),
+                            info: "Indicates whether the garment should be professionally cleaned using special solvents instead of water. This method is recommended for delicate fabrics or garments with special finishes.",
+                          ),
+                          CareInstructionRow(
+                            label: "Tumble Dry",
+                            isOk: _canTumbleDry(),
+                            info: "Tumble drying is the process of drying clothes in a clothes dryer (dryer machine) instead of hanging them to air dry. It indicates whether the garment is suitable for tumble drying and the recommended heat setting. Using the wrong drying method may cause shrinking or fabric damage.",
+                          ),
+                          CareInstructionRow(
+                            label: "Iron Level",
+                            isOk: true,
+                            value: _getIronLevel(),
+                            info: "Indicates the maximum ironing temperature that is safe for the fabric. Using excessive heat may damage, shrink, or burn the material.",
+                          ),
                         ],
                       ),
                     ),
@@ -496,43 +519,45 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   const SizedBox(height: 24),
 
                   // Add to Cart Button - only for customers
+                  // Add to Cart Button - only for customers
                   if (_isCustomer)
                     SizedBox(
                       width: double.infinity,
-                      child: OutlinedButton(
+                      child: ElevatedButton(
                         onPressed: !_inStock
                             ? null
                             : () {
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Added to cart!'),
-                                    backgroundColor: Color(0xFF4E8B6F),
-                                    duration: Duration(seconds: 2),
-                                  ),
-                                );
-                              },
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF2C5C44),
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Added to cart!'),
+                              backgroundColor: Color(0xFF4E8B6F),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2C5C44), // ✅ Dark green background
+                          foregroundColor: Colors.white, // ✅ White text
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          side: const BorderSide(color: Color(0xFF2C5C44)),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
+                          elevation: 2, // ✅ Slight elevation for better visibility
                         ),
                         child: const Text(
                           'Add to Cart',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF2C5C44),
+                            color: Colors.white,
                           ),
                         ),
                       ),
                     ),
-                  
+
                   // ❌ REMOVED: "View product details" button and text for Tailors/Retailers
-                  
+
                   const SizedBox(height: 30),
                 ],
               ),
@@ -655,43 +680,43 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
     );
   }
 
-  Widget _careInfoRow(
-    IconData icon,
-    String label,
-    bool isOk, {
-    String? trailing,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: isOk ? Colors.green : Colors.grey),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: isOk ? Colors.black87 : Colors.grey),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Flexible(
-            child: Text(
-              trailing ?? (isOk ? "Yes" : "No"),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: isOk ? Colors.green.shade800 : Colors.grey,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // Widget _careInfoRow(
+  //   IconData icon,
+  //   String label,
+  //   bool isOk, {
+  //   String? trailing,
+  // }) {
+  //   return Padding(
+  //     padding: const EdgeInsets.only(bottom: 10),
+  //     child: Row(
+  //       children: [
+  //         Icon(icon, size: 20, color: isOk ? Colors.green : Colors.grey),
+  //         const SizedBox(width: 12),
+  //         Expanded(
+  //           child: Text(
+  //             label,
+  //             maxLines: 1,
+  //             overflow: TextOverflow.ellipsis,
+  //             style: TextStyle(color: isOk ? Colors.black87 : Colors.grey),
+  //           ),
+  //         ),
+  //         const SizedBox(width: 12),
+  //         Flexible(
+  //           child: Text(
+  //             trailing ?? (isOk ? "Yes" : "No"),
+  //             maxLines: 1,
+  //             overflow: TextOverflow.ellipsis,
+  //             textAlign: TextAlign.right,
+  //             style: TextStyle(
+  //               fontWeight: FontWeight.bold,
+  //               color: isOk ? Colors.green.shade800 : Colors.grey,
+  //             ),
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   bool _canMachineWash() {
     final careSymbols = widget.product.careSymbol.map((s) => s.toLowerCase()).toList();
