@@ -88,7 +88,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
   void _showTopNotification(String message, {bool isError = false}) {
     _removeNotificationOverlay();
-    
+
     final overlay = Overlay.of(context);
     final entry = OverlayEntry(
       builder: (context) => Positioned(
@@ -102,7 +102,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: isError ? Colors.red[700] : const Color.fromARGB(255, 45, 141, 61),
+                color: isError
+                    ? Colors.red[700]
+                    : const Color.fromARGB(255, 45, 141, 61),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
@@ -145,10 +147,10 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         ),
       ),
     );
-    
+
     overlay.insert(entry);
     _notificationOverlay = entry;
-    
+
     // Auto dismiss after 2 seconds
     Future.delayed(const Duration(seconds: 2), () {
       _removeNotificationOverlay();
@@ -196,7 +198,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
             msgText: 'Great! I\'ll come tomorrow.',
             sentAt: DateTime.now().subtract(const Duration(hours: 2)),
             isRead: true,
-            readAt: DateTime.now().subtract(const Duration(hours: 1, minutes: 55)),
+            readAt: DateTime.now().subtract(
+              const Duration(hours: 1, minutes: 55),
+            ),
           ),
         ],
       ),
@@ -376,12 +380,18 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     // Filter based on role
     List<Conversation> filteredConversations;
     if (widget.currentUserRole == UserRole.customer) {
-      filteredConversations = allConversations.where((conv) =>
-      conv.otherRole == UserRole.tailor || conv.otherRole == UserRole.retailer).toList();
+      filteredConversations = allConversations
+          .where(
+            (conv) =>
+                conv.otherRole == UserRole.tailor ||
+                conv.otherRole == UserRole.retailer,
+          )
+          .toList();
     } else {
       // Tailor/Retailer: ONLY Customer
-      filteredConversations = allConversations.where((conv) =>
-      conv.otherRole == UserRole.customer).toList();
+      filteredConversations = allConversations
+          .where((conv) => conv.otherRole == UserRole.customer)
+          .toList();
     }
 
     setState(() {
@@ -390,6 +400,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       _isLoading = false;
     });
   }
+
   void _initUserCache() {
     // Tailors
     final tailor1 = Tailor(
@@ -486,14 +497,14 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
     _userCache.addAll({
       // ... Tailors and Retailers (same as before)
-'t1': {
-  'name': tailor1.name,
-  'phone': tailor1.phone,
-  'avatar': tailor1.profilePicture ?? 'assets/images/fab.jpg',
-  'role': UserRole.tailor,
-  'model': tailor1,
-  'isAnonymous': false,
-},
+      't1': {
+        'name': tailor1.name,
+        'phone': tailor1.phone,
+        'avatar': tailor1.profilePicture ?? 'assets/images/fab.jpg',
+        'role': UserRole.tailor,
+        'model': tailor1,
+        'isAnonymous': false,
+      },
       't2': {
         'name': tailor2.name,
         'phone': tailor2.phone,
@@ -588,7 +599,8 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       // tailors/retailers only talk to customers.
       filtered = filtered.where((conv) {
         if (widget.currentUserRole == UserRole.customer) {
-          return conv.otherRole == UserRole.tailor || conv.otherRole == UserRole.retailer;
+          return conv.otherRole == UserRole.tailor ||
+              conv.otherRole == UserRole.retailer;
         } else {
           return conv.otherRole == UserRole.customer;
         }
@@ -602,7 +614,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           final userPhone = userData?['phone']?.toString().toLowerCase() ?? '';
           final lastMessage = _getLastMessage(conv).toLowerCase();
           final query = _searchQuery.toLowerCase();
-          
+
           return userName.contains(query) ||
               userPhone.contains(query) ||
               lastMessage.contains(query);
@@ -614,12 +626,14 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           filtered = filtered.where((conv) => conv.unreadCount > 0).toList();
           break;
         case "Tailors":
-          filtered = filtered.where((conv) =>
-              conv.otherRole == UserRole.tailor).toList();
+          filtered = filtered
+              .where((conv) => conv.otherRole == UserRole.tailor)
+              .toList();
           break;
         case "Retailers":
-          filtered = filtered.where((conv) =>
-              conv.otherRole == UserRole.retailer).toList();
+          filtered = filtered
+              .where((conv) => conv.otherRole == UserRole.retailer)
+              .toList();
           break;
         default:
           break;
@@ -640,7 +654,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     }
     return conversation.otherId;
   }
-
 
   String _getOtherUserAvatar(Conversation conversation) {
     final userData = _userCache[conversation.otherId];
@@ -695,17 +708,14 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       final index = _conversations.indexWhere((c) => c.id == conversationId);
       if (index != -1) {
         final conversation = _conversations[index];
-        
+
         final updatedMessages = conversation.messages?.map((m) {
           if (m.senderId != widget.customerId && !m.isRead) {
-            return m.copyWith(
-              isRead: true,
-              readAt: DateTime.now(),
-            );
+            return m.copyWith(isRead: true, readAt: DateTime.now());
           }
           return m;
         }).toList();
-        
+
         _conversations[index] = conversation.copyWith(
           messages: updatedMessages,
           unreadCount: 0,
@@ -742,7 +752,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       final prefs = await SharedPreferences.getInstance();
       final isBlocked = prefs.getBool('blocked_$conversationId') ?? false;
       final unreadCount = prefs.getInt('unread_count_$conversationId') ?? 0;
-      
+
       setState(() {
         final index = _conversations.indexWhere((c) => c.id == conversationId);
         if (index != -1) {
@@ -758,7 +768,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     }
   }
 
-
   Future<void> _blockUser(Conversation conversation) async {
     setState(() {
       final index = _conversations.indexWhere((c) => c.id == conversation.id);
@@ -772,7 +781,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     });
 
     try {
-      _showTopNotification('${_getOtherUserName(conversation)} has been blocked');
+      _showTopNotification(
+        '${_getOtherUserName(conversation)} has been blocked',
+      );
     } catch (e) {
       setState(() {
         final index = _conversations.indexWhere((c) => c.id == conversation.id);
@@ -799,7 +810,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     });
 
     try {
-      _showTopNotification('${_getOtherUserName(conversation)} has been unblocked');
+      _showTopNotification(
+        '${_getOtherUserName(conversation)} has been unblocked',
+      );
     } catch (e) {
       setState(() {
         final index = _conversations.indexWhere((c) => c.id == conversation.id);
@@ -977,7 +990,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     ];
 
     final List<Map<String, dynamic>> contacts =
-    widget.currentUserRole == UserRole.customer
+        widget.currentUserRole == UserRole.customer
         ? tailorRetailerContacts
         : customerContacts;
     String searchQuery = '';
@@ -1015,18 +1028,12 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                   ),
                   const Text(
                     'New Conversation',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Search by name or phone number',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 16),
                   TextField(
@@ -1095,29 +1102,36 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                             itemCount: filteredContacts.length,
                             itemBuilder: (context, index) {
                               final contact = filteredContacts[index];
-                              final isTailor = contact['role'] == UserRole.tailor;
-                              final isAnonymous = contact['isAnonymous'] == true;
-                              
+                              final contactRole = contact['role'] as UserRole;
+                              final isAnonymous =
+                                  contact['isAnonymous'] == true;
+
                               // For anonymous users, show the phone number as name
                               String displayName = contact['name'];
-                              bool hasAvatar = contact['avatar'] != null && contact['avatar'].toString().isNotEmpty;
+                              bool hasAvatar =
+                                  contact['avatar'] != null &&
+                                  contact['avatar'].toString().isNotEmpty;
 
                               return ListTile(
                                 leading: CircleAvatar(
                                   radius: 24,
-                                  backgroundColor: contact['avatar'] != null ? Colors.grey[200] : Colors.grey[300],
+                                  backgroundColor: contact['avatar'] != null
+                                      ? Colors.grey[200]
+                                      : Colors.grey[300],
                                   backgroundImage: contact['avatar'] != null
                                       ? AssetImage(contact['avatar'])
                                       : null,
                                   child: contact['avatar'] == null
                                       ? Text(
-                                    contact['name'].isNotEmpty ? contact['name'][0].toUpperCase() : '?',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey[700],
-                                    ),
-                                  )
+                                          contact['name'].isNotEmpty
+                                              ? contact['name'][0].toUpperCase()
+                                              : '?',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.grey[700],
+                                          ),
+                                        )
                                       : null,
                                 ),
 
@@ -1125,7 +1139,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                   displayName,
                                   style: TextStyle(
                                     fontWeight: FontWeight.w600,
-                                    color: isAnonymous ? Colors.grey[700] : Colors.black,
+                                    color: isAnonymous
+                                        ? Colors.grey[700]
+                                        : Colors.black,
                                   ),
                                 ),
                                 subtitle: Row(
@@ -1145,30 +1161,44 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                     ),
                                     const SizedBox(width: 8),
                                     // Role badge (Tailor/Retailer) - removed "Unknown" label
+                                    // Role badge (Tailor/Retailer/Customer)
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 1,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: isTailor 
-                                            ? Colors.green.shade50 
-                                            : Colors.blue.shade50,
+                                        color: contactRole == UserRole.tailor
+                                            ? Colors.green.shade50
+                                            : contactRole == UserRole.retailer
+                                            ? Colors.blue.shade50
+                                            : Colors.orange.shade50,
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
-                                        isTailor ? 'Tailor' : 'Retailer',
+                                        contact['roleDisplay'] ??
+                                            contactRole.name,
                                         style: TextStyle(
                                           fontSize: 10,
-                                          color: isTailor ? Colors.green.shade700 : Colors.blue.shade700,
+                                          color: contactRole == UserRole.tailor
+                                              ? Colors.green.shade700
+                                              : contactRole == UserRole.retailer
+                                              ? Colors.blue.shade700
+                                              : Colors.orange.shade700,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
-                                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                                trailing: const Icon(
+                                  Icons.chevron_right,
+                                  color: Colors.grey,
+                                ),
                                 onTap: () {
                                   Navigator.pop(context);
                                   final contactId = contact['id'];
-                                  
+
                                   final existingConv = _conversations.firstWhere(
                                     (conv) => conv.otherId == contactId,
                                     orElse: () => Conversation(
@@ -1176,7 +1206,8 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                       customerId: widget.customerId,
                                       otherId: contactId,
                                       otherRole: contact['role'],
-                                      orderId: 'ORD-${DateTime.now().millisecondsSinceEpoch}',
+                                      orderId:
+                                          'ORD-${DateTime.now().millisecondsSinceEpoch}',
                                       messages: [],
                                       unreadCount: 0,
                                       isBlocked: false,
@@ -1185,7 +1216,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                   );
 
                                   // For anonymous users, store phone number as name
-                                  final userName = isAnonymous ? contact['phone'] : displayName;
+                                  final userName = isAnonymous
+                                      ? contact['phone']
+                                      : displayName;
 
                                   _userCache[contactId] = {
                                     'name': userName,
@@ -1196,7 +1229,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                     'isAnonymous': isAnonymous,
                                   };
 
-                                  if (!_conversations.any((c) => c.id == existingConv.id)) {
+                                  if (!_conversations.any(
+                                    (c) => c.id == existingConv.id,
+                                  )) {
                                     setState(() {
                                       _conversations.add(existingConv);
                                       _applyFilter();
@@ -1312,10 +1347,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       appBar: AppBar(
         title: const Text(
           'Messages',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: const Color(0xFF2C5C44),
         elevation: 0,
@@ -1337,15 +1369,12 @@ class _ConversationsScreenState extends State<ConversationsScreen>
               unselectedLabelColor: Colors.white70,
               tabs: widget.currentUserRole == UserRole.customer
                   ? const [
-                Tab(text: 'All'),
-                Tab(text: 'Unread'),
-                Tab(text: 'Tailors'),
-                Tab(text: 'Retailers'),
-              ]
-                  : const [
-                Tab(text: 'All'),
-                Tab(text: 'Unread'),
-              ],
+                      Tab(text: 'All'),
+                      Tab(text: 'Unread'),
+                      Tab(text: 'Tailors'),
+                      Tab(text: 'Retailers'),
+                    ]
+                  : const [Tab(text: 'All'), Tab(text: 'Unread')],
             ),
           ),
         ),
@@ -1357,22 +1386,20 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       ),
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF2C5C44),
-              ),
+              child: CircularProgressIndicator(color: Color(0xFF2C5C44)),
             )
           : _conversations.where((c) => !c.isDeleted).isEmpty
-              ? _buildEmptyState()
-              : _filteredConversations.isEmpty
-                  ? _buildEmptyFilterState()
-                  : ListView.builder(
-                      itemCount: _filteredConversations.length,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemBuilder: (context, index) {
-                        final conversation = _filteredConversations[index];
-                        return _buildConversationCard(conversation);
-                      },
-                    ),
+          ? _buildEmptyState()
+          : _filteredConversations.isEmpty
+          ? _buildEmptyFilterState()
+          : ListView.builder(
+              itemCount: _filteredConversations.length,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemBuilder: (context, index) {
+                final conversation = _filteredConversations[index];
+                return _buildConversationCard(conversation);
+              },
+            ),
     );
   }
 
@@ -1381,11 +1408,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.chat_bubble_outline,
-            size: 80,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.chat_bubble_outline, size: 80, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
             'No messages yet',
@@ -1398,10 +1421,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           const SizedBox(height: 8),
           Text(
             'Start a conversation with a tailor or retailer',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
           ),
           const SizedBox(height: 16),
           ElevatedButton.icon(
@@ -1427,11 +1447,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.filter_alt_off,
-            size: 80,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.filter_alt_off, size: 80, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
             'No conversations match',
@@ -1444,10 +1460,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           const SizedBox(height: 8),
           Text(
             'Try a different filter or search term',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
           ),
         ],
       ),
@@ -1511,19 +1524,26 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                 // ✅ For Customer: show first letter, no profile picture
                 CircleAvatar(
                   radius: 28,
-                  backgroundColor: isCustomer ? Colors.grey[300] : Colors.grey[200],
-                  backgroundImage: (!isCustomer && otherAvatar != null && otherAvatar.isNotEmpty)
+                  backgroundColor: isCustomer
+                      ? Colors.grey[300]
+                      : Colors.grey[200],
+                  backgroundImage:
+                      (!isCustomer &&
+                          otherAvatar != null &&
+                          otherAvatar.isNotEmpty)
                       ? AssetImage(otherAvatar)
                       : null,
                   child: isCustomer
                       ? Text(
-                    otherName.isNotEmpty ? otherName[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black54,
-                    ),
-                  )
+                          otherName.isNotEmpty
+                              ? otherName[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black54,
+                          ),
+                        )
                       : null,
                 ),
                 if (isBlocked)
@@ -1559,8 +1579,12 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                               otherName,
                               style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.w600,
-                                color: isCustomer ? Colors.grey[700] : Colors.black,
+                                fontWeight: unreadCount > 0
+                                    ? FontWeight.bold
+                                    : FontWeight.w600,
+                                color: isCustomer
+                                    ? Colors.grey[700]
+                                    : Colors.black,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -1568,7 +1592,10 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                             if (unreadCount > 0) ...[
                               const SizedBox(width: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF2C5C44),
                                   borderRadius: BorderRadius.circular(10),
@@ -1591,7 +1618,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[500],
-                          fontWeight: unreadCount > 0 ? FontWeight.w600 : FontWeight.normal,
+                          fontWeight: unreadCount > 0
+                              ? FontWeight.w600
+                              : FontWeight.normal,
                         ),
                       ),
                     ],
@@ -1601,7 +1630,8 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                     children: [
                       if (conversation.messages != null &&
                           conversation.messages!.isNotEmpty &&
-                          conversation.messages!.last.senderId != widget.customerId &&
+                          conversation.messages!.last.senderId !=
+                              widget.customerId &&
                           conversation.messages!.last.isRead)
                         const Icon(
                           Icons.done_all,
@@ -1610,24 +1640,30 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                         ),
                       if (conversation.messages != null &&
                           conversation.messages!.isNotEmpty &&
-                          conversation.messages!.last.senderId != widget.customerId &&
+                          conversation.messages!.last.senderId !=
+                              widget.customerId &&
                           !conversation.messages!.last.isRead)
-                        const Icon(
-                          Icons.done,
-                          size: 14,
-                          color: Colors.grey,
-                        ),
+                        const Icon(Icons.done, size: 14, color: Colors.grey),
                       if (conversation.messages != null &&
                           conversation.messages!.isNotEmpty &&
-                          conversation.messages!.last.senderId != widget.customerId)
+                          conversation.messages!.last.senderId !=
+                              widget.customerId)
                         const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          isBlocked ? '🔒 User is blocked - Tap to unblock' : lastMessage,
+                          isBlocked
+                              ? '🔒 User is blocked - Tap to unblock'
+                              : lastMessage,
                           style: TextStyle(
                             fontSize: 13,
-                            color: isBlocked ? Colors.red : (unreadCount > 0 ? Colors.black87 : Colors.grey[600]),
-                            fontWeight: unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
+                            color: isBlocked
+                                ? Colors.red
+                                : (unreadCount > 0
+                                      ? Colors.black87
+                                      : Colors.grey[600]),
+                            fontWeight: unreadCount > 0
+                                ? FontWeight.w500
+                                : FontWeight.normal,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1730,10 +1766,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                 Navigator.pop(context);
                 _blockUser(conversation);
               },
-              child: const Text(
-                'Block',
-                style: TextStyle(color: Colors.red),
-              ),
+              child: const Text('Block', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -1763,10 +1796,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                 Navigator.pop(context);
                 _deleteConversation(conversation);
               },
-              child: const Text(
-                'Delete',
-                style: TextStyle(color: Colors.red),
-              ),
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -1879,29 +1909,19 @@ class _ConversationSearchDelegate extends SearchDelegate {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.search_off,
-              size: 64,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
               query.isEmpty
                   ? 'Type to search conversations'
                   : 'No conversations found',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
             ),
             if (query.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
                 'Try searching by name or phone number',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey[500],
-                ),
+                style: TextStyle(fontSize: 13, color: Colors.grey[500]),
               ),
             ],
           ],
@@ -1920,7 +1940,8 @@ class _ConversationSearchDelegate extends SearchDelegate {
         final lastTime = getLastMessageTime(conversation);
         final unreadCount = conversation.unreadCount;
         final isBlocked = conversation.isBlocked;
-        final isAnonymous = userCache[conversation.otherId]?['isAnonymous'] == true;
+        final isAnonymous =
+            userCache[conversation.otherId]?['isAnonymous'] == true;
         final isCustomer = conversation.otherRole == UserRole.customer;
 
         return GestureDetector(
@@ -1937,7 +1958,7 @@ class _ConversationSearchDelegate extends SearchDelegate {
                     title: const Text('User Blocked'),
                     content: Text(
                       '$otherName is blocked.\n\n'
-                          'You need to unblock this user to send messages.',
+                      'You need to unblock this user to send messages.',
                     ),
                     actions: [
                       TextButton(
@@ -1983,19 +2004,26 @@ class _ConversationSearchDelegate extends SearchDelegate {
                     // ✅ For Customer: show first letter, no profile picture
                     CircleAvatar(
                       radius: 28,
-                      backgroundColor: isCustomer ? Colors.grey[300] : Colors.grey[200],
-                      backgroundImage: (!isCustomer && otherAvatar != null && otherAvatar.isNotEmpty)
+                      backgroundColor: isCustomer
+                          ? Colors.grey[300]
+                          : Colors.grey[200],
+                      backgroundImage:
+                          (!isCustomer &&
+                              otherAvatar != null &&
+                              otherAvatar.isNotEmpty)
                           ? AssetImage(otherAvatar)
                           : null,
                       child: isCustomer
                           ? Text(
-                        otherName.isNotEmpty ? otherName[0].toUpperCase() : '?',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[700],
-                        ),
-                      )
+                              otherName.isNotEmpty
+                                  ? otherName[0].toUpperCase()
+                                  : '?',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey[700],
+                              ),
+                            )
                           : null,
                     ),
                     if (isBlocked)
@@ -2033,8 +2061,12 @@ class _ConversationSearchDelegate extends SearchDelegate {
                                     fontSize: 16,
                                     fontWeight: isAnonymous
                                         ? FontWeight.normal
-                                        : (unreadCount > 0 ? FontWeight.bold : FontWeight.w600),
-                                    color: isCustomer ? Colors.grey[700] : Colors.black,
+                                        : (unreadCount > 0
+                                              ? FontWeight.bold
+                                              : FontWeight.w600),
+                                    color: isCustomer
+                                        ? Colors.grey[700]
+                                        : Colors.black,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -2042,7 +2074,10 @@ class _ConversationSearchDelegate extends SearchDelegate {
                                 if (unreadCount > 0) ...[
                                   const SizedBox(width: 6),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: const Color(0xFF2C5C44),
                                       borderRadius: BorderRadius.circular(10),
@@ -2065,7 +2100,9 @@ class _ConversationSearchDelegate extends SearchDelegate {
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey[500],
-                              fontWeight: unreadCount > 0 ? FontWeight.w600 : FontWeight.normal,
+                              fontWeight: unreadCount > 0
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
                             ),
                           ),
                         ],
@@ -2075,7 +2112,8 @@ class _ConversationSearchDelegate extends SearchDelegate {
                         children: [
                           if (conversation.messages != null &&
                               conversation.messages!.isNotEmpty &&
-                              conversation.messages!.last.senderId != customerId &&
+                              conversation.messages!.last.senderId !=
+                                  customerId &&
                               conversation.messages!.last.isRead)
                             const Icon(
                               Icons.done_all,
@@ -2084,7 +2122,8 @@ class _ConversationSearchDelegate extends SearchDelegate {
                             ),
                           if (conversation.messages != null &&
                               conversation.messages!.isNotEmpty &&
-                              conversation.messages!.last.senderId != customerId &&
+                              conversation.messages!.last.senderId !=
+                                  customerId &&
                               !conversation.messages!.last.isRead)
                             const Icon(
                               Icons.done,
@@ -2093,15 +2132,24 @@ class _ConversationSearchDelegate extends SearchDelegate {
                             ),
                           if (conversation.messages != null &&
                               conversation.messages!.isNotEmpty &&
-                              conversation.messages!.last.senderId != customerId)
+                              conversation.messages!.last.senderId !=
+                                  customerId)
                             const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              isBlocked ? '🔒 User is blocked - Tap to unblock' : lastMessage,
+                              isBlocked
+                                  ? '🔒 User is blocked - Tap to unblock'
+                                  : lastMessage,
                               style: TextStyle(
                                 fontSize: 13,
-                                color: isBlocked ? Colors.red : (unreadCount > 0 ? Colors.black87 : Colors.grey[600]),
-                                fontWeight: unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
+                                color: isBlocked
+                                    ? Colors.red
+                                    : (unreadCount > 0
+                                          ? Colors.black87
+                                          : Colors.grey[600]),
+                                fontWeight: unreadCount > 0
+                                    ? FontWeight.w500
+                                    : FontWeight.normal,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
