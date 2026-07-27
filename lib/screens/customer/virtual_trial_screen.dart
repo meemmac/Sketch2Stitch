@@ -81,7 +81,8 @@ const _poseIcons = [
 // Screen widget
 // ─────────────────────────────────────────────────────────────────────────────
 class VirtualTrialScreen extends StatefulWidget {
-  const VirtualTrialScreen({super.key});
+  final List<String>? prefillAssetImages; // NEW — retailer/product asset paths from Cart
+  const VirtualTrialScreen({super.key, this.prefillAssetImages});
 
   @override
   State<VirtualTrialScreen> createState() => _VirtualTrialScreenState();
@@ -94,6 +95,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
 
   // ── Design reference uploads ────────────────────────────────────────────────
   final List<XFile> _referenceImages = [];
+  final List<String> _prefilledAssetImages = [];
 
   // ── Appearance profile ──────────────────────────────────────────────────────
   final AppearanceProfile _profile = AppearanceProfile();
@@ -149,6 +151,9 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     // TODO(backend): replace this mock initialisation with a real fetch,
     // e.g. `final customer = await VtUsageService.loadAndResetIfNeeded(uid);`
     // then setState _vtUsed = customer.vtUsed, _vtResetDate = customer.vtResetDate.
+    if (widget.prefillAssetImages != null) {
+    _prefilledAssetImages.addAll(widget.prefillAssetImages!);
+  }
     final now = DateTime.now();
     _vtUsed = 5; // mock: change this to preview the "low" / "reached" states
     _vtResetDate = DateTime(now.year, now.month + 1, 1);
@@ -552,8 +557,10 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   }
 
   // ── Design References ───────────────────────────────────────────────────────
+  // ── Design References ───────────────────────────────────────────────────────
   Widget _buildDesignReferences() {
-    final bool hasImages = _referenceImages.isNotEmpty;
+    final bool hasImages = _referenceImages.isNotEmpty || _prefilledAssetImages.isNotEmpty;
+    final int totalCount = _prefilledAssetImages.length + _referenceImages.length;
     return _sectionCard(
       title: 'Design References',
       icon: Icons.collections_outlined,
@@ -568,7 +575,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                   children: [
                     Expanded(
                       child: Text(
-                        '${_referenceImages.length} item${_referenceImages.length == 1 ? '' : 's'} added',
+                        '$totalCount item${totalCount == 1 ? '' : 's'} added',
                         style: const TextStyle(
                             fontSize: 12, color: Colors.black54),
                       ),
@@ -591,8 +598,19 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                     mainAxisSpacing: 10,
                     childAspectRatio: 1,
                   ),
-                  itemCount: _referenceImages.length,
-                  itemBuilder: (_, i) => _referenceThumb(i),
+                  itemCount: totalCount,
+                  itemBuilder: (_, i) {
+                    if (i < _prefilledAssetImages.length) {
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.asset(
+                          _prefilledAssetImages[i],
+                          fit: BoxFit.cover,
+                        ),
+                      );
+                    }
+                    return _referenceThumb(i - _prefilledAssetImages.length);
+                  },
                 ),
               ],
             )
@@ -1107,34 +1125,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Notice banner explaining order page / dress parts for fabric calculation
-          Container(
-            padding: const EdgeInsets.all(12),
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: Colors.amber.shade50,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.amber.shade200),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.info_outline, color: Colors.amber.shade800, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'If you did not come from an order page, please mention the specific dress parts you want to buy (e.g., "Dupatta, Kameez, Salwar") in the box below so the AI can estimate the correct quantities.',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.black.withAlpha(180),
-                      fontWeight: FontWeight.w500,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -1177,7 +1167,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
             controller: _customInstructionsController,
             decoration: InputDecoration(
               hintText:
-                  'Any additional instructions (optional)…',
+                  'Explain clearly your preference to get the best look and estimated required quantity..',
               hintStyle: const TextStyle(
                   fontSize: 13, color: Colors.black38),
               border: OutlineInputBorder(
