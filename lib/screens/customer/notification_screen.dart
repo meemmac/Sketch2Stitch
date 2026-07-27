@@ -79,7 +79,7 @@ final List<CustomerNotificationCardData> kCustomerDummyNotifications = [
     avatarImage: 'assets/images/lace.jpg',
     itemName: 'Wedding Sherwani',
     partyLabel: 'from',
-    partyName: 'Elegant Tailor',
+    partyName: 'Dhaka Fabric House',
     orderId: 'OR04',
     subOrderId: null,
     timeAgo: 'Yesterday',
@@ -98,7 +98,7 @@ final List<CustomerNotificationCardData> kCustomerDummyNotifications = [
 ];
 
 // ============= RETAILER NOTIFICATION =============
-enum RetailerNotificationType { orderPlaced, stockOut }
+enum RetailerNotificationType { orderPlaced, stockOut, tailorAssigned }
 
 class RetailerNotification {
   final RetailerNotificationType type;
@@ -110,6 +110,8 @@ class RetailerNotification {
   final String timeAgo;
   final bool isNew;
   final String? colorName;
+  final String? tailorName;
+  final String? deliveryDeadline;
 
   const RetailerNotification({
     required this.type,
@@ -121,6 +123,8 @@ class RetailerNotification {
     required this.timeAgo,
     this.isNew = false,
     this.colorName,
+    this.tailorName,
+    this.deliveryDeadline,
   });
 }
 
@@ -161,6 +165,30 @@ final List<RetailerNotification> kRetailerDummyNotifications = [
     orderId: 'PROD004',
     timeAgo: '1 day ago',
     colorName: 'Red',
+
+  ),
+  // ✅ New: Tailor Assigned notification
+  const RetailerNotification(
+    type: RetailerNotificationType.tailorAssigned,
+    avatarImage: 'assets/images/fab.jpg',
+    customerName: 'Sarah Ahmed',
+    itemName: 'Salwar Kameez',
+    orderId: 'OR001',
+    timeAgo: '1 hour ago',
+    isNew: true,
+    tailorName: 'Master Karim',
+    deliveryDeadline: '25 Dec 2026',
+  ),
+  RetailerNotification(
+    type: RetailerNotificationType.tailorAssigned,
+    avatarImage: 'assets/images/fab2.jpg',
+    customerName: 'Fatima Khan',
+    itemName: 'Bridal Lehenga',
+    orderId: 'OR002',
+    timeAgo: '2 hours ago',
+    isNew: true,
+    tailorName: 'Rehana Begum',
+    deliveryDeadline: '28 Dec 2026',
   ),
 ];
 
@@ -402,8 +430,16 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   }
 
   // ============= CUSTOMER CARD =============
+  // ============= CUSTOMER CARD =============
   Widget _buildCustomerCard(CustomerNotificationCardData n) {
     final style = _customerStyleFor(n.type);
+
+    // ✅ Check if notification is from a retailer
+    bool isFromRetailer = n.partyName.contains('Fabric') ||
+        n.partyName.contains('House') ||
+        n.partyName.contains('Shop') ||
+        n.partyName.contains('Store') ||
+        n.partyLabel == 'from';
 
     return Material(
       color: Colors.transparent,
@@ -439,9 +475,24 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                             style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
                             children: [
                               TextSpan(text: '${style.messagePrefix} '),
-                              TextSpan(text: n.itemName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-                              TextSpan(text: ' ${n.partyLabel} '),
-                              TextSpan(text: n.partyName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                              if (isFromRetailer) ...[
+                                // ✅ Retailer: Show only retailer name
+                                TextSpan(
+                                  text: n.partyName,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                                ),
+                              ] else ...[
+                                // ✅ Tailor: Show product name + tailor name
+                                TextSpan(
+                                  text: n.itemName,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                                ),
+                                TextSpan(text: ' ${n.partyLabel} '),
+                                TextSpan(
+                                  text: n.partyName,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                                ),
+                              ],
                               if (style.messageSuffix.isNotEmpty) TextSpan(text: style.messageSuffix),
                             ],
                           ),
@@ -579,8 +630,9 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   Widget _buildRetailerCard(RetailerNotification n) {
     final style = _retailerStyleFor(n.type);
 
-    // For stockOut, show product icon. For orderPlaced, show first letter of customer name
     bool isStockOut = n.type == RetailerNotificationType.stockOut;
+    bool isTailorAssigned = n.type == RetailerNotificationType.tailorAssigned;
+
     String firstLetter = isStockOut ? '📦' : (n.customerName.isNotEmpty ? n.customerName[0].toUpperCase() : '?');
 
     return Material(
@@ -600,9 +652,13 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                   // Avatar - shows product emoji for stockOut, first letter for customer
                   CircleAvatar(
                     radius: 22,
-                    backgroundColor: isStockOut ? Colors.red.shade200 : style.iconColor.withOpacity(0.2),
+                    backgroundColor: isStockOut
+                        ? Colors.red.shade200
+                        : (isTailorAssigned ? Colors.blue.shade200 : style.iconColor.withOpacity(0.2)),
                     child: isStockOut
                         ? const Icon(Icons.inventory_2_outlined, color: Colors.red, size: 22)
+                        : isTailorAssigned
+                        ? Icon(Icons.design_services_rounded, color: Colors.blue.shade700, size: 22)
                         : Text(
                       firstLetter,
                       style: TextStyle(
@@ -631,7 +687,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                             style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
                             children: [
                               if (isStockOut) ...[
-                                TextSpan(text: '${n.customerName} '), // Product name
+                                TextSpan(text: '${n.customerName} '),
                                 TextSpan(text: style.messageMiddle),
                                 if (n.colorName != null) ...[
                                   TextSpan(text: ' (Color: '),
@@ -639,6 +695,20 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                                   TextSpan(text: ')'),
                                 ],
                                 TextSpan(text: style.messageSuffix),
+                              ] else if (isTailorAssigned) ...[
+                                TextSpan(text: 'Order #${n.orderId} '),
+                                TextSpan(text: style.messageMiddle),
+                                TextSpan(
+                                  text: n.tailorName ?? 'a tailor',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                                ),
+                                if (n.deliveryDeadline != null) ...[
+                                  TextSpan(text: ' with deadline: '),
+                                  TextSpan(
+                                    text: n.deliveryDeadline!,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+                                  ),
+                                ],
                               ] else ...[
                                 TextSpan(text: style.messagePrefix),
                                 TextSpan(text: n.customerName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
@@ -702,6 +772,16 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
           messagePrefix: '',
           messageMiddle: ' is out of stock',
           messageSuffix: '.',
+        );
+      case RetailerNotificationType.tailorAssigned:
+        return _RetailerNotificationStyle(
+          background: const Color(0xFFD3E9F7), // Blue background
+          icon: Icons.design_services_rounded,
+          iconColor: Colors.blue.shade700,
+          title: 'Tailor Assigned',
+          messagePrefix: '',
+          messageMiddle: ' assigned to ',
+          messageSuffix: ' for order ',
         );
     }
   }
