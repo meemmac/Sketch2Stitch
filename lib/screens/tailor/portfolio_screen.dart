@@ -226,7 +226,7 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
                       ),
                     ),
                     Text(
-                      item == null ? "Add Portfolio Item" : "Edit Portfolio Item",
+                      item == null ? "Add Item" : "Edit Item",
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
@@ -399,7 +399,7 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
         backgroundColor: Colors.green.shade800,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text(
-          "Add Portfolio",
+          "Add Items",
           style: TextStyle(color: Colors.white),
         ),
       ),
@@ -436,7 +436,7 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
                   ? Center(
                       child: Text(
                         _searchQuery.isEmpty
-                            ? "No portfolio items yet"
+                            ? "No items yet"
                             : "No items match your search",
                         style: const TextStyle(
                           color: Colors.black54,
