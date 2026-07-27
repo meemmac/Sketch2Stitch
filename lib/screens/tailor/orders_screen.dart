@@ -330,16 +330,22 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                     label: "Pending",
                     isSelected: _selectedTabIndex == 0,
                     count: _pendingOrders.length,
-                    onTap: () => setState(() => _selectedTabIndex = 0),
+                    onTap: () => setState(() {
+                      _selectedTabIndex = 0;
+                      _selectedStatus = "All";
+                    }),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: _sectionToggle(
-                    label: "Current Work",
+                    label: "Ongoing",
                     isSelected: _selectedTabIndex == 1,
                     count: _currentWorkOrders.length,
-                    onTap: () => setState(() => _selectedTabIndex = 1),
+                    onTap: () => setState(() {
+                      _selectedTabIndex = 1;
+                      _selectedStatus = "All";
+                    }),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -348,7 +354,10 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                     label: "Completed",
                     isSelected: _selectedTabIndex == 2,
                     count: _completedOrders.length,
-                    onTap: () => setState(() => _selectedTabIndex = 2),
+                    onTap: () => setState(() {
+                      _selectedTabIndex = 2;
+                      _selectedStatus = "All";
+                    }),
                   ),
                 ),
               ],
@@ -486,19 +495,21 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-                const Text("Status", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: ["All", "New Request", "Accepted", "Stitching", "Ready", "Finished", "Declined"].map((status) {
-                    return _filterChip(status, _selectedStatus == status, () {
-                      setSheetState(() => _selectedStatus = status);
-                      setState(() => _selectedStatus = status);
-                    });
-                  }).toList(),
-                ),
+                if (_selectedTabIndex == 0) ...[
+                  const SizedBox(height: 24),
+                  const Text("Status", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: ["All", "New Request", "Pending Customer"].map((status) {
+                      return _filterChip(status, _selectedStatus == status, () {
+                        setSheetState(() => _selectedStatus = status);
+                        setState(() => _selectedStatus = status);
+                      });
+                    }).toList(),
+                  ),
+                ],
                 const SizedBox(height: 32),
                 SizedBox(
                   width: double.infinity,
@@ -742,8 +753,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   Icons.cancel_outlined,
                   Colors.red,
                   () {
-                    setState(() => order.status = TailorOrderStatus.cancelled);
-                    Navigator.pop(context);
+                    _showCancellationDialog(order, context, () => Navigator.pop(context));
                   },
                 ),
               ],
@@ -957,8 +967,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
         Expanded(
           child: OutlinedButton(
             onPressed: () {
-              setState(() => order.status = TailorOrderStatus.cancelled);
-              Navigator.pop(modalContext);
+              _showCancellationDialog(order, modalContext, () => Navigator.pop(modalContext));
             },
             style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.red), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             child: const Text("Decline", style: TextStyle(fontWeight: FontWeight.bold)),
@@ -1032,7 +1041,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                         ),
                         onChanged: (val) {
                           setModalState(() {
-                            item.servicePrice = double.tryParse(val) ?? item.servicePrice;
+                            item.servicePrice = double.tryParse(val) ?? 0;
                           });
                           setState(() {});
                         },
@@ -1097,7 +1106,18 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   children: [
                     const Text("Price", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
                     const SizedBox(height: 2),
-                    Text("Tk ${item.servicePrice.toInt()}", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        Text("Tk ${item.servicePrice.toInt()}", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        if (order.status == TailorOrderStatus.inProgress || order.status == TailorOrderStatus.confirmed) ...[
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () => _showPriceEditDialog(item, setModalState),
+                            child: Icon(Icons.edit, size: 14, color: primaryGreen),
+                          ),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
                 Column(
@@ -1194,6 +1214,113 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 style: TextButton.styleFrom(padding: EdgeInsets.zero, foregroundColor: primaryGreen, minimumSize: const Size(0, 0), tapTargetSize: MaterialTapTargetSize.shrinkWrap),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCancellationDialog(TailorOrder order, BuildContext context, [VoidCallback? onDone]) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Reason for Cancellation", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("Please tell us why you're declining this request. This feedback helps customers understand.", style: TextStyle(color: Colors.black54, fontSize: 12)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              maxLines: 3,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: "Write reason here...",
+                hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.red.shade200)),
+              ),
+            ),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(foregroundColor: Colors.grey.shade600, padding: const EdgeInsets.symmetric(vertical: 12)),
+                  child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    if (controller.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please provide a reason")));
+                      return;
+                    }
+                    setState(() {
+                      order.status = TailorOrderStatus.cancelled;
+                    });
+                    Navigator.pop(context);
+                    if (onDone != null) onDone();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFCC3333),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: Color(0xFF8B0000), width: 1.5),
+                    ),
+                  ),
+                  child: const Text("Submit", style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPriceEditDialog(TailorOrderItem item, StateSetter setModalState) {
+    final controller = TextEditingController(text: item.servicePrice > 0 ? item.servicePrice.toInt().toString() : "");
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Edit Stitching Price", style: TextStyle(fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: "Price (Tk)",
+            hintText: "e.g. 1500",
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          ElevatedButton(
+            onPressed: () {
+              setModalState(() {
+                item.servicePrice = double.tryParse(controller.text) ?? item.servicePrice;
+              });
+              setState(() {});
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: primaryGreen),
+            child: const Text("Save", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

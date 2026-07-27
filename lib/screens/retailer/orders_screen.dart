@@ -342,7 +342,10 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                     label: "Ongoing",
                     isSelected: _showOngoing,
                     count: _ongoingOrders.length,
-                    onTap: () => setState(() => _showOngoing = true),
+                    onTap: () => setState(() {
+                      _showOngoing = true;
+                      _selectedStatus = "All";
+                    }),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -351,7 +354,10 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                     label: "Delivered",
                     isSelected: !_showOngoing,
                     count: _deliveredOrders.length,
-                    onTap: () => setState(() => _showOngoing = false),
+                    onTap: () => setState(() {
+                      _showOngoing = false;
+                      _selectedStatus = "All";
+                    }),
                   ),
                 ),
               ],
@@ -516,24 +522,24 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-                const Text(
-                  "Status",
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: ["All", "Preparing", "Packed", "Delivered"].map((
-                    status,
-                  ) {
-                    return _filterChip(status, _selectedStatus == status, () {
-                      setSheetState(() => _selectedStatus = status);
-                      setState(() => _selectedStatus = status);
-                    });
-                  }).toList(),
-                ),
+                if (_showOngoing) ...[
+                  const SizedBox(height: 24),
+                  const Text(
+                    "Status",
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: ["All", "Preparing", "Packed"].map((status) {
+                      return _filterChip(status, _selectedStatus == status, () {
+                        setSheetState(() => _selectedStatus = status);
+                        setState(() => _selectedStatus = status);
+                      });
+                    }).toList(),
+                  ),
+                ],
                 const SizedBox(height: 32),
                 SizedBox(
                   width: double.infinity,

@@ -1,15 +1,25 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'cart_screen.dart';
 import 'tailoring_setup_screen.dart';
 import '../../models/measurement.dart';
 import 'order_session.dart';
 import 'tailoring_callbacks.dart';
+import '../../models/sub_order.dart';
+import '../../services/bkash_service.dart';
+import 'bkash_payment_screen.dart';
 
+/// ─── Checkout Screen ────────────────────────────────────────────────────
+///
+/// Pays each retailer for the CURRENT cart snapshot, then starts exactly
+/// one brand-new OrderRecord and hands off to TailoringSetupScreen for
+/// THAT order. Never touches any other existing order.
 class CheckoutScreen extends StatefulWidget {
   final List<CartLine> cartLines;
   final Map<String, RetailerInfo> retailers;
   final double grandTotal;
   final Measurement measurement;
+  final List<SubOrder> subOrders;
   final VoidCallback onOrderPlaced;
 
   const CheckoutScreen({
@@ -18,6 +28,7 @@ class CheckoutScreen extends StatefulWidget {
     required this.retailers,
     required this.grandTotal,
     required this.measurement,
+    required this.subOrders,
     required this.onOrderPlaced,
   });
 
@@ -48,37 +59,114 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _payRetailer(String retailerId) async {
     setState(() => _payingRetailerId = retailerId);
+    try {
+      final subtotal = widget.cartLines
+          .where((l) => l.retailerId == retailerId)
+          .fold<double>(0, (sum, l) => sum + l.lineTotal);
+      final amount = subtotal + _deliveryChargeFor(retailerId);
 
-    // TODO: real Payments write, targetType = 'retailer', targetId = retailerId
-    // amount should be itemsAmount + deliveryAmount (see
-    // Payments.itemsAmount / Payments.deliveryAmount in the schema) —
-    // itemsAmount = subtotal, deliveryAmount = _deliveryChargeFor(retailerId).
-    await Future.delayed(const Duration(seconds: 1));
+      // Step 1 + 2: grant token, create payment — get bkashURL.
+      final pending = await BkashService.instance.initiatePayment(
+        amount: amount,
+        invoicePrefix: 'RET_${retailerId.replaceAll(RegExp(r'[^A-Za-z0-9]'), '')}',
+      );
 
-    if (!mounted) return;
-    setState(() {
-      _paidRetailers.add(retailerId);
-      _payingRetailerId = null;
-    });
+      if (!mounted) return;
+
+      // Step 3: open bKash in an in-app WebView (auto-closes on redirect).
+      final completed = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BkashPaymentScreen(bkashURL: pending.bkashURL),
+        ),
+      );
+
+      if (!mounted) return;
+      if (completed != true) {
+        // User closed the WebView without completing payment.
+        setState(() => _payingRetailerId = null);
+        return;
+      }
+
+      // Step 4: execute payment — confirms the transaction.
+      await BkashService.instance.executePayment(
+        paymentID: pending.paymentID,
+        idToken: pending.idToken,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _paidRetailers.add(retailerId);
+        _payingRetailerId = null;
+      });
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: const Text('Payment confirmed successfully'),
+            backgroundColor: const Color(0xFF1B5E20),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+    } on BkashException catch (e) {
+      if (!mounted) return;
+      _showPaymentError(e.message);
+    } catch (e, st) {
+      // Log the real error so we can diagnose device-specific failures
+      // (e.g. SSL handshake, DNS lookup, socket timeout, etc.)
+      debugPrint('[BkashPayment] Unexpected error: $e\n$st');
+      if (!mounted) return;
+      _showPaymentError(
+        kDebugMode
+            ? 'Payment error: $e'
+            : 'Payment could not be initiated. Please try again.',
+      );
+    } finally {
+      if (mounted) setState(() => _payingRetailerId = null);
+    }
   }
 
+  void _showPaymentError(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red.shade800,
+          duration: const Duration(seconds: 5),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+  }
+
+  /// Clears the cart, starts exactly ONE new order from this checkout's
+  /// sub-orders, and navigates into that order's tailoring setup. This is
+  /// the only place a new OrderRecord gets created.
   void _continueToTailoring() {
-  widget.onOrderPlaced(); // clears the cart
+    widget.onOrderPlaced(); // clears the cart
 
-  OrderSession.instance.startOrder();
+    final order = OrderStore.instance.startOrder(widget.subOrders);
 
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(
-      builder: (_) => TailoringSetupScreen(
-        orderId: OrderSession.instance.orderId!,
-        orderDate: OrderSession.instance.orderDate!,
-        savedMeasurements: [widget.measurement],
-        callbacks: buildTailoringCallbacks(),
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TailoringSetupScreen(
+          orderId: order.orderId,
+          orderDate: order.orderDate,
+          savedMeasurements: [widget.measurement],
+          subOrders: order.subOrders, // the stamped copies, not widget.subOrders
+          callbacks: buildTailoringCallbacks(order.orderId),
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -171,8 +259,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ],
           ),
           const SizedBox(height: 14),
-          // Subtotal / delivery / payable breakdown so the per-retailer
-          // "Pay" amount isn't a mystery number.
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
@@ -185,9 +271,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 const SizedBox(height: 4),
                 _breakdownRow(
                   "Delivery charge",
-                  deliveryCharge == 0
-                      ? "Free"
-                      : "Tk ${deliveryCharge.toStringAsFixed(0)}",
+                  deliveryCharge == 0 ? "Free" : "Tk ${deliveryCharge.toStringAsFixed(0)}",
                   icon: Icons.local_shipping_outlined,
                 ),
               ],
@@ -217,8 +301,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green.shade800,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor:
-                        isPaid ? Colors.green.shade100 : Colors.grey.shade300,
+                    disabledBackgroundColor: isPaid ? Colors.green.shade100 : Colors.grey.shade300,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),

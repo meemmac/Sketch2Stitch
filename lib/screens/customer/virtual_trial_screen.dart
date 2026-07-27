@@ -9,7 +9,6 @@ import '../../widgets/dashboard_drawer.dart';
 import 'home_screen.dart';
 import 'package:gal/gal.dart';
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Colour palette & tokens
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19,6 +18,13 @@ const _sagePale = Color(0xFFEEF6F0);
 const _ink = Color(0xFF1A2C22);
 const _cardBg = Color(0xFFFBFDF9);
 const _border = Color(0xFFDDEBE3);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Virtual Trial quota (frontend-only placeholder for now)
+// TODO(backend): replace with real value pulled from Customer doc (Firestore).
+// Flat limit, no tiers — see kVirtualTrialMonthlyLimit.
+// ─────────────────────────────────────────────────────────────────────────────
+const int kVirtualTrialMonthlyLimit = 20;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Style-preference chip data
@@ -74,7 +80,9 @@ const _poseIcons = [
 // Screen widget
 // ─────────────────────────────────────────────────────────────────────────────
 class VirtualTrialScreen extends StatefulWidget {
-  const VirtualTrialScreen({super.key});
+  final List<String>?
+  prefillAssetImages; // NEW — retailer/product asset paths from Cart
+  const VirtualTrialScreen({super.key, this.prefillAssetImages});
 
   @override
   State<VirtualTrialScreen> createState() => _VirtualTrialScreenState();
@@ -87,6 +95,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
 
   // ── Design reference uploads ────────────────────────────────────────────────
   final List<XFile> _referenceImages = [];
+  final List<String> _prefilledAssetImages = [];
 
   // ── Appearance profile ──────────────────────────────────────────────────────
   final AppearanceProfile _profile = AppearanceProfile();
@@ -120,13 +129,34 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   // will hold passed garment item parts, sketches, or measurements.
   // Example call: VirtualTrialScreen(prefillGarments: ['Kameez', 'Salwar'], measurements: ...)
   // =========================================================================
-  final List<String> _prefilledGarmentParts = []; 
+  final List<String> _prefilledGarmentParts = [];
+
+  // ── Virtual Trial quota state (frontend placeholder) ───────────────────────
+  // TODO(backend): load these three from the Customer doc on init, and
+  // persist `_vtUsed` + `_vtResetDate` server-side after each successful
+  // generation instead of mutating them locally.
+  int _vtUsed = 0;
+  DateTime? _vtResetDate;
+
+  int get _vtRemaining =>
+      (kVirtualTrialMonthlyLimit - _vtUsed).clamp(0, kVirtualTrialMonthlyLimit);
+  bool get _vtLimitReached => _vtUsed >= kVirtualTrialMonthlyLimit;
 
   @override
   void initState() {
     super.initState();
     // In future dev, bind these passed values to selection controllers:
     debugPrint('Autofill parts loaded: ${_prefilledGarmentParts.length}');
+
+    // TODO(backend): replace this mock initialisation with a real fetch,
+    // e.g. `final customer = await VtUsageService.loadAndResetIfNeeded(uid);`
+    // then setState _vtUsed = customer.vtUsed, _vtResetDate = customer.vtResetDate.
+    if (widget.prefillAssetImages != null) {
+      _prefilledAssetImages.addAll(widget.prefillAssetImages!);
+    }
+    final now = DateTime.now();
+    _vtUsed = 5; // mock: change this to preview the "low" / "reached" states
+    _vtResetDate = DateTime(now.year, now.month + 1, 1);
   }
 
   // ── Generation state ────────────────────────────────────────────────────────
@@ -139,23 +169,56 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   // ── Progress tracking ──────────────────────────────────────────
   /// True once the user has tapped any appearance-profile control.
   bool _profileConfigured = false;
+
   /// True once the user has expanded the Advanced Measurements tile.
   bool _measurementsReviewed = false;
 
   // ── Scroll & Animations ──────────────────────────────────────────────────────
   final _scrollController = ScrollController();
 
-  late final AnimationController _resultAnim =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
-  late final Animation<double> _resultFade =
-      CurvedAnimation(parent: _resultAnim, curve: Curves.easeOut);
+  late final AnimationController _resultAnim = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 500),
+  );
+  late final Animation<double> _resultFade = CurvedAnimation(
+    parent: _resultAnim,
+    curve: Curves.easeOut,
+  );
 
   // ── Pick helpers ─────────────────────────────────────────────────────────────
   Future<void> _pickReferenceImages() async {
     try {
-      final List<XFile> images = await _picker.pickMultiImage();
+      final List<XFile> picked = await _picker.pickMultiImage();
+      if (picked.isEmpty) return;
+
+      const validImageExtensions = {
+        'jpg',
+        'jpeg',
+        'png',
+        'heic',
+        'heif',
+        'webp',
+        'gif',
+        'bmp',
+      };
+
+      final images = picked.where((file) {
+        final ext = file.path.split('.').last.toLowerCase();
+        return validImageExtensions.contains(ext);
+      }).toList();
+
+      final rejectedCount = picked.length - images.length;
+
       if (images.isNotEmpty) {
         setState(() => _referenceImages.addAll(images));
+      }
+
+      if (rejectedCount > 0) {
+        _showSnack(
+          rejectedCount == 1
+              ? 'Videos are not supported — 1 file was skipped.'
+              : 'Videos are not supported — $rejectedCount files were skipped.',
+        );
       }
     } catch (e) {
       if (!mounted) return;
@@ -168,18 +231,46 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
 
   void _showSnack(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  String _formatDate(DateTime? d) {
+    if (d == null) return '';
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${d.day} ${months[d.month - 1]}';
   }
 
   // ── Generation ─────────────────────────────────────────────────────────────
   Future<void> _generate() async {
+    // ── Quota guard ────────────────────────────────────────────────────────
+    // TODO(backend): re-check the real quota server-side too (don't trust
+    // client state alone), e.g. via a callable function or security rule.
+    if (_vtLimitReached) {
+      _showSnack(
+        'You\'ve used all $kVirtualTrialMonthlyLimit trials this month. '
+        'Your limit resets on ${_formatDate(_vtResetDate)}.',
+      );
+      return;
+    }
+
     const geminiKey = APIConfig.geminiApiKey;
     const hfToken = APIConfig.hfToken;
 
     if (geminiKey.isEmpty || geminiKey == 'YOUR_GEMINI_API_KEY_HERE') {
-      _showSnack(
-          'Please set your Gemini API key in lib/utils/api_config.dart');
+      _showSnack('Please set your Gemini API key in lib/utils/api_config.dart');
       return;
     }
 
@@ -246,7 +337,9 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       final selectedAssetName = 'assets/images/${mockImages.first}';
 
       // Load image bytes from Flutter asset bundle
-      final assetData = await DefaultAssetBundle.of(context).load(selectedAssetName);
+      final assetData = await DefaultAssetBundle.of(
+        context,
+      ).load(selectedAssetName);
       final imageBytes = assetData.buffer.asUint8List();
 
       if (!mounted) return;
@@ -256,17 +349,24 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         _usedProfile = profileSnapshot;
         _isLoading = false;
         _statusMessage = '';
+
+        // ── Consume one trial on success ─────────────────────────────────
+        // TODO(backend): move this increment to after a confirmed successful
+        // server-side write, e.g. `await VtUsageService.incrementUsage(uid);`
+        _vtUsed += 1;
       });
       _resultAnim.forward();
 
       // Scroll down to results
       await Future.delayed(const Duration(milliseconds: 100));
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 600),
-          curve: Curves.easeInOut,
-        ).catchError((_) {});
+        _scrollController
+            .animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeInOut,
+            )
+            .catchError((_) {});
       }
     } catch (e) {
       if (mounted) {
@@ -287,7 +387,9 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       if (!hasAccess) {
         final granted = await Gal.requestAccess();
         if (!granted) {
-          _showSnack('Gallery permission denied. Please enable permission to save.');
+          _showSnack(
+            'Gallery permission denied. Please enable permission to save.',
+          );
           return;
         }
       }
@@ -325,6 +427,8 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildHeader(),
+            const SizedBox(height: 20),
+            _buildQuotaBanner(),
             const SizedBox(height: 20),
             _buildDesignReferences(),
             const SizedBox(height: 28),
@@ -402,8 +506,11 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                   color: Colors.white.withAlpha(30),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.auto_awesome,
-                    color: Colors.white, size: 24),
+                child: const Icon(
+                  Icons.auto_awesome,
+                  color: Colors.white,
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 12),
               const Expanded(
@@ -433,9 +540,83 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     );
   }
 
+  // ── Quota banner ─────────────────────────────────────────────────────────
+  Widget _buildQuotaBanner() {
+    final remaining = _vtRemaining;
+    final resetLabel = _formatDate(_vtResetDate);
+
+    if (_vtLimitReached) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.red.shade50,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.red.shade200),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.lock_clock_rounded,
+              color: Colors.red.shade700,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Your monthly limit of $kVirtualTrialMonthlyLimit trials has ended. '
+                'It resets on $resetLabel.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.red.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final bool isLow = remaining <= 3;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isLow ? Colors.amber.shade50 : _sagePale,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: isLow ? Colors.amber.shade200 : _border),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.auto_awesome,
+            color: isLow ? Colors.amber.shade800 : _sage,
+            size: 16,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$remaining of $kVirtualTrialMonthlyLimit trial${remaining == 1 ? '' : 's'} left this month'
+              '${isLow ? ' — running low' : ''} · resets $resetLabel',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isLow ? Colors.amber.shade900 : _sageDark,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Design References ───────────────────────────────────────────────────────
   // ── Design References ───────────────────────────────────────────────────────
   Widget _buildDesignReferences() {
-    final bool hasImages = _referenceImages.isNotEmpty;
+    final bool hasImages =
+        _referenceImages.isNotEmpty || _prefilledAssetImages.isNotEmpty;
+    final int totalCount =
+        _prefilledAssetImages.length + _referenceImages.length;
     return _sectionCard(
       title: 'Design References',
       icon: Icons.collections_outlined,
@@ -450,9 +631,11 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                   children: [
                     Expanded(
                       child: Text(
-                        '${_referenceImages.length} item${_referenceImages.length == 1 ? '' : 's'} added',
+                        '$totalCount item${totalCount == 1 ? '' : 's'} added',
                         style: const TextStyle(
-                            fontSize: 12, color: Colors.black54),
+                          fontSize: 12,
+                          color: Colors.black54,
+                        ),
                       ),
                     ),
                     _smallButton(
@@ -466,15 +649,25 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 3,
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 10,
                     childAspectRatio: 1,
                   ),
-                  itemCount: _referenceImages.length,
-                  itemBuilder: (_, i) => _referenceThumb(i),
+                  itemCount: totalCount,
+                  itemBuilder: (_, i) {
+                    if (i < _prefilledAssetImages.length) {
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.asset(
+                          _prefilledAssetImages[i],
+                          fit: BoxFit.cover,
+                        ),
+                      );
+                    }
+                    return _referenceThumb(i - _prefilledAssetImages.length);
+                  },
                 ),
               ],
             )
@@ -487,28 +680,30 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 decoration: BoxDecoration(
                   color: _sagePale,
                   borderRadius: BorderRadius.circular(14),
-                  border:
-                      Border.all(color: _sage.withAlpha(90), width: 1.5),
+                  border: Border.all(color: _sage.withAlpha(90), width: 1.5),
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Icon(Icons.add_photo_alternate_outlined,
-                        color: _sage, size: 32),
+                    Icon(
+                      Icons.add_photo_alternate_outlined,
+                      color: _sage,
+                      size: 32,
+                    ),
                     const SizedBox(height: 6),
                     const Text(
                       'Tap to add design references',
                       style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black45),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black45,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     const Text(
                       'garments · fabrics · sketches · patterns · accessories',
-                      style:
-                          TextStyle(fontSize: 10, color: Colors.black38),
+                      style: TextStyle(fontSize: 10, color: Colors.black38),
                     ),
                   ],
                 ),
@@ -539,8 +734,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 shape: BoxShape.circle,
               ),
               padding: const EdgeInsets.all(3),
-              child: const Icon(Icons.close,
-                  size: 13, color: Colors.white),
+              child: const Icon(Icons.close, size: 13, color: Colors.white),
             ),
           ),
         ),
@@ -618,11 +812,16 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
             label: 'Skin Tone',
             child: _swatchRow(
               items: _skinSwatches
-                  .map((s) => (s.$1, s.$2 == _profile.skinTone,
+                  .map(
+                    (s) => (
+                      s.$1,
+                      s.$2 == _profile.skinTone,
                       () => setState(() {
-                            _profile.skinTone = s.$2;
-                            _profileConfigured = true;
-                          })))
+                        _profile.skinTone = s.$2;
+                        _profileConfigured = true;
+                      }),
+                    ),
+                  )
                   .toList(),
               tooltip: (i) => _skinSwatches[i].$2.label,
               bordered: (i) => _skinSwatches[i].$2 == SkinTone.fair,
@@ -653,7 +852,9 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 child: _chipRow(
                   values: HairStyle.values,
                   labels: (v) => v.label,
-                  selected: (v) => _profile.hairLength != HairLength.bald && _profile.hairStyle == v,
+                  selected: (v) =>
+                      _profile.hairLength != HairLength.bald &&
+                      _profile.hairStyle == v,
                   onTap: (v) => setState(() {
                     _profile.hairStyle = v;
                     _profileConfigured = true;
@@ -670,14 +871,19 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _swatchRow(
-                  items: _hairSwatches.take(3).map((s) => (
-                    s.$1,
-                    _profile.hairColor == s.$2,
-                    () => setState(() {
-                      _profile.hairColor = s.$2;
-                      _profileConfigured = true;
-                    })
-                  )).toList(),
+                  items: _hairSwatches
+                      .take(3)
+                      .map(
+                        (s) => (
+                          s.$1,
+                          _profile.hairColor == s.$2,
+                          () => setState(() {
+                            _profile.hairColor = s.$2;
+                            _profileConfigured = true;
+                          }),
+                        ),
+                      )
+                      .toList(),
                   tooltip: (i) => _hairSwatches[i].$2.label,
                   bordered: (i) => false,
                 ),
@@ -697,21 +903,38 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: _profile.hairColor == HairColor.colorful ? _sage : _border,
-                            width: _profile.hairColor == HairColor.colorful ? 2 : 1,
+                            color: _profile.hairColor == HairColor.colorful
+                                ? _sage
+                                : _border,
+                            width: _profile.hairColor == HairColor.colorful
+                                ? 2
+                                : 1,
                           ),
                           gradient: const SweepGradient(
-                            colors: [Colors.red, Colors.yellow, Colors.blue, Colors.red],
+                            colors: [
+                              Colors.red,
+                              Colors.yellow,
+                              Colors.blue,
+                              Colors.red,
+                            ],
                           ),
                         ),
                         child: _profile.hairColor == HairColor.colorful
-                            ? const Icon(Icons.check, size: 12, color: Colors.white)
+                            ? const Icon(
+                                Icons.check,
+                                size: 12,
+                                color: Colors.white,
+                              )
                             : null,
                       ),
                       const SizedBox(width: 8),
                       const Text(
                         'Other Custom Color',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black54),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black54,
+                        ),
                       ),
                     ],
                   ),
@@ -723,9 +946,16 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                     child: TextField(
                       controller: _customHairColorController,
                       decoration: InputDecoration(
-                        hintText: 'Enter hair color (e.g. Auburn, Silver, Pink)...',
-                        hintStyle: const TextStyle(fontSize: 12, color: Colors.black38),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        hintText:
+                            'Enter hair color (e.g. Auburn, Silver, Pink)...',
+                        hintStyle: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.black38,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: const BorderSide(color: _border),
@@ -770,27 +1000,23 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                         decoration: BoxDecoration(
                           color: selected ? _sage : _sagePale,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                              color: selected
-                                  ? _sage
-                                  : _border),
+                          border: Border.all(color: selected ? _sage : _border),
                         ),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(pi.$1,
-                                size: 20,
-                                color: selected
-                                    ? Colors.white
-                                    : _sage),
+                            Icon(
+                              pi.$1,
+                              size: 20,
+                              color: selected ? Colors.white : _sage,
+                            ),
                             Text(
                               pi.$2.displayName,
                               style: TextStyle(
-                                  fontSize: 8,
-                                  color: selected
-                                      ? Colors.white
-                                      : Colors.black54,
-                                  fontWeight: FontWeight.w600),
+                                fontSize: 8,
+                                color: selected ? Colors.white : Colors.black54,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ],
                         ),
@@ -807,9 +1033,8 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
             label: 'Expression',
             child: _chipRow(
               values: FacialExpression.values,
-              labels: (v) => v == FacialExpression.neutral
-                  ? '😐 Neutral'
-                  : '😊 Smile',
+              labels: (v) =>
+                  v == FacialExpression.neutral ? '😐 Neutral' : '😊 Smile',
               selected: (v) => _profile.expression == v,
               onTap: (v) => setState(() {
                 _profile.expression = v;
@@ -828,8 +1053,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                   spacing: 6,
                   runSpacing: 6,
                   children: ModelAccessory.values.map((acc) {
-                    final selected =
-                        _profile.accessories.contains(acc);
+                    final selected = _profile.accessories.contains(acc);
                     return GestureDetector(
                       onTap: () => setState(() {
                         if (selected) {
@@ -842,21 +1066,20 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 180),
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: selected ? _sage : _sagePale,
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                              color: selected ? _sage : _border),
+                          border: Border.all(color: selected ? _sage : _border),
                         ),
                         child: Text(
                           acc.label,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: selected
-                                ? Colors.white
-                                : Colors.black54,
+                            color: selected ? Colors.white : Colors.black54,
                           ),
                         ),
                       ),
@@ -869,9 +1092,16 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                   child: TextField(
                     controller: _customAccessoriesController,
                     decoration: InputDecoration(
-                      hintText: 'Other custom accessories (e.g. Earrings, Bracelet, Tiara)...',
-                      hintStyle: const TextStyle(fontSize: 12, color: Colors.black38),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      hintText:
+                          'Other custom accessories (e.g. Earrings, Bracelet, Tiara)...',
+                      hintStyle: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black38,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: const BorderSide(color: _border),
@@ -906,12 +1136,9 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         border: Border.all(color: _border),
       ),
       child: Theme(
-        data: Theme.of(context).copyWith(
-          dividerColor: Colors.transparent,
-        ),
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          tilePadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           leading: Container(
             padding: const EdgeInsets.all(7),
@@ -919,8 +1146,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
               color: _sagePale,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.straighten_rounded,
-                color: _sage, size: 18),
+            child: const Icon(Icons.straighten_rounded, color: _sage, size: 18),
           ),
           title: const Text(
             'Advanced Measurements',
@@ -961,7 +1187,9 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                             borderRadius: BorderRadius.circular(10),
                           ),
                           contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 14),
+                            horizontal: 12,
+                            vertical: 14,
+                          ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
                             borderSide: const BorderSide(color: _sage),
@@ -989,34 +1217,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Notice banner explaining order page / dress parts for fabric calculation
-          Container(
-            padding: const EdgeInsets.all(12),
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: Colors.amber.shade50,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.amber.shade200),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.info_outline, color: Colors.amber.shade800, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'If you did not come from an order page, please mention the specific dress parts you want to buy (e.g., "Dupatta, Kameez, Salwar") in the box below so the AI can estimate the correct quantities.',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.black.withAlpha(180),
-                      fontWeight: FontWeight.w500,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -1033,21 +1233,20 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 7),
+                    horizontal: 12,
+                    vertical: 7,
+                  ),
                   decoration: BoxDecoration(
                     color: selected ? _sage : _sagePale,
                     borderRadius: BorderRadius.circular(22),
-                    border: Border.all(
-                        color: selected ? _sage : _border),
+                    border: Border.all(color: selected ? _sage : _border),
                   ),
                   child: Text(
                     chip,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: selected
-                          ? Colors.white
-                          : Colors.black54,
+                      color: selected ? Colors.white : Colors.black54,
                     ),
                   ),
                 ),
@@ -1059,9 +1258,8 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
             controller: _customInstructionsController,
             decoration: InputDecoration(
               hintText:
-                  'Any additional instructions (optional)…',
-              hintStyle: const TextStyle(
-                  fontSize: 13, color: Colors.black38),
+                  'Describe your preferences and garment parts (e.g. "Kameez, Dupatta") for the best look and an accurate fabric estimation.',
+              hintStyle: const TextStyle(fontSize: 12, color: Colors.black38),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(color: _border),
@@ -1075,7 +1273,9 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 borderSide: const BorderSide(color: _sage),
               ),
               contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 12),
+                horizontal: 14,
+                vertical: 12,
+              ),
             ),
             maxLines: 3,
             style: const TextStyle(fontSize: 13),
@@ -1093,14 +1293,13 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         child: Column(
           children: [
             const CircularProgressIndicator(
-                valueColor:
-                    AlwaysStoppedAnimation<Color>(_sage)),
+              valueColor: AlwaysStoppedAnimation<Color>(_sage),
+            ),
             const SizedBox(height: 12),
             Text(
               _statusMessage,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                  color: _sage, fontWeight: FontWeight.w600),
+              style: const TextStyle(color: _sage, fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -1129,25 +1328,34 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
 
   // ── Generate button ─────────────────────────────────────────────────────────
   Widget _buildGenerateButton() {
+    final limitReached = _vtLimitReached;
+    final disabled = _isLoading || limitReached;
+
     return SizedBox(
       height: 54,
       child: ElevatedButton.icon(
         style: ElevatedButton.styleFrom(
-          backgroundColor: _isLoading ? _sage.withAlpha(120) : _sage,
+          backgroundColor: disabled ? _sage.withAlpha(120) : _sage,
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14)),
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
-        onPressed: _isLoading ? null : _generate,
-        icon: const Icon(Icons.auto_awesome_rounded,
-            color: Colors.white),
+        onPressed: disabled ? null : _generate,
+        icon: Icon(
+          limitReached ? Icons.lock_clock_rounded : Icons.auto_awesome_rounded,
+          color: Colors.white,
+        ),
         label: Text(
-          _isLoading ? 'Generating…' : 'Generate AI Preview',
+          limitReached
+              ? 'Limit Reached · Resets ${_formatDate(_vtResetDate)}'
+              : (_isLoading ? 'Generating…' : 'Generate AI Preview'),
           style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: Colors.white),
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
         ),
       ),
     );
@@ -1212,8 +1420,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
           const SizedBox(height: 16),
 
           // Fabric ledger
-          if (_fabricEstimates != null)
-            _buildFabricLedger(_fabricEstimates!),
+          if (_fabricEstimates != null) _buildFabricLedger(_fabricEstimates!),
         ],
       ),
     );
@@ -1226,15 +1433,17 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       ('Body Shape', p.bodyShape.label),
       ('Height', p.height.label),
       ('Skin Tone', p.skinTone.label),
-      ('Hair',
-          '${p.hairLength.label} ${p.hairStyle.label} ${p.hairColor.label}'),
+      (
+        'Hair',
+        '${p.hairLength.label} ${p.hairStyle.label} ${p.hairColor.label}',
+      ),
       ('Pose', p.pose.displayName),
       ('Expression', p.expression.label),
       (
         'Accessories',
         p.accessories.isEmpty
             ? 'None'
-            : p.accessories.map((a) => a.label).join(', ')
+            : p.accessories.map((a) => a.label).join(', '),
       ),
     ];
 
@@ -1250,8 +1459,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         children: [
           Row(
             children: [
-              const Icon(Icons.person_pin_rounded,
-                  color: _sage, size: 18),
+              const Icon(Icons.person_pin_rounded, color: _sage, size: 18),
               const SizedBox(width: 8),
               const Text(
                 'Model Summary',
@@ -1264,34 +1472,36 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
             ],
           ),
           const SizedBox(height: 12),
-          ...rows.map((row) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 110,
-                      child: Text(
-                        row.$1,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.black45,
-                          fontWeight: FontWeight.w500,
-                        ),
+          ...rows.map(
+            (row) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 110,
+                    child: Text(
+                      row.$1,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black45,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                    Expanded(
-                      child: Text(
-                        row.$2,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: _ink,
-                        ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      row.$2,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _ink,
                       ),
                     ),
-                  ],
-                ),
-              )),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1309,7 +1519,11 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706), size: 20),
+            const Icon(
+              Icons.warning_amber_rounded,
+              color: Color(0xFFD97706),
+              size: 20,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -1339,8 +1553,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         children: [
           Row(
             children: const [
-              Icon(Icons.content_cut_rounded,
-                  color: _sageDark, size: 18),
+              Icon(Icons.content_cut_rounded, color: _sageDark, size: 18),
               SizedBox(width: 8),
               Text(
                 'Estimated Fabric Required',
@@ -1361,9 +1574,10 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 child: Text(
                   e.value,
                   style: const TextStyle(
-                      fontSize: 11,
-                      color: Colors.black45,
-                      fontStyle: FontStyle.italic),
+                    fontSize: 11,
+                    color: Colors.black45,
+                    fontStyle: FontStyle.italic,
+                  ),
                 ),
               );
             }
@@ -1381,17 +1595,18 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                   Text(
                     e.key,
                     style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: _ink),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: _ink,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Wrap(
                     spacing: 6,
                     runSpacing: 4,
                     children: parts.map((part) {
-                      final isInch   = part.toLowerCase().contains('inch');
-                      final isGauge  = part.toLowerCase().contains('gauge');
+                      final isInch = part.toLowerCase().contains('inch');
+                      final isGauge = part.toLowerCase().contains('gauge');
                       Color bg, border, fg;
                       if (isInch) {
                         bg = const Color(0xFFE8F0FE);
@@ -1408,7 +1623,9 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                       }
                       return Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: bg,
                           borderRadius: BorderRadius.circular(8),
@@ -1476,8 +1693,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
@@ -1544,8 +1760,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
           onTap: () => onTap(v),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: sel ? _sage : _sagePale,
               borderRadius: BorderRadius.circular(20),
@@ -1591,8 +1806,8 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                     color: selected
                         ? _sage
                         : (bordered?.call(i) ?? false)
-                            ? Colors.grey.shade300
-                            : Colors.transparent,
+                        ? Colors.grey.shade300
+                        : Colors.transparent,
                     width: selected ? 3 : 1.5,
                   ),
                   boxShadow: selected
@@ -1601,13 +1816,12 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                             color: _sage.withAlpha(100),
                             blurRadius: 8,
                             spreadRadius: 1,
-                          )
+                          ),
                         ]
                       : null,
                 ),
                 child: selected
-                    ? const Icon(Icons.check,
-                        size: 15, color: Colors.white)
+                    ? const Icon(Icons.check, size: 15, color: Colors.white)
                     : null,
               ),
             ),
@@ -1626,8 +1840,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 10, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
           color: _sagePale,
           borderRadius: BorderRadius.circular(10),

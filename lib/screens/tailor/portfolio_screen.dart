@@ -139,8 +139,7 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
         ? decoded
               .whereType<Map>()
               .map(
-                (entry) =>
-                    Portfolio.fromMap(Map<String, dynamic>.from(entry)),
+                (entry) => Portfolio.fromMap(Map<String, dynamic>.from(entry)),
               )
               .toList()
         : _seedItems();
@@ -173,9 +172,7 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
   void _openDetails(Portfolio item) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => PortfolioDetailsScreen(item: item),
-      ),
+      MaterialPageRoute(builder: (_) => PortfolioDetailsScreen(item: item)),
     );
   }
 
@@ -226,7 +223,7 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
                       ),
                     ),
                     Text(
-                      item == null ? "Add Item" : "Edit Item",
+                      item == null ? "Add Work Item" : "Edit Work Item",
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
@@ -283,7 +280,10 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
                               : ClipRRect(
                                   borderRadius: BorderRadius.circular(15),
                                   child: isAsset
-                                      ? Image.asset(imagePath, fit: BoxFit.cover)
+                                      ? Image.asset(
+                                          imagePath,
+                                          fit: BoxFit.cover,
+                                        )
                                       : Image.file(
                                           File(imagePath),
                                           fit: BoxFit.cover,
@@ -343,7 +343,7 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
                             }
                             _gridAnimationSeed++;
                           });
-                          await _savePortfolio();
+                          await _savePortfolio(); // ← this writes items to SharedPreferences
                           if (item == null) {
                             WidgetsBinding.instance.addPostFrameCallback(
                               (_) => _animateToNewestItem(),
@@ -353,7 +353,7 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
                           Navigator.of(context).pop();
                         },
                         child: Text(
-                          item == null ? "Add Item" : "Save Changes",
+                          item == null ? "Add" : "Save Changes",
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,
@@ -398,10 +398,7 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
         onPressed: () => _showPortfolioForm(),
         backgroundColor: Colors.green.shade800,
         icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          "Add Items",
-          style: TextStyle(color: Colors.white),
-        ),
+        label: const Text("Add Work", style: TextStyle(color: Colors.white)),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),

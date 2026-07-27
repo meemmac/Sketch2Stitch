@@ -359,7 +359,7 @@ class _CustomerReviewsScreenState extends State<CustomerReviewsScreen> {
             "\"${review.comment}\"",
             style: const TextStyle(fontSize: 14, height: 1.5, fontStyle: FontStyle.italic),
           ),
-          if (review.products.isNotEmpty) ...[
+          if (review.products.isNotEmpty && review.recipientType != ReviewRecipient.tailor) ...[
             const SizedBox(height: 16),
             const Text(
               "Related Items",

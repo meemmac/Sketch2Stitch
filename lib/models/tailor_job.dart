@@ -8,12 +8,28 @@ enum TailorJobStatus {
   quoted,
   confirmed,
   expired,
-  cancelled;
+  cancelled,
+  tailorDeclined;
 
-  String get toValue => name;
+  String get toValue => const {
+    TailorJobStatus.pending: 'pending',
+    TailorJobStatus.rejected: 'rejected',
+    TailorJobStatus.quoted: 'quoted',
+    TailorJobStatus.confirmed: 'confirmed',
+    TailorJobStatus.expired: 'expired',
+    TailorJobStatus.cancelled: 'cancelled',
+    TailorJobStatus.tailorDeclined: 'tailor_declined',
+  }[this]!;
 
-  static TailorJobStatus fromValue(String v) =>
-      TailorJobStatus.values.byName(v);
+  static TailorJobStatus fromValue(String v) => const {
+    'pending': TailorJobStatus.pending,
+    'rejected': TailorJobStatus.rejected,
+    'quoted': TailorJobStatus.quoted,
+    'confirmed': TailorJobStatus.confirmed,
+    'expired': TailorJobStatus.expired,
+    'cancelled': TailorJobStatus.cancelled,
+    'tailor_declined': TailorJobStatus.tailorDeclined,
+  }[v] ?? TailorJobStatus.pending;
 }
 
 enum QuoteStatus {
@@ -47,6 +63,15 @@ enum TailorPaymentStatus {
       TailorPaymentStatus.values.byName(v);
 }
 
+/// One tailor job per ORDER — covers every sub-order (every retailer's
+/// items) in that order under a single tailor, single quote, single
+/// estimated delivery date. Matches the DB schema: `Tailor-jobs` has an
+/// `orderId` field but no `subOrderId` field.
+///
+/// REMOVED: `subOrderId`. It was previously added to let one order have
+/// multiple independent per-retailer tailor jobs, but that's not how the
+/// schema or the product flow actually work — a customer picks ONE
+/// tailor for the whole order, not one per retailer.
 class TailorJob {
   final String id;
   final String orderId;
@@ -116,6 +141,8 @@ class TailorJob {
         return 'Expired';
       case TailorJobStatus.cancelled:
         return 'Cancelled';
+          case TailorJobStatus.tailorDeclined:
+      return 'Declined by Tailor';
     }
   }
 

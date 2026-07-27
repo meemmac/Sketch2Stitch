@@ -1,44 +1,84 @@
 import 'order_session.dart';
 import 'tailoring_setup_screen.dart';
 
-TailoringSetupCallbacks buildTailoringCallbacks() {
-  final session = OrderSession.instance;
+/// Builds the backend-sync callbacks for a specific order. Every callback
+/// closes over `orderId`, so `TailoringSetupScreen` never needs to know
+/// about `OrderStore` directly — it only reports what happened.
+///
+/// One tailor job per ORDER (not per sub-order) — matches the Tailor-jobs
+/// schema, which has an orderId field but no subOrderId field.
+///
+/// Matches the "tailor submits quote" workflow: the TAILOR calls
+/// OrderStore.submitTailorQuote() from their own screen to set
+/// quoteAmount / estimatedDeliveryDate / deliverCharge on the job. The
+/// CUSTOMER only ever accepts or declines what's already there — neither
+/// onConfirmTailorJob nor onRejectTailorJob takes any values from the
+/// customer anymore.
+TailoringSetupCallbacks buildTailoringCallbacks(String orderId) {
+  final store = OrderStore.instance;
 
   return TailoringSetupCallbacks(
     onSkipTailoring: () async {
-      session.setSkippedTailoring();
+      store.setSkippedTailoring(orderId);
     },
     onContinueToTailor: (deadline) async {
-      session.setAwaitingTailorSearch(deadline);
+      store.setAwaitingTailorSearch(orderId, deadline);
     },
     onCreateTailorJob: ({
-      required measurementId,
-      required designIds,
-      required tailorId,
-      required instructions,
+      required String measurementId,
+      required List<String> designIds,
+      required String tailorId,
+      required String instructions,
     }) async {
-      session.createTailorJob(tailorId: tailorId);
-      return session.tailorJobId!;
+      final job = store.createTailorJob(
+        orderId: orderId,
+        tailorId: tailorId,
+        measurementId: measurementId,
+        designIds: designIds,
+        specialInstructions: instructions,
+      );
+      return job.tailorJobId;
     },
-    onPayTailor: (tailorJobId) async {
-      session.completeOrder();
+    onConfirmTailorJob: () async {
+      // No values passed in — the tailor already submitted quoteAmount /
+      // estimatedDeliveryDate / deliverCharge via submitTailorQuote() on
+      // their own screen. The customer is only locking in what's already
+      // on the job; confirmTailorJob(orderId) reads it straight off.
+      store.confirmTailorJob(orderId);
+    },
+    onRejectTailorJob: () async {
+      // No reason required — the customer can simply decline the
+      // tailor's quote without justifying it.
+      store.rejectTailorJob(orderId);
+    },
+   onPayTailor: () async {
+      // No-op now — OrderStore.confirmTailorJob() sets payment to 'paid'
+      // and completes the order atomically. This callback stays wired
+      // in case any code path still calls it, but there's nothing left
+      // for it to do against the store.
     },
     onTailorSearchExpired: () async {
-      session.setTailorSearchExpired();
+      store.expireTailorSearch(orderId);
     },
     onFetchResumeState: () async {
-      if (session.orderId == null) return null;
-      if (session.tailorJobId == null) return null; // no job yet — let screen start at step 0/local progress
+      final order = store.get(orderId);
+      if (order == null) return null;
+      final job = order.tailorJob;
+
       return OrderResumeState(
-        tailorSelectionDeadline: session.tailorSelectionDeadline,
-        tailorJobId: session.tailorJobId,
-        tailorId: session.tailorId,
-        status: session.tailorJobStatus,
-        requestedAt: session.tailorJobRequestedAt,
-        quoteAmount: session.quoteAmount,
-        estimatedDeliveryDate: session.estimatedDeliveryDate,
-        rejectionReason: session.rejectionReason,
+        tailorSelectionDeadline: order.tailorSelectionDeadline,
+        tailorJobId: job?.tailorJobId,
+        tailorId: job?.tailorId,
+        status: job?.status,
+        requestedAt: job?.requestedAt,
+        quoteAmount: job?.quoteAmount,
+        deliverCharge: job?.deliverCharge,
+        estimatedDeliveryDate: job?.estimatedDeliveryDate,
+        rejectionReason: job?.rejectionReason, 
+        tailorPaymentStatus: job?.tailorPaymentStatus, // NEW
       );
     },
   );
 }
+
+
