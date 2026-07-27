@@ -46,7 +46,7 @@ final List<CustomerNotificationCardData> kCustomerDummyNotifications = [
     avatarImage: 'assets/images/fab.jpg',
     itemName: 'Salwar Kameez',
     partyLabel: 'confirmed by',
-    partyName: 'Rahman Tailors',
+    partyName: 'Rahman Readymade House',
     orderId: 'OR01',
     subOrderId: null,
     timeAgo: '2 hours ago',
@@ -518,7 +518,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
               if (n.type == NotificationType.delivered)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: Text('Please review from orders', style: TextStyle(fontSize: 12, color: Colors.blue.shade700, fontWeight: FontWeight.w500)),
+                  child: Text('Please review on orders', style: TextStyle(fontSize: 12, color: Colors.blue.shade700, fontWeight: FontWeight.w500)),
                 ),
             ],
           ),
