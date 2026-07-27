@@ -469,31 +469,26 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                       child: Column(
                         children: [
                           CareInstructionRow(
-                            icon: Icons.wash,
                             label: "Machine Washable",
                             isOk: _canMachineWash(),
                             info: "Indicates whether the garment can be safely washed in a washing machine and the recommended washing conditions. Following these instructions helps maintain the fabric's quality, color, and shape.",
                           ),
                           CareInstructionRow(
-                            icon: Icons.biotech,
                             label: "Bleach Allowed",
                             isOk: _canBleach(),
                             info: "Indicates whether bleach can be safely used on the fabric. Some materials may fade, weaken, or become damaged when exposed to bleach.",
                           ),
                           CareInstructionRow(
-                            icon: Icons.dry_cleaning,
                             label: "Dry Clean Only",
                             isOk: _canDryClean(),
                             info: "Indicates whether the garment should be professionally cleaned using special solvents instead of water. This method is recommended for delicate fabrics or garments with special finishes.",
                           ),
                           CareInstructionRow(
-                            icon: Icons.settings_input_component,
                             label: "Tumble Dry",
                             isOk: _canTumbleDry(),
                             info: "Tumble drying is the process of drying clothes in a clothes dryer (dryer machine) instead of hanging them to air dry. It indicates whether the garment is suitable for tumble drying and the recommended heat setting. Using the wrong drying method may cause shrinking or fabric damage.",
                           ),
                           CareInstructionRow(
-                            icon: Icons.iron,
                             label: "Iron Level",
                             isOk: true,
                             value: _getIronLevel(),
@@ -685,43 +680,43 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
     );
   }
 
-  Widget _careInfoRow(
-    IconData icon,
-    String label,
-    bool isOk, {
-    String? trailing,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: isOk ? Colors.green : Colors.grey),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: isOk ? Colors.black87 : Colors.grey),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Flexible(
-            child: Text(
-              trailing ?? (isOk ? "Yes" : "No"),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: isOk ? Colors.green.shade800 : Colors.grey,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // Widget _careInfoRow(
+  //   IconData icon,
+  //   String label,
+  //   bool isOk, {
+  //   String? trailing,
+  // }) {
+  //   return Padding(
+  //     padding: const EdgeInsets.only(bottom: 10),
+  //     child: Row(
+  //       children: [
+  //         Icon(icon, size: 20, color: isOk ? Colors.green : Colors.grey),
+  //         const SizedBox(width: 12),
+  //         Expanded(
+  //           child: Text(
+  //             label,
+  //             maxLines: 1,
+  //             overflow: TextOverflow.ellipsis,
+  //             style: TextStyle(color: isOk ? Colors.black87 : Colors.grey),
+  //           ),
+  //         ),
+  //         const SizedBox(width: 12),
+  //         Flexible(
+  //           child: Text(
+  //             trailing ?? (isOk ? "Yes" : "No"),
+  //             maxLines: 1,
+  //             overflow: TextOverflow.ellipsis,
+  //             textAlign: TextAlign.right,
+  //             style: TextStyle(
+  //               fontWeight: FontWeight.bold,
+  //               color: isOk ? Colors.green.shade800 : Colors.grey,
+  //             ),
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   bool _canMachineWash() {
     final careSymbols = widget.product.careSymbol.map((s) => s.toLowerCase()).toList();
