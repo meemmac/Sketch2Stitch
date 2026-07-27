@@ -32,7 +32,7 @@ class CustomerReview {
     required this.dateLabel,
     required this.createdAt,
     required this.comment,
-    required this.products,
+    this.products = const [],
     required this.helpfulCount,
     this.isHelpful = false,
   });
@@ -80,6 +80,7 @@ class _CustomerReviewsScreenState extends State<CustomerReviewsScreen> {
         ReviewProduct(name: "Printed Voile", image: "assets/images/gorgeous.jpg", price: 3200),
       ],
     ),
+    // Tailors don't sell products, so no `products` list is provided here.
     CustomerReview(
       recipientName: "Master Tailor Ahmed",
       recipientType: ReviewRecipient.tailor,
@@ -88,9 +89,6 @@ class _CustomerReviewsScreenState extends State<CustomerReviewsScreen> {
       createdAt: DateTime.now().subtract(const Duration(days: 7)),
       comment: "The stitching is perfect and fits me exactly as I wanted. Highly recommended!",
       helpfulCount: 2,
-      products: const [
-        ReviewProduct(name: "Stitching Service - Kurti", image: "assets/images/ref2.jpg", price: 1500),
-      ],
     ),
     CustomerReview(
       recipientName: "Bismillah Fabrics",
@@ -124,9 +122,6 @@ class _CustomerReviewsScreenState extends State<CustomerReviewsScreen> {
       createdAt: DateTime.now().subtract(const Duration(days: 60)),
       comment: "Best tailor experience ever. The fit is top-notch.",
       helpfulCount: 3,
-      products: const [
-        ReviewProduct(name: "Stitching Service - Lehenga", image: "assets/images/ref1.jpg", price: 4000),
-      ],
     ),
   ];
 
@@ -299,7 +294,8 @@ class _CustomerReviewsScreenState extends State<CustomerReviewsScreen> {
 
   Widget _buildReviewItem(CustomerReview review) {
     final themeColor = review.recipientType == ReviewRecipient.tailor ? Colors.orange : Colors.blue;
-    
+    final isTailor = review.recipientType == ReviewRecipient.tailor;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -324,7 +320,7 @@ class _CustomerReviewsScreenState extends State<CustomerReviewsScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  review.recipientType == ReviewRecipient.tailor ? "Tailor" : "Retailer",
+                  isTailor ? "Tailor" : "Retailer",
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
@@ -359,7 +355,9 @@ class _CustomerReviewsScreenState extends State<CustomerReviewsScreen> {
             "\"${review.comment}\"",
             style: const TextStyle(fontSize: 14, height: 1.5, fontStyle: FontStyle.italic),
           ),
-          if (review.products.isNotEmpty && review.recipientType != ReviewRecipient.tailor) ...[
+          // Related Items are only shown for retailers — tailors don't have
+          // an associated product list, so this block is skipped entirely for them.
+          if (!isTailor && review.products.isNotEmpty) ...[
             const SizedBox(height: 16),
             const Text(
               "Related Items",
@@ -399,8 +397,10 @@ class _CustomerReviewsScreenState extends State<CustomerReviewsScreen> {
               width: 50,
               height: 50,
               fit: BoxFit.cover,
-              errorBuilder: (_,__,___) => Container(
-                width: 50, height: 50, color: Colors.grey[200],
+              errorBuilder: (_, __, ___) => Container(
+                width: 50,
+                height: 50,
+                color: Colors.grey[200],
                 child: const Icon(Icons.shopping_bag, size: 20),
               ),
             ),
