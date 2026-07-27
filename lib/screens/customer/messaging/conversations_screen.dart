@@ -980,6 +980,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     widget.currentUserRole == UserRole.customer
         ? tailorRetailerContacts
         : customerContacts;
+    String searchQuery = '';
 
     showModalBottomSheet(
       context: context,
@@ -990,8 +991,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
-            String searchQuery = '';
-            
             List filteredContacts = contacts.where((contact) {
               final name = contact['name'].toLowerCase();
               final phone = contact['phone'].toLowerCase();
