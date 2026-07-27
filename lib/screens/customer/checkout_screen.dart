@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'cart_screen.dart';
 import 'tailoring_setup_screen.dart';
@@ -114,9 +115,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } on BkashException catch (e) {
       if (!mounted) return;
       _showPaymentError(e.message);
-    } catch (e) {
+    } catch (e, st) {
+      // Log the real error so we can diagnose device-specific failures
+      // (e.g. SSL handshake, DNS lookup, socket timeout, etc.)
+      debugPrint('[BkashPayment] Unexpected error: $e\n$st');
       if (!mounted) return;
-      _showPaymentError('Payment could not be initiated. Please try again.');
+      _showPaymentError(
+        kDebugMode
+            ? 'Payment error: $e'
+            : 'Payment could not be initiated. Please try again.',
+      );
     } finally {
       if (mounted) setState(() => _payingRetailerId = null);
     }

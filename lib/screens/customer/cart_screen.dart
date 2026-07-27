@@ -5,6 +5,7 @@ import 'browsing/browse_shell.dart';
 import 'order_session.dart';
 import 'running_orders_screen.dart';
 import '../../models/sub_order.dart';
+import 'virtual_trial_screen.dart';
 
 /// ─── Local Cart Models ──────────────────────────────────────────────────
 ///
@@ -734,6 +735,37 @@ class _CartScreenState extends State<CartScreen> {
                     ],
                   ),
                 ],
+              ),
+            ),
+            // ── Virtual Trial CTA — per whole order (all cart lines) ─────────
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _cartLines.isEmpty
+                      ? null
+                      : () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => VirtualTrialScreen(
+                                prefillAssetImages:
+                                    _cartLines.map((l) => l.image).toList(),
+                              ),
+                            ),
+                          ),
+                  icon: const Icon(Icons.auto_awesome, size: 16, color: Colors.green),
+                  label: const Text(
+                    "See how you'll look with this!",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.green.shade800,
+                    side: BorderSide(color: Colors.green.shade300),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
               ),
             ),
             Row(
