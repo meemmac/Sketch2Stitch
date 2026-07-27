@@ -193,7 +193,7 @@ final List<RetailerNotification> kRetailerDummyNotifications = [
 ];
 
 // ============= TAILOR NOTIFICATION =============
-enum TailorNotificationType { newOrder, orderConfirmationReminder, deliveryDeadline }
+enum TailorNotificationType { newOrder, orderConfirmationReminder, deliveryDeadline,orderCancelledByCustomer }
 
 class TailorNotification {
   final TailorNotificationType type;
@@ -205,6 +205,7 @@ class TailorNotification {
   final String timeAgo;
   final bool isNew;
   final String? deadlineDate;
+  final String? cancelReason;
 
   const TailorNotification({
     required this.type,
@@ -216,6 +217,7 @@ class TailorNotification {
     required this.timeAgo,
     this.isNew = false,
     this.deadlineDate,
+    this.cancelReason,
   });
 }
 
@@ -246,6 +248,16 @@ final List<TailorNotification> kTailorDummyNotifications = [
     timeAgo: '5 hours ago',
     isNew: true,
     deadlineDate: '2026-07-20',
+  ),
+  const TailorNotification(
+    type: TailorNotificationType.orderCancelledByCustomer,
+    avatarImage: 'assets/images/fab2.jpg',
+    customerName: 'Fatima Khan',
+    itemName: 'Bridal Lehenga',
+    orderId: 'OR002',
+    timeAgo: '1 hour ago',
+    isNew: true,
+    cancelReason: 'The stitching cost too high. We are looking for more affordable tailor.',
   ),
 ];
 
@@ -429,7 +441,6 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     }
   }
 
-  // ============= CUSTOMER CARD =============
   // ============= CUSTOMER CARD =============
   Widget _buildCustomerCard(CustomerNotificationCardData n) {
     final style = _customerStyleFor(n.type);
@@ -787,11 +798,13 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   }
 
   // ============= TAILOR CARD =============
+  // ============= TAILOR CARD =============
   Widget _buildTailorCard(TailorNotification n) {
     final style = _tailorStyleFor(n.type);
 
     // Get first letter of customer name for avatar
     String firstLetter = n.customerName.isNotEmpty ? n.customerName[0].toUpperCase() : '?';
+    bool isCancelled = n.type == TailorNotificationType.orderCancelledByCustomer;
 
     return Material(
       color: Colors.transparent,
@@ -807,16 +820,18 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Avatar with first letter of customer name
+                  // ✅ Avatar with first letter of customer name (for cancellation too)
                   CircleAvatar(
                     radius: 22,
-                    backgroundColor: style.iconColor.withOpacity(0.2),
+                    backgroundColor: isCancelled
+                        ? Colors.red.shade100
+                        : style.iconColor.withOpacity(0.2),
                     child: Text(
                       firstLetter,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: style.iconColor,
+                        color: isCancelled ? Colors.red.shade700 : style.iconColor,
                       ),
                     ),
                   ),
@@ -839,20 +854,41 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                             style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
                             children: [
                               TextSpan(text: style.messagePrefix),
-                              TextSpan(text: n.customerName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                              TextSpan(
+                                text: n.customerName,
+                                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                              ),
                               TextSpan(text: style.messageMiddle),
-                              TextSpan(text: n.itemName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                              TextSpan(
+                                text: n.itemName,
+                                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                              ),
                               if (style.messageSuffix.isNotEmpty) TextSpan(text: style.messageSuffix),
                               if (n.type == TailorNotificationType.deliveryDeadline && n.deadlineDate != null) ...[
-                                TextSpan(text: ' Deadline: ${n.deadlineDate}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                                TextSpan(
+                                  text: ' Deadline: ${n.deadlineDate}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+                                ),
                               ],
                               if (n.type == TailorNotificationType.newOrder) ...[
-                                TextSpan(text: ' ',),
-                                TextSpan(text: 'View Order', style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
+                                TextSpan(
+                                  text: ' View Order',
+                                  style: TextStyle(
+                                    color: Colors.blue.shade700,
+                                    fontWeight: FontWeight.bold,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
                               ],
                               if (n.type == TailorNotificationType.orderConfirmationReminder) ...[
-                                TextSpan(text: ' ',),
-                                TextSpan(text: 'Confirm Now', style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
+                                TextSpan(
+                                  text: ' Confirm Now',
+                                  style: TextStyle(
+                                    color: Colors.blue.shade700,
+                                    fontWeight: FontWeight.bold,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
                               ],
                             ],
                           ),
@@ -863,14 +899,138 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              _buildTailorFooter(n),
+              if (isCancelled)
+                _buildCancelledFooter(n)
+              else
+                _buildTailorFooter(n),
             ],
           ),
         ),
       ),
     );
   }
+  Widget _buildCancelledFooter(TailorNotification n) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text('Order ID: ${n.orderId}', style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
+        Row(
+          children: [
+            OutlinedButton(
+              onPressed: () => _showTailorCancelReasonDialog(n),
+              style: OutlinedButton.styleFrom(
+                backgroundColor: Colors.white,
+                side: BorderSide.none,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text('View Reason', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.black87)),
+            ),
+            const SizedBox(width: 10),
+            Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withOpacity(0.45)),
+            const SizedBox(width: 4),
+            Text(n.timeAgo, style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
+          ],
+        ),
+      ],
+    );
+  }
+  void _showTailorCancelReasonDialog(TailorNotification n) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        alignment: Alignment.center,
+        insetPadding: const EdgeInsets.all(20),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header with close button
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Cancellation Reason',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
 
+              // Reason container
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7D6D6).withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFFF7D6D6).withOpacity(0.5),
+                  ),
+                ),
+                child: Text(
+                  n.cancelReason ?? 'Customer cancelled the order.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: Colors.black.withOpacity(0.8),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Close button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Close',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
   Widget _buildTailorFooter(TailorNotification n) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -890,11 +1050,45 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   _TailorNotificationStyle _tailorStyleFor(TailorNotificationType type) {
     switch (type) {
       case TailorNotificationType.newOrder:
-        return _TailorNotificationStyle(background: const Color(0xFFCDEFD3), icon: Icons.shopping_cart_rounded, iconColor: Colors.green.shade800, title: 'New Order Received', messagePrefix: '', messageMiddle: ' placed a new order for ', messageSuffix: '.');
+        return _TailorNotificationStyle(
+          background: const Color(0xFFCDEFD3),
+          icon: Icons.shopping_cart_rounded,
+          iconColor: Colors.green.shade800,
+          title: 'New Order Received',
+          messagePrefix: '',
+          messageMiddle: ' placed a new order for ',
+          messageSuffix: '.',
+        );
       case TailorNotificationType.orderConfirmationReminder:
-        return _TailorNotificationStyle(background: const Color(0xFFF7D6D6), icon: Icons.warning_rounded, iconColor: Colors.red.shade700, title: 'Confirm Order', messagePrefix: '', messageMiddle: '\'s order for ', messageSuffix: ' will be cancelled if not confirmed.');
+        return _TailorNotificationStyle(
+          background: const Color(0xFFF7D6D6),
+          icon: Icons.warning_rounded,
+          iconColor: Colors.red.shade700,
+          title: 'Confirm Order',
+          messagePrefix: '',
+          messageMiddle: '\'s order for ',
+          messageSuffix: ' will be cancelled if not confirmed.',
+        );
       case TailorNotificationType.deliveryDeadline:
-        return _TailorNotificationStyle(background: const Color(0xFFFBE7C0), icon: Icons.timer_rounded, iconColor: Colors.orange.shade800, title: 'Delivery Deadline Approaching', messagePrefix: 'Order from ', messageMiddle: ' for ', messageSuffix: ' is approaching deadline.');
+        return _TailorNotificationStyle(
+          background: const Color(0xFFFBE7C0),
+          icon: Icons.timer_rounded,
+          iconColor: Colors.orange.shade800,
+          title: 'Delivery Deadline Approaching',
+          messagePrefix: 'Order from ',
+          messageMiddle: ' for ',
+          messageSuffix: ' is approaching deadline.',
+        );
+      case TailorNotificationType.orderCancelledByCustomer:
+        return _TailorNotificationStyle(
+          background: const Color(0xFFF7D6D6),
+          icon: Icons.cancel_rounded,
+          iconColor: Colors.red.shade700,
+          title: 'Order Cancelled by Customer',
+          messagePrefix: '',
+          messageMiddle: '\'s order for ',
+          messageSuffix: ' has been cancelled.',
+        );
     }
   }
 }
