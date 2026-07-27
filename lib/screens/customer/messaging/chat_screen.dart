@@ -995,26 +995,37 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       backgroundColor: const Color(0xFFECE5DD),
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
         ),
         title: Row(
           children: [
+            // ✅ Avatar - Show first letter for Customer, image for others
             CircleAvatar(
               radius: 20,
-              backgroundColor: Colors.grey[300],
-              backgroundImage: widget.otherUserAvatar != null
+              backgroundColor: widget.otherUserRole == UserRole.customer
+                  ? Colors.grey[300]
+                  : Colors.grey[200],
+              backgroundImage: (widget.otherUserRole != UserRole.customer &&
+                  widget.otherUserAvatar != null &&
+                  widget.otherUserAvatar!.isNotEmpty)
                   ? AssetImage(widget.otherUserAvatar!)
                   : null,
-              child: widget.otherUserAvatar == null
+              child: (widget.otherUserRole == UserRole.customer ||
+                  widget.otherUserAvatar == null ||
+                  widget.otherUserAvatar!.isEmpty)
                   ? Text(
-                      widget.otherUserName.isNotEmpty ? widget.otherUserName[0] : '?',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2C5C44),
-                      ),
-                    )
+                widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : '?',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: widget.otherUserRole == UserRole.customer
+                      ? Colors.grey[700]
+                      : const Color(0xFF2C5C44),
+                ),
+              )
                   : null,
             ),
             const SizedBox(width: 12),
@@ -1056,47 +1067,47 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
           ),
         ],
       ),
-      body: _isBlocked 
+      body: _isBlocked
           ? _buildBlockedScreen()
           : Column(
-              children: [
-                Expanded(
-                  child: _isLoading
-                      ? const Center(
-                          child: CircularProgressIndicator(
-                            color: Color(0xFF2C5C44),
-                          ),
-                        )
-                      : _messages.isEmpty
-                          ? _buildEmptyChat()
-                          : ListView.builder(
-                              controller: _scrollController,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                              itemCount: _messages.length + (_isTyping ? 1 : 0),
-                              itemBuilder: (context, index) {
-                                if (_isTyping && index == _messages.length) {
-                                  return _buildTypingIndicator();
-                                }
-                                final message = _messages[index];
-                                final isFromMe = message.senderId == widget.customerId;
-                                final bool showDate = index == 0 || 
-                                    _messages[index - 1].sentAt.day != message.sentAt.day;
-                                return Column(
-                                  children: [
-                                    if (showDate) _buildDateDivider(message.sentAt),
-                                    _buildMessageBubble(message, isFromMe),
-                                  ],
-                                );
-                              },
-                            ),
-                ),
-                
-                if (_replyingToMessageId != null)
-                  _buildReplyIndicator(),
-                
-                _buildMessageInput(),
-              ],
+        children: [
+          Expanded(
+            child: _isLoading
+                ? const Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFF2C5C44),
+              ),
+            )
+                : _messages.isEmpty
+                ? _buildEmptyChat()
+                : ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              itemCount: _messages.length + (_isTyping ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (_isTyping && index == _messages.length) {
+                  return _buildTypingIndicator();
+                }
+                final message = _messages[index];
+                final isFromMe = message.senderId == widget.customerId;
+                final bool showDate = index == 0 ||
+                    _messages[index - 1].sentAt.day != message.sentAt.day;
+                return Column(
+                  children: [
+                    if (showDate) _buildDateDivider(message.sentAt),
+                    _buildMessageBubble(message, isFromMe),
+                  ],
+                );
+              },
             ),
+          ),
+
+          if (_replyingToMessageId != null)
+            _buildReplyIndicator(),
+
+          _buildMessageInput(),
+        ],
+      ),
     );
   }
 
