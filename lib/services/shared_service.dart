@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/conversation.dart';
