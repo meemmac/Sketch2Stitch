@@ -16,7 +16,9 @@ class InventoryService {
   // ─── getProducts ──────────────────────────────────────────────────────────
 
   /// Fetches inventory with search, category, and pagination support.
+  /// Now scoped to a specific [retailerId] to match the Inventory Screen logic.
   Future<List<Product>> getProducts({
+    String? retailerId,
     String? category,
     String? searchQuery,
     DocumentSnapshot? lastDocument,
@@ -24,6 +26,10 @@ class InventoryService {
   }) async {
     try {
       Query query = _db.collection(_productsCollection);
+
+      if (retailerId != null && retailerId.isNotEmpty) {
+        query = query.where('retailerId', isEqualTo: retailerId);
+      }
 
       if (category != null && category.isNotEmpty) {
         query = query.where('category', isEqualTo: category);
@@ -51,6 +57,20 @@ class InventoryService {
       debugPrint('Error fetching products: $e');
       return [];
     }
+  }
+
+  // ─── streamRetailerProducts ───────────────────────────────────────────────
+
+  /// Real-time stream of products for a specific retailer.
+  /// Recommended for the Inventory Screen to show stock changes immediately.
+  Stream<List<Product>> streamRetailerProducts(String retailerId) {
+    return _db
+        .collection(_productsCollection)
+        .where('retailerId', isEqualTo: retailerId)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => Product.fromJson({...doc.data(), 'id': doc.id}))
+            .toList());
   }
 
   // ─── createProduct ────────────────────────────────────────────────────────
@@ -140,14 +160,18 @@ class InventoryService {
 
   // ─── getLowStockProducts ──────────────────────────────────────────────────
 
-  /// List low stock products (<5).
-  Future<List<Product>> getLowStockProducts({int threshold = 5}) async {
+  /// List low stock products (<5) for a specific [retailerId].
+  Future<List<Product>> getLowStockProducts(String retailerId, {int threshold = 5}) async {
     try {
-      // Fetches all and filters client-side due to Firestore nested array limitations.
-      final snapshot = await _db.collection(_productsCollection).get();
+      // Fetches retailer-specific products and filters client-side 
+      // due to Firestore nested array limitations.
+      final snapshot = await _db
+          .collection(_productsCollection)
+          .where('retailerId', isEqualTo: retailerId)
+          .get();
 
       final products = snapshot.docs
-          .map((doc) => Product.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
+          .map((doc) => Product.fromJson({...doc.data(), 'id': doc.id}))
           .toList();
 
       return products.where((product) {
