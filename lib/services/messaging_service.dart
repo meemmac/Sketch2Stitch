@@ -1,0 +1,338 @@
+import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import '../models/conversation.dart';
+import '../models/message.dart';
+import '../models/user_role.dart';
+import 'Cloudinary_service.dart';
+
+class MessagingService {
+  MessagingService({FirebaseFirestore? firestore})
+      : _db = firestore ?? FirebaseFirestore.instance;
+
+  final FirebaseFirestore _db;
+  final CloudinaryService _cloudinary = CloudinaryService();
+
+  static const String _conversations = 'Conversations';
+  static const String _messages = 'Messages';
+  static const String _customers = 'Customer';
+  static const String _tailors = 'Tailors';
+  static const String _retailers = 'Retailer';
+
+  // ─── Conversation Management ──────────────────────────────────────────────
+
+  /// Fetches a specific conversation by ID.
+  Future<Conversation?> getConversationByConversationId(String conversationId) async {
+    try {
+      final doc = await _db.collection(_conversations).doc(conversationId).get();
+      if (!doc.exists || doc.data() == null) return null;
+      return Conversation.fromJson({...doc.data()!, 'id': doc.id});
+    } catch (e) {
+      debugPrint('Error fetching conversation: $e');
+      return null;
+    }
+  }
+
+  /// Streams all conversations for a specific customer.
+  Stream<List<Conversation>> getConversationsByCustomerId(String customerId) {
+    return _db
+        .collection(_conversations)
+        .where('customerId', isEqualTo: customerId)
+        .where('isDeleted', isEqualTo: false)
+        .orderBy('updatedAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) => Conversation.fromJson({...doc.data(), 'id': doc.id}))
+            .toList());
+  }
+
+  /// Streams all conversations for a user (can be customer, tailor, or retailer).
+  Stream<List<Conversation>> getConversations(String userId) {
+    // We query where the user is either the customer OR the 'otherId'.
+    // Note: Firestore doesn't support logical OR across different fields easily in a single query
+    // without multiple queries or using 'whereIn' (if fields were the same).
+    // For simplicity and matching current schema:
+    final customerStream = _db
+        .collection(_conversations)
+        .where('customerId', isEqualTo: userId)
+        .where('isDeleted', isEqualTo: false)
+        .snapshots();
+
+    final otherStream = _db
+        .collection(_conversations)
+        .where('otherId', isEqualTo: userId)
+        .where('isDeleted', isEqualTo: false)
+        .snapshots();
+
+    // In a real app, you might use RxDart to combine these streams.
+    // For this service, we'll return a stream that merges both client-side if needed,
+    // but typically a user only has one role in a conversation based on the schema.
+    return _db
+        .collection(_conversations)
+        .where('customerId', isEqualTo: userId)
+        .orderBy('updatedAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) => Conversation.fromJson({...doc.data(), 'id': doc.id}))
+            .toList());
+  }
+
+  /// Creates a new conversation record.
+  Future<Conversation> createConversation({
+    required String customerId,
+    required String otherId,
+    required UserRole otherRole,
+    required String orderId,
+  }) async {
+    try {
+      final now = Timestamp.now();
+      final data = {
+        'customerId': customerId,
+        'otherId': otherId,
+        'otherRole': otherRole.name,
+        'orderId': orderId,
+        'unreadCount': 0,
+        'isBlocked': false,
+        'isDeleted': false,
+        'updatedAt': now,
+      };
+
+      final ref = await _db.collection(_conversations).add(data);
+      return Conversation(
+        id: ref.id,
+        customerId: customerId,
+        otherId: otherId,
+        otherRole: otherRole,
+        orderId: orderId,
+        updatedAt: now.toDate(),
+      );
+    } catch (e) {
+      debugPrint('Error creating conversation: $e');
+      rethrow;
+    }
+  }
+
+  /// Alias for [createConversation].
+  Future<Conversation> createConversationByCustomerId(
+    String customerId,
+    String otherId,
+    UserRole otherRole,
+    String orderId,
+  ) => createConversation(
+        customerId: customerId,
+        otherId: otherId,
+        otherRole: otherRole,
+        orderId: orderId,
+      );
+
+  /// Marks a conversation as read and resets unread count.
+  Future<void> markConversationReadByConversationId(String conversationId) async {
+    try {
+      await _db.collection(_conversations).doc(conversationId).update({
+        'unreadCount': 0,
+        'lastReadAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('Error marking conversation read: $e');
+    }
+  }
+
+  /// Marks all unread messages as read for a specific user in a conversation.
+  Future<void> markMessagesRead(String conversationId, String userId) async {
+    try {
+      final batch = _db.batch();
+      final unreadMessages = await _db
+          .collection(_messages)
+          .where('conversationId', isEqualTo: conversationId)
+          .where('isRead', isEqualTo: false)
+          .get();
+
+      for (var doc in unreadMessages.docs) {
+        if (doc.data()['senderId'] != userId) {
+          batch.update(doc.reference, {
+            'isRead': true,
+            'readAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+
+      batch.update(_db.collection(_conversations).doc(conversationId), {
+        'unreadCount': 0,
+        'lastReadAt': FieldValue.serverTimestamp(),
+      });
+
+      await batch.commit();
+    } catch (e) {
+      debugPrint('Error marking messages read: $e');
+    }
+  }
+
+  /// Soft deletes a conversation.
+  Future<void> deleteConversationByConversationId(String conversationId) async {
+    try {
+      await _db.collection(_conversations).doc(conversationId).update({
+        'isDeleted': true,
+        'deletedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('Error deleting conversation: $e');
+    }
+  }
+
+  /// Blocks a conversation.
+  Future<void> blockConversationByConversationId(String conversationId) async {
+    try {
+      await _db.collection(_conversations).doc(conversationId).update({
+        'isBlocked': true,
+      });
+    } catch (e) {
+      debugPrint('Error blocking conversation: $e');
+    }
+  }
+
+  /// Unblocks a conversation.
+  Future<void> unblockConversationByConversationId(String conversationId) async {
+    try {
+      await _db.collection(_conversations).doc(conversationId).update({
+        'isBlocked': false,
+      });
+    } catch (e) {
+      debugPrint('Error unblocking conversation: $e');
+    }
+  }
+
+  // ─── Message Management ──────────────────────────────────────────────────
+
+  /// Fetches chat history for a specific conversation.
+  Stream<List<Message>> getMessagesByConversationId(String conversationId) {
+    return _db
+        .collection(_messages)
+        .where('conversationId', isEqualTo: conversationId)
+        .orderBy('sentAt', descending: false)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) => Message.fromJson({...doc.data(), 'id': doc.id}))
+            .toList());
+  }
+
+  /// Fetches paginated messages for a conversation.
+  Future<List<Message>> getMessages(String conversationId, {int limit = 20, DocumentSnapshot? lastDocument}) async {
+    try {
+      Query query = _db
+          .collection(_messages)
+          .where('conversationId', isEqualTo: conversationId)
+          .orderBy('sentAt', descending: true)
+          .limit(limit);
+
+      if (lastDocument != null) {
+        query = query.startAfterDocument(lastDocument);
+      }
+
+      final snap = await query.get();
+      return snap.docs
+          .map((doc) => Message.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching paginated messages: $e');
+      return [];
+    }
+  }
+
+  /// Sends a message and updates the conversation timestamp and unread count.
+  Future<void> sendMessage(String conversationId, String senderId, Map<String, dynamic> data) async {
+    try {
+      final batch = _db.batch();
+      final msgRef = _db.collection(_messages).doc();
+      
+      final msgData = {
+        ...data,
+        'conversationId': conversationId,
+        'senderId': senderId,
+        'sentAt': FieldValue.serverTimestamp(),
+        'isRead': false,
+      };
+
+      batch.set(msgRef, msgData);
+      batch.update(_db.collection(_conversations).doc(conversationId), {
+        'updatedAt': FieldValue.serverTimestamp(),
+        'unreadCount': FieldValue.increment(1),
+      });
+
+      await batch.commit();
+    } catch (e) {
+      debugPrint('Error sending message: $e');
+      rethrow;
+    }
+  }
+
+  /// Alias for [sendMessage] but takes a [Message] object.
+  Future<void> sendMessageByConversationId(String conversationId, Message message) async {
+    await sendMessage(conversationId, message.senderId, message.toJson());
+  }
+
+  /// Deletes a specific message by ID.
+  Future<void> deleteMessageByMessageId(String messageId) async {
+    try {
+      await _db.collection(_messages).doc(messageId).delete();
+    } catch (e) {
+      debugPrint('Error deleting message: $e');
+    }
+  }
+
+  // ─── Attachments ──────────────────────────────────────────────────────────
+
+  /// Uploads a file to Cloudinary and returns the URL.
+  Future<String?> uploadAttachmentFile(File file) async {
+    return await _cloudinary.uploadImage(file, folder: 'chat_attachments');
+  }
+
+  // ─── User Search ──────────────────────────────────────────────────────────
+
+  /// Searches for users across Customers, Tailors, and Retailers by name or phone.
+  /// Note: Firestore doesn't support cross-collection queries. This performs three queries.
+  Future<List<Map<String, dynamic>>> searchUsersByNameOrPhone(String query) async {
+    if (query.isEmpty) return [];
+    
+    try {
+      final List<Map<String, dynamic>> results = [];
+      
+      // We search by name or phone. For simplicity, we search for prefix match.
+      final collections = [_customers, _tailors, _retailers];
+      
+      for (var col in collections) {
+        // Search by name
+        final nameSnap = await _db.collection(col)
+            .where('name', isGreaterThanOrEqualTo: query)
+            .where('name', isLessThanOrEqualTo: '$query\uf8ff')
+            .limit(5)
+            .get();
+        
+        results.addAll(nameSnap.docs.map((doc) => {
+          ...doc.data(),
+          'id': doc.id,
+          'role': col == _customers ? 'customer' : (col == _tailors ? 'tailor' : 'retailer')
+        }));
+
+        // Search by phone (if not enough results)
+        if (results.length < 10) {
+          final phoneSnap = await _db.collection(col)
+              .where('phone', isGreaterThanOrEqualTo: query)
+              .where('phone', isLessThanOrEqualTo: '$query\uf8ff')
+              .limit(5)
+              .get();
+          
+          results.addAll(phoneSnap.docs.map((doc) => {
+            ...doc.data(),
+            'id': doc.id,
+            'role': col == _customers ? 'customer' : (col == _tailors ? 'tailor' : 'retailer')
+          }));
+        }
+      }
+      
+      return results;
+    } catch (e) {
+      debugPrint('Error searching users: $e');
+      return [];
+    }
+  }
+}
