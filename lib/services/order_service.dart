@@ -4,6 +4,7 @@ import '../models/order.dart';
 import '../models/sub_order.dart';
 import '../models/order_item.dart';
 import '../models/tailor_job.dart';
+import '../models/review.dart';
 
 class OrderService {
   OrderService({FirebaseFirestore? firestore})
@@ -15,6 +16,8 @@ class OrderService {
   static const String _subOrdersCollection = 'Sub-orders';
   static const String _orderItemsCollection = 'Order-Items';
   static const String _tailorJobsCollection = 'Tailor-jobs';
+  static const String _reviewsCollection = 'Reviews';
+  static const String _paymentsCollection = 'Payments';
 
   // ─── fetchCustomerOrders ───────────────────────────────────────────────────
 
@@ -127,6 +130,88 @@ class OrderService {
       });
     } catch (e) {
       debugPrint('Error updating tailor request status: $e');
+      rethrow;
+    }
+  }
+
+  // ─── submitReview ─────────────────────────────────────────────────────────
+
+  /// Submits a review for an order recipient (tailor or retailer).
+  Future<void> submitReview({
+    required String orderId,
+    required String recipientId,
+    required double rating,
+    required String comment,
+    required ReviewTargetRole type,
+    String? customerId,
+  }) async {
+    try {
+      String actualCustomerId = customerId ?? '';
+      
+      // If customerId not provided, fetch from Order
+      if (actualCustomerId.isEmpty) {
+        final orderDoc = await _db.collection(_ordersCollection).doc(orderId).get();
+        if (orderDoc.exists) {
+          actualCustomerId = orderDoc.data()?['customerId'] ?? '';
+        }
+      }
+
+      if (actualCustomerId.isEmpty) {
+        throw Exception('Customer ID is required to submit a review');
+      }
+
+      final data = {
+        'orderId': orderId,
+        'customerId': actualCustomerId,
+        'targetId': recipientId,
+        'rating': rating,
+        'comment': comment,
+        'targetRole': type.name,
+        'createdAt': DateTime.now().toIso8601String(),
+      };
+
+      await _db.collection(_reviewsCollection).add(data);
+    } catch (e) {
+      debugPrint('Error submitting review: $e');
+      rethrow;
+    }
+  }
+
+  // ─── getOrderDetails ──────────────────────────────────────────────────────
+
+  /// Alias for fetching full order details.
+  Future<Order?> getOrderDetails(String orderId) => fetchOrderDetails(orderId);
+
+  // ─── cancelOrder ──────────────────────────────────────────────────────────
+
+  /// Cancels an order and marks associated payments as refunded/failed.
+  Future<void> cancelOrder(String orderId) async {
+    try {
+      final batch = _db.batch();
+
+      // 1. Update Order status
+      batch.update(_db.collection(_ordersCollection).doc(orderId), {
+        'status': OrderStatus.cancelled.toValue,
+      });
+
+      // 2. Handle Payments
+      final paymentsSnap = await _db
+          .collection(_paymentsCollection)
+          .where('orderId', isEqualTo: orderId)
+          .get();
+
+      for (var doc in paymentsSnap.docs) {
+        final status = doc.data()['status'];
+        if (status == PaymentStatus.pending.toValue) {
+          batch.update(doc.reference, {'status': PaymentStatus.failed.toValue});
+        } else if (status == PaymentStatus.completed.toValue) {
+          batch.update(doc.reference, {'status': PaymentStatus.refunded.toValue});
+        }
+      }
+
+      await batch.commit();
+    } catch (e) {
+      debugPrint('Error cancelling order: $e');
       rethrow;
     }
   }
