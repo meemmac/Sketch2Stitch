@@ -323,4 +323,140 @@ class OrderService {
       return false;
     }
   }
+
+  // ─── Tailor Order Functions ─────────────────────────────────────────────
+
+  /// Fetches jobs/orders assigned to a specific tailor.
+  Future<List<TailorJob>> fetchTailorOrders(String tailorId) async {
+    try {
+      final snapshot = await _db
+          .collection(_tailorJobsCollection)
+          .where('tailorId', isEqualTo: tailorId)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => TailorJob.fromJson({...doc.data(), 'id': doc.id}))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching tailor orders: $e');
+      return [];
+    }
+  }
+
+  /// Accepts a tailor job request and sets initial terms.
+  Future<void> acceptTailorJob(String orderId, double servicePrice, DateTime estimatedDate) async {
+    try {
+      final snap = await _db
+          .collection(_tailorJobsCollection)
+          .where('orderId', isEqualTo: orderId)
+          .limit(1)
+          .get();
+
+      if (snap.docs.isEmpty) throw Exception('Tailor job not found');
+
+      await snap.docs.first.reference.update({
+        'status': TailorJobStatus.confirmed.toValue,
+        'quoteAmount': servicePrice,
+        'estimatedDeliveryDate': estimatedDate.toIso8601String(),
+        'confirmedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('Error accepting tailor job: $e');
+      rethrow;
+    }
+  }
+
+  /// Declines a tailor job request.
+  Future<void> declineTailorJob(String orderId, String reason) async {
+    try {
+      final snap = await _db
+          .collection(_tailorJobsCollection)
+          .where('orderId', isEqualTo: orderId)
+          .limit(1)
+          .get();
+
+      if (snap.docs.isEmpty) throw Exception('Tailor job not found');
+
+      await snap.docs.first.reference.update({
+        'status': TailorJobStatus.tailorDeclined.toValue,
+        'rejectionReason': reason,
+      });
+    } catch (e) {
+      debugPrint('Error declining tailor job: $e');
+      rethrow;
+    }
+  }
+
+  /// Updates work progress for a tailor job.
+  Future<void> updateWorkProgress(String orderId, String status) async {
+    try {
+      final snap = await _db
+          .collection(_tailorJobsCollection)
+          .where('orderId', isEqualTo: orderId)
+          .limit(1)
+          .get();
+
+      if (snap.docs.isEmpty) throw Exception('Tailor job not found');
+
+      await snap.docs.first.reference.update({
+        'status': status.toLowerCase(),
+      });
+    } catch (e) {
+      debugPrint('Error updating work progress: $e');
+      rethrow;
+    }
+  }
+
+  /// Updates pricing or delivery terms for a job.
+  Future<void> editStitchingTerms(String orderId, double newPrice, DateTime newDate) async {
+    try {
+      final snap = await _db
+          .collection(_tailorJobsCollection)
+          .where('orderId', isEqualTo: orderId)
+          .limit(1)
+          .get();
+
+      if (snap.docs.isEmpty) throw Exception('Tailor job not found');
+
+      await snap.docs.first.reference.update({
+        'quoteAmount': newPrice,
+        'estimatedDeliveryDate': newDate.toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Error editing stitching terms: $e');
+      rethrow;
+    }
+  }
+
+  /// Gets analytical stats for a tailor.
+  Future<Map<String, dynamic>> getTailorJobStats(String tailorId) async {
+    try {
+      final jobs = await fetchTailorOrders(tailorId);
+      
+      double totalEarnings = 0;
+      int activeJobs = 0;
+      int pendingRequests = 0;
+
+      for (var job in jobs) {
+        if (job.status == TailorJobStatus.confirmed) {
+          activeJobs++;
+          if (job.tailorPaymentStatus == TailorPaymentStatus.paid) {
+            totalEarnings += job.quoteAmount ?? 0;
+          }
+        } else if (job.status == TailorJobStatus.pending || job.status == TailorJobStatus.quoted) {
+          pendingRequests++;
+        }
+      }
+
+      return {
+        'totalJobs': jobs.length,
+        'activeJobs': activeJobs,
+        'pendingRequests': pendingRequests,
+        'totalEarnings': totalEarnings,
+      };
+    } catch (e) {
+      debugPrint('Error getting tailor job stats: $e');
+      return {};
+    }
+  }
 }
