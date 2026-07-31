@@ -46,7 +46,8 @@ class MessagingService {
             .toList());
   }
 
-  /// Streams all conversations for a user (can be customer, tailor, or retailer).
+  /// Streams all conversations for a user.
+  /// Handles both 'customerId' and 'otherId' fields to ensure all roles see their chats.
   Stream<List<Conversation>> getConversations(String userId) {
     // We query where the user is either the customer OR the 'otherId'.
     // Note: Firestore doesn't support logical OR across different fields easily in a single query
@@ -64,17 +65,76 @@ class MessagingService {
         .where('isDeleted', isEqualTo: false)
         .snapshots();
 
-    // In a real app, you might use RxDart to combine these streams.
-    // For this service, we'll return a stream that merges both client-side if needed,
-    // but typically a user only has one role in a conversation based on the schema.
+    // We combine the snapshots and merge them client-side.
+    // In a production app, you might use RxDart's CombineLatest or similar.
+    return customerStream.asyncMap((customerSnap) async {
+      final otherSnap = await _db
+          .collection(_conversations)
+          .where('otherId', isEqualTo: userId)
+          .where('isDeleted', isEqualTo: false)
+          .get();
+
+      final allDocs = [...customerSnap.docs, ...otherSnap.docs];
+      
+      final conversations = allDocs.map((doc) {
+        return Conversation.fromJson({...doc.data(), 'id': doc.id});
+      }).toList();
+
+      // Sort by updatedAt descending
+      conversations.sort((a, b) {
+        final dateA = a.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final dateB = b.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return dateB.compareTo(dateA);
+      });
+
+      return conversations;
+    });
+  }
+
+  /// Fetches an existing conversation between two users for a specific order.
+  Future<Conversation?> getConversationBetween(String customerId, String otherId, {String? orderId}) async {
+    try {
+      Query query = _db.collection(_conversations)
+          .where('customerId', isEqualTo: customerId)
+          .where('otherId', isEqualTo: otherId);
+      
+      if (orderId != null) {
+        query = query.where('orderId', isEqualTo: orderId);
+      }
+
+      final snap = await query.limit(1).get();
+      if (snap.docs.isEmpty) return null;
+      
+      return Conversation.fromJson({...snap.docs.first.data() as Map<String, dynamic>, 'id': snap.docs.first.id});
+    } catch (e) {
+      debugPrint('Error fetching conversation between users: $e');
+      return null;
+    }
+  }
+
+  // ─── Typing Status ────────────────────────────────────────────────────────
+
+  /// Sets the typing status for a user in a conversation.
+  Future<void> setTypingStatus(String conversationId, String userId, bool isTyping) async {
+    try {
+      await _db.collection(_conversations).doc(conversationId).collection('TypingStatus').doc(userId).set({
+        'isTyping': isTyping,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('Error setting typing status: $e');
+    }
+  }
+
+  /// Streams the typing status of the other user in a conversation.
+  Stream<bool> streamTypingStatus(String conversationId, String otherUserId) {
     return _db
         .collection(_conversations)
-        .where('customerId', isEqualTo: userId)
-        .orderBy('updatedAt', descending: true)
+        .doc(conversationId)
+        .collection('TypingStatus')
+        .doc(otherUserId)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((doc) => Conversation.fromJson({...doc.data(), 'id': doc.id}))
-            .toList());
+        .map((snap) => (snap.data()?['isTyping'] as bool?) ?? false);
   }
 
   /// Creates a new conversation record.
