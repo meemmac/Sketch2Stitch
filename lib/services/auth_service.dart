@@ -80,6 +80,50 @@ class AuthService {
     }
   }
 
+  /// Logout user.
+  Future<void> signOut() async {
+    await _auth.signOut();
+  }
+
+
+  /// Fetch user profile data from the respective Firestore collection.
+  /// Returns [Customer], [Tailor], or [Retailer] if found, otherwise null.
+  Future<dynamic> getUserProfile(String uid, UserRole role) async {
+    try {
+      final collection = _getCollectionForRole(role);
+      final doc = await _firestore.collection(collection).doc(uid).get();
+
+
+      if (!doc.exists || doc.data() == null) return null;
+
+
+      final data = doc.data()!;
+      switch (role) {
+        case UserRole.customer:
+          return Customer.fromJson(data);
+        case UserRole.tailor:
+          return Tailor.fromJson(data);
+        case UserRole.retailer:
+          return Retailer.fromJson(data);
+      }
+    } catch (e) {
+      debugPrint('Error fetching user profile: $e');
+      return null;
+    }
+  }
+
+
+  String _getCollectionForRole(UserRole role) {
+    switch (role) {
+      case UserRole.customer:
+        return 'Customers';
+      case UserRole.tailor:
+        return 'Tailors';
+      case UserRole.retailer:
+        return 'Retailers';
+    }
+  }
+
 
   String _messageForCode(String code) {
     switch (code) {
