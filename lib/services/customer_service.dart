@@ -101,4 +101,64 @@ Stream<Customer?> streamCustomerProfile(String uid) {
         snapshot.docs.map((doc) => Favorite.fromJson(doc.data())).toList());
   }
 
+  // ─── Last Viewed ───────────────────────────────────────────────────────────
+
+
+  /// Records a product view for the customer.
+  /// Keeps only the most recent views by updating a timestamp.
+  Future<void> addToLastViewed(String uid, String productId) async {
+    try {
+      final lastViewedRef = _firestore
+          .collection('Customers')
+          .doc(uid)
+          .collection('LastViewed')
+          .doc(productId);
+
+
+      await lastViewedRef.set({
+        'productId': productId,
+        'viewedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Optional: Logic to prune old entries could go here or in a Cloud Function
+    } catch (e) {
+      debugPrint('Error adding to last viewed: $e');
+    }
+  }
+
+
+  /// Streams the list of recently viewed products.
+  Stream<List<Product>> streamLastViewed(String uid) {
+    return _firestore
+        .collection('Customers')
+        .doc(uid)
+        .collection('LastViewed')
+        .orderBy('viewedAt', descending: true)
+        .limit(10)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      final productIds = snapshot.docs.map((doc) => doc['productId'] as String).toList();
+
+      if (productIds.isEmpty) return [];
+
+
+      // Fetch product details for these IDs
+      final productsQuery = await _firestore
+          .collection('Products')
+          .where(FieldPath.documentId, whereIn: productIds)
+          .get();
+
+
+      final products = productsQuery.docs
+          .map((doc) => Product.fromJson(doc.data()))
+          .toList();
+
+
+      // Sort products to match the order of productIds (recent first)
+      products.sort((a, b) => productIds.indexOf(a.id).compareTo(productIds.indexOf(b.id)));
+
+      return products;
+    });
+  }
+
 }
