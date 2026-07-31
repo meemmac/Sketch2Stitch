@@ -255,4 +255,58 @@ class NotificationService {
   }
 
 
+
+// ─── Retailer Notifications ────────────────────────────────────────────────
+
+
+  Future<void> notifyRetailerNewOrder(
+      String retailerId,
+      String orderId,
+      String customerName,
+      String itemName,
+      ) async {
+    await _sendNotification(
+      userId: retailerId,
+      userRole: UserRole.retailer,
+      type: NotificationDbType.suborderPlaced,
+      message: 'New material order from $customerName for $itemName. Order #$orderId',
+      orderId: orderId,
+    );
+  }
+
+
+  Future<void> notifyRetailerStockAlert(
+      String retailerId,
+      String productId,
+      String productName,
+      String colorName,
+      int stock,
+      ) async {
+    await _sendNotification(
+      userId: retailerId,
+      userRole: UserRole.retailer,
+      type: NotificationDbType.deliveryReminder, // Best fit for stock alert
+      message: 'Low stock alert: $productName ($colorName) has only $stock units left.',
+      orderId: 'N/A',
+    );
+  }
+
+
+  Future<void> notifyRetailerTailorAssigned(
+      String retailerId,
+      String orderId,
+      String customerName,
+      String tailorName,
+      DateTime deadlineDate,
+      ) async {
+    await _sendNotification(
+      userId: retailerId,
+      userRole: UserRole.retailer,
+      type: NotificationDbType.jobConfirmed,
+      message: 'A tailor ($tailorName) has been assigned to $customerName\'s order #$orderId.',
+      orderId: orderId,
+    );
+  }
+
+
 }
