@@ -19,8 +19,6 @@ class UserReview {
   final DateTime createdAt;
   final String comment;
   final List<ReviewProduct> products;
-  final int helpfulCount;
-  final bool isHelpful;
 
   const UserReview({
     required this.userName,
@@ -29,25 +27,7 @@ class UserReview {
     required this.createdAt,
     required this.comment,
     required this.products,
-    required this.helpfulCount,
-    this.isHelpful = false,
   });
-
-  UserReview copyWith({
-    int? helpfulCount,
-    bool? isHelpful,
-  }) {
-    return UserReview(
-      userName: userName,
-      rating: rating,
-      dateLabel: dateLabel,
-      createdAt: createdAt,
-      comment: comment,
-      products: products,
-      helpfulCount: helpfulCount ?? this.helpfulCount,
-      isHelpful: isHelpful ?? this.isHelpful,
-    );
-  }
 }
 
 class RetailerReviewsScreen extends StatefulWidget {
@@ -69,7 +49,6 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
       dateLabel: "2 months ago",
       createdAt: DateTime.now().subtract(const Duration(days: 60)),
       comment: "Denim quality was good but a little too expensive.",
-      helpfulCount: 3,
       products: const [
         ReviewProduct(name: "Premium Egyptian Cotton", image: "assets/images/fabrics_rolled.jpg", price: 3250),
         ReviewProduct(name: "Denim Patchwork", image: "assets/images/denim.jpg", price: 1950),
@@ -81,7 +60,6 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
       dateLabel: "Today",
       createdAt: DateTime.now(),
       comment: "great",
-      helpfulCount: 0,
       products: const [],
     ),
     UserReview(
@@ -90,7 +68,6 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
       dateLabel: "2 days ago",
       createdAt: DateTime.now().subtract(const Duration(days: 2)),
       comment: "Excellent quality and fast delivery. Very satisfied!",
-      helpfulCount: 5,
       products: const [
         ReviewProduct(name: "Golden Silk Blend", image: "assets/images/silk.jpg", price: 5400),
       ],
@@ -101,7 +78,6 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
       dateLabel: "1 week ago",
       createdAt: DateTime.now().subtract(const Duration(days: 7)),
       comment: "The color was slightly different than the photo.",
-      helpfulCount: 1,
       products: const [
         ReviewProduct(name: "Printed Scarf", image: "assets/images/gorgeous.jpg", price: 3000),
       ],
@@ -112,12 +88,8 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
     List<UserReview> sortedList = List.from(_reviews);
     switch (_selectedFilter) {
       case "Top reviews":
-        // Sort by high rating first, then by helpful count
-        sortedList.sort((a, b) {
-          int ratingComp = b.rating.compareTo(a.rating);
-          if (ratingComp != 0) return ratingComp;
-          return b.helpfulCount.compareTo(a.helpfulCount);
-        });
+        // Sort by high rating first
+        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
         break;
       case "Newest":
         sortedList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -360,47 +332,6 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
               ),
             ),
           ],
-          const SizedBox(height: 16),
-          InkWell(
-            onTap: () {
-              setState(() {
-                final index = _reviews.indexWhere((r) => r.userName == review.userName && r.createdAt == review.createdAt);
-                if (index != -1) {
-                  final current = _reviews[index];
-                  if (current.isHelpful) {
-                    _reviews[index] = current.copyWith(
-                      helpfulCount: current.helpfulCount - 1,
-                      isHelpful: false,
-                    );
-                  } else {
-                    _reviews[index] = current.copyWith(
-                      helpfulCount: current.helpfulCount + 1,
-                      isHelpful: true,
-                    );
-                  }
-                }
-              });
-            },
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  review.isHelpful ? Icons.thumb_up_alt : Icons.thumb_up_alt_outlined,
-                  size: 16,
-                  color: review.isHelpful ? Colors.orange : Colors.grey,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  review.helpfulCount > 0 ? "Helpful ${review.helpfulCount}" : "Helpful",
-                  style: TextStyle(
-                    color: review.isHelpful ? Colors.orange : Colors.grey,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );

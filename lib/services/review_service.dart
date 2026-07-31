@@ -146,9 +146,9 @@ class ReviewService {
         query = query.where('rating', isEqualTo: starFilter.toDouble());
       }
 
-      // Note: top reviews sorting might involve multiple fields (rating, helpfulCount)
+      // Note: top reviews sorting might involve high ratings
       if (sortBy == 'top') {
-        query = query.orderBy('rating', descending: true).orderBy('helpfulCount', descending: true);
+        query = query.orderBy('rating', descending: true);
       } else {
         query = query.orderBy(sortBy, descending: descending);
       }
@@ -226,32 +226,6 @@ class ReviewService {
       });
     } catch (e) {
       debugPrint('Error responding to review: $e');
-      rethrow;
-    }
-  }
-
-  /// Marks a review as helpful for a user.
-  Future<void> markReviewHelpful(String reviewId, String userId) async {
-    try {
-      await _db.collection(_reviewsCollection).doc(reviewId).update({
-        'votedHelpfulBy': FieldValue.arrayUnion([userId]),
-        'helpfulCount': FieldValue.increment(1),
-      });
-    } catch (e) {
-      debugPrint('Error marking review helpful: $e');
-      rethrow;
-    }
-  }
-
-  /// Unmarks a review as helpful for a user.
-  Future<void> unmarkReviewHelpful(String reviewId, String userId) async {
-    try {
-      await _db.collection(_reviewsCollection).doc(reviewId).update({
-        'votedHelpfulBy': FieldValue.arrayRemove([userId]),
-        'helpfulCount': FieldValue.increment(-1),
-      });
-    } catch (e) {
-      debugPrint('Error unmarking review helpful: $e');
       rethrow;
     }
   }
