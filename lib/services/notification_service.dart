@@ -110,4 +110,82 @@ class NotificationService {
         .map((snap) => snap.docs.length);
   }
 
+
+
+// ─── Customer Notifications ────────────────────────────────────────────────
+
+
+  Future<void> _sendNotification({
+    required String userId,
+    required UserRole userRole,
+    required NotificationDbType type,
+    required String message,
+    required String orderId,
+    String? subOrderId,
+  }) async {
+    final docRef = _db.collection(_collection).doc();
+    final notification = AppNotification(
+      id: docRef.id,
+      userId: userId,
+      userRole: userRole,
+      type: type,
+      message: message,
+      createdAt: DateTime.now(),
+      orderId: orderId,
+      subOrderId: subOrderId,
+      isRead: false,
+    );
+    await docRef.set(notification.toJson());
+  }
+
+
+  Future<void> notifyCustomerOrderDelivered(
+      String customerId,
+      String orderId,
+      String partyName,
+      String partyRole,
+      ) async {
+    await _sendNotification(
+      userId: customerId,
+      userRole: UserRole.customer,
+      type: NotificationDbType.orderCompleted,
+      message: 'Your order #$orderId has been delivered by $partyName ($partyRole).',
+      orderId: orderId,
+    );
+  }
+
+
+  Future<void> notifyCustomerOrderConfirmed(
+      String customerId,
+      String orderId,
+      String partyName,
+      String partyRole,
+      ) async {
+    await _sendNotification(
+      userId: customerId,
+      userRole: UserRole.customer,
+      type: NotificationDbType.orderConfirmed,
+      message: 'Your order #$orderId has been confirmed by $partyName ($partyRole).',
+      orderId: orderId,
+    );
+  }
+
+
+  Future<void> notifyCustomerOrderCancelled(
+      String customerId,
+      String orderId,
+      String partyName,
+      String partyRole,
+      String cancelReason,
+      ) async {
+    await _sendNotification(
+      userId: customerId,
+      userRole: UserRole.customer,
+      type: NotificationDbType.jobRejected, // Best fit for cancellation
+      message: 'Order #$orderId was cancelled by $partyName. Reason: $cancelReason',
+      orderId: orderId,
+    );
+  }
+
+
 }
