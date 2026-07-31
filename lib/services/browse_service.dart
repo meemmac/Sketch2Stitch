@@ -79,5 +79,59 @@ class BrowseService {
     return snapshot.docs.map((doc) => Product.fromJson(doc.data())).toList();
   }
 
+  // ─── Tailors ──────────────────────────────────────────────────────────────
+
+
+  /// Filters tailors based on rating, location, and search terms.
+  Stream<List<Tailor>> getTailorsByFilter({
+    double? minRating,
+    String? location,
+    String sortBy = 'default',
+    String? search,
+  }) {
+    Query query = _db.collection('Tailors');
+
+
+    if (minRating != null && minRating > 0) {
+      query = query.where('rating', isGreaterThanOrEqualTo: minRating);
+    }
+
+
+    if (sortBy == 'ratingHighToLow') {
+      query = query.orderBy('rating', descending: true);
+    }
+
+
+    return query.snapshots().map((snapshot) {
+      var tailors = snapshot.docs.map((doc) => Tailor.fromJson(doc.data() as Map<String, dynamic>)).toList();
+
+
+      if (location != null && location != 'All') {
+        tailors = tailors.where((t) => t.address.toLowerCase().contains(location.toLowerCase())).toList();
+      }
+
+
+      if (search != null && search.isNotEmpty) {
+        tailors = tailors.where((t) => t.name.toLowerCase().contains(search.toLowerCase())).toList();
+      }
+
+
+      return tailors;
+    });
+  }
+
+
+  /// Searches for tailors by name.
+  Future<List<Tailor>> searchTailorsByQuery(String query) async {
+    final normalizedQuery = query.toLowerCase();
+    final snapshot = await _db.collection('Tailors')
+        .where('nameLower', isGreaterThanOrEqualTo: normalizedQuery)
+        .where('nameLower', isLessThanOrEqualTo: '$normalizedQuery\uf8ff')
+        .get();
+
+
+    return snapshot.docs.map((doc) => Tailor.fromJson(doc.data())).toList();
+  }
+
 
 }
