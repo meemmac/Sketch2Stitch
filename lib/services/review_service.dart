@@ -129,8 +129,13 @@ class ReviewService {
 
   // ─── Retailer Review Functions ───────────────────────────────────────────
 
-  /// Fetches reviews for a specific retailer shop.
-  Future<List<Review>> fetchShopReviews(String retailerId, {int? starFilter}) async {
+  /// Fetches reviews for a specific retailer shop with optional filtering and sorting.
+  Future<List<Review>> fetchShopReviews(
+    String retailerId, {
+    int? starFilter,
+    String sortBy = 'createdAt',
+    bool descending = true,
+  }) async {
     try {
       Query query = _db
           .collection(_reviewsCollection)
@@ -141,7 +146,14 @@ class ReviewService {
         query = query.where('rating', isEqualTo: starFilter.toDouble());
       }
 
-      final snapshot = await query.orderBy('createdAt', descending: true).get();
+      // Note: top reviews sorting might involve multiple fields (rating, helpfulCount)
+      if (sortBy == 'top') {
+        query = query.orderBy('rating', descending: true).orderBy('helpfulCount', descending: true);
+      } else {
+        query = query.orderBy(sortBy, descending: descending);
+      }
+
+      final snapshot = await query.get();
       return snapshot.docs
           .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
           .toList();
@@ -154,8 +166,19 @@ class ReviewService {
   /// Gets review statistics for a retailer shop.
   Future<Map<String, dynamic>> getShopReviewStats(String retailerId) async {
     try {
-      final reviews = await fetchShopReviews(retailerId);
-      if (reviews.isEmpty) return {'total': 0, 'average': 0.0, 'distribution': {}};
+      // We fetch all reviews to calculate stats. For very large numbers, 
+      // this should be moved to a Cloud Function that updates a stats doc.
+      final snapshot = await _db
+          .collection(_reviewsCollection)
+          .where('targetId', isEqualTo: retailerId)
+          .where('targetRole', isEqualTo: ReviewTargetRole.retailer.name)
+          .get();
+
+      final reviews = snapshot.docs
+          .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
+          .toList();
+
+      if (reviews.isEmpty) return {'total': 0, 'average': 0.0, 'distribution': {1:0, 2:0, 3:0, 4:0, 5:0}};
 
       final total = reviews.length;
       final avg = reviews.fold(0.0, (sum, r) => sum + r.rating) / total;
@@ -207,10 +230,41 @@ class ReviewService {
     }
   }
 
+  /// Marks a review as helpful for a user.
+  Future<void> markReviewHelpful(String reviewId, String userId) async {
+    try {
+      await _db.collection(_reviewsCollection).doc(reviewId).update({
+        'votedHelpfulBy': FieldValue.arrayUnion([userId]),
+        'helpfulCount': FieldValue.increment(1),
+      });
+    } catch (e) {
+      debugPrint('Error marking review helpful: $e');
+      rethrow;
+    }
+  }
+
+  /// Unmarks a review as helpful for a user.
+  Future<void> unmarkReviewHelpful(String reviewId, String userId) async {
+    try {
+      await _db.collection(_reviewsCollection).doc(reviewId).update({
+        'votedHelpfulBy': FieldValue.arrayRemove([userId]),
+        'helpfulCount': FieldValue.increment(-1),
+      });
+    } catch (e) {
+      debugPrint('Error unmarking review helpful: $e');
+      rethrow;
+    }
+  }
+
   // ─── Tailor Review Functions ─────────────────────────────────────────────
 
-  /// Fetches reviews for a specific tailor.
-  Future<List<Review>> fetchTailorReviews(String tailorId, {int? ratingFilter}) async {
+  /// Fetches reviews for a specific tailor with optional filtering and sorting.
+  Future<List<Review>> fetchTailorReviews(
+    String tailorId, {
+    int? ratingFilter,
+    String sortBy = 'createdAt',
+    bool descending = true,
+  }) async {
     try {
       Query query = _db
           .collection(_reviewsCollection)
@@ -221,7 +275,9 @@ class ReviewService {
         query = query.where('rating', isGreaterThanOrEqualTo: ratingFilter.toDouble());
       }
 
-      final snapshot = await query.orderBy('createdAt', descending: true).get();
+      query = query.orderBy(sortBy, descending: descending);
+
+      final snapshot = await query.get();
       return snapshot.docs
           .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
           .toList();
