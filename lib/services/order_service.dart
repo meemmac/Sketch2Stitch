@@ -241,6 +241,17 @@ class OrderService {
     }
   }
 
+  /// Streams sub-orders for a specific retailer for real-time updates.
+  Stream<List<SubOrder>> streamRetailerOrders(String retailerId) {
+    return _db
+        .collection(_subOrdersCollection)
+        .where('retailerId', isEqualTo: retailerId)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) => SubOrder.fromJson({...doc.data(), 'id': doc.id}))
+            .toList());
+  }
+
   /// Updates the status of a sub-order.
   Future<void> updateOrderStatus(String subOrderId, String newStatus) async {
     try {
@@ -345,6 +356,17 @@ class OrderService {
       debugPrint('Error fetching tailor orders: $e');
       return [];
     }
+  }
+
+  /// Streams tailor jobs for a specific tailor for real-time updates.
+  Stream<List<TailorJob>> streamTailorOrders(String tailorId) {
+    return _db
+        .collection(_tailorJobsCollection)
+        .where('tailorId', isEqualTo: tailorId)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) => TailorJob.fromJson({...doc.data(), 'id': doc.id}))
+            .toList());
   }
 
   /// Accepts a tailor job request and sets initial terms.
