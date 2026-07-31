@@ -459,4 +459,138 @@ class OrderService {
       return {};
     }
   }
+
+  // ─── Order Form - Tailor Job Functions ───────────────────────────────────
+
+  /// Creates a new tailor job record.
+  Future<String> createTailorJob(String orderId, String tailorId, Map<String, dynamic> data) async {
+    try {
+      final docData = {
+        ...data,
+        'orderId': orderId,
+        'tailorId': tailorId,
+        'status': TailorJobStatus.pending.toValue,
+        'quoteStatus': QuoteStatus.notSent.toValue,
+        'tailorPaymentStatus': TailorPaymentStatus.unpaid.toValue,
+        'createdAt': FieldValue.serverTimestamp(),
+        'requestedAt': FieldValue.serverTimestamp(),
+      };
+
+      final ref = await _db.collection(_tailorJobsCollection).add(docData);
+      return ref.id;
+    } catch (e) {
+      debugPrint('Error creating tailor job: $e');
+      rethrow;
+    }
+  }
+
+  /// Fetches a specific tailor job by ID.
+  Future<TailorJob?> getTailorJob(String tailorJobId) async {
+    try {
+      final doc = await _db.collection(_tailorJobsCollection).doc(tailorJobId).get();
+      if (!doc.exists || doc.data() == null) return null;
+      return TailorJob.fromJson({...doc.data()!, 'id': doc.id});
+    } catch (e) {
+      debugPrint('Error getting tailor job: $e');
+      return null;
+    }
+  }
+
+  /// Fetches all tailor jobs associated with a specific order.
+  Future<List<TailorJob>> getTailorJobsByOrder(String orderId) async {
+    try {
+      final snapshot = await _db
+          .collection(_tailorJobsCollection)
+          .where('orderId', isEqualTo: orderId)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => TailorJob.fromJson({...doc.data(), 'id': doc.id}))
+          .toList();
+    } catch (e) {
+      debugPrint('Error getting tailor jobs by order: $e');
+      return [];
+    }
+  }
+
+  /// Updates the status of a tailor job.
+  Future<void> updateTailorJobStatus(String tailorJobId, TailorJobStatus status) async {
+    try {
+      await _db.collection(_tailorJobsCollection).doc(tailorJobId).update({
+        'status': status.toValue,
+      });
+    } catch (e) {
+      debugPrint('Error updating tailor job status: $e');
+      rethrow;
+    }
+  }
+
+  /// Submits a price quote for a tailor job.
+  Future<void> submitQuote(String tailorJobId, double quoteAmount, String? quoteNote) async {
+    try {
+      await _db.collection(_tailorJobsCollection).doc(tailorJobId).update({
+        'quoteAmount': quoteAmount,
+        'quoteNote': quoteNote,
+        'quoteStatus': QuoteStatus.sent.toValue,
+        'status': TailorJobStatus.quoted.toValue,
+      });
+    } catch (e) {
+      debugPrint('Error submitting quote: $e');
+      rethrow;
+    }
+  }
+
+  /// Records a customer's response to a tailor's quote.
+  Future<void> respondToQuote(String tailorJobId, QuoteStatus response) async {
+    try {
+      final status = response == QuoteStatus.accepted 
+          ? TailorJobStatus.confirmed 
+          : TailorJobStatus.rejected;
+          
+      await _db.collection(_tailorJobsCollection).doc(tailorJobId).update({
+        'quoteStatus': response.toValue,
+        'status': status.toValue,
+        if (response == QuoteStatus.accepted) 'confirmedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('Error responding to quote: $e');
+      rethrow;
+    }
+  }
+
+  /// Updates the payment status of a tailor job.
+  Future<void> updateTailorPaymentStatus(String tailorJobId, TailorPaymentStatus status) async {
+    try {
+      await _db.collection(_tailorJobsCollection).doc(tailorJobId).update({
+        'tailorPaymentStatus': status.toValue,
+      });
+    } catch (e) {
+      debugPrint('Error updating tailor payment status: $e');
+      rethrow;
+    }
+  }
+
+  /// Sets the deadline for tailor selection on an order.
+  Future<void> setTailorSelectionDeadline(String orderId, DateTime deadline) async {
+    try {
+      await _db.collection(_ordersCollection).doc(orderId).update({
+        'tailorSelectionDeadline': deadline.toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Error setting tailor selection deadline: $e');
+      rethrow;
+    }
+  }
+
+  /// Appends a design reference to a tailor job.
+  Future<void> addDesignToTailorJob(String tailorJobId, String designId) async {
+    try {
+      await _db.collection(_tailorJobsCollection).doc(tailorJobId).update({
+        'designIds': FieldValue.arrayUnion([designId]),
+      });
+    } catch (e) {
+      debugPrint('Error adding design to tailor job: $e');
+      rethrow;
+    }
+  }
 }
