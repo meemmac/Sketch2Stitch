@@ -146,5 +146,43 @@ class FavoriteService {
     });
   }
 
+  // ─── Product Helpers ───────────────────────────────────────────────────────
+
+
+  Future<void> toggleFavoriteProduct(String customerId, String productId) async {
+    final status = await isFavorite(customerId, productId, FavoriteTargetRole.product).first;
+    if (status) {
+      await removeFavorite(customerId, productId, FavoriteTargetRole.product);
+    } else {
+      await addFavorite(customerId, productId, FavoriteTargetRole.product);
+    }
+  }
+
+
+  Stream<bool> isFavoriteProduct(String customerId, String productId) {
+    return isFavorite(customerId, productId, FavoriteTargetRole.product);
+  }
+
+
+  Stream<List<Product>> getFavoriteProducts(String customerId) {
+    return _db
+        .collection('Favorites')
+        .where('customerId', isEqualTo: customerId)
+        .where('targetRole', isEqualTo: FavoriteTargetRole.product.name)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      final ids = snapshot.docs.map((doc) => doc['targetId'] as String).toList();
+      if (ids.isEmpty) return [];
+
+
+      final productsQuery = await _db
+          .collection('Products')
+          .where(FieldPath.documentId, whereIn: ids)
+          .get();
+
+
+      return productsQuery.docs.map((doc) => Product.fromJson(doc.data())).toList();
+    });
+  }
 
 }
