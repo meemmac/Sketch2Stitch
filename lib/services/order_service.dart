@@ -215,4 +215,112 @@ class OrderService {
       rethrow;
     }
   }
+
+  // ─── Retailer Order Functions ─────────────────────────────────────────────
+
+  /// Fetches sub-orders for a specific retailer, optionally filtered by category.
+  Future<List<SubOrder>> fetchRetailerOrders(String retailerId, {String? statusCategory}) async {
+    try {
+      Query query = _db.collection(_subOrdersCollection).where('retailerId', isEqualTo: retailerId);
+
+      if (statusCategory != null && statusCategory != 'All') {
+        query = query.where('status', isEqualTo: statusCategory.toLowerCase());
+      }
+
+      final snapshot = await query.get();
+      return snapshot.docs
+          .map((doc) => SubOrder.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching retailer orders: $e');
+      return [];
+    }
+  }
+
+  /// Updates the status of a sub-order.
+  Future<void> updateOrderStatus(String subOrderId, String newStatus) async {
+    try {
+      await _db.collection(_subOrdersCollection).doc(subOrderId).update({
+        'status': newStatus.toLowerCase(),
+      });
+    } catch (e) {
+      debugPrint('Error updating order status: $e');
+      rethrow;
+    }
+  }
+
+  /// Calculates analytics for a retailer's sub-orders.
+  Future<Map<String, dynamic>> getOrderAnalytics(String retailerId) async {
+    try {
+      final subOrders = await fetchRetailerOrders(retailerId);
+      
+      double totalRevenue = 0;
+      int pendingCount = 0;
+      int packedCount = 0;
+      int deliveredCount = 0;
+
+      for (var so in subOrders) {
+        totalRevenue += so.itemsSubtotal;
+        switch (so.status) {
+          case SubOrderStatus.preparing:
+            pendingCount++;
+            break;
+          case SubOrderStatus.packed:
+            packedCount++;
+            break;
+          case SubOrderStatus.delivered:
+            deliveredCount++;
+            break;
+        }
+      }
+
+      return {
+        'totalOrders': subOrders.length,
+        'totalRevenue': totalRevenue,
+        'pendingOrders': pendingCount,
+        'packedOrders': packedCount,
+        'deliveredOrders': deliveredCount,
+      };
+    } catch (e) {
+      debugPrint('Error getting order analytics: $e');
+      return {};
+    }
+  }
+
+  /// Searches a retailer's sub-orders by ID or order ID.
+  Future<List<SubOrder>> searchRetailerOrders(String retailerId, String query) async {
+    try {
+      final all = await fetchRetailerOrders(retailerId);
+      final q = query.toLowerCase();
+      return all.where((so) => 
+        so.id.toLowerCase().contains(q) || 
+        so.orderId.toLowerCase().contains(q)
+      ).toList();
+    } catch (e) {
+      debugPrint('Error searching retailer orders: $e');
+      return [];
+    }
+  }
+
+  /// Validates if a product option has sufficient stock.
+  Future<bool> checkStock(String productId, int optionId, int quantity) async {
+    try {
+      final doc = await _db.collection('Products').doc(productId).get();
+      if (!doc.exists) return false;
+
+      final data = doc.data()!;
+      final List<dynamic> options = data['colorOptions'] ?? [];
+      
+      final option = options.firstWhere(
+        (opt) => opt['optionId'] == optionId,
+        orElse: () => null,
+      );
+
+      if (option == null) return false;
+      return (option['stock'] ?? 0) >= quantity;
+    } catch (e) {
+      debugPrint('Error checking stock: $e');
+      return false;
+    }
+  }
 }
