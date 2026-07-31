@@ -76,7 +76,6 @@ class Tailor {
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
     'name': name,
     'email': email,
     'phone': phone,
@@ -87,9 +86,9 @@ class Tailor {
     'about': about,
   };
 
-  factory Tailor.fromJson(Map<String, dynamic> json) {
+  factory Tailor.fromJson(Map<String, dynamic> json, {String? id}) {
     return Tailor(
-      id: json['id'] ?? '',
+      id: id ?? json['id'] ?? '',
       name: json['name'] ?? '',
       email: json['email'] ?? '',
       phone: json['phone'] ?? '',
