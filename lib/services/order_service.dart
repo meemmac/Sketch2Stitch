@@ -1,16 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/order.dart';
 import '../models/sub_order.dart';
 import '../models/order_item.dart';
 import '../models/tailor_job.dart';
 import '../models/review.dart';
+import 'Cloudinary_service.dart';
 
 class OrderService {
-  OrderService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+  OrderService({FirebaseFirestore? firestore, FirebaseAuth? auth})
+      : _db = firestore ?? FirebaseFirestore.instance,
+        _auth = auth ?? FirebaseAuth.instance;
 
   final FirebaseFirestore _db;
+  final FirebaseAuth _auth;
 
   static const String _ordersCollection = 'Orders';
   static const String _subOrdersCollection = 'Sub-orders';
@@ -592,5 +596,37 @@ class OrderService {
       debugPrint('Error adding design to tailor job: $e');
       rethrow;
     }
+  }
+
+  // ─── Shared Order Functions ──────────────────────────────────────────────
+
+  /// Converts a list of raw Cloudinary public-id paths or partial URLs into
+  /// fully-qualified, optimised CDN URLs.
+  List<String> resolveImageUrls(List<String> imagePaths) {
+    final svc = CloudinaryService();
+    return imagePaths.map((p) {
+      final url = p.contains('cloudinary.com') ? p : getCDNUrl(p);
+      return svc.getOptimizedImageUrl(url);
+    }).toList();
+  }
+
+  /// Builds a full Cloudinary delivery URL from a public ID or relative path.
+  String getCDNUrl(String imagePath) {
+    if (imagePath.startsWith('http')) return imagePath;
+    // Strip leading slash if present.
+    final cleaned = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+    return 'https://res.cloudinary.com/${CloudinaryService.cloudName}/image/upload/$cleaned';
+  }
+
+  /// Verifies if the current logged-in user matches the tailor ID.
+  bool tailorAuthCheck(String tailorId) {
+    final user = _auth.currentUser;
+    return user != null && user.uid == tailorId;
+  }
+
+  /// Verifies if the current logged-in user matches the retailer ID.
+  bool verifyRetailerAccess(String retailerId) {
+    final user = _auth.currentUser;
+    return user != null && user.uid == retailerId;
   }
 }
