@@ -48,6 +48,24 @@ class AuthService {
     }
   }
 
+  /// Create new account.
+  Future<UserCredential> registerWithEmailAndPassword(
+      String email,
+      String password,
+      UserRole role,
+      ) async {
+    try {
+      return await _auth.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+    } on FirebaseAuthException catch (e) {
+      throw AuthServiceException(_messageForCode(e.code));
+    } catch (e) {
+      throw AuthServiceException('Registration failed: ${e.toString()}');
+    }
+  }
+
 
   /// Handle "Forgot Password" requests.
   Future<void> sendPasswordResetEmail(String email) async {
@@ -62,7 +80,7 @@ class AuthService {
     }
   }
 
-  
+
   String _messageForCode(String code) {
     switch (code) {
       case 'invalid-email':
