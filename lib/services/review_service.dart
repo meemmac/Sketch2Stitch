@@ -177,6 +177,23 @@ class ReviewService {
     }
   }
 
+  /// Fetches all reviews associated with a specific order.
+  Future<List<Review>> fetchReviewRelatedItems(String orderId) async {
+    try {
+      final snapshot = await _db
+          .collection(_reviewsCollection)
+          .where('orderId', isEqualTo: orderId)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching review related items: $e');
+      return [];
+    }
+  }
+
   /// Responds to a review (Retailer functionality).
   Future<void> respondToReview(String reviewId, String retailerComment) async {
     try {
@@ -230,6 +247,18 @@ class ReviewService {
     } catch (e) {
       debugPrint('Error getting tailor reputation summary: $e');
       return {};
+    }
+  }
+
+  /// Fetches a single review's detailed metadata.
+  Future<Review?> fetchReviewMetadata(String reviewId) async {
+    try {
+      final doc = await _db.collection(_reviewsCollection).doc(reviewId).get();
+      if (!doc.exists || doc.data() == null) return null;
+      return Review.fromJson({...doc.data()!, 'id': doc.id});
+    } catch (e) {
+      debugPrint('Error fetching review metadata: $e');
+      return null;
     }
   }
 
