@@ -51,5 +51,54 @@ Stream<Customer?> streamCustomerProfile(String uid) {
       .map((doc) => doc.exists ? Customer.fromJson(doc.data()!) : null);
 }
 
+// ─── Favorites ─────────────────────────────────────────────────────────────
+
+
+  /// Toggles a favorite status for a target (tailor, retailer, or product).
+  Future<void> toggleFavorite(
+      String customerId,
+      String targetId,
+      FavoriteTargetRole targetRole,
+      ) async {
+    try {
+      final favoritesRef = _firestore.collection('Favorites');
+      final query = await favoritesRef
+          .where('customerId', isEqualTo: customerId)
+          .where('targetId', isEqualTo: targetId)
+          .where('targetRole', isEqualTo: targetRole.name)
+          .limit(1)
+          .get();
+
+
+      if (query.docs.isNotEmpty) {
+        // Remove from favorites
+        await favoritesRef.doc(query.docs.first.id).delete();
+      } else {
+        // Add to favorites
+        final newDoc = favoritesRef.doc();
+        final favorite = Favorite(
+          id: newDoc.id,
+          customerId: customerId,
+          targetId: targetId,
+          targetRole: targetRole,
+        );
+        await newDoc.set(favorite.toJson());
+      }
+    } catch (e) {
+      debugPrint('Error toggling favorite: $e');
+      rethrow;
+    }
+  }
+
+
+  /// Streams a list of favorites for a customer.
+  Stream<List<Favorite>> streamFavorites(String customerId) {
+    return _firestore
+        .collection('Favorites')
+        .where('customerId', isEqualTo: customerId)
+        .snapshots()
+        .map((snapshot) =>
+        snapshot.docs.map((doc) => Favorite.fromJson(doc.data())).toList());
+  }
 
 }
