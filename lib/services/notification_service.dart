@@ -187,5 +187,72 @@ class NotificationService {
     );
   }
 
+  // ─── Tailor Notifications ──────────────────────────────────────────────────
+
+
+  Future<void> notifyTailorNewOrder(
+      String tailorId,
+      String orderId,
+      String customerName,
+      String itemName,
+      ) async {
+    await _sendNotification(
+      userId: tailorId,
+      userRole: UserRole.tailor,
+      type: NotificationDbType.jobRequested,
+      message: 'New stitching request from $customerName for $itemName. Order #$orderId',
+      orderId: orderId,
+    );
+  }
+
+
+  Future<void> notifyTailorConfirmOrder(
+      String tailorId,
+      String orderId,
+      String customerName,
+      String itemName,
+      ) async {
+    await _sendNotification(
+      userId: tailorId,
+      userRole: UserRole.tailor,
+      type: NotificationDbType.selectionDeadlineReminder,
+      message: 'Reminder: Please confirm the stitching request for $customerName ($itemName).',
+      orderId: orderId,
+    );
+  }
+
+
+  Future<void> notifyTailorDeliveryDeadline(
+      String tailorId,
+      String orderId,
+      String customerName,
+      DateTime deadlineDate,
+      ) async {
+    await _sendNotification(
+      userId: tailorId,
+      userRole: UserRole.tailor,
+      type: NotificationDbType.selectionDeadlineReminder,
+      message: 'Delivery deadline approaching for $customerName\'s order #$orderId.',
+      orderId: orderId,
+    );
+  }
+
+
+  Future<void> notifyTailorOrderCancelled(
+      String tailorId,
+      String orderId,
+      String customerName,
+      String itemName,
+      String cancelReason,
+      ) async {
+    await _sendNotification(
+      userId: tailorId,
+      userRole: UserRole.tailor,
+      type: NotificationDbType.jobRejected,
+      message: '$customerName cancelled their order for $itemName. Reason: $cancelReason',
+      orderId: orderId,
+    );
+  }
+
 
 }
