@@ -16,7 +16,7 @@ class MessagingService {
   static const String _conversations = 'Conversations';
   static const String _messages = 'Messages';
   static const String _customers = 'Customer';
-  static const String _tailors = 'Tailors';
+  static const String _tailors = 'Tailor';
   static const String _retailers = 'Retailer';
 
   // ─── Conversation Management ──────────────────────────────────────────────

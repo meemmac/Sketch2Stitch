@@ -89,6 +89,11 @@ class InventoryService {
         throw Exception('Product with SKU $sku already exists');
       }
 
+      // Ensure materialType is handled as a list if provided as a string from legacy UI
+      if (productData['materialType'] is String) {
+        productData['materialType'] = [{'type': productData['materialType'], 'blend': 100}];
+      }
+
       await docRef.set(productData);
     } catch (e) {
       debugPrint('Error creating product: $e');
@@ -101,6 +106,10 @@ class InventoryService {
   /// Update existing product identified by SKU.
   Future<void> updateProduct(String sku, Map<String, dynamic> productData) async {
     try {
+      // Ensure materialType is handled as a list if provided as a string from legacy UI
+      if (productData['materialType'] is String) {
+        productData['materialType'] = [{'type': productData['materialType'], 'blend': 100}];
+      }
       await _db.collection(_productsCollection).doc(sku).update(productData);
     } catch (e) {
       debugPrint('Error updating product: $e');

@@ -370,7 +370,12 @@ class OrderService {
   }
 
   /// Accepts a tailor job request and sets initial terms.
-  Future<void> acceptTailorJob(String orderId, double servicePrice, DateTime estimatedDate) async {
+  Future<void> acceptTailorJob(
+    String orderId,
+    double servicePrice,
+    DateTime estimatedDate, {
+    double? deliveryCharge,
+  }) async {
     try {
       final snap = await _db
           .collection(_tailorJobsCollection)
@@ -383,6 +388,7 @@ class OrderService {
       await snap.docs.first.reference.update({
         'status': TailorJobStatus.confirmed.toValue,
         'quoteAmount': servicePrice,
+        if (deliveryCharge != null) 'deliveryCharge': deliveryCharge,
         'estimatedDeliveryDate': estimatedDate.toIso8601String(),
         'confirmedAt': FieldValue.serverTimestamp(),
       });
