@@ -29,6 +29,27 @@ class CustomerService {
       return snapshot.docs.map((doc) => Retailer.fromJson(doc.data())).toList();
     });
   }
+// ─── Profile Management ────────────────────────────────────────────────────
+
+
+  /// Updates customer profile data.
+  Future<void> updateCustomerProfile(String customerId, Map<String, dynamic> data) async {
+    try {
+      await _firestore.collection('Customers').doc(customerId).update(data);
+    } catch (e) {
+      debugPrint('Error updating customer profile: $e');
+      rethrow;
+    }
+  }
+
+/// Streams the customer profile for real-time updates.
+Stream<Customer?> streamCustomerProfile(String uid) {
+  return _firestore
+      .collection('Customers')
+      .doc(uid)
+      .snapshots()
+      .map((doc) => doc.exists ? Customer.fromJson(doc.data()!) : null);
+}
 
 
 }
