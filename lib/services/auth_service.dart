@@ -116,11 +116,11 @@ class AuthService {
   String _getCollectionForRole(UserRole role) {
     switch (role) {
       case UserRole.customer:
-        return 'Customers';
+        return 'Customer'; // Singular per schema
       case UserRole.tailor:
-        return 'Tailors';
+        return 'Tailor'; // Singular per schema
       case UserRole.retailer:
-        return 'Retailers';
+        return 'Retailer'; // Singular per schema
     }
   }
 

@@ -20,7 +20,7 @@ class FavoriteService {
     FavoriteTargetRole targetRole,
   ) async {
     try {
-      final docRef = _db.collection('Favorites').doc();
+      final docRef = _db.collection('Favorite').doc();
       final favorite = Favorite(
         id: docRef.id,
         customerId: customerId,
@@ -42,7 +42,7 @@ class FavoriteService {
   ) async {
     try {
       final snapshot = await _db
-          .collection('Favorites')
+          .collection('Favorite')
           .where('customerId', isEqualTo: customerId)
           .where('targetId', isEqualTo: targetId)
           .where('targetRole', isEqualTo: targetRole.name)
@@ -65,7 +65,7 @@ class FavoriteService {
     FavoriteTargetRole targetRole,
   ) {
     return _db
-        .collection('Favorites')
+        .collection('Favorite')
         .where('customerId', isEqualTo: customerId)
         .where('targetId', isEqualTo: targetId)
         .where('targetRole', isEqualTo: targetRole.name)
@@ -90,7 +90,7 @@ class FavoriteService {
 
   Stream<List<Tailor>> getFavoriteTailors(String customerId) {
     return _db
-        .collection('Favorites')
+        .collection('Favorite')
         .where('customerId', isEqualTo: customerId)
         .where('targetRole', isEqualTo: FavoriteTargetRole.tailor.name)
         .snapshots()
@@ -99,7 +99,7 @@ class FavoriteService {
       if (ids.isEmpty) return [];
 
       final tailorsQuery = await _db
-          .collection('Tailors')
+          .collection('Tailor')
           .where(FieldPath.documentId, whereIn: ids)
           .get();
 
@@ -127,7 +127,7 @@ class FavoriteService {
 
   Stream<List<Retailer>> getFavoriteRetailers(String customerId) {
     return _db
-        .collection('Favorites')
+        .collection('Favorite')
         .where('customerId', isEqualTo: customerId)
         .where('targetRole', isEqualTo: FavoriteTargetRole.retailer.name)
         .snapshots()
@@ -137,7 +137,7 @@ class FavoriteService {
 
 
       final retailersQuery = await _db
-          .collection('Retailers')
+          .collection('Retailer')
           .where(FieldPath.documentId, whereIn: ids)
           .get();
 
@@ -166,7 +166,7 @@ class FavoriteService {
 
   Stream<List<Product>> getFavoriteProducts(String customerId) {
     return _db
-        .collection('Favorites')
+        .collection('Favorite')
         .where('customerId', isEqualTo: customerId)
         .where('targetRole', isEqualTo: FavoriteTargetRole.product.name)
         .snapshots()

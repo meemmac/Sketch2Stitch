@@ -89,7 +89,7 @@ class BrowseService {
     String sortBy = 'default',
     String? search,
   }) {
-    Query query = _db.collection('Tailors');
+    Query query = _db.collection('Tailor');
 
 
     if (minRating != null && minRating > 0) {
@@ -124,7 +124,7 @@ class BrowseService {
   /// Searches for tailors by name.
   Future<List<Tailor>> searchTailorsByQuery(String query) async {
     final normalizedQuery = query.toLowerCase();
-    final snapshot = await _db.collection('Tailors')
+    final snapshot = await _db.collection('Tailor')
         .where('nameLower', isGreaterThanOrEqualTo: normalizedQuery)
         .where('nameLower', isLessThanOrEqualTo: '$normalizedQuery\uf8ff')
         .get();
@@ -142,7 +142,7 @@ class BrowseService {
     String sortBy = 'default',
     String? search,
   }) {
-    Query query = _db.collection('Retailers');
+    Query query = _db.collection('Retailer');
 
 
     if (minRating != null && minRating > 0) {
@@ -177,7 +177,7 @@ class BrowseService {
   /// Searches for retailers by shop name.
   Future<List<Retailer>> searchRetailersByQuery(String query) async {
     final normalizedQuery = query.toLowerCase();
-    final snapshot = await _db.collection('Retailers')
+    final snapshot = await _db.collection('Retailer')
         .where('shopNameLower', isGreaterThanOrEqualTo: normalizedQuery)
         .where('shopNameLower', isLessThanOrEqualTo: '$normalizedQuery\uf8ff')
         .get();

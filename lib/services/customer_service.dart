@@ -16,16 +16,16 @@ class CustomerService {
 
   // ─── Service Providers ─────────────────────────────────────────────────────
 
-  /// Fetches all tailors from the 'Tailors' collection.
+  /// Fetches all tailors from the 'Tailor' collection.
   Stream<List<Tailor>> getTailors() {
-    return _firestore.collection('Tailors').snapshots().map((snapshot) {
+    return _firestore.collection('Tailor').snapshots().map((snapshot) {
       return snapshot.docs.map((doc) => Tailor.fromJson(doc.data())).toList();
     });
   }
 
-  /// Fetches all retailers from the 'Retailers' collection.
+  /// Fetches all retailers from the 'Retailer' collection.
   Stream<List<Retailer>> getRetailers() {
-    return _firestore.collection('Retailers').snapshots().map((snapshot) {
+    return _firestore.collection('Retailer').snapshots().map((snapshot) {
       return snapshot.docs.map((doc) => Retailer.fromJson(doc.data())).toList();
     });
   }
@@ -35,7 +35,7 @@ class CustomerService {
   /// Updates customer profile data.
   Future<void> updateCustomerProfile(String customerId, Map<String, dynamic> data) async {
     try {
-      await _firestore.collection('Customers').doc(customerId).update(data);
+      await _firestore.collection('Customer').doc(customerId).update(data);
     } catch (e) {
       debugPrint('Error updating customer profile: $e');
       rethrow;
@@ -45,7 +45,7 @@ class CustomerService {
 /// Streams the customer profile for real-time updates.
 Stream<Customer?> streamCustomerProfile(String uid) {
   return _firestore
-      .collection('Customers')
+      .collection('Customer')
       .doc(uid)
       .snapshots()
       .map((doc) => doc.exists ? Customer.fromJson(doc.data()!) : null);
@@ -61,7 +61,7 @@ Stream<Customer?> streamCustomerProfile(String uid) {
       FavoriteTargetRole targetRole,
       ) async {
     try {
-      final favoritesRef = _firestore.collection('Favorites');
+      final favoritesRef = _firestore.collection('Favorite');
       final query = await favoritesRef
           .where('customerId', isEqualTo: customerId)
           .where('targetId', isEqualTo: targetId)
@@ -94,7 +94,7 @@ Stream<Customer?> streamCustomerProfile(String uid) {
   /// Streams a list of favorites for a customer.
   Stream<List<Favorite>> streamFavorites(String customerId) {
     return _firestore
-        .collection('Favorites')
+        .collection('Favorite')
         .where('customerId', isEqualTo: customerId)
         .snapshots()
         .map((snapshot) =>
@@ -109,7 +109,7 @@ Stream<Customer?> streamCustomerProfile(String uid) {
   Future<void> addToLastViewed(String uid, String productId) async {
     try {
       final lastViewedRef = _firestore
-          .collection('Customers')
+          .collection('Customer')
           .doc(uid)
           .collection('LastViewed')
           .doc(productId);
@@ -130,7 +130,7 @@ Stream<Customer?> streamCustomerProfile(String uid) {
   /// Streams the list of recently viewed products.
   Stream<List<Product>> streamLastViewed(String uid) {
     return _firestore
-        .collection('Customers')
+        .collection('Customer')
         .doc(uid)
         .collection('LastViewed')
         .orderBy('viewedAt', descending: true)

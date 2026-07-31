@@ -18,7 +18,7 @@ class RetailerService {
   /// Fetches a specific retailer profile by ID.
   Future<Retailer?> getRetailerByRetailerId(String retailerId) async {
     try {
-      final doc = await _db.collection('Retailers').doc(retailerId).get();
+      final doc = await _db.collection('Retailer').doc(retailerId).get();
       if (!doc.exists || doc.data() == null) return null;
       return Retailer.fromJson(doc.data()!);
     } catch (e) {
@@ -34,7 +34,7 @@ class RetailerService {
   /// Updates retailer shop info, location, and other profile details.
   Future<void> updateRetailerProfile(String retailerId, Map<String, dynamic> data) async {
     try {
-      await _db.collection('Retailers').doc(retailerId).update(data);
+      await _db.collection('Retailer').doc(retailerId).update(data);
     } catch (e) {
       debugPrint('Error updating retailer profile: $e');
       rethrow;

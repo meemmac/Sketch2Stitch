@@ -15,7 +15,7 @@ class TailorService {
   /// Fetches a specific tailor profile by ID.
   Future<Tailor?> getTailorByTailorId(String tailorId) async {
     try {
-      final doc = await _db.collection('Tailors').doc(tailorId).get();
+      final doc = await _db.collection('Tailor').doc(tailorId).get();
       if (!doc.exists || doc.data() == null) return null;
       return Tailor.fromJson(doc.data()!);
     } catch (e) {
@@ -30,7 +30,7 @@ class TailorService {
   /// Updates tailor shop info, location, and other profile details.
   Future<void> updateTailorProfile(String tailorId, Map<String, dynamic> data) async {
     try {
-      await _db.collection('Tailors').doc(tailorId).update(data);
+      await _db.collection('Tailor').doc(tailorId).update(data);
     } catch (e) {
       debugPrint('Error updating tailor profile: $e');
       rethrow;
@@ -117,7 +117,7 @@ class TailorService {
         'status': TailorJobStatus.quoted.toValue,
         'quoteStatus': QuoteStatus.sent.toValue,
         'quoteAmount': quoteAmount,
-        'estimatedDeliveryDate': estimatedDeliveryDate.toIso8601String(),
+        'estimatedDeliveryDate': Timestamp.fromDate(estimatedDeliveryDate),
         'quoteNote': note,
       });
     } catch (e) {
@@ -149,7 +149,7 @@ class TailorService {
   Stream<List<Tailor>> getNearbyTailors(GeoPoint center, double radiusKm) {
     // This simple query fetches all tailors; client-side filtering is applied.
     // For large datasets, a true geo-query using Geohashes is required.
-    return _db.collection('Tailors').snapshots().map((snapshot) {
+    return _db.collection('Tailor').snapshots().map((snapshot) {
       return snapshot.docs.map((doc) => Tailor.fromJson(doc.data())).where((tailor) {
         if (tailor.location == null) return false;
 

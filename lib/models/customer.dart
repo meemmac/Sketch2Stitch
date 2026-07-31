@@ -7,9 +7,7 @@ import 'conversation.dart';
 import 'favorite.dart';
 import 'notification.dart';
 
-/// Flat monthly cap for Virtual Trial generations. Same for every customer —
-/// no tiers. At ~0.005 tk per generation this exists to stop scripted abuse,
-/// not to save money, so keep it generous.
+/// Flat monthly cap for Virtual Trial generations.
 const int kVirtualTrialMonthlyLimit = 20;
 
 class Customer {
@@ -60,7 +58,6 @@ class Customer {
   bool get vtLimitReached => vtUsed >= kVirtualTrialMonthlyLimit;
 
   Map<String, dynamic> toJson() => {
-    'id': id,
     'name': name,
     'email': email,
     'phone': phone,
@@ -71,9 +68,9 @@ class Customer {
         vtResetDate != null ? Timestamp.fromDate(vtResetDate!) : null,
   };
 
-  factory Customer.fromJson(Map<String, dynamic> json) {
+  factory Customer.fromJson(Map<String, dynamic> json, {String? id}) {
     return Customer(
-      id: json['id'] ?? '',
+      id: id ?? json['id'] ?? '',
       name: json['name'] ?? '',
       email: json['email'] ?? '',
       phone: json['phone'] ?? '',

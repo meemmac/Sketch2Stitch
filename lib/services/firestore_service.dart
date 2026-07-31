@@ -21,10 +21,18 @@ class FirestoreService {
     return _db.collection('Orders').doc(orderId).snapshots().map((doc) {
       if (!doc.exists) return null;
       final data = doc.data() as Map<String, dynamic>;
+      
+      // Convert Timestamps to ISO strings for the Model
+      if (data['orderDate'] is Timestamp) {
+        data['orderDate'] = (data['orderDate'] as Timestamp).toDate().toIso8601String();
+      }
+      if (data['tailorSelectionDeadline'] is Timestamp) {
+        data['tailorSelectionDeadline'] = (data['tailorSelectionDeadline'] as Timestamp).toDate().toIso8601String();
+      }
+      
       return Order.fromJson({...data, 'id': doc.id});
     });
   }
-
 
   /// Streams all sub-orders associated with an order.
   Stream<List<SubOrder>> streamSubOrders(String orderId) {
@@ -33,11 +41,19 @@ class FirestoreService {
         .where('orderId', isEqualTo: orderId)
         .snapshots()
         .map((snapshot) => snapshot.docs.map((doc) {
-      final data = doc.data();
-      return SubOrder.fromJson({...data, 'id': doc.id});
-    }).toList());
+              final data = doc.data();
+              
+              // Convert Timestamps for the Model
+              if (data['deliveryDate'] is Timestamp) {
+                data['deliveryDate'] = (data['deliveryDate'] as Timestamp).toDate().toIso8601String();
+              }
+              if (data['autoReleaseAt'] is Timestamp) {
+                data['autoReleaseAt'] = (data['autoReleaseAt'] as Timestamp).toDate().toIso8601String();
+              }
+              
+              return SubOrder.fromJson({...data, 'id': doc.id});
+            }).toList());
   }
-
 
   /// Streams the tailor job associated with an order.
   Stream<TailorJob?> streamTailorJob(String orderId) {
@@ -50,8 +66,29 @@ class FirestoreService {
       if (snapshot.docs.isEmpty) return null;
       final doc = snapshot.docs.first;
       final data = doc.data();
-      return TailorJob.fromJson({...data, 'id': doc.id});
+      
+      // Convert Timestamps and map 'deliverCharge' (DB) to 'deliveryCharge' (Model)
+      final modelData = Map<String, dynamic>.from(data);
+      
+      _convertTailorJobDates(modelData);
+      if (modelData['deliverCharge'] != null) {
+        modelData['deliveryCharge'] = modelData['deliverCharge'];
+      }
+      
+      return TailorJob.fromJson({...modelData, 'id': doc.id});
     });
+  }
+
+  void _convertTailorJobDates(Map<String, dynamic> data) {
+    const dateFields = [
+      'confirmedAt', 'createdAt', 'requestedAt', 'estimatedDeliveryDate',
+      'quoteResponseDeadline', 'autoReleaseAt'
+    ];
+    for (var field in dateFields) {
+      if (data[field] is Timestamp) {
+        data[field] = (data[field] as Timestamp).toDate().toIso8601String();
+      }
+    }
   }
 
 
@@ -86,6 +123,9 @@ class FirestoreService {
             .snapshots()
             .map((s) => s.docs.map((d) {
           final data = d.data();
+          if (data['orderDate'] is Timestamp) {
+            data['orderDate'] = (data['orderDate'] as Timestamp).toDate().toIso8601String();
+          }
           return Order.fromJson({...data, 'id': d.id});
         }).toList());
 
@@ -105,6 +145,9 @@ class FirestoreService {
               .get();
           return ordersSnap.docs.map((d) {
             final data = d.data();
+            if (data['orderDate'] is Timestamp) {
+              data['orderDate'] = (data['orderDate'] as Timestamp).toDate().toIso8601String();
+            }
             return Order.fromJson({...data, 'id': d.id});
           }).toList();
         });
@@ -125,6 +168,9 @@ class FirestoreService {
               .get();
           return ordersSnap.docs.map((d) {
             final data = d.data();
+            if (data['orderDate'] is Timestamp) {
+              data['orderDate'] = (data['orderDate'] as Timestamp).toDate().toIso8601String();
+            }
             return Order.fromJson({...data, 'id': d.id});
           }).toList();
         });
