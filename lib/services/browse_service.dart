@@ -132,6 +132,83 @@ class BrowseService {
 
     return snapshot.docs.map((doc) => Tailor.fromJson(doc.data())).toList();
   }
+// ─── Retailers ────────────────────────────────────────────────────────────
 
+
+  /// Filters retailers based on rating, location, and search terms.
+  Stream<List<Retailer>> getRetailersByFilter({
+    double? minRating,
+    String? location,
+    String sortBy = 'default',
+    String? search,
+  }) {
+    Query query = _db.collection('Retailers');
+
+
+    if (minRating != null && minRating > 0) {
+      query = query.where('rating', isGreaterThanOrEqualTo: minRating);
+    }
+
+
+    if (sortBy == 'ratingHighToLow') {
+      query = query.orderBy('rating', descending: true);
+    }
+
+
+    return query.snapshots().map((snapshot) {
+      var retailers = snapshot.docs.map((doc) => Retailer.fromJson(doc.data() as Map<String, dynamic>)).toList();
+
+
+      if (location != null && location != 'All') {
+        retailers = retailers.where((r) => r.address.toLowerCase().contains(location.toLowerCase())).toList();
+      }
+
+
+      if (search != null && search.isNotEmpty) {
+        retailers = retailers.where((r) => r.shopName.toLowerCase().contains(search.toLowerCase())).toList();
+      }
+
+
+      return retailers;
+    });
+  }
+
+
+  /// Searches for retailers by shop name.
+  Future<List<Retailer>> searchRetailersByQuery(String query) async {
+    final normalizedQuery = query.toLowerCase();
+    final snapshot = await _db.collection('Retailers')
+        .where('shopNameLower', isGreaterThanOrEqualTo: normalizedQuery)
+        .where('shopNameLower', isLessThanOrEqualTo: '$normalizedQuery\uf8ff')
+        .get();
+
+
+    return snapshot.docs.map((doc) => Retailer.fromJson(doc.data())).toList();
+  }
+
+
+// ─── Orders ───────────────────────────────────────────────────────────────
+
+
+  /// Searches through a customer's orders.
+  Stream<List<Order>> searchOrders(String customerId, String query) {
+    return _db.collection('Orders')
+        .where('customerId', isEqualTo: customerId)
+        .snapshots()
+        .map((snapshot) {
+      final orders = snapshot.docs
+          .map((doc) => Order.fromJson(doc.data()))
+          .toList();
+
+      if (query.isEmpty) return orders;
+
+
+      final lowerQuery = query.toLowerCase();
+      return orders.where((o) {
+        return o.id.toLowerCase().contains(lowerQuery) ||
+            o.status.name.toLowerCase().contains(lowerQuery);
+      }).toList();
+    });
+  }
 
 }
