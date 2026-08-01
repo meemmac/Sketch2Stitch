@@ -4,7 +4,8 @@ import 'package:sketch2stitch/screens/shared/register_screen.dart';
 import 'package:sketch2stitch/screens/shared/welcome_screen.dart'; // Add this import
 import 'package:sketch2stitch/screens/shared/forgot_password_screen.dart';
 import 'package:sketch2stitch/screens/customer/home_screen.dart';
-
+import '../../services/auth_service.dart';
+import '../../models/user_role.dart';
 import '../../widgets/dashboard_drawer.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -20,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen>
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   String? _selectedUserType;
+  bool _isLoading = false;
 
   final List<String> _userTypes = ['Customer', 'Retailer', 'Tailor'];
 
@@ -43,7 +45,7 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   // ✅ Helper method to get AppUserRole from string
-  AppUserRole _getSelectedRole() {
+  AppUserRole _getSelectedAppRole() {
     switch (_selectedUserType) {
       case 'Tailor':
         return AppUserRole.tailor;
@@ -54,7 +56,18 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  void _login() {
+  UserRole _getSelectedUserRole() {
+    switch (_selectedUserType) {
+      case 'Tailor':
+        return UserRole.tailor;
+      case 'Retailer':
+        return UserRole.retailer;
+      default:
+        return UserRole.customer;
+    }
+  }
+
+  Future<void> _login() async {
     // Validate user type
     if (_selectedUserType == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -66,18 +79,62 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-    // Get the role
-    AppUserRole role = _getSelectedRole();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
 
-    // Navigate to home with selected role
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => UnifiedHomeScreen(
-          initialRole: role, // ✅ Pass the selected role
-        ),
-      ),
-    );
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter email and password')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final credential = await AuthService().signInWithEmailAndPassword(
+        email,
+        password,
+      );
+
+      if (credential.user != null) {
+        final role = _getSelectedUserRole();
+        final profile = await AuthService().getUserProfile(
+          credential.user!.uid,
+          role,
+        );
+
+        if (!mounted) return;
+
+        if (profile != null) {
+          // Navigate to home with selected role
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => UnifiedHomeScreen(
+                initialRole: _getSelectedAppRole(),
+              ),
+            ),
+          );
+        } else {
+          // Sign out if profile doesn't match role
+          await AuthService().signOut();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Profile not found for this role')),
+          );
+        }
+      }
+    } on AuthServiceException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('An unexpected error occurred')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -379,7 +436,7 @@ class _LoginScreenState extends State<LoginScreen>
                                   width: double.infinity,
                                   height: 46,
                                   child: ElevatedButton(
-                                    onPressed: _login, // Call _login method
+                                    onPressed: _isLoading ? null : _login,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.black,
                                       shape: RoundedRectangleBorder(
@@ -387,14 +444,23 @@ class _LoginScreenState extends State<LoginScreen>
                                       ),
                                       elevation: 0,
                                     ),
-                                    child: const Text(
-                                      'Get Started',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
+                                    child: _isLoading
+                                        ? const SizedBox(
+                                            height: 20,
+                                            width: 20,
+                                            child: CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : const Text(
+                                            'Get Started',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
                                   ),
                                 ),
                                 const SizedBox(height: 12),

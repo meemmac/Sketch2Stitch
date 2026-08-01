@@ -1,5 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../../models/user_role.dart';
+import '../../services/auth_service.dart';
 import 'login_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'location_picker_screen.dart';
@@ -29,6 +31,7 @@ class _RegisterScreenState extends State<RegisterScreen>
   GeoPoint? _tailorLocation;
   GeoPoint? _retailerLocation;
   bool _locationError = false;
+  bool _isLoading = false;
 
 
   late AnimationController _floatController;
@@ -156,6 +159,79 @@ class _RegisterScreenState extends State<RegisterScreen>
 
 
     return true;
+  }
+
+  Future<void> _handleRegistration() async {
+    final email = _step == RegisterStep.customerForm
+        ? _customerEmailController.text
+        : _step == RegisterStep.tailorForm
+            ? _tailorEmailController.text
+            : _orgEmailController.text;
+
+    if (!_validateCommonFields(email)) return;
+
+    UserRole role;
+    Map<String, dynamic> profileData = {
+      'email': email,
+      'phone': _step == RegisterStep.customerForm
+          ? _customerPhoneController.text
+          : _step == RegisterStep.tailorForm
+              ? _tailorPhoneController.text
+              : _retailerPhoneController.text,
+      'address': _step == RegisterStep.customerForm
+          ? _cusomerAddressController.text
+          : _step == RegisterStep.tailorForm
+              ? _tailorAddressController.text
+              : _shopAddressController.text,
+    };
+
+    if (_step == RegisterStep.customerForm) {
+      role = UserRole.customer;
+      profileData['name'] = _customerFullNameController.text;
+      profileData['location'] = _customerLocation;
+      profileData['vtUsed'] = 0;
+    } else if (_step == RegisterStep.tailorForm) {
+      role = UserRole.tailor;
+      profileData['name'] = _tailorFullNameController.text;
+      profileData['location'] = _tailorLocation;
+      profileData['rating'] = 0.0;
+    } else {
+      role = UserRole.retailer;
+      profileData['shopName'] = _shopNameController.text;
+      profileData['location'] = _retailerLocation;
+      profileData['rating'] = 0.0;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await AuthService().signUpWithEmailAndPassword(
+        email,
+        _passwordController.text,
+        role,
+        profileData,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Registration successful! Please login.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+    } on AuthServiceException catch (e) {
+      _showError(e.message);
+    } catch (e) {
+      _showError('An unexpected error occurred.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
 
@@ -462,29 +538,20 @@ class _RegisterScreenState extends State<RegisterScreen>
 
 
         _buildNextButton(
-          onPressed: () {
-            if (_customerFullNameController.text.trim().isEmpty) {
-              _showError('Full name is required');
-              return;
-            }
-            if (!_validateCommonFields(_customerEmailController.text)) return;
-            if (_customerLocation == null) {
-              setState(() => _locationError = true);
-              _showError('Please pin your delivery location.');
-              return;
-            }
-            UserSession.instance.customerProfile.value = DrawerProfileData(
-              name: _customerFullNameController.text,
-              email: _customerEmailController.text,
-              phone: _customerPhoneController.text,
-              address: _cusomerAddressController.text,
-              location: _customerLocation,
-            );
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const LoginScreen()),
-            );
-          },
+          onPressed: _isLoading
+              ? () {}
+              : () {
+                  if (_customerFullNameController.text.trim().isEmpty) {
+                    _showError('Full name is required');
+                    return;
+                  }
+                  if (_customerLocation == null) {
+                    setState(() => _locationError = true);
+                    _showError('Please pin your delivery location.');
+                    return;
+                  }
+                  _handleRegistration();
+                },
         ),
         const SizedBox(height: 8),
         _buildSignInRow(),
@@ -565,29 +632,20 @@ class _RegisterScreenState extends State<RegisterScreen>
         ),
         const SizedBox(height: 12),
         _buildNextButton(
-          onPressed: () {
-            if (_tailorFullNameController.text.trim().isEmpty) {
-              _showError('Shop name is required');
-              return;
-            }
-            if (!_validateCommonFields(_tailorEmailController.text)) return;
-            if (_tailorLocation == null) {
-              setState(() => _locationError = true);
-              _showError('Please pin your shop location.');
-              return;
-            }
-            UserSession.instance.tailorProfile.value = DrawerProfileData(
-              name: _tailorFullNameController.text,
-              email: _tailorEmailController.text,
-              phone: _tailorPhoneController.text,
-              address: _tailorAddressController.text,
-              location: _tailorLocation,
-            );
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const LoginScreen()),
-            );
-          },
+          onPressed: _isLoading
+              ? () {}
+              : () {
+                  if (_tailorFullNameController.text.trim().isEmpty) {
+                    _showError('Shop name is required');
+                    return;
+                  }
+                  if (_tailorLocation == null) {
+                    setState(() => _locationError = true);
+                    _showError('Please pin your shop location.');
+                    return;
+                  }
+                  _handleRegistration();
+                },
         ),
         const SizedBox(height: 8),
         _buildSignInRow(),
@@ -669,30 +727,20 @@ class _RegisterScreenState extends State<RegisterScreen>
 
 
         _buildNextButton(
-          onPressed: () {
-            if (_shopNameController.text.trim().isEmpty) {
-              _showError('Shop name is required');
-              return;
-            }
-            if (!_validateCommonFields(_orgEmailController.text)) return;
-            if (_retailerLocation == null) {
-              setState(() => _locationError = true);
-              _showError('Please pin your shop location.');
-              return;
-            }
-            UserSession.instance.retailerProfile.value = DrawerProfileData(
-              name: _shopNameController.text,
-              shopName: _shopNameController.text,
-              email: _orgEmailController.text,
-              phone: _retailerPhoneController.text,
-              address: _shopAddressController.text,
-              location: _retailerLocation,
-            );
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const LoginScreen()),
-            );
-          },
+          onPressed: _isLoading
+              ? () {}
+              : () {
+                  if (_shopNameController.text.trim().isEmpty) {
+                    _showError('Shop name is required');
+                    return;
+                  }
+                  if (_retailerLocation == null) {
+                    setState(() => _locationError = true);
+                    _showError('Please pin your shop location.');
+                    return;
+                  }
+                  _handleRegistration();
+                },
         ),
         const SizedBox(height: 8),
         _buildSignInRow(),
@@ -912,7 +960,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       width: double.infinity,
       height: 42,
       child: ElevatedButton(
-        onPressed: onPressed,
+        onPressed: _isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.black,
           shape: RoundedRectangleBorder(
@@ -920,18 +968,28 @@ class _RegisterScreenState extends State<RegisterScreen>
           ),
           elevation: 0,
         ),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              'Submit',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+            if (_isLoading)
+              const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+            else
+              const Text(
+                'Submit',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
           ],
         ),
       ),

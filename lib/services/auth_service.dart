@@ -48,17 +48,28 @@ class AuthService {
     }
   }
 
-  /// Create new account.
-  Future<UserCredential> registerWithEmailAndPassword(
-      String email,
-      String password,
-      UserRole role,
-      ) async {
+  /// Create new account and save profile data.
+  Future<UserCredential> signUpWithEmailAndPassword(
+    String email,
+    String password,
+    UserRole role,
+    Map<String, dynamic> profileData,
+  ) async {
     try {
-      return await _auth.createUserWithEmailAndPassword(
+      final credential = await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
+
+      if (credential.user != null) {
+        final collection = _getCollectionForRole(role);
+        await _firestore
+            .collection(collection)
+            .doc(credential.user!.uid)
+            .set(profileData);
+      }
+
+      return credential;
     } on FirebaseAuthException catch (e) {
       throw AuthServiceException(_messageForCode(e.code));
     } catch (e) {
@@ -143,8 +154,10 @@ class AuthService {
         return 'Too many attempts. Please wait a bit and try again.';
       case 'network-request-failed':
         return 'Network error — check your connection and try again.';
+      case 'operation-not-allowed':
+        return 'Email and password authentication is not enabled in Firebase Console.';
       default:
-        return 'An authentication error occurred. Please try again.';
+        return 'Authentication error ($code). Please try again.';
     }
   }
 }
