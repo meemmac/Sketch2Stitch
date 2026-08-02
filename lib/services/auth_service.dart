@@ -295,9 +295,9 @@ class AuthService {
       case 'user-disabled':
         return 'This account has been disabled. Please contact support.';
       case 'user-not-found':
-        return 'We couldn\'t find an account with that email.';
       case 'wrong-password':
-        return 'The password you entered is incorrect.';
+      case 'invalid-credential':
+        return 'Credentials do not match.';
       case 'email-already-in-use':
         return 'This email is already registered. Try logging in instead.';
       case 'weak-password':

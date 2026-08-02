@@ -690,6 +690,7 @@ class _LoginScreenState extends State<LoginScreen>
                                   fontWeight: FontWeight.w600,
                                   fontSize: 14,
                                   height: 1.3,
+
                                 ),
                               ),
                             ),
