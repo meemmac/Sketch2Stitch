@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/models/product.dart';
-import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
+import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
 import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
@@ -757,13 +757,13 @@ final List<Retailer> kHardcodedRetailers = [
 class RetailersPageBody extends StatefulWidget {
   final ValueNotifier<String> searchQuery;
   final RetailersFilterData filterData;
-  final AppUserRole userRole;
+  final UserRole userRole;
 
   const RetailersPageBody({
     super.key,
     required this.searchQuery,
     required this.filterData,
-    this.userRole = AppUserRole.customer,
+    this.userRole = UserRole.customer,
   });
 
   @override

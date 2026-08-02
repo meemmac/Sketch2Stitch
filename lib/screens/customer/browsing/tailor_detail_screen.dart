@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/review.dart';
-import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
 import 'package:sketch2stitch/models/user_role.dart';
@@ -9,13 +8,13 @@ import 'package:sketch2stitch/models/user_role.dart';
 class TailorDetailScreen extends StatefulWidget {
   final Tailor tailor;
   final void Function(String tailorId)? onTailorSelected;
-  final AppUserRole userRole;
+  final UserRole userRole;
 
   const TailorDetailScreen({
     super.key,
     required this.tailor,
     this.onTailorSelected,
-    this.userRole = AppUserRole.customer,
+    this.userRole = UserRole.customer,
   });
 
   @override
@@ -40,7 +39,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     'Faisal Ahmed',
   ];
 
-  bool get _isCustomer => widget.userRole == AppUserRole.customer;
+  bool get _isCustomer => widget.userRole == UserRole.customer;
 
   @override
   void initState() {

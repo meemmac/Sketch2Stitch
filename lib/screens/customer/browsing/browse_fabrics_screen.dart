@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
-import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
+import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
@@ -350,14 +350,14 @@ class FabricsPageBody extends StatefulWidget {
   final ValueNotifier<String> searchQuery;
   final ProductFilterData filterData;
   final bool showFabrics;
-  final AppUserRole userRole;
+  final UserRole userRole;
 
   const FabricsPageBody({
     super.key,
     required this.searchQuery,
     required this.filterData,
     this.showFabrics = true,
-    this.userRole = AppUserRole.customer,
+    this.userRole = UserRole.customer,
   });
 
   @override

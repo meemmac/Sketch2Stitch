@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
+import 'package:sketch2stitch/models/user_role.dart';
 import 'track_order.dart';
 
 class OrderListScreen extends StatefulWidget {
-  final AppUserRole userRole;
+  final UserRole userRole;
 
   const OrderListScreen({
     super.key,
-    this.userRole = AppUserRole.customer,
+    this.userRole = UserRole.customer,
   });
 
   @override

@@ -73,7 +73,7 @@ class Customer {
       id: id ?? json['id'] ?? '',
       name: json['name'] ?? '',
       email: json['email'] ?? '',
-      phone: json['phone'] ?? '',
+      phone: json['phone']?.toString() ?? '',
       address: json['address'] ?? '',
       location: json['location'] is GeoPoint
           ? json['location'] as GeoPoint

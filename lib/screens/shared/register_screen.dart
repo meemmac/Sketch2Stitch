@@ -1,30 +1,66 @@
 import 'dart:ui';
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../models/user_role.dart';
+import '../../services/auth_service.dart';
 import 'login_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'location_picker_screen.dart';
-import '../../services/user_session.dart';
-import '../../widgets/dashboard_drawer.dart';
+import '../../utils/validation_utils.dart';
+import '../../widgets/password_strength_indicator.dart';
+
+
+
 
 enum RegisterStep { roleSelect, customerForm, tailorForm, retailerForm }
 
+
+
+
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
+
+
+
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
+
+
+
 class _RegisterScreenState extends State<RegisterScreen>
     with SingleTickerProviderStateMixin {
   RegisterStep _step = RegisterStep.roleSelect;
-  String? _selectedRole;
   GeoPoint? _customerLocation;
   GeoPoint? _tailorLocation;
   GeoPoint? _retailerLocation;
   bool _locationError = false;
+  bool _isLoading = false;
+
+
+  // Top feedback state
+  String? _feedbackMessage;
+  Color? _feedbackColor;
+  Timer? _feedbackTimer;
+
+
+
 
   late AnimationController _floatController;
+
+
+
+
+  // Shared Account controllers
+  final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
+  String _passwordStrength = '';
+
+
+
 
   // Customer form controllers
   final _customerFullNameController = TextEditingController();
@@ -32,17 +68,26 @@ class _RegisterScreenState extends State<RegisterScreen>
   final _customerPhoneController = TextEditingController();
   final _cusomerAddressController = TextEditingController();
 
+
+
+
   // Tailor form controllers
   final _tailorFullNameController = TextEditingController();
   final _tailorEmailController = TextEditingController();
   final _tailorPhoneController = TextEditingController();
   final _tailorAddressController = TextEditingController();
 
+
+
+
   // Retailer form controllers
   final _shopNameController = TextEditingController();
   final _orgEmailController = TextEditingController();
   final _retailerPhoneController = TextEditingController();
   final _shopAddressController = TextEditingController();
+
+
+
 
   @override
   void initState() {
@@ -53,8 +98,12 @@ class _RegisterScreenState extends State<RegisterScreen>
     )..repeat(reverse: true);
   }
 
+
+
+
   @override
   void dispose() {
+    _passwordController.dispose();
     _customerFullNameController.dispose();
     _customerEmailController.dispose();
     _customerPhoneController.dispose();
@@ -70,9 +119,11 @@ class _RegisterScreenState extends State<RegisterScreen>
     super.dispose();
   }
 
+
+
+
   void _selectRole(String role) {
     setState(() {
-      _selectedRole = role;
       if (role == 'Retailer') {
         _step = RegisterStep.retailerForm;
       } else if (role == 'Tailor') {
@@ -82,6 +133,9 @@ class _RegisterScreenState extends State<RegisterScreen>
       }
     });
   }
+
+
+
 
   void _goBack() {
     if (_step == RegisterStep.roleSelect) {
@@ -93,13 +147,304 @@ class _RegisterScreenState extends State<RegisterScreen>
     }
   }
 
+
+
+
+  void _showFeedback(String message, {bool isError = true}) {
+    _feedbackTimer?.cancel();
+    setState(() {
+      _feedbackMessage = message;
+      _feedbackColor = isError ? Colors.red.shade700 : Colors.green.shade700;
+    });
+
+
+    _feedbackTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() {
+          _feedbackMessage = null;
+        });
+      }
+    });
+  }
+
+
+
+
+  void _showError(String message) {
+    _showFeedback(message, isError: true);
+  }
+
+
+  void _showPasswordRequirements() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.shield_outlined, color: Colors.green),
+            SizedBox(width: 10),
+            Text('Strong Password'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'To keep your account safe, please use at least:',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            ),
+            SizedBox(height: 12),
+            _RequirementItem('At least 8 characters long'),
+            _RequirementItem('One uppercase letter (A-Z)'),
+            _RequirementItem('One lowercase letter (a-z)'),
+            _RequirementItem('One number (0-9)'),
+            _RequirementItem('One special character (!@#\$%^&*)'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+
+
+  bool _validateCommonFields(String email) {
+    if (email.trim().isEmpty || !ValidationUtils.isValidEmail(email)) {
+      _showError('That email address doesn\'t look right. Please check it.');
+      return false;
+    }
+
+
+
+
+    final password = _passwordController.text;
+    if (password.isEmpty) {
+      _showError('Password is required');
+      return false;
+    }
+
+
+
+
+    if (!ValidationUtils.strongPasswordRegex.hasMatch(password)) {
+      _showError(
+        'Password must be at least 8 characters long and include an uppercase letter, lowercase letter, a number, and a special character.',
+      );
+      return false;
+    }
+
+
+    if (_passwordStrength == 'Weak') {
+      _showError('Please choose a stronger password');
+      return false;
+    }
+
+
+
+
+    return true;
+  }
+
+
+  bool _isFormValid() {
+    // 1. Check Role-Specific Fields
+    if (_step == RegisterStep.customerForm) {
+      if (_customerFullNameController.text.trim().isEmpty) {
+        _showError('Please enter your full name');
+        return false;
+      }
+      if (_customerEmailController.text.trim().isEmpty) {
+        _showError('Email address is required');
+        return false;
+      }
+      if (_customerPhoneController.text.trim().isEmpty) {
+        _showError('Please enter your phone number');
+        return false;
+      }
+      if (!ValidationUtils.isValidPhone(_customerPhoneController.text.trim())) {
+        _showError('Please enter a valid phone number (digits and optional +)');
+        return false;
+      }
+      if (_cusomerAddressController.text.trim().isEmpty) {
+        _showError('Please enter your address');
+        return false;
+      }
+      if (_customerLocation == null) {
+        _showError('Please pin your delivery location on the map');
+        return false;
+      }
+    } else if (_step == RegisterStep.tailorForm) {
+      if (_tailorFullNameController.text.trim().isEmpty) {
+        _showError('Please enter your shop name');
+        return false;
+      }
+      if (_tailorEmailController.text.trim().isEmpty) {
+        _showError('Email address is required');
+        return false;
+      }
+      if (_tailorPhoneController.text.trim().isEmpty) {
+        _showError('Please enter your phone number');
+        return false;
+      }
+      if (!ValidationUtils.isValidPhone(_tailorPhoneController.text.trim())) {
+        _showError('Please enter a valid phone number (digits and optional +)');
+        return false;
+      }
+      if (_tailorAddressController.text.trim().isEmpty) {
+        _showError('Please enter your shop address');
+        return false;
+      }
+      if (_tailorLocation == null) {
+        _showError('Please pin your shop location on the map');
+        return false;
+      }
+    } else if (_step == RegisterStep.retailerForm) {
+      if (_shopNameController.text.trim().isEmpty) {
+        _showError('Please enter your shop name');
+        return false;
+      }
+      if (_orgEmailController.text.trim().isEmpty) {
+        _showError('Organizational email is required');
+        return false;
+      }
+      if (_retailerPhoneController.text.trim().isEmpty) {
+        _showError('Please enter your phone number');
+        return false;
+      }
+      if (!ValidationUtils.isValidPhone(_retailerPhoneController.text.trim())) {
+        _showError('Please enter a valid phone number (digits and optional +)');
+        return false;
+      }
+      if (_shopAddressController.text.trim().isEmpty) {
+        _showError('Please enter your shop address');
+        return false;
+      }
+      if (_retailerLocation == null) {
+        _showError('Please pin your shop location on the map');
+        return false;
+      }
+    }
+
+    // 2. Check Password
+    if (_passwordController.text.trim().isEmpty) {
+      _showError('Please create a password');
+      return false;
+    }
+
+
+    // 3. Run Regex/Strength Checks (re-uses _validateCommonFields logic)
+    final email = _step == RegisterStep.customerForm
+        ? _customerEmailController.text
+        : _step == RegisterStep.tailorForm
+        ? _tailorEmailController.text
+        : _orgEmailController.text;
+
+    return _validateCommonFields(email);
+  }
+
+
+  Future<void> _handleRegistration() async {
+    if (!_isFormValid()) return;
+
+
+    final email = _step == RegisterStep.customerForm
+        ? _customerEmailController.text
+        : _step == RegisterStep.tailorForm
+        ? _tailorEmailController.text
+        : _orgEmailController.text;
+
+
+    UserRole role;
+    Map<String, dynamic> profileData = {
+      'email': email.trim(),
+      'phone': (_step == RegisterStep.customerForm
+          ? _customerPhoneController.text
+          : _step == RegisterStep.tailorForm
+          ? _tailorPhoneController.text
+          : _retailerPhoneController.text).trim(),
+      'address': (_step == RegisterStep.customerForm
+          ? _cusomerAddressController.text
+          : _step == RegisterStep.tailorForm
+          ? _tailorAddressController.text
+          : _shopAddressController.text).trim(),
+    };
+
+
+    if (_step == RegisterStep.customerForm) {
+      role = UserRole.customer;
+      profileData['name'] = _customerFullNameController.text.trim();
+      profileData['location'] = _customerLocation;
+      profileData['vtUsed'] = 0;
+    } else if (_step == RegisterStep.tailorForm) {
+      role = UserRole.tailor;
+      profileData['name'] = _tailorFullNameController.text.trim();
+      profileData['location'] = _tailorLocation;
+      profileData['rating'] = 5.0;
+    } else {
+      role = UserRole.retailer;
+      profileData['shopName'] = _shopNameController.text.trim();
+      profileData['location'] = _retailerLocation;
+      profileData['rating'] = 5.0;
+      // Convert phone to number for Retailer per schema
+      profileData['phone'] = int.tryParse(profileData['phone'].toString().replaceAll(RegExp(r'\D'), '')) ?? 0;
+    }
+
+
+    setState(() => _isLoading = true);
+
+
+    try {
+      final result = await AuthService().signUpWithEmailAndPassword(
+        email.trim(),
+        _passwordController.text,
+        role,
+        profileData,
+      );
+
+      if (!mounted) return;
+      
+      _showFeedback(
+        'Registration successful! You can now log in.',
+        isError: false,
+      );
+
+
+      // Delay navigation slightly so the user sees the green banner
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+          );
+        }
+      });
+    } on AuthServiceException catch (e) {
+      _showError(e.message);
+    } catch (e) {
+      _showError('An unexpected error occurred.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [Color(0xFFCDECCB), Color(0xFFEFF9EE)],
@@ -151,6 +496,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                   );
                 },
               ),
+
+
+
 
               // Main content — reserved top space keeps it from ever
               // reaching the Back button, and AnimatedPadding smoothly
@@ -209,9 +557,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                 ),
               ),
 
-              // Back button — last child so it always renders on top,
-              // and the reserved top padding above keeps the card from
-              // ever reaching it.
+
+              // Back button
               Positioned(
                 top: 8,
                 left: 8,
@@ -237,12 +584,150 @@ class _RegisterScreenState extends State<RegisterScreen>
                   ),
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
+
+
+              // 🆕 Top Feedback Banner — Now the ABSOLUTE last item to ensure it sits on top of everything
+              if (_feedbackMessage != null)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: SafeArea(
+                      bottom: false,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(
+                            sigmaX: 12,
+                            sigmaY: 12,
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                            decoration: BoxDecoration(
+                              // Glass background
+                              color: _feedbackColor == Colors.red.shade700
+                                  ? const Color(0xFFFFEBEE).withValues(alpha: 0.92)
+                                  : const Color(0xFFC8E6C9).withValues(alpha: 0.92),
+
+                              borderRadius: BorderRadius.circular(18),
+
+                              // Soft border like the screenshot
+                              border: Border.all(
+                                color: _feedbackColor == Colors.red.shade700
+                                    ? const Color(0xFFFFCDD2)
+                                    : const Color(0xFF9CCC9F),
+                                width: 1.2,
+                              ),
+
+                              // Soft glass shadow
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _feedbackColor == Colors.red.shade700
+                                      ? const Color(0xFFD32F2F).withValues(alpha: 0.10)
+                                      : const Color(0xFF2E7D32).withValues(alpha: 0.10),
+                                  blurRadius: 20,
+                                  spreadRadius: 1,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+
+                            child: Row(
+                              children: [
+
+                                // Icon Circle
+                                Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+
+                                    color: _feedbackColor == Colors.red.shade700
+                                        ? const Color(0xFFE53935)
+                                        : const Color(0xFF4CAF50),
+
+                                    border: Border.all(
+                                      color: _feedbackColor == Colors.red.shade700
+                                          ? const Color(0xFFEF9A9A)
+                                          : const Color(0xFFA5D6A7),
+                                      width: 1,
+                                    ),
+                                  ),
+
+                                  child: Icon(
+                                    _feedbackColor == Colors.red.shade700
+                                        ? Icons.close_rounded
+                                        : Icons.check_rounded,
+
+                                    color: Colors.white,
+
+                                    size: 20,
+                                  ),
+                                ),
+
+                                const SizedBox(width: 12),
+
+                                // Message
+                                Expanded(
+                                  child: Text(
+                                    _feedbackMessage!,
+                                    style: TextStyle(
+                                      color: _feedbackColor == Colors.red.shade700
+                                          ? const Color(0xFF222222)
+                                          : const Color(0xFF222222),
+
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ),
+
+                                const SizedBox(width: 8),
+
+                                // Close Button
+                                GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _feedbackMessage = null;
+                                    });
+                                  },
+                                  child: Container(
+                                    width: 28,
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.white.withValues(alpha: 0.35),
+                                    ),
+                                    child: Icon(
+                                      Icons.close_rounded,
+                                      color: Colors.black.withValues(alpha: 0.45),
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+    ],
+    ),
+    ),
+    ),
     );
   }
+
+
+
 
   Widget _buildStepContent() {
     switch (_step) {
@@ -257,6 +742,9 @@ class _RegisterScreenState extends State<RegisterScreen>
     }
   }
 
+
+
+
   Widget _buildLogo() {
     return Image.asset(
       'assets/images/transparent_logo.png',
@@ -264,6 +752,9 @@ class _RegisterScreenState extends State<RegisterScreen>
       fit: BoxFit.contain,
     );
   }
+
+
+
 
   // ---------------- Step 1: Register As ----------------
   Widget _buildRoleSelect() {
@@ -287,6 +778,9 @@ class _RegisterScreenState extends State<RegisterScreen>
       ],
     );
   }
+
+
+
 
   Widget _buildRoleButton(String role) {
     return SizedBox(
@@ -313,6 +807,9 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
+
+
+
   // ---------------- Step 2a: Customer Form ----------------
   Widget _buildCustomerForm() {
     return Column(
@@ -326,6 +823,9 @@ class _RegisterScreenState extends State<RegisterScreen>
         ),
         const SizedBox(height: 10),
 
+
+
+
         _buildFieldLabel('Full name'),
         const SizedBox(height: 3),
         _buildTextField(
@@ -333,6 +833,9 @@ class _RegisterScreenState extends State<RegisterScreen>
           hint: 'Full name',
         ),
         const SizedBox(height: 7),
+
+
+
 
         _buildFieldLabel('Email address'),
         const SizedBox(height: 3),
@@ -344,15 +847,36 @@ class _RegisterScreenState extends State<RegisterScreen>
         ),
         const SizedBox(height: 7),
 
+
+
+
+        _buildPasswordField(
+          controller: _passwordController,
+          label: 'Password',
+          hint: 'Enter your password',
+          obscureText: _obscurePassword,
+          onToggle: () => setState(() => _obscurePassword = !_obscurePassword),
+          onChanged: (val) => setState(() => _passwordStrength = ValidationUtils.checkPasswordStrength(val)),
+          showStrength: true,
+        ),
+        const SizedBox(height: 7),
+
+
+
+
         _buildFieldLabel('Phone number'),
         const SizedBox(height: 3),
         _buildTextField(
           controller: _customerPhoneController,
           hint: 'Phone number',
           icon: Icons.phone_outlined,
-          keyboardType: TextInputType.phone,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d+]')), LengthLimitingTextInputFormatter(16)],
         ),
         const SizedBox(height: 7),
+
+
+
 
         _buildFieldLabel('Address'),
         const SizedBox(height: 3),
@@ -366,40 +890,27 @@ class _RegisterScreenState extends State<RegisterScreen>
           location: _customerLocation,
           onTap: () => _pickLocation(
             _customerLocation,
-            (loc) => _customerLocation = loc,
+                (loc) => _customerLocation = loc,
           ),
         ),
         const SizedBox(height: 12),
 
+
+
+
         _buildNextButton(
-          onPressed: () {
-            if (_customerLocation == null) {
-              setState(() => _locationError = true);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Please pin your delivery location.'),
-                ),
-              );
-              return;
-            }
-            UserSession.instance.customerProfile.value = DrawerProfileData(
-              name: _customerFullNameController.text,
-              email: _customerEmailController.text,
-              phone: _customerPhoneController.text,
-              address: _cusomerAddressController.text,
-              location: _customerLocation,
-            );
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const LoginScreen()),
-            );
-          },
+          onPressed: _isLoading
+              ? () {}
+              : _handleRegistration,
         ),
         const SizedBox(height: 8),
         _buildSignInRow(),
       ],
     );
   }
+
+
+
 
   // ---------------- Step 2b: Tailor Form ----------------
   Widget _buildTailorForm() {
@@ -414,6 +925,9 @@ class _RegisterScreenState extends State<RegisterScreen>
         ),
         const SizedBox(height: 10),
 
+
+
+
         _buildFieldLabel('Shop name'),
         const SizedBox(height: 3),
         _buildTextField(
@@ -421,6 +935,9 @@ class _RegisterScreenState extends State<RegisterScreen>
           hint: 'Shop name',
         ),
         const SizedBox(height: 7),
+
+
+
 
         _buildFieldLabel('Email address'),
         const SizedBox(height: 3),
@@ -432,15 +949,36 @@ class _RegisterScreenState extends State<RegisterScreen>
         ),
         const SizedBox(height: 7),
 
+
+
+
+        _buildPasswordField(
+          controller: _passwordController,
+          label: 'Password',
+          hint: 'Enter your password',
+          obscureText: _obscurePassword,
+          onToggle: () => setState(() => _obscurePassword = !_obscurePassword),
+          onChanged: (val) => setState(() => _passwordStrength = ValidationUtils.checkPasswordStrength(val)),
+          showStrength: true,
+        ),
+        const SizedBox(height: 7),
+
+
+
+
         _buildFieldLabel('Phone number'),
         const SizedBox(height: 3),
         _buildTextField(
           controller: _tailorPhoneController,
           hint: 'Phone number',
           icon: Icons.phone_outlined,
-          keyboardType: TextInputType.phone,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d+]')), LengthLimitingTextInputFormatter(16)],
         ),
         const SizedBox(height: 7),
+
+
+
 
         _buildFieldLabel('Shop address'),
         const SizedBox(height: 3),
@@ -457,32 +995,18 @@ class _RegisterScreenState extends State<RegisterScreen>
         ),
         const SizedBox(height: 12),
         _buildNextButton(
-          onPressed: () {
-            if (_tailorLocation == null) {
-              setState(() => _locationError = true);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Please pin your shop location.')),
-              );
-              return;
-            }
-            UserSession.instance.tailorProfile.value = DrawerProfileData(
-              name: _tailorFullNameController.text,
-              email: _tailorEmailController.text,
-              phone: _tailorPhoneController.text,
-              address: _tailorAddressController.text,
-              location: _tailorLocation,
-            );
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const LoginScreen()),
-            );
-          },
+          onPressed: _isLoading
+              ? () {}
+              : _handleRegistration,
         ),
         const SizedBox(height: 8),
         _buildSignInRow(),
       ],
     );
   }
+
+
+
 
   // ---------------- Step 3: Retailer Form ----------------
   Widget _buildRetailerForm() {
@@ -497,10 +1021,16 @@ class _RegisterScreenState extends State<RegisterScreen>
         ),
         const SizedBox(height: 10),
 
+
+
+
         _buildFieldLabel('Shop name'),
         const SizedBox(height: 3),
         _buildTextField(controller: _shopNameController, hint: 'Shop name'),
         const SizedBox(height: 7),
+
+
+
 
         _buildFieldLabel('Organizational email'),
         const SizedBox(height: 3),
@@ -512,15 +1042,36 @@ class _RegisterScreenState extends State<RegisterScreen>
         ),
         const SizedBox(height: 7),
 
+
+
+
+        _buildPasswordField(
+          controller: _passwordController,
+          label: 'Password',
+          hint: 'Enter your password',
+          obscureText: _obscurePassword,
+          onToggle: () => setState(() => _obscurePassword = !_obscurePassword),
+          onChanged: (val) => setState(() => _passwordStrength = ValidationUtils.checkPasswordStrength(val)),
+          showStrength: true,
+        ),
+        const SizedBox(height: 7),
+
+
+
+
         _buildFieldLabel('Phone number'),
         const SizedBox(height: 3),
         _buildTextField(
           controller: _retailerPhoneController,
           hint: 'Phone number',
           icon: Icons.phone_outlined,
-          keyboardType: TextInputType.phone,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d+]')), LengthLimitingTextInputFormatter(16)],
         ),
         const SizedBox(height: 7),
+
+
+
 
         _buildFieldLabel('Shop address'),
         const SizedBox(height: 3),
@@ -534,33 +1085,18 @@ class _RegisterScreenState extends State<RegisterScreen>
           location: _retailerLocation,
           onTap: () => _pickLocation(
             _retailerLocation,
-            (loc) => _retailerLocation = loc,
+                (loc) => _retailerLocation = loc,
           ),
         ),
         const SizedBox(height: 12),
 
+
+
+
         _buildNextButton(
-          onPressed: () {
-            if (_retailerLocation == null) {
-              setState(() => _locationError = true);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Please pin your shop location.')),
-              );
-              return;
-            }
-            UserSession.instance.retailerProfile.value = DrawerProfileData(
-              name: _shopNameController.text,
-              shopName: _shopNameController.text,
-              email: _orgEmailController.text,
-              phone: _retailerPhoneController.text,
-              address: _shopAddressController.text,
-              location: _retailerLocation,
-            );
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const LoginScreen()),
-            );
-          },
+          onPressed: _isLoading
+              ? () {}
+              : _handleRegistration,
         ),
         const SizedBox(height: 8),
         _buildSignInRow(),
@@ -568,10 +1104,13 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
+
+
+
   Future<void> _pickLocation(
-    GeoPoint? current,
-    ValueChanged<GeoPoint> onPicked,
-  ) async {
+      GeoPoint? current,
+      ValueChanged<GeoPoint> onPicked,
+      ) async {
     final result = await Navigator.push<GeoPoint>(
       context,
       MaterialPageRoute(
@@ -585,6 +1124,9 @@ class _RegisterScreenState extends State<RegisterScreen>
       });
     }
   }
+
+
+
 
   Widget _buildLocationField({
     required GeoPoint? location,
@@ -648,6 +1190,9 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
+
+
+
   // ---------------- Shared small widgets ----------------
   Widget _buildFieldLabel(String text) {
     return Align(
@@ -659,15 +1204,20 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
+
+
+
   Widget _buildTextField({
     required TextEditingController controller,
     required String hint,
     IconData? icon,
     TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
       style: const TextStyle(fontSize: 14),
       decoration: InputDecoration(
         hintText: hint,
@@ -680,15 +1230,15 @@ class _RegisterScreenState extends State<RegisterScreen>
         suffixIcon: icon == null
             ? null
             : Container(
-                margin: const EdgeInsets.all(5),
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDFF2DF),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, size: 14, color: Colors.black87),
-              ),
+          margin: const EdgeInsets.all(5),
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: const Color(0xFFDFF2DF),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 14, color: Colors.black87),
+        ),
         filled: true,
         fillColor: Colors.white,
         border: OutlineInputBorder(
@@ -699,12 +1249,88 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
+
+
+
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required bool obscureText,
+    required VoidCallback onToggle,
+    ValueChanged<String>? onChanged,
+    bool showStrength = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            _buildFieldLabel(label),
+            if (showStrength) ...[
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: _showPasswordRequirements,
+                child: const Icon(
+                  Icons.info_outline,
+                  size: 16,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 3),
+        TextField(
+          controller: controller,
+          obscureText: obscureText,
+          onChanged: onChanged,
+          style: const TextStyle(fontSize: 14),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: const TextStyle(fontSize: 14),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
+            prefixIcon: const Icon(Icons.lock_outline, size: 20),
+            suffixIcon: IconButton(
+              icon: Icon(
+                obscureText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                size: 18,
+                color: Colors.grey,
+              ),
+              onPressed: onToggle,
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        if (showStrength && controller.text.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          PasswordStrengthIndicator(
+            password: controller.text,
+            strength: _passwordStrength,
+          ),
+        ],
+      ],
+    );
+  }
+
+
+
+
   Widget _buildNextButton({required VoidCallback onPressed}) {
     return SizedBox(
       width: double.infinity,
       height: 42,
       child: ElevatedButton(
-        onPressed: onPressed,
+        onPressed: _isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.black,
           shape: RoundedRectangleBorder(
@@ -714,21 +1340,34 @@ class _RegisterScreenState extends State<RegisterScreen>
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Text(
-              'Submit',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+          children: [
+            if (_isLoading)
+              const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+            else
+              const Text(
+                'Submit',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
           ],
         ),
       ),
     );
   }
+
+
+
 
   Widget _buildSignInRow() {
     return Row(
@@ -759,6 +1398,9 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
+
+
+
   Widget _floatingCircle(double size, Color color) {
     return Container(
       width: size,
@@ -767,3 +1409,30 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 }
+
+
+class _RequirementItem extends StatelessWidget {
+  final String text;
+  const _RequirementItem(this.text);
+
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle_outline, size: 16, color: Colors.green),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 13, color: Colors.black87),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

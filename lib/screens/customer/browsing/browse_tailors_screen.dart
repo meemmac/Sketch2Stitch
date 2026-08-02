@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/portfolio.dart';
-import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
+import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
@@ -158,14 +158,14 @@ class TailorsPageBody extends StatefulWidget {
   final ValueNotifier<String> searchQuery;
   final TailorsFilterData filterData;
   final void Function(String tailorId)? onTailorSelected;
-  final AppUserRole userRole;
+  final UserRole userRole;
 
   const TailorsPageBody({
     super.key,
     required this.searchQuery,
     required this.filterData,
     this.onTailorSelected,
-    this.userRole = AppUserRole.customer,
+    this.userRole = UserRole.customer,
   });
 
   @override

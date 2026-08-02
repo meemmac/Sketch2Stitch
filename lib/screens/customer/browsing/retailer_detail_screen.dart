@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/review.dart';
-import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
@@ -13,14 +12,14 @@ class RetailerDetailScreen extends StatefulWidget {
   final Retailer retailer;
   final VoidCallback? onBackPressed;
   final void Function(String retailerId)? onRetailerSelected;
-  final AppUserRole userRole;
+  final UserRole userRole;
 
   const RetailerDetailScreen({
     super.key,
     required this.retailer,
     this.onBackPressed,
     this.onRetailerSelected,
-    this.userRole = AppUserRole.customer,
+    this.userRole = UserRole.customer,
   });
 
   @override
@@ -64,7 +63,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     'Ribbons',
   ];
 
-  bool get _isCustomer => widget.userRole == AppUserRole.customer;
+  bool get _isCustomer => widget.userRole == UserRole.customer;
 
   @override
   void initState() {

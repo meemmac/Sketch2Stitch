@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/ai_service.dart';
+import '../../models/user_role.dart';
 import '../../utils/api_config.dart';
 import '../../widgets/dashboard_drawer.dart';
 
@@ -256,7 +257,7 @@ class _AITestScreenState extends State<AITestScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       drawer: const DashboardDrawer(
-        initialRole: AppUserRole.customer,
+        initialRole: UserRole.customer,
       ),
       appBar: AppBar(
         leading: Builder(

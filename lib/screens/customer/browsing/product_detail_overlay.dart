@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
-import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
+import 'package:sketch2stitch/models/user_role.dart';
 import '../../../widgets/video_preview_player.dart';
 import '../../../widgets/care_info_tooltip.dart';
 
@@ -9,7 +9,7 @@ class ProductDetailOverlay extends StatefulWidget {
   final bool isFabric;
   final String retailerName;
   final List<String>? materialBlends;
-  final AppUserRole userRole;
+  final UserRole userRole;
 
   const ProductDetailOverlay({
     super.key,
@@ -17,7 +17,7 @@ class ProductDetailOverlay extends StatefulWidget {
     this.isFabric = true,
     this.retailerName = 'Unknown Retailer',
     this.materialBlends,
-    this.userRole = AppUserRole.customer,
+    this.userRole = UserRole.customer,
   });
 
   @override
@@ -39,7 +39,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
   }
 
   bool get _inStock => (_selectedOption?.stock ?? 0) > 0;
-  bool get _isCustomer => widget.userRole == AppUserRole.customer;
+  bool get _isCustomer => widget.userRole == UserRole.customer;
 
   String get _materialBlendDisplay {
     if (widget.materialBlends != null && widget.materialBlends!.isNotEmpty) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/retailer.dart';
+import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_fabrics_screen.dart';
@@ -21,16 +22,16 @@ import 'package:sketch2stitch/screens/tailor/orders_screen.dart';
 import 'order_list_screen.dart';
 
 class UnifiedHomeScreen extends StatefulWidget {
-  final AppUserRole initialRole;
+  final UserRole initialRole;
 
-  const UnifiedHomeScreen({super.key, this.initialRole = AppUserRole.customer});
+  const UnifiedHomeScreen({super.key, this.initialRole = UserRole.customer});
 
   @override
   State<UnifiedHomeScreen> createState() => _UnifiedHomeScreenState();
 }
 
 class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
-  late AppUserRole _currentRole;
+  late UserRole _currentRole;
   final ScrollController _scrollController = ScrollController();
 
   // Customer specific keys
@@ -362,7 +363,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                 ),
             ],
           ),
-          if (_currentRole == AppUserRole.customer)
+          if (_currentRole == UserRole.customer)
             IconButton(
               icon: const Icon(
                 Icons.local_shipping_outlined,
@@ -372,7 +373,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
               onPressed: _openOrderList,
               tooltip: 'My Orders',
             ),
-          if (_currentRole == AppUserRole.customer)
+          if (_currentRole == UserRole.customer)
             IconButton(
               icon: const Icon(
                 Icons.shopping_cart_outlined,
@@ -395,7 +396,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   Widget _buildSectionNavBar() {
     List<Widget> pills = [];
 
-    if (_currentRole == AppUserRole.customer) {
+    if (_currentRole == UserRole.customer) {
       pills.addAll([
         _navPill(
           'Last Viewed',
@@ -497,17 +498,17 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     bool showButton;
 
     switch (_currentRole) {
-      case AppUserRole.customer:
+      case UserRole.customer:
         title = 'Tailoring made easy for you, all in one place.';
         imagePath = 'assets/images/Mask group.png';
         showButton = true;
         break;
-      case AppUserRole.tailor:
+      case UserRole.tailor:
         title = 'Tailoring workspace, digitally organized.';
         imagePath = 'assets/images/tailer_Mask group.png';
         showButton = false;
         break;
-      case AppUserRole.retailer:
+      case UserRole.retailer:
         title = 'Manage inventory, track orders and communicate';
         imagePath = 'assets/images/pexels-dima-valkov-6402847 2.png';
         showButton = false;
@@ -595,7 +596,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   // ---------------- Role specific sections ----------------
   Widget _buildRoleSpecificSections() {
     switch (_currentRole) {
-      case AppUserRole.customer:
+      case UserRole.customer:
         return Column(
           children: [
             _buildVirtualTrialBanner(),
@@ -609,7 +610,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
             _buildCommonSections(),
           ],
         );
-      case AppUserRole.tailor:
+      case UserRole.tailor:
         return Column(
           children: [
             const SizedBox(height: 10),
@@ -618,7 +619,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
             _buildCommonSections(),
           ],
         );
-      case AppUserRole.retailer:
+      case UserRole.retailer:
         return Column(
           children: [
             const SizedBox(height: 10),
@@ -1814,7 +1815,7 @@ class _SeeAllGridScreen<T> extends StatelessWidget {
   final String title;
   final List<T> items;
   final Widget Function(BuildContext, T) cardBuilder;
-  final AppUserRole userRole; // ✅ Added
+  final UserRole userRole; // ✅ Added
 
   const _SeeAllGridScreen({
     required this.title,

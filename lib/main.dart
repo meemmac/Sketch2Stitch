@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'screens/shared/welcome_screen.dart'; // Add this import
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'screens/shared/auth_wrapper.dart';
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -33,7 +35,7 @@ class Sketch2StitchApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
-      home: const WelcomeScreen(), 
+      home: const AuthWrapper(),
     );
   }
 }

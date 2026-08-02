@@ -1,31 +1,33 @@
 import 'package:flutter/foundation.dart';
+import '../models/user_role.dart';
 import '../widgets/dashboard_drawer.dart';
 
-/// Temporary in-memory stand-in for "who's logged in and what's their
-/// profile" until real auth + Firestore are wired up.
-///
-/// DashboardDrawer writes to this whenever a profile is saved.
-/// Any other screen (e.g. CartScreen at checkout, or browsing screens
-/// showing delivery charge) can read it to check things like "has this
-/// customer pinned a delivery location yet?"
+/// Managed the current user's session and profile data.
+/// Provides real-time updates to the UI when the profile changes.
 class UserSession {
   UserSession._();
   static final UserSession instance = UserSession._();
 
-  final ValueNotifier<DrawerProfileData?> customerProfile = ValueNotifier(null);
-  final ValueNotifier<DrawerProfileData?> tailorProfile = ValueNotifier(null);
-  final ValueNotifier<DrawerProfileData?> retailerProfile = ValueNotifier(null);
+  /// The currently active profile.
+  final ValueNotifier<DrawerProfileData?> currentProfile = ValueNotifier(null);
 
-  ValueNotifier<DrawerProfileData?> forRole(AppUserRole role) {
-    switch (role) {
-      case AppUserRole.customer:
-        return customerProfile;
-      case AppUserRole.tailor:
-        return tailorProfile;
-      case AppUserRole.retailer:
-        return retailerProfile;
-    }
+  /// The role of the current user.
+  UserRole? _role;
+  UserRole? get role => _role;
+
+  /// Sets the active session.
+  void setSession(DrawerProfileData profile, UserRole role) {
+    _role = role;
+    currentProfile.value = profile;
+    debugPrint('[UserSession] Session started for ${profile.email} as $role');
   }
 
-  bool get customerHasLocation => customerProfile.value?.location != null;
+  /// Clears the session.
+  void logout() {
+    _role = null;
+    currentProfile.value = null;
+    debugPrint('[UserSession] Session cleared');
+  }
+
+  bool get customerHasLocation => currentProfile.value?.location != null;
 }

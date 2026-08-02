@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../widgets/dashboard_drawer.dart';
+import 'package:sketch2stitch/models/user_role.dart';
 
 // TODO(backend): Replace static `events` list with data fetched from Firestore.
 // Each TrackEventType below maps 1:1 to a backend status value, so building
@@ -173,7 +173,7 @@ class OrderTrackScreen extends StatelessWidget {
     this.lastUpdated = '22 Dec 2026',
     this.deliveryAddress = 'The Shakespeare Centre, Henley Street, CV37 6QW Stratford-upon-Avon, UK.',
     this.events,
-    required AppUserRole userRole,
+    required UserRole userRole,
   });
 
   @override

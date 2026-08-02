@@ -22,7 +22,6 @@ import '../../models/measurement.dart';
 import 'measurement_screen.dart';
 import 'browsing/browse_shell.dart';
 import 'track_order.dart';
-import '../../widgets/dashboard_drawer.dart'; // AppUserRole is defined here
 
 /// ─── Backend Sync Contract ──────────────────────────────────────────────
 ///
@@ -754,7 +753,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
                 MaterialPageRoute(
                   builder: (_) => OrderTrackScreen(
                     orderId: widget.orderId,
-                    userRole: AppUserRole.customer,
+                    userRole: UserRole.customer,
                   ),
                 ),
               );
