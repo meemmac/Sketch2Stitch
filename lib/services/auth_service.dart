@@ -8,20 +8,24 @@ import '../models/customer.dart';
 import '../models/tailor.dart';
 import '../models/retailer.dart';
 
+
 /// EmailJS Credentials - TODO: Replace with your actual IDs from EmailJS Dashboard
 const String _emailjsServiceId = 'service_k4v23nj';
 const String _emailjsTemplateId = 'template_cj9ca0n';
 const String _emailjsPublicKey = 'fkv1tJuqoVoD2O5Ey';
 const String _emailjsAccessToken = 'WczQoC1tFzLQrIhcbLI6J'; //Your Access Token
 
+
 /// Thrown by [AuthService] with an already user-friendly message.
 class AuthServiceException implements Exception {
   AuthServiceException(this.message);
   final String message;
 
+
   @override
   String toString() => message;
 }
+
 
 /// Wraps all Firebase Auth calls. This service handles user authentication
 /// and fetching user profile data from Firestore.
@@ -30,20 +34,24 @@ class AuthService {
       : _auth = firebaseAuth ?? FirebaseAuth.instance,
         _firestore = firestore ?? FirebaseFirestore.instance;
 
+
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
+
 
   /// Current authenticated user.
   User? get currentUser => _auth.currentUser;
 
+
   /// Stream of authentication state changes.
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+
   /// Authenticate user via Firebase Auth.
   Future<UserCredential> signInWithEmailAndPassword(
-    String email,
-    String password,
-  ) async {
+      String email,
+      String password,
+      ) async {
     try {
       return await _auth.signInWithEmailAndPassword(
         email: email.trim(),
@@ -56,19 +64,21 @@ class AuthService {
     }
   }
 
+
   /// Create new account and save profile data.
   /// Returns a record with the [UserCredential] and a [bool] indicating if the welcome email was sent.
   Future<({UserCredential credential, bool emailSent})> signUpWithEmailAndPassword(
-    String email,
-    String password,
-    UserRole role,
-    Map<String, dynamic> profileData,
-  ) async {
+      String email,
+      String password,
+      UserRole role,
+      Map<String, dynamic> profileData,
+      ) async {
     try {
       final credential = await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
+
 
       bool emailSent = false;
       if (credential.user != null) {
@@ -78,10 +88,12 @@ class AuthService {
             .doc(credential.user!.uid)
             .set(profileData);
 
+
         // Send Welcome Email securely via EmailJS
         final name = profileData['name'] ?? profileData['shopName'] ?? 'Member';
         emailSent = await _sendWelcomeEmailViaEmailJS(email: email, name: name, role: role);
       }
+
 
       return (credential: credential, emailSent: emailSent);
     } on FirebaseAuthException catch (e) {
@@ -90,6 +102,8 @@ class AuthService {
       throw AuthServiceException('Registration failed: ${e.toString()}');
     }
   }
+
+
 
 
   /// Handle "Forgot Password" requests.
@@ -105,10 +119,12 @@ class AuthService {
     }
   }
 
+
   /// Logout user.
   Future<void> signOut() async {
     await _auth.signOut();
   }
+
 
   /// Probes Firestore to find which role collection the user belongs to.
   Future<UserRole?> findUserRole(String uid) async {
@@ -116,14 +132,18 @@ class AuthService {
     final customer = await _firestore.collection('Customer').doc(uid).get();
     if (customer.exists) return UserRole.customer;
 
+
     final tailor = await _firestore.collection('Tailor').doc(uid).get();
     if (tailor.exists) return UserRole.tailor;
+
 
     final retailer = await _firestore.collection('Retailer').doc(uid).get();
     if (retailer.exists) return UserRole.retailer;
 
+
     return null;
   }
+
 
   /// Fetch user profile data from the respective Firestore collection.
   /// Returns [Customer], [Tailor], or [Retailer] if found, otherwise null.
@@ -134,10 +154,14 @@ class AuthService {
       final doc = await _firestore.collection(collection).doc(uid).get();
 
 
+
+
       if (!doc.exists || doc.data() == null) {
         debugPrint('[AuthService] No document found in $collection for UID: $uid');
         return null;
       }
+
+
 
 
       final data = doc.data()!;
@@ -157,6 +181,8 @@ class AuthService {
   }
 
 
+
+
   String _getCollectionForRole(UserRole role) {
     switch (role) {
       case UserRole.customer:
@@ -167,6 +193,7 @@ class AuthService {
         return 'Retailer'; // Singular per schema
     }
   }
+
 
   /// Sends a welcome email securely using the EmailJS API.
   /// The app only uses a Public Key, keeping your SMTP/API credentials safe.
@@ -180,8 +207,9 @@ class AuthService {
       return false;
     }
 
+
     final url = Uri.parse('https://api.emailjs.com/api/v1.0/email/send');
-    
+
     try {
       final now = DateTime.now();
       final months = [
@@ -189,6 +217,7 @@ class AuthService {
         'July', 'August', 'September', 'October', 'November', 'December'
       ];
       final formattedDate = "${months[now.month - 1]} ${now.day}, ${now.year}";
+
 
       final payload = jsonEncode({
         'service_id': _emailjsServiceId,
@@ -205,6 +234,7 @@ class AuthService {
         },
       });
 
+
       final response = await http.post(
         url,
         headers: {
@@ -214,12 +244,14 @@ class AuthService {
         body: payload,
       );
 
+
       return response.statusCode == 200;
     } catch (e) {
       debugPrint('Error sending welcome email: $e');
       return false;
     }
   }
+
 
   String _getWelcomeMessageForRole(UserRole role) {
     switch (role) {
@@ -232,28 +264,32 @@ class AuthService {
     }
   }
 
+
   String _messageForCode(String code) {
     switch (code) {
       case 'invalid-email':
-        return 'That email address looks invalid.';
+        return 'That email address doesn\'t look right. Please check it.';
       case 'user-disabled':
-        return 'This account has been disabled.';
+        return 'This account has been disabled. Please contact support.';
       case 'user-not-found':
-        return 'No account found with that email address.';
+        return 'We couldn\'t find an account with that email.';
       case 'wrong-password':
-        return 'Incorrect password. Please try again.';
+        return 'The password you entered is incorrect.';
       case 'email-already-in-use':
-        return 'An account already exists for that email.';
+        return 'This email is already registered. Try logging in instead.';
       case 'weak-password':
-        return 'The password provided is too weak.';
+        return 'Your password is too weak. Try adding more letters or numbers.';
       case 'too-many-requests':
-        return 'Too many attempts. Please wait a bit and try again.';
+        return 'Too many attempts. Please wait a moment and try again.';
       case 'network-request-failed':
-        return 'Network error — check your connection and try again.';
+        return 'Connection lost. Please check your internet and try again.';
       case 'operation-not-allowed':
-        return 'Email and password authentication is not enabled in Firebase Console.';
+        return 'Registration is currently unavailable. Please try again later.';
       default:
-        return 'Authentication error ($code). Please try again.';
+        return 'Something went wrong. Please try again in a moment.';
     }
   }
 }
+
+
+
