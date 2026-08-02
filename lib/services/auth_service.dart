@@ -262,11 +262,11 @@ class AuthService {
   String _getWelcomeMessageForRole(UserRole role) {
     switch (role) {
       case UserRole.customer:
-        return 'Welcome to Sketch2Stitch! We’re delighted to have you with us.Discover beautiful fabrics, connect with skilled tailors, and bring your unique style to life.';
+        return 'Welcome to Sketch2Stitch! We’re delighted to have you with us. Discover beautiful fabrics, connect with skilled tailors, and bring your unique style to life.';
         case UserRole.tailor:
           return 'Welcome to Sketch2Stitch! Share your craftsmanship, connect with customers and turn your tailoring expertise into beautiful creations.';
           case UserRole.retailer:
-            return 'Welcome to Sketch2Stitch! Showcase your quality fabrics and products, connect with customers and build meaningful connections through our creative marketplace.';
+            return 'Welcome to Sketch2Stitch! Showcase your quality fabrics and elements, connect with customers and build meaningful connections through our creative marketplace.';
     }
   }
 

@@ -607,36 +607,97 @@ class _LoginScreenState extends State<LoginScreen>
                   top: 0,
                   left: 0,
                   right: 0,
-                  child: Material(
-                    elevation: 8,
-                    color: _feedbackColor,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      child: SafeArea(
-                        bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    child: SafeArea(
+                      bottom: false,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          // Light green / light red background
+                          color: _feedbackColor == Colors.red.shade700
+                              ? const Color(0xFFFFEBEE)
+                              : const Color(0xFFC8E6C9),
+
+                          borderRadius: BorderRadius.circular(16),
+
+                          // Soft border
+                          border: Border.all(
+                            color: _feedbackColor == Colors.red.shade700
+                                ? const Color(0xFFFFCDD2)
+                                : const Color(0xFFA5D6A7),
+                            width: 1.2,
+                          ),
+
+                          // Soft shadow
+                          boxShadow: [
+                            BoxShadow(
+                              color: _feedbackColor == Colors.red.shade700
+                                  ? const Color(0xFFE53935).withValues(alpha: 0.10)
+                                  : const Color(0xFF43A047).withValues(alpha: 0.10),
+                              blurRadius: 15,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+
                         child: Row(
                           children: [
-                            Icon(
-                              _feedbackColor == Colors.red.shade700
-                                  ? Icons.error_outline
-                                  : Icons.check_circle_outline,
-                              color: Colors.white,
-                              size: 20,
+
+                            // Filled Circle
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: _feedbackColor == Colors.red.shade700
+                                    ? const Color(0xFFE53935)
+                                    : const Color(0xFF4CAF50),
+                              ),
+                              child: Icon(
+                                _feedbackColor == Colors.red.shade700
+                                    ? Icons.close_rounded
+                                    : Icons.check_rounded,
+                                color: Colors.white,
+                                size: 21,
+                              ),
                             ),
+
                             const SizedBox(width: 12),
+
+                            // Message
                             Expanded(
                               child: Text(
                                 _feedbackMessage!,
                                 style: const TextStyle(
-                                  color: Colors.white,
+                                  color: Color(0xFF222222),
                                   fontWeight: FontWeight.w600,
-                                  fontSize: 13,
+                                  fontSize: 14,
+                                  height: 1.3,
                                 ),
                               ),
                             ),
+
+                            const SizedBox(width: 8),
+
+                            // Close button
                             GestureDetector(
-                              onTap: () => setState(() => _feedbackMessage = null),
-                              child: const Icon(Icons.close, color: Colors.white, size: 20),
+                              onTap: () {
+                                setState(() {
+                                  _feedbackMessage = null;
+                                });
+                              },
+                              child: Icon(
+                                Icons.close_rounded,
+                                color: Colors.black.withValues(alpha: 0.55),
+                                size: 21,
+                              ),
                             ),
                           ],
                         ),
