@@ -11,7 +11,7 @@ class ValidationUtils {
 
 
 
-    if (password.length >= 6) score++;
+    if (password.length >= 8) score++;
     if (RegExp(r'[a-z]').hasMatch(password)) score++;
     if (RegExp(r'[A-Z]').hasMatch(password)) score++;
     if (RegExp(r'[0-9]').hasMatch(password)) score++;
@@ -55,9 +55,9 @@ class ValidationUtils {
 
 
 
-  // Strong password regex (same as React)
+  // Strong password regex (Enforces at least 8 characters)
   static final RegExp strongPasswordRegex = RegExp(
-      r'^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[!@#$%^&*()_\-+={}[\]:;"\u0027<>,.?/|\\]).+$'
+      r'^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[!@#$%^&*()_\-+={}[\]:;"\u0027<>,.?/|\\]).{8,}$'
   );
 
 

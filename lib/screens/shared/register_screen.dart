@@ -235,7 +235,7 @@ class _RegisterScreenState extends State<RegisterScreen>
 
     if (!ValidationUtils.strongPasswordRegex.hasMatch(password)) {
       _showError(
-        'Password must include at least one uppercase letter, one lowercase letter, one number, and one special character.',
+        'Password must be at least 8 characters long and include an uppercase letter, lowercase letter, a number, and a special character.',
       );
       return false;
     }
