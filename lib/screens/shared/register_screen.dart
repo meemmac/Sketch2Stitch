@@ -217,7 +217,7 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   bool _validateCommonFields(String email) {
     if (email.trim().isEmpty || !ValidationUtils.isValidEmail(email)) {
-      _showError('Please enter a valid email address');
+      _showError('That email address doesn\'t look right. Please check it.');
       return false;
     }
 
@@ -401,7 +401,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       if (!mounted) return;
 
 
-      final emailStatus = result.emailSent ? 'Welcome email sent ' : 'Email failed ❌';
+      final emailStatus = result.emailSent ? 'Welcome email sent ✅' : 'Email failed ❌';
       _showFeedback(
         'Registration successful! ($emailStatus)',
         isError: false,

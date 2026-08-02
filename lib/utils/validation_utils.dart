@@ -63,9 +63,9 @@ class ValidationUtils {
 
 
 
-  // Email validation
+  // Email validation (Robust RegExp)
   static bool isValidEmail(String email) {
-    return email.contains('@') && email.contains('.');
+    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
   }
 }
 

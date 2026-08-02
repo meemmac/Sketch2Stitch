@@ -9,6 +9,7 @@ import 'package:sketch2stitch/screens/shared/register_screen.dart';
 import 'package:sketch2stitch/screens/shared/welcome_screen.dart';
 import 'package:sketch2stitch/screens/shared/forgot_password_screen.dart';
 import 'package:sketch2stitch/screens/customer/home_screen.dart';
+import '../../utils/validation_utils.dart';
 import '../../widgets/dashboard_drawer.dart';
 import '../../models/customer.dart';
 import '../../models/tailor.dart';
@@ -94,6 +95,11 @@ class _LoginScreenState extends State<LoginScreen>
 
     if (email.isEmpty || password.isEmpty) {
       _showError('Please enter email and password');
+      return;
+    }
+
+    if (!ValidationUtils.isValidEmail(email)) {
+      _showError('That email address doesn\'t look right. Please check it.');
       return;
     }
 
