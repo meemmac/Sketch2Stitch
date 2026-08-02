@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:sketch2stitch/models/user_role.dart';
@@ -28,6 +29,11 @@ class _LoginScreenState extends State<LoginScreen>
   String? _selectedUserType;
   bool _isLoading = false;
 
+  // Top feedback state
+  String? _feedbackMessage;
+  Color? _feedbackColor;
+  Timer? _feedbackTimer;
+
   final List<String> _userTypes = ['Customer', 'Retailer', 'Tailor'];
 
   late AnimationController _floatController;
@@ -46,7 +52,28 @@ class _LoginScreenState extends State<LoginScreen>
     _emailController.dispose();
     _passwordController.dispose();
     _floatController.dispose();
+    _feedbackTimer?.cancel();
     super.dispose();
+  }
+
+  void _showFeedback(String message, {bool isError = true}) {
+    _feedbackTimer?.cancel();
+    setState(() {
+      _feedbackMessage = message;
+      _feedbackColor = isError ? Colors.red.shade700 : Colors.green.shade700;
+    });
+
+    _feedbackTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() {
+          _feedbackMessage = null;
+        });
+      }
+    });
+  }
+
+  void _showError(String message) {
+    _showFeedback(message, isError: true);
   }
 
   UserRole _getSelectedUserRole() {
@@ -61,26 +88,22 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _login() async {
-    // Validate user type
-    if (_selectedUserType == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a user type'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
 
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter email and password')),
-      );
+      _showError('Please enter email and password');
       return;
     }
+
+    // Validate user type
+    if (_selectedUserType == null) {
+      _showError('Please select a user type');
+      return;
+    }
+
+
 
     setState(() => _isLoading = true);
 
@@ -150,24 +173,17 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
           );
-        }
-else {
+        } else {
           // Sign out if profile doesn't match role
           await AuthService().signOut();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Profile not found for this role')),
-          );
+          _showError('Profile not found for this role');
         }
       }
     } on AuthServiceException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      _showError(e.message);
     } catch (e) {
       debugPrint('[Login] Error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('An unexpected error occurred')),
-      );
+      _showError('An unexpected error occurred');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -578,6 +594,50 @@ else {
                   ),
                 ),
               ),
+
+              // 🆕 Top Feedback Banner — Last in stack to overlay everything
+              if (_feedbackMessage != null)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Material(
+                    elevation: 8,
+                    color: _feedbackColor,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: SafeArea(
+                        bottom: false,
+                        child: Row(
+                          children: [
+                            Icon(
+                              _feedbackColor == Colors.red.shade700
+                                  ? Icons.error_outline
+                                  : Icons.check_circle_outline,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                _feedbackMessage!,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () => setState(() => _feedbackMessage = null),
+                              child: const Icon(Icons.close, color: Colors.white, size: 20),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

@@ -183,6 +183,13 @@ class AuthService {
     final url = Uri.parse('https://api.emailjs.com/api/v1.0/email/send');
     
     try {
+      final now = DateTime.now();
+      final months = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+      final formattedDate = "${months[now.month - 1]} ${now.day}, ${now.year}";
+
       final payload = jsonEncode({
         'service_id': _emailjsServiceId,
         'template_id': _emailjsTemplateId,
@@ -194,6 +201,7 @@ class AuthService {
           'user_email': email,
           'user_role': role.name.toUpperCase(),
           'welcome_message': _getWelcomeMessageForRole(role),
+          'join_date': formattedDate,
         },
       });
 
