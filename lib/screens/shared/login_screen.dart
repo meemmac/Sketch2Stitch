@@ -89,17 +89,11 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _login() async {
-
-    final email = _emailController.text.trim();
+    final credential = _emailController.text.trim();
     final password = _passwordController.text;
 
-    if (email.isEmpty || password.isEmpty) {
-      _showError('Please enter email and password');
-      return;
-    }
-
-    if (!ValidationUtils.isValidEmail(email)) {
-      _showError('That email address doesn\'t look right. Please check it.');
+    if (credential.isEmpty || password.isEmpty) {
+      _showError('Please enter email/phone and password');
       return;
     }
 
@@ -109,20 +103,36 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-
-
     setState(() => _isLoading = true);
 
     try {
-      final credential = await AuthService().signInWithEmailAndPassword(
-        email,
+      String finalEmail = credential;
+      final role = _getSelectedUserRole();
+
+      // If it looks like a phone number, look up the email
+      final isPhone = RegExp(r'^\+?\d+$').hasMatch(credential);
+      if (isPhone) {
+        final foundEmail = await AuthService().findEmailByPhone(credential, role);
+        if (foundEmail == null) {
+          _showError('No account found with this phone number for the selected role');
+          setState(() => _isLoading = false);
+          return;
+        }
+        finalEmail = foundEmail;
+      } else if (!ValidationUtils.isValidEmail(credential)) {
+        _showError('That email address doesn\'t look right. Please check it.');
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final authCredential = await AuthService().signInWithEmailAndPassword(
+        finalEmail,
         password,
       );
 
-      if (credential.user != null) {
-        final role = _getSelectedUserRole();
+      if (authCredential.user != null) {
         final profile = await AuthService().getUserProfile(
-          credential.user!.uid,
+          authCredential.user!.uid,
           role,
         );
 

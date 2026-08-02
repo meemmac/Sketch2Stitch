@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/user_role.dart';
@@ -9,11 +10,12 @@ import '../models/tailor.dart';
 import '../models/retailer.dart';
 
 
-/// EmailJS Credentials - TODO: Replace with your actual IDs from EmailJS Dashboard
-const String _emailjsServiceId = 'service_k4v23nj';
-const String _emailjsTemplateId = 'template_cj9ca0n';
-const String _emailjsPublicKey = 'fkv1tJuqoVoD2O5Ey';
-const String _emailjsAccessToken = 'WczQoC1tFzLQrIhcbLI6J'; //Your Access Token
+
+/// EmailJS Credentials retrieved from environment variables
+final String _emailjsServiceId = dotenv.get('EMAILJS_SERVICE_ID', fallback: '');
+final String _emailjsTemplateId = dotenv.get('EMAILJS_TEMPLATE_ID', fallback: '');
+final String _emailjsPublicKey = dotenv.get('EMAILJS_PUBLIC_KEY', fallback: '');
+final String _emailjsAccessToken = dotenv.get('EMAILJS_ACCESS_TOKEN', fallback: '');
 
 
 /// Thrown by [AuthService] with an already user-friendly message.
@@ -141,6 +143,21 @@ class AuthService {
     if (retailer.exists) return UserRole.retailer;
 
 
+    return null;
+  }
+
+  /// Attempts to find the email associated with a phone number in a specific role collection.
+  Future<String?> findEmailByPhone(String phone, UserRole role) async {
+    final collection = _getCollectionForRole(role);
+    final query = await _firestore
+        .collection(collection)
+        .where('phone', isEqualTo: phone.trim())
+        .limit(1)
+        .get();
+
+    if (query.docs.isNotEmpty) {
+      return query.docs.first.data()['email'] as String?;
+    }
     return null;
   }
 

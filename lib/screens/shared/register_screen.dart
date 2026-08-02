@@ -364,37 +364,37 @@ class _RegisterScreenState extends State<RegisterScreen>
 
     UserRole role;
     Map<String, dynamic> profileData = {
-      'email': email,
-      'phone': _step == RegisterStep.customerForm
+      'email': email.trim(),
+      'phone': (_step == RegisterStep.customerForm
           ? _customerPhoneController.text
           : _step == RegisterStep.tailorForm
           ? _tailorPhoneController.text
-          : _retailerPhoneController.text,
-      'address': _step == RegisterStep.customerForm
+          : _retailerPhoneController.text).trim(),
+      'address': (_step == RegisterStep.customerForm
           ? _cusomerAddressController.text
           : _step == RegisterStep.tailorForm
           ? _tailorAddressController.text
-          : _shopAddressController.text,
+          : _shopAddressController.text).trim(),
     };
 
 
     if (_step == RegisterStep.customerForm) {
       role = UserRole.customer;
-      profileData['name'] = _customerFullNameController.text;
+      profileData['name'] = _customerFullNameController.text.trim();
       profileData['location'] = _customerLocation;
       profileData['vtUsed'] = 0;
     } else if (_step == RegisterStep.tailorForm) {
       role = UserRole.tailor;
-      profileData['name'] = _tailorFullNameController.text;
+      profileData['name'] = _tailorFullNameController.text.trim();
       profileData['location'] = _tailorLocation;
       profileData['rating'] = 0.0;
     } else {
       role = UserRole.retailer;
-      profileData['shopName'] = _shopNameController.text;
+      profileData['shopName'] = _shopNameController.text.trim();
       profileData['location'] = _retailerLocation;
       profileData['rating'] = 0.0;
       // Convert phone to number for Retailer per schema
-      profileData['phone'] = int.tryParse(profileData['phone'].toString()) ?? 0;
+      profileData['phone'] = int.tryParse(profileData['phone'].toString().replaceAll(RegExp(r'\D'), '')) ?? 0;
     }
 
 
@@ -402,8 +402,8 @@ class _RegisterScreenState extends State<RegisterScreen>
 
 
     try {
-      await AuthService().signUpWithEmailAndPassword(
-        email,
+      final result = await AuthService().signUpWithEmailAndPassword(
+        email.trim(),
         _passwordController.text,
         role,
         profileData,
@@ -648,8 +648,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                                     shape: BoxShape.circle,
 
                                     color: _feedbackColor == Colors.red.shade700
-                                        ? const Color(0xFFE53935).withValues(alpha: 0.75)
-                                        : const Color(0xFF4CAF50).withValues(alpha: 0.75),
+                                        ? const Color(0xFFE53935)
+                                        : const Color(0xFF4CAF50),
 
                                     border: Border.all(
                                       color: _feedbackColor == Colors.red.shade700

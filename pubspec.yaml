@@ -47,6 +47,7 @@ dependencies:
   geolocator: ^13.0.1
   url_launcher: ^6.3.1
   webview_flutter: ^4.14.1
+  flutter_dotenv: ^5.1.0
 
 dev_dependencies:
   flutter_test:
@@ -72,6 +73,7 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
+    - .env
     - assets/images/
     - assets/images/guides/
     - assets/images/templates/
