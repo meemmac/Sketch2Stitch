@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../models/user_role.dart';
 import '../../services/auth_service.dart';
 import 'login_screen.dart';
@@ -268,6 +269,10 @@ class _RegisterScreenState extends State<RegisterScreen>
         _showError('Please enter your phone number');
         return false;
       }
+      if (!ValidationUtils.isValidPhone(_customerPhoneController.text)) {
+        _showError('Please enter a valid phone number (digits and optional +)');
+        return false;
+      }
       if (_cusomerAddressController.text.trim().isEmpty) {
         _showError('Please enter your address');
         return false;
@@ -289,6 +294,10 @@ class _RegisterScreenState extends State<RegisterScreen>
         _showError('Please enter your phone number');
         return false;
       }
+      if (!ValidationUtils.isValidPhone(_tailorPhoneController.text)) {
+        _showError('Please enter a valid phone number (digits and optional +)');
+        return false;
+      }
       if (_tailorAddressController.text.trim().isEmpty) {
         _showError('Please enter your shop address');
         return false;
@@ -308,6 +317,10 @@ class _RegisterScreenState extends State<RegisterScreen>
       }
       if (_retailerPhoneController.text.trim().isEmpty) {
         _showError('Please enter your phone number');
+        return false;
+      }
+      if (!ValidationUtils.isValidPhone(_retailerPhoneController.text)) {
+        _showError('Please enter a valid phone number (digits and optional +)');
         return false;
       }
       if (_shopAddressController.text.trim().isEmpty) {
@@ -399,11 +412,9 @@ class _RegisterScreenState extends State<RegisterScreen>
 
 
       if (!mounted) return;
-
-
-      final emailStatus = result.emailSent ? 'Welcome email sent ✅' : 'Email failed ❌';
+      
       _showFeedback(
-        'Registration successful! ($emailStatus)',
+        'Registration successful! You can now log in.',
         isError: false,
       );
 
@@ -771,7 +782,8 @@ class _RegisterScreenState extends State<RegisterScreen>
           controller: _customerPhoneController,
           hint: 'Phone number',
           icon: Icons.phone_outlined,
-          keyboardType: TextInputType.phone,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d+]')), LengthLimitingTextInputFormatter(16)],
         ),
         const SizedBox(height: 7),
 
@@ -872,7 +884,8 @@ class _RegisterScreenState extends State<RegisterScreen>
           controller: _tailorPhoneController,
           hint: 'Phone number',
           icon: Icons.phone_outlined,
-          keyboardType: TextInputType.phone,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d+]')), LengthLimitingTextInputFormatter(16)],
         ),
         const SizedBox(height: 7),
 
@@ -964,7 +977,8 @@ class _RegisterScreenState extends State<RegisterScreen>
           controller: _retailerPhoneController,
           hint: 'Phone number',
           icon: Icons.phone_outlined,
-          keyboardType: TextInputType.phone,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d+]')), LengthLimitingTextInputFormatter(16)],
         ),
         const SizedBox(height: 7),
 
@@ -1110,10 +1124,12 @@ class _RegisterScreenState extends State<RegisterScreen>
     required String hint,
     IconData? icon,
     TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
       style: const TextStyle(fontSize: 14),
       decoration: InputDecoration(
         hintText: hint,
