@@ -589,53 +589,105 @@ class _RegisterScreenState extends State<RegisterScreen>
 
 
               // 🆕 Top Feedback Banner — Now the ABSOLUTE last item to ensure it sits on top of everything
-              if (_feedbackMessage != null)
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: Material(
-                    elevation: 8, // Add shadow for depth
-                    color: _feedbackColor,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      child: SafeArea(
-                        bottom: false,
-                        child: Row(
-                          children: [
-                            Icon(
-                              _feedbackColor == Colors.red.shade700
-                                  ? Icons.error_outline
-                                  : Icons.check_circle_outline,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                _feedbackMessage!,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () => setState(() => _feedbackMessage = null),
-                              child: const Icon(Icons.close, color: Colors.white, size: 20),
-                            ),
-                          ],
+            if (_feedbackMessage != null)
+        Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: SafeArea(
+            bottom: false,
+            child: Material(
+              elevation: 0,
+              color: Colors.transparent,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: _feedbackColor == Colors.red.shade700
+                      ? const Color(0xFFFFF5F5)  // Light red tint
+                      : const Color(0xFFF0FFF4), // Light green tint
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _feedbackColor == Colors.red.shade700
+                        ? Colors.red.shade200
+                        : Colors.green.shade200,
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    // Circular icon badge
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: _feedbackColor == Colors.red.shade700
+                            ? Colors.red.shade50
+                            : Colors.green.shade50,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _feedbackColor == Colors.red.shade700
+                              ? Colors.red.shade200
+                              : Colors.green.shade200,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Icon(
+                        _feedbackColor == Colors.red.shade700
+                            ? Icons.close
+                            : Icons.check,
+                        color: _feedbackColor == Colors.red.shade700
+                            ? Colors.red.shade700
+                            : Colors.green.shade700,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Message text
+                    Expanded(
+                      child: Text(
+                        _feedbackMessage!,
+                        style: TextStyle(
+                          color: _feedbackColor == Colors.red.shade700
+                              ? Colors.red.shade900
+                              : Colors.green.shade900,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          height: 1.3,
                         ),
                       ),
                     ),
-                  ),
+                    // Close button
+                    GestureDetector(
+                      onTap: () => setState(() => _feedbackMessage = null),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.close,
+                          color: Colors.black.withValues(alpha: 0.4),
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-            ],
+              ),
+              ),
+            ),
           ),
-        ),
-      ),
-    );
+        );
   }
 
 
