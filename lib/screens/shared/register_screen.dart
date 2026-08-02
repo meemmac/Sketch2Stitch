@@ -269,7 +269,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         _showError('Please enter your phone number');
         return false;
       }
-      if (!ValidationUtils.isValidPhone(_customerPhoneController.text)) {
+      if (!ValidationUtils.isValidPhone(_customerPhoneController.text.trim())) {
         _showError('Please enter a valid phone number (digits and optional +)');
         return false;
       }
@@ -294,7 +294,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         _showError('Please enter your phone number');
         return false;
       }
-      if (!ValidationUtils.isValidPhone(_tailorPhoneController.text)) {
+      if (!ValidationUtils.isValidPhone(_tailorPhoneController.text.trim())) {
         _showError('Please enter a valid phone number (digits and optional +)');
         return false;
       }
@@ -319,7 +319,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         _showError('Please enter your phone number');
         return false;
       }
-      if (!ValidationUtils.isValidPhone(_retailerPhoneController.text)) {
+      if (!ValidationUtils.isValidPhone(_retailerPhoneController.text.trim())) {
         _showError('Please enter a valid phone number (digits and optional +)');
         return false;
       }
@@ -333,9 +333,8 @@ class _RegisterScreenState extends State<RegisterScreen>
       }
     }
 
-
     // 2. Check Password
-    if (_passwordController.text.isEmpty) {
+    if (_passwordController.text.trim().isEmpty) {
       _showError('Please create a password');
       return false;
     }
@@ -403,13 +402,12 @@ class _RegisterScreenState extends State<RegisterScreen>
 
 
     try {
-      final result = await AuthService().signUpWithEmailAndPassword(
+      await AuthService().signUpWithEmailAndPassword(
         email,
         _passwordController.text,
         role,
         profileData,
       );
-
 
       if (!mounted) return;
       
@@ -589,105 +587,143 @@ class _RegisterScreenState extends State<RegisterScreen>
 
 
               // 🆕 Top Feedback Banner — Now the ABSOLUTE last item to ensure it sits on top of everything
-            if (_feedbackMessage != null)
-        Positioned(
-        top: 0,
-        left: 0,
-        right: 0,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: SafeArea(
-            bottom: false,
-            child: Material(
-              elevation: 0,
-              color: Colors.transparent,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: _feedbackColor == Colors.red.shade700
-                      ? const Color(0xFFFFF5F5)  // Light red tint
-                      : const Color(0xFFF0FFF4), // Light green tint
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: _feedbackColor == Colors.red.shade700
-                        ? Colors.red.shade200
-                        : Colors.green.shade200,
-                    width: 1.5,
+              if (_feedbackMessage != null)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: SafeArea(
+                      bottom: false,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(
+                            sigmaX: 12,
+                            sigmaY: 12,
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                            decoration: BoxDecoration(
+                              // Glass background
+                              color: _feedbackColor == Colors.red.shade700
+                                  ? const Color(0xFFFFEBEE).withValues(alpha: 0.92)
+                                  : const Color(0xFFC8E6C9).withValues(alpha: 0.92),
+
+                              borderRadius: BorderRadius.circular(18),
+
+                              // Soft border like the screenshot
+                              border: Border.all(
+                                color: _feedbackColor == Colors.red.shade700
+                                    ? const Color(0xFFFFCDD2)
+                                    : const Color(0xFF9CCC9F),
+                                width: 1.2,
+                              ),
+
+                              // Soft glass shadow
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _feedbackColor == Colors.red.shade700
+                                      ? const Color(0xFFD32F2F).withValues(alpha: 0.10)
+                                      : const Color(0xFF2E7D32).withValues(alpha: 0.10),
+                                  blurRadius: 20,
+                                  spreadRadius: 1,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+
+                            child: Row(
+                              children: [
+
+                                // Icon Circle
+                                Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+
+                                    color: _feedbackColor == Colors.red.shade700
+                                        ? const Color(0xFFE53935).withValues(alpha: 0.75)
+                                        : const Color(0xFF4CAF50).withValues(alpha: 0.75),
+
+                                    border: Border.all(
+                                      color: _feedbackColor == Colors.red.shade700
+                                          ? const Color(0xFFEF9A9A)
+                                          : const Color(0xFFA5D6A7),
+                                      width: 1,
+                                    ),
+                                  ),
+
+                                  child: Icon(
+                                    _feedbackColor == Colors.red.shade700
+                                        ? Icons.close_rounded
+                                        : Icons.check_rounded,
+
+                                    color: Colors.white,
+
+                                    size: 20,
+                                  ),
+                                ),
+
+                                const SizedBox(width: 12),
+
+                                // Message
+                                Expanded(
+                                  child: Text(
+                                    _feedbackMessage!,
+                                    style: TextStyle(
+                                      color: _feedbackColor == Colors.red.shade700
+                                          ? const Color(0xFF222222)
+                                          : const Color(0xFF222222),
+
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ),
+
+                                const SizedBox(width: 8),
+
+                                // Close Button
+                                GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _feedbackMessage = null;
+                                    });
+                                  },
+                                  child: Container(
+                                    width: 28,
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.white.withValues(alpha: 0.35),
+                                    ),
+                                    child: Icon(
+                                      Icons.close_rounded,
+                                      color: Colors.black.withValues(alpha: 0.45),
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
                 ),
-                child: Row(
-                  children: [
-                    // Circular icon badge
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: _feedbackColor == Colors.red.shade700
-                            ? Colors.red.shade50
-                            : Colors.green.shade50,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: _feedbackColor == Colors.red.shade700
-                              ? Colors.red.shade200
-                              : Colors.green.shade200,
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Icon(
-                        _feedbackColor == Colors.red.shade700
-                            ? Icons.close
-                            : Icons.check,
-                        color: _feedbackColor == Colors.red.shade700
-                            ? Colors.red.shade700
-                            : Colors.green.shade700,
-                        size: 18,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Message text
-                    Expanded(
-                      child: Text(
-                        _feedbackMessage!,
-                        style: TextStyle(
-                          color: _feedbackColor == Colors.red.shade700
-                              ? Colors.red.shade900
-                              : Colors.green.shade900,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                          height: 1.3,
-                        ),
-                      ),
-                    ),
-                    // Close button
-                    GestureDetector(
-                      onTap: () => setState(() => _feedbackMessage = null),
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.04),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.close,
-                          color: Colors.black.withValues(alpha: 0.4),
-                          size: 16,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              ),
-            ),
-          ),
-        );
+    ],
+    ),
+    ),
+    ),
+    );
   }
 
 
