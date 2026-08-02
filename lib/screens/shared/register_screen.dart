@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/user_role.dart';
 import '../../services/auth_service.dart';
@@ -9,16 +10,24 @@ import '../../utils/validation_utils.dart';
 import '../../widgets/password_strength_indicator.dart';
 
 
+
+
 enum RegisterStep { roleSelect, customerForm, tailorForm, retailerForm }
+
+
 
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
 
+
+
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
+
+
 
 
 class _RegisterScreenState extends State<RegisterScreen>
@@ -31,13 +40,25 @@ class _RegisterScreenState extends State<RegisterScreen>
   bool _isLoading = false;
 
 
+  // Top feedback state
+  String? _feedbackMessage;
+  Color? _feedbackColor;
+  Timer? _feedbackTimer;
+
+
+
+
   late AnimationController _floatController;
+
+
 
 
   // Shared Account controllers
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   String _passwordStrength = '';
+
+
 
 
   // Customer form controllers
@@ -47,6 +68,8 @@ class _RegisterScreenState extends State<RegisterScreen>
   final _cusomerAddressController = TextEditingController();
 
 
+
+
   // Tailor form controllers
   final _tailorFullNameController = TextEditingController();
   final _tailorEmailController = TextEditingController();
@@ -54,11 +77,15 @@ class _RegisterScreenState extends State<RegisterScreen>
   final _tailorAddressController = TextEditingController();
 
 
+
+
   // Retailer form controllers
   final _shopNameController = TextEditingController();
   final _orgEmailController = TextEditingController();
   final _retailerPhoneController = TextEditingController();
   final _shopAddressController = TextEditingController();
+
+
 
 
   @override
@@ -69,6 +96,8 @@ class _RegisterScreenState extends State<RegisterScreen>
       duration: const Duration(seconds: 6),
     )..repeat(reverse: true);
   }
+
+
 
 
   @override
@@ -90,6 +119,8 @@ class _RegisterScreenState extends State<RegisterScreen>
   }
 
 
+
+
   void _selectRole(String role) {
     setState(() {
       if (role == 'Retailer') {
@@ -103,6 +134,8 @@ class _RegisterScreenState extends State<RegisterScreen>
   }
 
 
+
+
   void _goBack() {
     if (_step == RegisterStep.roleSelect) {
       Navigator.pop(context);
@@ -114,17 +147,72 @@ class _RegisterScreenState extends State<RegisterScreen>
   }
 
 
+
+
+  void _showFeedback(String message, {bool isError = true}) {
+    _feedbackTimer?.cancel();
+    setState(() {
+      _feedbackMessage = message;
+      _feedbackColor = isError ? Colors.red.shade700 : Colors.green.shade700;
+    });
+
+
+    _feedbackTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() {
+          _feedbackMessage = null;
+        });
+      }
+    });
+  }
+
+
+
+
   void _showError(String message) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red.shade700,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    _showFeedback(message, isError: true);
+  }
+
+
+  void _showPasswordRequirements() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.shield_outlined, color: Colors.green),
+            SizedBox(width: 10),
+            Text('Strong Password'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'To keep your account safe, please use at least:',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            ),
+            SizedBox(height: 12),
+            _RequirementItem('At least 8 characters long'),
+            _RequirementItem('One uppercase letter (A-Z)'),
+            _RequirementItem('One lowercase letter (a-z)'),
+            _RequirementItem('One number (0-9)'),
+            _RequirementItem('One special character (!@#\$%^&*)'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
+
+
 
 
   bool _validateCommonFields(String email) {
@@ -134,11 +222,15 @@ class _RegisterScreenState extends State<RegisterScreen>
     }
 
 
+
+
     final password = _passwordController.text;
     if (password.isEmpty) {
       _showError('Password is required');
       return false;
     }
+
+
 
 
     if (!ValidationUtils.strongPasswordRegex.hasMatch(password)) {
@@ -148,23 +240,115 @@ class _RegisterScreenState extends State<RegisterScreen>
       return false;
     }
 
+
     if (_passwordStrength == 'Weak') {
       _showError('Please choose a stronger password');
       return false;
     }
 
 
+
+
     return true;
   }
 
-  Future<void> _handleRegistration() async {
+
+  bool _isFormValid() {
+    // 1. Check Role-Specific Fields
+    if (_step == RegisterStep.customerForm) {
+      if (_customerFullNameController.text.trim().isEmpty) {
+        _showError('Please enter your full name');
+        return false;
+      }
+      if (_customerEmailController.text.trim().isEmpty) {
+        _showError('Email address is required');
+        return false;
+      }
+      if (_customerPhoneController.text.trim().isEmpty) {
+        _showError('Please enter your phone number');
+        return false;
+      }
+      if (_cusomerAddressController.text.trim().isEmpty) {
+        _showError('Please enter your address');
+        return false;
+      }
+      if (_customerLocation == null) {
+        _showError('Please pin your delivery location on the map');
+        return false;
+      }
+    } else if (_step == RegisterStep.tailorForm) {
+      if (_tailorFullNameController.text.trim().isEmpty) {
+        _showError('Please enter your shop name');
+        return false;
+      }
+      if (_tailorEmailController.text.trim().isEmpty) {
+        _showError('Email address is required');
+        return false;
+      }
+      if (_tailorPhoneController.text.trim().isEmpty) {
+        _showError('Please enter your phone number');
+        return false;
+      }
+      if (_tailorAddressController.text.trim().isEmpty) {
+        _showError('Please enter your shop address');
+        return false;
+      }
+      if (_tailorLocation == null) {
+        _showError('Please pin your shop location on the map');
+        return false;
+      }
+    } else if (_step == RegisterStep.retailerForm) {
+      if (_shopNameController.text.trim().isEmpty) {
+        _showError('Please enter your shop name');
+        return false;
+      }
+      if (_orgEmailController.text.trim().isEmpty) {
+        _showError('Organizational email is required');
+        return false;
+      }
+      if (_retailerPhoneController.text.trim().isEmpty) {
+        _showError('Please enter your phone number');
+        return false;
+      }
+      if (_shopAddressController.text.trim().isEmpty) {
+        _showError('Please enter your shop address');
+        return false;
+      }
+      if (_retailerLocation == null) {
+        _showError('Please pin your shop location on the map');
+        return false;
+      }
+    }
+
+
+    // 2. Check Password
+    if (_passwordController.text.isEmpty) {
+      _showError('Please create a password');
+      return false;
+    }
+
+
+    // 3. Run Regex/Strength Checks (re-uses _validateCommonFields logic)
     final email = _step == RegisterStep.customerForm
         ? _customerEmailController.text
         : _step == RegisterStep.tailorForm
-            ? _tailorEmailController.text
-            : _orgEmailController.text;
+        ? _tailorEmailController.text
+        : _orgEmailController.text;
 
-    if (!_validateCommonFields(email)) return;
+    return _validateCommonFields(email);
+  }
+
+
+  Future<void> _handleRegistration() async {
+    if (!_isFormValid()) return;
+
+
+    final email = _step == RegisterStep.customerForm
+        ? _customerEmailController.text
+        : _step == RegisterStep.tailorForm
+        ? _tailorEmailController.text
+        : _orgEmailController.text;
+
 
     UserRole role;
     Map<String, dynamic> profileData = {
@@ -172,14 +356,15 @@ class _RegisterScreenState extends State<RegisterScreen>
       'phone': _step == RegisterStep.customerForm
           ? _customerPhoneController.text
           : _step == RegisterStep.tailorForm
-              ? _tailorPhoneController.text
-              : _retailerPhoneController.text,
+          ? _tailorPhoneController.text
+          : _retailerPhoneController.text,
       'address': _step == RegisterStep.customerForm
           ? _cusomerAddressController.text
           : _step == RegisterStep.tailorForm
-              ? _tailorAddressController.text
-              : _shopAddressController.text,
+          ? _tailorAddressController.text
+          : _shopAddressController.text,
     };
+
 
     if (_step == RegisterStep.customerForm) {
       role = UserRole.customer;
@@ -200,7 +385,9 @@ class _RegisterScreenState extends State<RegisterScreen>
       profileData['phone'] = int.tryParse(profileData['phone'].toString()) ?? 0;
     }
 
+
     setState(() => _isLoading = true);
+
 
     try {
       final result = await AuthService().signUpWithEmailAndPassword(
@@ -210,20 +397,26 @@ class _RegisterScreenState extends State<RegisterScreen>
         profileData,
       );
 
+
       if (!mounted) return;
 
-   //   final emailStatus = result.emailSent ? 'Welcome email sent ✅' : 'Email failed ❌';
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Registration successful! Please login.'),
-          backgroundColor: Colors.green,
-        ),
+
+      final emailStatus = result.emailSent ? 'Welcome email sent ✅' : 'Email failed ❌';
+      _showFeedback(
+        'Registration successful! ($emailStatus)',
+        isError: false,
       );
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-      );
+
+      // Delay navigation slightly so the user sees the green banner
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+          );
+        }
+      });
     } on AuthServiceException catch (e) {
       _showError(e.message);
     } catch (e) {
@@ -232,6 +425,8 @@ class _RegisterScreenState extends State<RegisterScreen>
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
+
 
 
   @override
@@ -294,6 +489,8 @@ class _RegisterScreenState extends State<RegisterScreen>
               ),
 
 
+
+
               // Main content — reserved top space keeps it from ever
               // reaching the Back button, and AnimatedPadding smoothly
               // lifts it above the keyboard when typing.
@@ -352,9 +549,7 @@ class _RegisterScreenState extends State<RegisterScreen>
               ),
 
 
-              // Back button — last child so it always renders on top,
-              // and the reserved top padding above keeps the card from
-              // ever reaching it.
+              // Back button
               Positioned(
                 top: 8,
                 left: 8,
@@ -380,12 +575,59 @@ class _RegisterScreenState extends State<RegisterScreen>
                   ),
                 ),
               ),
+
+
+              // 🆕 Top Feedback Banner — Now the ABSOLUTE last item to ensure it sits on top of everything
+              if (_feedbackMessage != null)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Material(
+                    elevation: 8, // Add shadow for depth
+                    color: _feedbackColor,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: SafeArea(
+                        bottom: false,
+                        child: Row(
+                          children: [
+                            Icon(
+                              _feedbackColor == Colors.red.shade700
+                                  ? Icons.error_outline
+                                  : Icons.check_circle_outline,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                _feedbackMessage!,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () => setState(() => _feedbackMessage = null),
+                              child: const Icon(Icons.close, color: Colors.white, size: 20),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
       ),
     );
   }
+
+
 
 
   Widget _buildStepContent() {
@@ -402,6 +644,8 @@ class _RegisterScreenState extends State<RegisterScreen>
   }
 
 
+
+
   Widget _buildLogo() {
     return Image.asset(
       'assets/images/transparent_logo.png',
@@ -409,6 +653,8 @@ class _RegisterScreenState extends State<RegisterScreen>
       fit: BoxFit.contain,
     );
   }
+
+
 
 
   // ---------------- Step 1: Register As ----------------
@@ -433,6 +679,8 @@ class _RegisterScreenState extends State<RegisterScreen>
       ],
     );
   }
+
+
 
 
   Widget _buildRoleButton(String role) {
@@ -461,6 +709,8 @@ class _RegisterScreenState extends State<RegisterScreen>
   }
 
 
+
+
   // ---------------- Step 2a: Customer Form ----------------
   Widget _buildCustomerForm() {
     return Column(
@@ -475,6 +725,8 @@ class _RegisterScreenState extends State<RegisterScreen>
         const SizedBox(height: 10),
 
 
+
+
         _buildFieldLabel('Full name'),
         const SizedBox(height: 3),
         _buildTextField(
@@ -482,6 +734,8 @@ class _RegisterScreenState extends State<RegisterScreen>
           hint: 'Full name',
         ),
         const SizedBox(height: 7),
+
+
 
 
         _buildFieldLabel('Email address'),
@@ -493,6 +747,8 @@ class _RegisterScreenState extends State<RegisterScreen>
           keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: 7),
+
+
 
 
         _buildPasswordField(
@@ -507,6 +763,8 @@ class _RegisterScreenState extends State<RegisterScreen>
         const SizedBox(height: 7),
 
 
+
+
         _buildFieldLabel('Phone number'),
         const SizedBox(height: 3),
         _buildTextField(
@@ -516,6 +774,8 @@ class _RegisterScreenState extends State<RegisterScreen>
           keyboardType: TextInputType.phone,
         ),
         const SizedBox(height: 7),
+
+
 
 
         _buildFieldLabel('Address'),
@@ -536,27 +796,20 @@ class _RegisterScreenState extends State<RegisterScreen>
         const SizedBox(height: 12),
 
 
+
+
         _buildNextButton(
           onPressed: _isLoading
               ? () {}
-              : () {
-                  if (_customerFullNameController.text.trim().isEmpty) {
-                    _showError('Full name is required');
-                    return;
-                  }
-                  if (_customerLocation == null) {
-                    setState(() => _locationError = true);
-                    _showError('Please pin your delivery location.');
-                    return;
-                  }
-                  _handleRegistration();
-                },
+              : _handleRegistration,
         ),
         const SizedBox(height: 8),
         _buildSignInRow(),
       ],
     );
   }
+
+
 
 
   // ---------------- Step 2b: Tailor Form ----------------
@@ -573,6 +826,8 @@ class _RegisterScreenState extends State<RegisterScreen>
         const SizedBox(height: 10),
 
 
+
+
         _buildFieldLabel('Shop name'),
         const SizedBox(height: 3),
         _buildTextField(
@@ -580,6 +835,8 @@ class _RegisterScreenState extends State<RegisterScreen>
           hint: 'Shop name',
         ),
         const SizedBox(height: 7),
+
+
 
 
         _buildFieldLabel('Email address'),
@@ -591,6 +848,8 @@ class _RegisterScreenState extends State<RegisterScreen>
           keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: 7),
+
+
 
 
         _buildPasswordField(
@@ -605,6 +864,8 @@ class _RegisterScreenState extends State<RegisterScreen>
         const SizedBox(height: 7),
 
 
+
+
         _buildFieldLabel('Phone number'),
         const SizedBox(height: 3),
         _buildTextField(
@@ -614,6 +875,8 @@ class _RegisterScreenState extends State<RegisterScreen>
           keyboardType: TextInputType.phone,
         ),
         const SizedBox(height: 7),
+
+
 
 
         _buildFieldLabel('Shop address'),
@@ -633,24 +896,15 @@ class _RegisterScreenState extends State<RegisterScreen>
         _buildNextButton(
           onPressed: _isLoading
               ? () {}
-              : () {
-                  if (_tailorFullNameController.text.trim().isEmpty) {
-                    _showError('Shop name is required');
-                    return;
-                  }
-                  if (_tailorLocation == null) {
-                    setState(() => _locationError = true);
-                    _showError('Please pin your shop location.');
-                    return;
-                  }
-                  _handleRegistration();
-                },
+              : _handleRegistration,
         ),
         const SizedBox(height: 8),
         _buildSignInRow(),
       ],
     );
   }
+
+
 
 
   // ---------------- Step 3: Retailer Form ----------------
@@ -667,10 +921,14 @@ class _RegisterScreenState extends State<RegisterScreen>
         const SizedBox(height: 10),
 
 
+
+
         _buildFieldLabel('Shop name'),
         const SizedBox(height: 3),
         _buildTextField(controller: _shopNameController, hint: 'Shop name'),
         const SizedBox(height: 7),
+
+
 
 
         _buildFieldLabel('Organizational email'),
@@ -682,6 +940,8 @@ class _RegisterScreenState extends State<RegisterScreen>
           keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: 7),
+
+
 
 
         _buildPasswordField(
@@ -696,6 +956,8 @@ class _RegisterScreenState extends State<RegisterScreen>
         const SizedBox(height: 7),
 
 
+
+
         _buildFieldLabel('Phone number'),
         const SizedBox(height: 3),
         _buildTextField(
@@ -705,6 +967,8 @@ class _RegisterScreenState extends State<RegisterScreen>
           keyboardType: TextInputType.phone,
         ),
         const SizedBox(height: 7),
+
+
 
 
         _buildFieldLabel('Shop address'),
@@ -725,27 +989,20 @@ class _RegisterScreenState extends State<RegisterScreen>
         const SizedBox(height: 12),
 
 
+
+
         _buildNextButton(
           onPressed: _isLoading
               ? () {}
-              : () {
-                  if (_shopNameController.text.trim().isEmpty) {
-                    _showError('Shop name is required');
-                    return;
-                  }
-                  if (_retailerLocation == null) {
-                    setState(() => _locationError = true);
-                    _showError('Please pin your shop location.');
-                    return;
-                  }
-                  _handleRegistration();
-                },
+              : _handleRegistration,
         ),
         const SizedBox(height: 8),
         _buildSignInRow(),
       ],
     );
   }
+
+
 
 
   Future<void> _pickLocation(
@@ -765,6 +1022,8 @@ class _RegisterScreenState extends State<RegisterScreen>
       });
     }
   }
+
+
 
 
   Widget _buildLocationField({
@@ -830,6 +1089,8 @@ class _RegisterScreenState extends State<RegisterScreen>
   }
 
 
+
+
   // ---------------- Shared small widgets ----------------
   Widget _buildFieldLabel(String text) {
     return Align(
@@ -840,6 +1101,8 @@ class _RegisterScreenState extends State<RegisterScreen>
       ),
     );
   }
+
+
 
 
   Widget _buildTextField({
@@ -883,6 +1146,8 @@ class _RegisterScreenState extends State<RegisterScreen>
   }
 
 
+
+
   Widget _buildPasswordField({
     required TextEditingController controller,
     required String label,
@@ -900,11 +1165,11 @@ class _RegisterScreenState extends State<RegisterScreen>
             _buildFieldLabel(label),
             if (showStrength) ...[
               const SizedBox(width: 4),
-              Tooltip(
-                message: 'Must include a number, uppercase & lowercase letter, and a special character',
+              GestureDetector(
+                onTap: _showPasswordRequirements,
                 child: const Icon(
                   Icons.info_outline,
-                  size: 14,
+                  size: 16,
                   color: Colors.grey,
                 ),
               ),
@@ -954,6 +1219,8 @@ class _RegisterScreenState extends State<RegisterScreen>
   }
 
 
+
+
   Widget _buildNextButton({required VoidCallback onPressed}) {
     return SizedBox(
       width: double.infinity,
@@ -996,6 +1263,8 @@ class _RegisterScreenState extends State<RegisterScreen>
   }
 
 
+
+
   Widget _buildSignInRow() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -1026,6 +1295,8 @@ class _RegisterScreenState extends State<RegisterScreen>
   }
 
 
+
+
   Widget _floatingCircle(double size, Color color) {
     return Container(
       width: size,
@@ -1034,3 +1305,30 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 }
+
+
+class _RequirementItem extends StatelessWidget {
+  final String text;
+  const _RequirementItem(this.text);
+
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle_outline, size: 16, color: Colors.green),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 13, color: Colors.black87),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
