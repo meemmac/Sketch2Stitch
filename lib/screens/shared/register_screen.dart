@@ -401,7 +401,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       if (!mounted) return;
 
 
-      final emailStatus = result.emailSent ? 'Welcome email sent ✅' : 'Email failed ❌';
+      final emailStatus = result.emailSent ? 'Welcome email sent ' : 'Email failed ❌';
       _showFeedback(
         'Registration successful! ($emailStatus)',
         isError: false,

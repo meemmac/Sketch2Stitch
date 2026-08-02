@@ -213,10 +213,16 @@ class AuthService {
     try {
       final now = DateTime.now();
       final months = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
       ];
-      final formattedDate = "${months[now.month - 1]} ${now.day}, ${now.year}";
+      final formattedDate = " ${now.day} ${months[now.month - 1]} ${now.year}, ";
+      
+      // Format time as HH:mm AM/PM
+      final hour = now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
+      final period = now.hour >= 12 ? 'PM' : 'AM';
+      final minute = now.minute.toString().padLeft(2, '0');
+      final formattedTime = "$hour:$minute $period";
 
 
       final payload = jsonEncode({
@@ -226,11 +232,11 @@ class AuthService {
         'accessToken': _emailjsAccessToken,
         'template_params': {
           'user_name': name,
-          'email': email,
+          'email': email, // Used for the "To Email" field in Dashboard
           'user_email': email,
-          'user_role': role.name.toUpperCase(),
-          'welcome_message': _getWelcomeMessageForRole(role),
           'join_date': formattedDate,
+          'join_time': formattedTime,
+          'welcome_message': _getWelcomeMessageForRole(role),
         },
       });
 
@@ -256,11 +262,11 @@ class AuthService {
   String _getWelcomeMessageForRole(UserRole role) {
     switch (role) {
       case UserRole.customer:
-        return 'Welcome to Sketch Stitch! Start exploring premium fabrics and expert tailors to create your perfect outfit.';
-      case UserRole.tailor:
-        return 'Welcome to our professional network! We are excited to have you on board to provide expert tailoring services to our customers.';
-      case UserRole.retailer:
-        return 'Welcome to the marketplace! Start listing your high-quality fabrics and elements to reach thousands of customers.';
+        return 'Welcome to Sketch2Stitch! We’re delighted to have you with us.Discover beautiful fabrics, connect with skilled tailors, and bring your unique style to life.';
+        case UserRole.tailor:
+          return 'Welcome to Sketch2Stitch! Share your craftsmanship, connect with customers and turn your tailoring expertise into beautiful creations.';
+          case UserRole.retailer:
+            return 'Welcome to Sketch2Stitch! Showcase your quality fabrics and products, connect with customers and build meaningful connections through our creative marketplace.';
     }
   }
 
