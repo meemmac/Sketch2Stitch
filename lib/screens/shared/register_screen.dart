@@ -387,12 +387,12 @@ class _RegisterScreenState extends State<RegisterScreen>
       role = UserRole.tailor;
       profileData['name'] = _tailorFullNameController.text.trim();
       profileData['location'] = _tailorLocation;
-      profileData['rating'] = 0.0;
+      profileData['rating'] = 5.0;
     } else {
       role = UserRole.retailer;
       profileData['shopName'] = _shopNameController.text.trim();
       profileData['location'] = _retailerLocation;
-      profileData['rating'] = 0.0;
+      profileData['rating'] = 5.0;
       // Convert phone to number for Retailer per schema
       profileData['phone'] = int.tryParse(profileData['phone'].toString().replaceAll(RegExp(r'\D'), '')) ?? 0;
     }
