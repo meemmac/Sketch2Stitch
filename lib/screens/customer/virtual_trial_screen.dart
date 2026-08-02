@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../models/appearance_profile.dart';
+import '../../models/user_role.dart';
 import '../../services/ai_service.dart';
 import '../../utils/api_config.dart';
 import '../../widgets/dashboard_drawer.dart';
@@ -418,7 +419,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      drawer: const DashboardDrawer(initialRole: AppUserRole.customer),
+      drawer: const DashboardDrawer(initialRole: UserRole.customer),
       appBar: _buildAppBar(),
       body: SingleChildScrollView(
         controller: _scrollController,

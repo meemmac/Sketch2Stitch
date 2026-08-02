@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sketch2stitch/models/user_role.dart';
+import 'package:sketch2stitch/services/auth_service.dart';
+import 'package:sketch2stitch/services/user_session.dart';
 import '../screens/customer/virtual_trial_screen.dart';
 import '../screens/retailer/inventory_screen.dart';
 import '../screens/retailer/orders_screen.dart';
@@ -15,9 +17,6 @@ import '../screens/tailor/orders_screen.dart';
 import '../screens/customer/cart_screen.dart';
 import '../screens/customer/orders/order_detail_screen.dart';
 import '../screens/customer/messaging/conversations_screen.dart';
-
-/// Enum representing the three user roles.
-enum AppUserRole { customer, tailor, retailer }
 
 /// Model class representing the profile information for the drawer.
 class DrawerProfileData {
@@ -73,26 +72,17 @@ class DrawerProfileData {
 }
 
 /// The main reusable Dashboard Drawer widget.
-///
-/// The role shown here is decided once, upstream — by whatever tells
-/// `UnifiedHomeScreen` who's logged in (real auth once that's wired up).
-/// This widget just renders that role; it no longer owns a role switcher.
 class DashboardDrawer extends StatefulWidget {
-  final AppUserRole initialRole;
+  final UserRole initialRole;
 
-  const DashboardDrawer({super.key, this.initialRole = AppUserRole.customer});
+  const DashboardDrawer({super.key, required this.initialRole});
 
   @override
   State<DashboardDrawer> createState() => _DashboardDrawerState();
 }
 
 class _DashboardDrawerState extends State<DashboardDrawer> {
-  late AppUserRole _currentRole;
-
-  // Placeholder profile details
-  late DrawerProfileData _customerProfile;
-  late DrawerProfileData _tailorProfile;
-  late DrawerProfileData _retailerProfile;
+  late UserRole _currentRole;
   late Measurement _customerMeasurement;
 
   @override
@@ -118,157 +108,113 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       waistToAnkle: 40.0,
       shoulderToAnkle: 57.0,
     );
-
-    // Initialize mock data
-    _customerProfile = const DrawerProfileData(
-      name: "Maria Doe",
-      email: "maria.doe@example.com",
-      phone: "+880 1234567890",
-      address: "123 Creative Lane, New Market Road, Dhaka",
-    );
-
-    _tailorProfile = const DrawerProfileData(
-      name: "Master Karim",
-      email: "karim.tailors@example.com",
-      phone: "+880 1234567890",
-      address: "Suite 4B, Concord Tower, Dhaka",
-      rating: 4.8,
-      about:
-          "Bespoke traditional and modern wear expert with over 15 years of experience in custom tailoring.",
-    );
-
-    _retailerProfile = const DrawerProfileData(
-      name: "Alim Rahman",
-      shopName: "Elegant Fabrics Ltd.",
-      email: "contact@elegantfabrics.com",
-      phone: "+880 1234567890",
-      address: "Shop 12, Banani Super Market, Dhaka",
-      rating: 4.6,
-      about:
-          "Premium local and imported fabric supplier specializing in silk, cotton, and wedding collections.",
-    );
-  }
-
-  DrawerProfileData get _activeProfile {
-    switch (_currentRole) {
-      case AppUserRole.customer:
-        return _customerProfile;
-      case AppUserRole.tailor:
-        return _tailorProfile;
-      case AppUserRole.retailer:
-        return _retailerProfile;
-    }
   }
 
   void _updateProfile(DrawerProfileData updated) {
-    setState(() {
-      switch (_currentRole) {
-        case AppUserRole.customer:
-          _customerProfile = updated;
-          break;
-        case AppUserRole.tailor:
-          _tailorProfile = updated;
-          break;
-        case AppUserRole.retailer:
-          _retailerProfile = updated;
-          break;
-      }
-    });
+    UserSession.instance.currentProfile.value = updated;
     debugPrint("Profile updated: ${updated.name} (${_currentRole.name})");
   }
 
   @override
   Widget build(BuildContext context) {
-    const themeColor = Color(
-      0xFF6C9985,
-    ); // Sage theme color matching AI Test Screen
+    const themeColor = Color(0xFF6C9985);
 
-    return Drawer(
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(
-          topRight: Radius.circular(24),
-          bottomRight: Radius.circular(24),
-        ),
-      ),
-      child: SafeArea(
-        child: Column(
-          children: [
-            // Profile Section
-            Expanded(
-              child: CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: DrawerProfileSection(
-                      role: _currentRole,
-                      profile: _activeProfile,
-                      themeColor: themeColor,
-                      onEditPressed: () => _openEditScreen(context),
-                    ),
-                  ),
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Divider(),
-                    ),
-                  ),
+    return ValueListenableBuilder<DrawerProfileData?>(
+      valueListenable: UserSession.instance.currentProfile,
+      builder: (context, profile, _) {
+        if (profile == null) return const Drawer(child: Center(child: CircularProgressIndicator()));
 
-                  // Navigation Section
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: DrawerNavigationSection(
-                            role: _currentRole,
-                            themeColor: themeColor,
-                            measurement: _customerMeasurement,
-                            onSave: (updated) async {
-                              await Future.delayed(
-                                const Duration(milliseconds: 500),
-                              );
-                              if (!mounted) return;
-                              setState(() {
-                                _customerMeasurement = updated;
-                              });
-                            },
-                          ),
-                        ),
-                        const Divider(height: 1),
-
-                        // Logout Section
-                        DrawerLogoutButton(
-                          onLogoutPressed: () {
-                            debugPrint("Logout pressed");
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text("Logged out successfully!"),
-                              ),
-                            );
-                            Navigator.pushAndRemoveUntil(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const WelcomeScreen(),
-                              ),
-                              (route) => false,
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+        return Drawer(
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.only(
+              topRight: Radius.circular(24),
+              bottomRight: Radius.circular(24),
             ),
-          ],
-        ),
-      ),
+          ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                // Profile Section
+                Expanded(
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: DrawerProfileSection(
+                          role: _currentRole,
+                          profile: profile,
+                          themeColor: themeColor,
+                          onEditPressed: () => _openEditScreen(context, profile),
+                        ),
+                      ),
+                      const SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16.0),
+                          child: Divider(),
+                        ),
+                      ),
+
+                      // Navigation Section
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: DrawerNavigationSection(
+                                role: _currentRole,
+                                themeColor: themeColor,
+                                measurement: _customerMeasurement,
+                                onSave: (updated) async {
+                                  await Future.delayed(
+                                    const Duration(milliseconds: 500),
+                                  );
+                                  if (!mounted) return;
+                                  setState(() {
+                                    _customerMeasurement = updated;
+                                  });
+                                },
+                              ),
+                            ),
+                            const Divider(height: 1),
+
+                            // Logout Section
+                            DrawerLogoutButton(
+                              onLogoutPressed: () async {
+                                debugPrint("Logout pressed");
+                                await AuthService().signOut();
+                                UserSession.instance.logout();
+                                
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text("Logged out successfully!"),
+                                  ),
+                                );
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const WelcomeScreen(),
+                                  ),
+                                  (route) => false,
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Future<void> _openEditScreen(BuildContext context) async {
-    // Close the drawer first so we're not pushing a full-screen route
-    // on top of an open Drawer overlay.
+  Future<void> _openEditScreen(BuildContext context, DrawerProfileData currentProfile) async {
+    // Close the drawer first
     Navigator.pop(context);
 
     final updatedProfile = await Navigator.push<DrawerProfileData>(
@@ -276,7 +222,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       MaterialPageRoute(
         builder: (_) => EditProfileScreen(
           role: _currentRole,
-          initialProfile: _activeProfile,
+          initialProfile: currentProfile,
         ),
       ),
     );
@@ -289,7 +235,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
 
 /// Profile display widget inside the drawer.
 class DrawerProfileSection extends StatelessWidget {
-  final AppUserRole role;
+  final UserRole role;
   final DrawerProfileData profile;
   final Color themeColor;
   final VoidCallback onEditPressed;
@@ -304,7 +250,7 @@ class DrawerProfileSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isCustomer = role == AppUserRole.customer;
+    final bool isCustomer = role == UserRole.customer;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
@@ -341,7 +287,7 @@ class DrawerProfileSection extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      role == AppUserRole.retailer
+                      role == UserRole.retailer
                           ? profile.shopName
                           : profile.name,
                       style: const TextStyle(
@@ -481,7 +427,7 @@ class DrawerProfileSection extends StatelessWidget {
 
 /// Navigation section widget filtering routes based on user role.
 class DrawerNavigationSection extends StatelessWidget {
-  final AppUserRole role;
+  final UserRole role;
   final Color themeColor;
   final Measurement? measurement;
   final Future<void> Function(Measurement)? onSave;
@@ -514,21 +460,21 @@ class DrawerNavigationSection extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const VirtualTrialScreen()),
                 );
               } else if (item['title'] == 'Orders') {
-                if (role == AppUserRole.retailer) {
+                if (role == UserRole.retailer) {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => const RetailerOrdersScreen(),
                     ),
                   );
-                } else if (role == AppUserRole.customer) {
+                } else if (role == UserRole.customer) {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => const OrderDetailScreen(),
                     ),
                   );
-                } else if (role == AppUserRole.tailor) {
+                } else if (role == UserRole.tailor) {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -571,7 +517,7 @@ class DrawerNavigationSection extends StatelessWidget {
                   MaterialPageRoute(
                     builder: (_) => ConversationsScreen(
                       customerId: 'current_customer_id',
-                      currentUserRole: _mapToUserRole(role),
+                      currentUserRole: role,
                     ),
                   ),
                 );
@@ -593,7 +539,7 @@ class DrawerNavigationSection extends StatelessWidget {
 
   List<Map<String, dynamic>> _getNavigationItems() {
     switch (role) {
-      case AppUserRole.customer:
+      case UserRole.customer:
         return [
           {'title': 'Virtual Trial', 'icon': Icons.auto_awesome_rounded},
           {'title': 'Measurements', 'icon': Icons.straighten_rounded},
@@ -601,29 +547,18 @@ class DrawerNavigationSection extends StatelessWidget {
           {'title': 'Messages', 'icon': Icons.chat_bubble_outline_rounded},
           {'title': 'Orders', 'icon': Icons.receipt_long_rounded},
         ];
-      case AppUserRole.tailor:
+      case UserRole.tailor:
         return [
           {'title': 'Orders', 'icon': Icons.receipt_long_rounded},
           {'title': 'Portfolio', 'icon': Icons.design_services_outlined},
           {'title': 'Messages', 'icon': Icons.chat_bubble_outline_rounded},
         ];
-      case AppUserRole.retailer:
+      case UserRole.retailer:
         return [
           {'title': 'Orders', 'icon': Icons.receipt_long_rounded},
           {'title': 'Inventory', 'icon': Icons.inventory_2_outlined},
           {'title': 'Messages', 'icon': Icons.chat_bubble_outline_rounded},
         ];
-    }
-  }
-
-  UserRole _mapToUserRole(AppUserRole appRole) {
-    switch (appRole) {
-      case AppUserRole.customer:
-        return UserRole.customer;
-      case AppUserRole.tailor:
-        return UserRole.tailor;
-      case AppUserRole.retailer:
-        return UserRole.retailer;
     }
   }
 }
@@ -721,7 +656,7 @@ class DrawerLogoutButton extends StatelessWidget {
 /// Returns the updated `DrawerProfileData` via `Navigator.pop(context, data)`
 /// when saved, or `null` if the user backs out without saving.
 class EditProfileScreen extends StatefulWidget {
-  final AppUserRole role;
+  final UserRole role;
   final DrawerProfileData initialProfile;
 
   const EditProfileScreen({
@@ -811,7 +746,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     final updated = widget.initialProfile.copyWith(
       name: _nameController.text,
-      shopName: widget.role == AppUserRole.retailer
+      shopName: widget.role == UserRole.retailer
           ? _shopNameController.text
           : null,
       email: _emailController.text,
@@ -837,8 +772,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isRetailer = widget.role == AppUserRole.retailer;
-    final bool isCustomer = widget.role == AppUserRole.customer;
+    final bool isRetailer = widget.role == UserRole.retailer;
+    final bool isCustomer = widget.role == UserRole.customer;
     const themeColor = Color(0xFF6C9985);
 
     const fieldTextStyle = TextStyle(fontSize: 14);

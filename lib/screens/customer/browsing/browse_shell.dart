@@ -6,19 +6,19 @@ import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
 import 'package:sketch2stitch/screens/customer/cart_screen.dart';
-import 'package:sketch2stitch/widgets/dashboard_drawer.dart'; // ✅ Import AppUserRole
+import 'package:sketch2stitch/models/user_role.dart';
 
 /// Shared shell for the four "Browse" tabs (Fabrics, Elements, Tailors, Retailers)
 class BrowseShell extends StatefulWidget {
   final int initialIndex;
   final void Function(String tailorId)? onTailorSelected;
-  final AppUserRole userRole;
+  final UserRole userRole;
 
   const BrowseShell({
     super.key,
     this.initialIndex = 0,
     this.onTailorSelected,
-    this.userRole = AppUserRole.customer,
+    this.userRole = UserRole.customer,
   });
 
   @override
@@ -200,7 +200,7 @@ class _BrowseShellState extends State<BrowseShell> {
   @override
   Widget build(BuildContext context) {
     final currentIndex = _page.round().clamp(0, _tabLabels.length - 1);
-    final isCustomer = widget.userRole == AppUserRole.customer;
+    final isCustomer = widget.userRole == UserRole.customer;
 
     final fabricsFilterData = FabricsFilterData(
       minPrice: _fabricsMinPrice,

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
+import 'package:sketch2stitch/models/user_role.dart';
 // ============= CUSTOMER NOTIFICATION =============
 enum NotificationType { confirmed, delivered, cancelled, paymentDue }
 
@@ -254,7 +254,7 @@ final List<TailorNotification> kTailorDummyNotifications = [
 
 // ============= UNIFIED NOTIFICATION SCREEN =============
 class UnifiedNotificationScreen extends StatefulWidget {
-  final AppUserRole role;
+  final UserRole role;
   final void Function(String orderId, String? subOrderId)? onNotificationTap;
 
   const UnifiedNotificationScreen({
@@ -283,13 +283,13 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   void _clearAll() {
     setState(() {
       switch (widget.role) {
-        case AppUserRole.customer:
+        case UserRole.customer:
           _customerNotifications.clear();
           break;
-        case AppUserRole.tailor:
+        case UserRole.tailor:
           _tailorNotifications.clear();
           break;
-        case AppUserRole.retailer:
+        case UserRole.retailer:
           _retailerNotifications.clear();
           break;
       }
@@ -298,11 +298,11 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
 
   int get _notificationCount {
     switch (widget.role) {
-      case AppUserRole.customer:
+      case UserRole.customer:
         return _customerNotifications.length;
-      case AppUserRole.tailor:
+      case UserRole.tailor:
         return _tailorNotifications.length;
-      case AppUserRole.retailer:
+      case UserRole.retailer:
         return _retailerNotifications.length;
     }
   }
@@ -337,13 +337,13 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   Widget _buildHeader() {
     String title;
     switch (widget.role) {
-      case AppUserRole.customer:
+      case UserRole.customer:
         title = 'Notifications';
         break;
-      case AppUserRole.tailor:
+      case UserRole.tailor:
         title = 'Notifications';
         break;
-      case AppUserRole.retailer:
+      case UserRole.retailer:
         title = 'Notifications';
         break;
     }
@@ -423,11 +423,11 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
 
   Widget _buildNotificationCard(int index) {
     switch (widget.role) {
-      case AppUserRole.customer:
+      case UserRole.customer:
         return _buildCustomerCard(_customerNotifications[index]);
-      case AppUserRole.tailor:
+      case UserRole.tailor:
         return _buildTailorCard(_tailorNotifications[index]);
-      case AppUserRole.retailer:
+      case UserRole.retailer:
         return _buildRetailerCard(_retailerNotifications[index]);
     }
   }

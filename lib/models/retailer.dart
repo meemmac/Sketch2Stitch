@@ -82,12 +82,12 @@ class Retailer {
     'about': about,
   };
 
-  factory Retailer.fromJson(Map<String, dynamic> json) {
+  factory Retailer.fromJson(Map<String, dynamic> json, {String? id}) {
     return Retailer(
-      id: json['id'] ?? '',
+      id: id ?? json['id'] ?? '',
       shopName: json['shopName'] ?? '',
       email: json['email'] ?? '',
-      phone: json['phone'] ?? '',
+      phone: json['phone']?.toString() ?? '',
       address: json['address'] ?? '',
       rating: (json['rating'] ?? 0).toDouble(),
       location: json['location'] is GeoPoint ? json['location'] as GeoPoint : null,

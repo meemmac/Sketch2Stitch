@@ -110,26 +110,45 @@ class AuthService {
     await _auth.signOut();
   }
 
+  /// Probes Firestore to find which role collection the user belongs to.
+  Future<UserRole?> findUserRole(String uid) async {
+    // We check in order of expected frequency
+    final customer = await _firestore.collection('Customer').doc(uid).get();
+    if (customer.exists) return UserRole.customer;
+
+    final tailor = await _firestore.collection('Tailor').doc(uid).get();
+    if (tailor.exists) return UserRole.tailor;
+
+    final retailer = await _firestore.collection('Retailer').doc(uid).get();
+    if (retailer.exists) return UserRole.retailer;
+
+    return null;
+  }
 
   /// Fetch user profile data from the respective Firestore collection.
   /// Returns [Customer], [Tailor], or [Retailer] if found, otherwise null.
   Future<dynamic> getUserProfile(String uid, UserRole role) async {
     try {
       final collection = _getCollectionForRole(role);
+      debugPrint('[AuthService] Fetching profile from $collection for UID: $uid');
       final doc = await _firestore.collection(collection).doc(uid).get();
 
 
-      if (!doc.exists || doc.data() == null) return null;
+      if (!doc.exists || doc.data() == null) {
+        debugPrint('[AuthService] No document found in $collection for UID: $uid');
+        return null;
+      }
 
 
       final data = doc.data()!;
+      debugPrint('[AuthService] Data found: $data');
       switch (role) {
         case UserRole.customer:
-          return Customer.fromJson(data);
+          return Customer.fromJson(data, id: uid);
         case UserRole.tailor:
-          return Tailor.fromJson(data);
+          return Tailor.fromJson(data, id: uid);
         case UserRole.retailer:
-          return Retailer.fromJson(data);
+          return Retailer.fromJson(data, id: uid);
       }
     } catch (e) {
       debugPrint('Error fetching user profile: $e');

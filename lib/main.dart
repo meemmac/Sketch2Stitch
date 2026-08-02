@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'screens/shared/welcome_screen.dart'; // Add this import
+import 'screens/shared/auth_wrapper.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -33,7 +33,7 @@ class Sketch2StitchApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
-      home: const WelcomeScreen(), 
+      home: const AuthWrapper(),
     );
   }
 }

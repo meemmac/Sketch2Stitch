@@ -1,12 +1,17 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:sketch2stitch/models/user_role.dart';
+import 'package:sketch2stitch/services/auth_service.dart';
+import 'package:sketch2stitch/services/user_session.dart';
 import 'package:sketch2stitch/screens/shared/register_screen.dart';
-import 'package:sketch2stitch/screens/shared/welcome_screen.dart'; // Add this import
+import 'package:sketch2stitch/screens/shared/welcome_screen.dart';
 import 'package:sketch2stitch/screens/shared/forgot_password_screen.dart';
 import 'package:sketch2stitch/screens/customer/home_screen.dart';
-import '../../services/auth_service.dart';
-import '../../models/user_role.dart';
 import '../../widgets/dashboard_drawer.dart';
+import '../../models/customer.dart';
+import '../../models/tailor.dart';
+import '../../models/retailer.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -42,18 +47,6 @@ class _LoginScreenState extends State<LoginScreen>
     _passwordController.dispose();
     _floatController.dispose();
     super.dispose();
-  }
-
-  // ✅ Helper method to get AppUserRole from string
-  AppUserRole _getSelectedAppRole() {
-    switch (_selectedUserType) {
-      case 'Tailor':
-        return AppUserRole.tailor;
-      case 'Retailer':
-        return AppUserRole.retailer;
-      default:
-        return AppUserRole.customer;
-    }
   }
 
   UserRole _getSelectedUserRole() {
@@ -107,16 +100,58 @@ class _LoginScreenState extends State<LoginScreen>
         if (!mounted) return;
 
         if (profile != null) {
+          // Robust mapping from Models to DrawerProfileData
+          String name = '';
+          String shopName = '';
+          double rating = 0.0;
+          String? profilePicture;
+          String? about;
+          GeoPoint? location;
+
+          if (profile is Customer) {
+            name = profile.name;
+            location = profile.location;
+          } else if (profile is Tailor) {
+            name = profile.name;
+            rating = profile.rating;
+            profilePicture = profile.profilePicture;
+            about = profile.about;
+            location = profile.location;
+          } else if (profile is Retailer) {
+            shopName = profile.shopName;
+            name = profile.shopName; // Display shop name as primary name
+            rating = profile.rating;
+            profilePicture = profile.profilePicture;
+            about = profile.about;
+            location = profile.location;
+          }
+
+          final drawerData = DrawerProfileData(
+            name: name,
+            shopName: shopName,
+            email: profile.email,
+            phone: profile.phone,
+            address: profile.address,
+            rating: rating,
+            location: location,
+            profilePicture: profilePicture,
+            about: about,
+          );
+
+          // Save to global session
+          UserSession.instance.setSession(drawerData, role);
+
           // Navigate to home with selected role
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               builder: (context) => UnifiedHomeScreen(
-                initialRole: _getSelectedAppRole(),
+                initialRole: role,
               ),
             ),
           );
-        } else {
+        }
+else {
           // Sign out if profile doesn't match role
           await AuthService().signOut();
           ScaffoldMessenger.of(context).showSnackBar(
@@ -129,6 +164,7 @@ class _LoginScreenState extends State<LoginScreen>
         SnackBar(content: Text(e.message)),
       );
     } catch (e) {
+      debugPrint('[Login] Error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('An unexpected error occurred')),
       );

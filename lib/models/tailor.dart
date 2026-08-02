@@ -91,7 +91,7 @@ class Tailor {
       id: id ?? json['id'] ?? '',
       name: json['name'] ?? '',
       email: json['email'] ?? '',
-      phone: json['phone'] ?? '',
+      phone: json['phone']?.toString() ?? '',
       address: json['address'] ?? '',
       rating: (json['rating'] ?? 0).toDouble(),
       location: json['location'] is GeoPoint ? json['location'] as GeoPoint : null,
