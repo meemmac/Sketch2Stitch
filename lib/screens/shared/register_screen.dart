@@ -5,8 +5,6 @@ import '../../services/auth_service.dart';
 import 'login_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'location_picker_screen.dart';
-import '../../services/user_session.dart';
-import '../../widgets/dashboard_drawer.dart';
 import '../../utils/validation_utils.dart';
 import '../../widgets/password_strength_indicator.dart';
 
@@ -26,7 +24,6 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen>
     with SingleTickerProviderStateMixin {
   RegisterStep _step = RegisterStep.roleSelect;
-  String? _selectedRole;
   GeoPoint? _customerLocation;
   GeoPoint? _tailorLocation;
   GeoPoint? _retailerLocation;
@@ -95,7 +92,6 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   void _selectRole(String role) {
     setState(() {
-      _selectedRole = role;
       if (role == 'Retailer') {
         _step = RegisterStep.retailerForm;
       } else if (role == 'Tailor') {
@@ -200,12 +196,14 @@ class _RegisterScreenState extends State<RegisterScreen>
       profileData['shopName'] = _shopNameController.text;
       profileData['location'] = _retailerLocation;
       profileData['rating'] = 0.0;
+      // Convert phone to number for Retailer per schema
+      profileData['phone'] = int.tryParse(profileData['phone'].toString()) ?? 0;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      await AuthService().signUpWithEmailAndPassword(
+      final result = await AuthService().signUpWithEmailAndPassword(
         email,
         _passwordController.text,
         role,
@@ -214,6 +212,7 @@ class _RegisterScreenState extends State<RegisterScreen>
 
       if (!mounted) return;
 
+   //   final emailStatus = result.emailSent ? 'Welcome email sent ✅' : 'Email failed ❌';
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Registration successful! Please login.'),
