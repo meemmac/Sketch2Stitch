@@ -9,25 +9,20 @@ import '../models/customer.dart';
 import '../models/tailor.dart';
 import '../models/retailer.dart';
 
-
-
 /// EmailJS Credentials retrieved from environment variables
 final String _emailjsServiceId = dotenv.get('EMAILJS_SERVICE_ID', fallback: '');
 final String _emailjsTemplateId = dotenv.get('EMAILJS_TEMPLATE_ID', fallback: '');
 final String _emailjsPublicKey = dotenv.get('EMAILJS_PUBLIC_KEY', fallback: '');
 final String _emailjsAccessToken = dotenv.get('EMAILJS_ACCESS_TOKEN', fallback: '');
 
-
 /// Thrown by [AuthService] with an already user-friendly message.
 class AuthServiceException implements Exception {
   AuthServiceException(this.message);
   final String message;
 
-
   @override
   String toString() => message;
 }
-
 
 /// Wraps all Firebase Auth calls. This service handles user authentication
 /// and fetching user profile data from Firestore.
@@ -36,24 +31,22 @@ class AuthService {
       : _auth = firebaseAuth ?? FirebaseAuth.instance,
         _firestore = firestore ?? FirebaseFirestore.instance;
 
-
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
-
 
   /// Current authenticated user.
   User? get currentUser => _auth.currentUser;
 
-
   /// Stream of authentication state changes.
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+  // ==================== AUTHENTICATION METHODS ====================
 
   /// Authenticate user via Firebase Auth.
   Future<UserCredential> signInWithEmailAndPassword(
-      String email,
-      String password,
-      ) async {
+    String email,
+    String password,
+  ) async {
     try {
       return await _auth.signInWithEmailAndPassword(
         email: email.trim(),
@@ -66,21 +59,19 @@ class AuthService {
     }
   }
 
-
   /// Create new account and save profile data.
   /// Returns a record with the [UserCredential] and a [bool] indicating if the welcome email was sent.
   Future<({UserCredential credential, bool emailSent})> signUpWithEmailAndPassword(
-      String email,
-      String password,
-      UserRole role,
-      Map<String, dynamic> profileData,
-      ) async {
+    String email,
+    String password,
+    UserRole role,
+    Map<String, dynamic> profileData,
+  ) async {
     try {
       final credential = await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
-
 
       bool emailSent = false;
       if (credential.user != null) {
@@ -90,12 +81,10 @@ class AuthService {
             .doc(credential.user!.uid)
             .set(profileData);
 
-
         // Send Welcome Email securely via EmailJS
         final name = profileData['name'] ?? profileData['shopName'] ?? 'Member';
         emailSent = await _sendWelcomeEmailViaEmailJS(email: email, name: name, role: role);
       }
-
 
       return (credential: credential, emailSent: emailSent);
     } on FirebaseAuthException catch (e) {
@@ -105,10 +94,7 @@ class AuthService {
     }
   }
 
-
-
-
-  /// Handle "Forgot Password" requests.
+  /// Handle "Forgot Password" requests using Firebase's built-in method.
   Future<void> sendPasswordResetEmail(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email.trim());
@@ -121,12 +107,12 @@ class AuthService {
     }
   }
 
-
   /// Logout user.
   Future<void> signOut() async {
     await _auth.signOut();
   }
 
+  // ==================== USER PROFILE METHODS ====================
 
   /// Probes Firestore to find which role collection the user belongs to.
   Future<UserRole?> findUserRole(String uid) async {
@@ -134,14 +120,11 @@ class AuthService {
     final customer = await _firestore.collection('Customer').doc(uid).get();
     if (customer.exists) return UserRole.customer;
 
-
     final tailor = await _firestore.collection('Tailor').doc(uid).get();
     if (tailor.exists) return UserRole.tailor;
 
-
     final retailer = await _firestore.collection('Retailer').doc(uid).get();
     if (retailer.exists) return UserRole.retailer;
-
 
     return null;
   }
@@ -161,7 +144,6 @@ class AuthService {
     return null;
   }
 
-
   /// Fetch user profile data from the respective Firestore collection.
   /// Returns [Customer], [Tailor], or [Retailer] if found, otherwise null.
   Future<dynamic> getUserProfile(String uid, UserRole role) async {
@@ -170,16 +152,10 @@ class AuthService {
       debugPrint('[AuthService] Fetching profile from $collection for UID: $uid');
       final doc = await _firestore.collection(collection).doc(uid).get();
 
-
-
-
       if (!doc.exists || doc.data() == null) {
         debugPrint('[AuthService] No document found in $collection for UID: $uid');
         return null;
       }
-
-
-
 
       final data = doc.data()!;
       debugPrint('[AuthService] Data found: $data');
@@ -197,20 +173,18 @@ class AuthService {
     }
   }
 
-
-
-
   String _getCollectionForRole(UserRole role) {
     switch (role) {
       case UserRole.customer:
-        return 'Customer'; // Singular per schema
+        return 'Customer';
       case UserRole.tailor:
-        return 'Tailor'; // Singular per schema
+        return 'Tailor';
       case UserRole.retailer:
-        return 'Retailer'; // Singular per schema
+        return 'Retailer';
     }
   }
 
+  // ==================== EMAIL METHODS ====================
 
   /// Sends a welcome email securely using the EmailJS API.
   /// The app only uses a Public Key, keeping your SMTP/API credentials safe.
@@ -224,7 +198,6 @@ class AuthService {
       return false;
     }
 
-
     final url = Uri.parse('https://api.emailjs.com/api/v1.0/email/send');
 
     try {
@@ -235,12 +208,10 @@ class AuthService {
       ];
       final formattedDate = " ${now.day} ${months[now.month - 1]} ${now.year}, ";
       
-      // Format time as HH:mm AM/PM
       final hour = now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
       final period = now.hour >= 12 ? 'PM' : 'AM';
       final minute = now.minute.toString().padLeft(2, '0');
       final formattedTime = "$hour:$minute $period";
-
 
       final payload = jsonEncode({
         'service_id': _emailjsServiceId,
@@ -249,14 +220,13 @@ class AuthService {
         'accessToken': _emailjsAccessToken,
         'template_params': {
           'user_name': name,
-          'email': email, // Used for the "To Email" field in Dashboard
+          'email': email,
           'user_email': email,
           'join_date': formattedDate,
           'join_time': formattedTime,
           'welcome_message': _getWelcomeMessageForRole(role),
         },
       });
-
 
       final response = await http.post(
         url,
@@ -267,7 +237,6 @@ class AuthService {
         body: payload,
       );
 
-
       return response.statusCode == 200;
     } catch (e) {
       debugPrint('Error sending welcome email: $e');
@@ -275,18 +244,18 @@ class AuthService {
     }
   }
 
-
   String _getWelcomeMessageForRole(UserRole role) {
     switch (role) {
       case UserRole.customer:
-        return 'Welcome to Sketch2Stitch! We’re delighted to have you with us. Discover beautiful fabrics, connect with skilled tailors, and bring your unique style to life.';
-        case UserRole.tailor:
-          return 'Welcome to Sketch2Stitch! Share your craftsmanship, connect with customers and turn your tailoring expertise into beautiful creations.';
-          case UserRole.retailer:
-            return 'Welcome to Sketch2Stitch! Showcase your quality fabrics and elements, connect with customers and build meaningful connections through our creative marketplace.';
+        return 'Welcome to Sketch2Stitch! We\'re delighted to have you with us. Discover beautiful fabrics, connect with skilled tailors, and bring your unique style to life.';
+      case UserRole.tailor:
+        return 'Welcome to Sketch2Stitch! Share your craftsmanship, connect with customers and turn your tailoring expertise into beautiful creations.';
+      case UserRole.retailer:
+        return 'Welcome to Sketch2Stitch! Showcase your quality fabrics and elements, connect with customers and build meaningful connections through our creative marketplace.';
     }
   }
 
+  // ==================== ERROR HANDLING ====================
 
   String _messageForCode(String code) {
     switch (code) {
@@ -313,6 +282,3 @@ class AuthService {
     }
   }
 }
-
-
-

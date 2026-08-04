@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/screens/shared/login_screen.dart';
+import 'package:sketch2stitch/services/auth_service.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -12,20 +13,14 @@ class ForgotPasswordScreen extends StatefulWidget {
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     with SingleTickerProviderStateMixin {
   final _emailController = TextEditingController();
-  final _otpController = TextEditingController();
-  final _newPasswordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-
   late AnimationController _floatController;
-
-  // Step management
-  int _currentStep = 0; // 0: Email, 1: OTP, 2: New Password
   bool _isLoading = false;
-  bool _obscureNewPassword = true;
-  bool _obscureConfirmPassword = true;
+  bool _emailSent = false;
 
   // For overlay notification
   OverlayEntry? _overlayEntry;
+
+  final AuthService _authService = AuthService();
 
   @override
   void initState() {
@@ -39,15 +34,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   @override
   void dispose() {
     _emailController.dispose();
-    _otpController.dispose();
-    _newPasswordController.dispose();
-    _confirmPasswordController.dispose();
     _floatController.dispose();
     _hideOverlayNotification();
     super.dispose();
   }
 
-  // Show notification at the top of the glass card using Overlay
   void _showOverlayNotification(String message, Color color) {
     _hideOverlayNotification();
 
@@ -105,7 +96,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
     overlayState.insert(_overlayEntry!);
 
-    Future.delayed(const Duration(seconds: 3), () {
+    Future.delayed(const Duration(seconds: 4), () {
       _hideOverlayNotification();
     });
   }
@@ -115,109 +106,52 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     _overlayEntry = null;
   }
 
-  void _sendOTP() {
-    if (_emailController.text.isEmpty) {
+  Future<void> _sendResetEmail() async {
+    final email = _emailController.text.trim();
+    
+    if (email.isEmpty) {
+      _showOverlayNotification('Please enter your email address', Colors.red);
+      return;
+    }
+
+    if (!email.contains('@') || !email.contains('.')) {
+      _showOverlayNotification('Please enter a valid email address', Colors.red);
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Send password reset email using Firebase's built-in method
+      await _authService.sendPasswordResetEmail(email);
+      
+      setState(() {
+        _isLoading = false;
+        _emailSent = true;
+      });
+      
       _showOverlayNotification(
-        'Please enter your email or phone number',
+        'Password reset email sent! Check your inbox.',
+        Colors.green,
+      );
+      
+    } on AuthServiceException catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      _showOverlayNotification(e.message, Colors.red);
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      _showOverlayNotification(
+        'Failed to send reset email. Please try again.',
         Colors.red,
       );
-      return;
+      debugPrint('Error sending reset email: $e');
     }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    Future.delayed(const Duration(seconds: 2), () {
-      setState(() {
-        _isLoading = false;
-        _currentStep = 1;
-      });
-      _showOverlayNotification('OTP sent successfully!', Colors.green);
-    });
-  }
-
-  void _verifyOTP() {
-    if (_otpController.text.length < 6) {
-      _showOverlayNotification('Please enter a valid 6-digit OTP', Colors.red);
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    Future.delayed(const Duration(seconds: 2), () {
-      setState(() {
-        _isLoading = false;
-        _currentStep = 2;
-      });
-      _showOverlayNotification('OTP verified successfully!', Colors.green);
-    });
-  }
-
-  void _resetPassword() {
-    if (_newPasswordController.text.length < 6) {
-      _showOverlayNotification(
-        'Password must be at least 6 characters',
-        Colors.red,
-      );
-      return;
-    }
-
-    if (_newPasswordController.text != _confirmPasswordController.text) {
-      _showOverlayNotification('Passwords do not match', Colors.red);
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    Future.delayed(const Duration(seconds: 2), () {
-      setState(() {
-        _isLoading = false;
-      });
-
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.green, size: 28),
-              SizedBox(width: 10),
-              Text('Success'),
-            ],
-          ),
-          content: const Text(
-            'Your password has been reset successfully!\nPlease sign in with your new password.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                );
-              },
-              style: TextButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: const Text('Go to Sign In'),
-            ),
-          ],
-        ),
-      );
-    });
   }
 
   @override
@@ -245,34 +179,22 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                       Positioned(
                         top: 60 - offset,
                         left: -30,
-                        child: _floatingCircle(
-                          120,
-                          Colors.white.withOpacity(0.25),
-                        ),
+                        child: _floatingCircle(120, Colors.white.withOpacity(0.25)),
                       ),
                       Positioned(
                         top: 180 + offset,
                         right: -40,
-                        child: _floatingCircle(
-                          90,
-                          Colors.green.shade100.withOpacity(0.35),
-                        ),
+                        child: _floatingCircle(90, Colors.green.shade100.withOpacity(0.35)),
                       ),
                       Positioned(
                         bottom: 100 - offset,
                         left: 20,
-                        child: _floatingCircle(
-                          70,
-                          Colors.white.withOpacity(0.3),
-                        ),
+                        child: _floatingCircle(70, Colors.white.withOpacity(0.3)),
                       ),
                       Positioned(
                         bottom: 40 + offset,
                         right: 30,
-                        child: _floatingCircle(
-                          50,
-                          Colors.green.shade200.withOpacity(0.3),
-                        ),
+                        child: _floatingCircle(50, Colors.green.shade200.withOpacity(0.3)),
                       ),
                     ],
                   );
@@ -316,13 +238,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                 ),
                                 const SizedBox(height: 16),
 
-                                // Title based on step
+                                // Title
                                 Text(
-                                  _currentStep == 0
-                                      ? 'Forgot Password?'
-                                      : _currentStep == 1
-                                      ? 'Verify OTP'
-                                      : 'Create New Password',
+                                  _emailSent ? 'Check Your Email' : 'Forgot Password?',
                                   style: const TextStyle(
                                     fontSize: 19,
                                     fontWeight: FontWeight.bold,
@@ -330,13 +248,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                 ),
                                 const SizedBox(height: 6),
 
-                                // Subtitle based on step
+                                // Subtitle
                                 Text(
-                                  _currentStep == 0
-                                      ? 'An OTP will be sent to your email/message\nto reset your Password'
-                                      : _currentStep == 1
-                                      ? 'Enter the OTP sent to your email/message'
-                                      : 'Enter your new password below',
+                                  _emailSent
+                                      ? 'We\'ve sent a password reset link to your email.\n\nPlease check your inbox and spam folder.'
+                                      : 'Enter your email address and we\'ll send you\na link to reset your password.',
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
                                     fontSize: 12.5,
@@ -346,12 +262,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                 ),
                                 const SizedBox(height: 16),
 
-                                // Step 0: Email field
-                                if (_currentStep == 0) ...[
+                                // Email input field (only shown when email not sent)
+                                if (!_emailSent) ...[
                                   const Align(
                                     alignment: Alignment.centerLeft,
                                     child: Text(
-                                      'Email address/Phone No',
+                                      'Email Address',
                                       style: TextStyle(
                                         fontSize: 12.5,
                                         fontWeight: FontWeight.w600,
@@ -364,16 +280,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                     keyboardType: TextInputType.emailAddress,
                                     style: const TextStyle(fontSize: 14),
                                     decoration: InputDecoration(
-                                      hintText: 'Email/Phone',
+                                      hintText: 'Enter your email',
                                       hintStyle: const TextStyle(fontSize: 14),
                                       isDense: true,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 12,
-                                          ),
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 12,
+                                      ),
                                       prefixIcon: const Icon(
-                                        Icons.person_outline,
+                                        Icons.email_outlined,
                                         size: 20,
                                       ),
                                       filled: true,
@@ -384,203 +299,142 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                       ),
                                     ),
                                   ),
-                                ],
-
-                                // Step 1: OTP field
-                                if (_currentStep == 1) ...[
-                                  const Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(
-                                      'Enter OTP',
-                                      style: TextStyle(
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w600,
+                                  const SizedBox(height: 8),
+                                ] else ...[
+                                  // Success message container
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.shade50,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.green.shade200,
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 5),
-                                  TextField(
-                                    controller: _otpController,
-                                    keyboardType: TextInputType.number,
-                                    maxLength: 6,
-                                    style: const TextStyle(fontSize: 14),
-                                    decoration: InputDecoration(
-                                      hintText: 'Enter 6-digit OTP',
-                                      hintStyle: const TextStyle(fontSize: 14),
-                                      isDense: true,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 12,
-                                          ),
-                                      prefixIcon: const Icon(
-                                        Icons.pin,
-                                        size: 20,
-                                      ),
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-
-                                // Step 2: New Password fields
-                                if (_currentStep == 2) ...[
-                                  const Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(
-                                      'New Password',
-                                      style: TextStyle(
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 5),
-                                  TextField(
-                                    controller: _newPasswordController,
-                                    obscureText: _obscureNewPassword,
-                                    style: const TextStyle(fontSize: 14),
-                                    decoration: InputDecoration(
-                                      hintText: 'Enter new password',
-                                      hintStyle: const TextStyle(fontSize: 14),
-                                      isDense: true,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 12,
-                                          ),
-                                      prefixIcon: const Icon(
-                                        Icons.lock_outline,
-                                        size: 20,
-                                      ),
-                                      suffixIcon: IconButton(
-                                        icon: Icon(
-                                          _obscureNewPassword
-                                              ? Icons.visibility_off_outlined
-                                              : Icons.visibility_outlined,
-                                          size: 18,
+                                    child: Column(
+                                      children: [
+                                        Icon(
+                                          Icons.check_circle_outline,
+                                          color: Colors.green.shade700,
+                                          size: 48,
                                         ),
-                                        onPressed: () {
-                                          setState(() {
-                                            _obscureNewPassword =
-                                                !_obscureNewPassword;
-                                          });
-                                        },
-                                      ),
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-
-                                  const Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(
-                                      'Confirm Password',
-                                      style: TextStyle(
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 5),
-                                  TextField(
-                                    controller: _confirmPasswordController,
-                                    obscureText: _obscureConfirmPassword,
-                                    style: const TextStyle(fontSize: 14),
-                                    decoration: InputDecoration(
-                                      hintText: 'Confirm new password',
-                                      hintStyle: const TextStyle(fontSize: 14),
-                                      isDense: true,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 12,
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Email Sent Successfully!',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.green.shade700,
                                           ),
-                                      prefixIcon: const Icon(
-                                        Icons.lock_outline,
-                                        size: 20,
-                                      ),
-                                      suffixIcon: IconButton(
-                                        icon: Icon(
-                                          _obscureConfirmPassword
-                                              ? Icons.visibility_off_outlined
-                                              : Icons.visibility_outlined,
-                                          size: 18,
                                         ),
-                                        onPressed: () {
-                                          setState(() {
-                                            _obscureConfirmPassword =
-                                                !_obscureConfirmPassword;
-                                          });
-                                        },
-                                      ),
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                        borderSide: BorderSide.none,
-                                      ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'We\'ve sent a password reset link to:\n${_emailController.text}',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.green.shade700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              const Text(
+                                                '📌 Important:',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                'Check your spam folder if you don\'t see the email within 5 minutes.',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
+                                  const SizedBox(height: 16),
                                 ],
 
                                 const SizedBox(height: 16),
 
                                 // Action Button
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 46,
-                                  child: ElevatedButton(
-                                    onPressed: _isLoading
-                                        ? null
-                                        : () {
-                                            if (_currentStep == 0) {
-                                              _sendOTP();
-                                            } else if (_currentStep == 1) {
-                                              _verifyOTP();
-                                            } else if (_currentStep == 2) {
-                                              _resetPassword();
-                                            }
-                                          },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.black,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(14),
+                                if (!_emailSent)
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 46,
+                                    child: ElevatedButton(
+                                      onPressed: _isLoading ? null : _sendResetEmail,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.black,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(14),
+                                        ),
+                                        elevation: 0,
                                       ),
-                                      elevation: 0,
+                                      child: _isLoading
+                                          ? const SizedBox(
+                                              height: 20,
+                                              width: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white,
+                                              ),
+                                            )
+                                          : const Text(
+                                              'Send Reset Link',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
                                     ),
-                                    child: _isLoading
-                                        ? const SizedBox(
-                                            height: 20,
-                                            width: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: Colors.white,
-                                            ),
-                                          )
-                                        : Text(
-                                            _currentStep == 0
-                                                ? 'Send OTP'
-                                                : _currentStep == 1
-                                                ? 'Verify OTP'
-                                                : 'Submit',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w600,
-                                            ),
+                                  )
+                                else
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 46,
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        Navigator.pushReplacement(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => const LoginScreen(),
                                           ),
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.black,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(14),
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      child: const Text(
+                                        'Go to Sign In',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                ),
                                 const SizedBox(height: 12),
 
                                 // Navigation links
@@ -629,31 +483,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                 ),
               ),
 
-              // Back button — left-aligned and consistent with other screens
+              // Back button
               Positioned(
                 top: 8,
                 left: 8,
                 child: TextButton(
                   onPressed: () {
-                    if (_currentStep > 0) {
-                      setState(() {
-                        if (_currentStep == 1) {
-                          _currentStep = 0;
-                          _otpController.clear();
-                        } else if (_currentStep == 2) {
-                          _currentStep = 1;
-                          _newPasswordController.clear();
-                          _confirmPasswordController.clear();
-                        }
-                      });
-                    } else {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LoginScreen(),
-                        ),
-                      );
-                    }
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LoginScreen(),
+                      ),
+                    );
                   },
                   style: TextButton.styleFrom(
                     backgroundColor: Colors.white,
