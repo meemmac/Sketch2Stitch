@@ -305,6 +305,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
               builder: (context) => TailorDetailScreen(
                 tailor: tailor,
                 userRole: widget.userRole,
+                onTailorSelected: widget.onTailorSelected,
               ),
             ),
           );
@@ -492,21 +493,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                         ),
                       ],
                     ),
-                    if (tailor.about != null && tailor.about!.isNotEmpty)
-                      Padding(
-                        padding: EdgeInsets.only(top: isSmall ? 2 : 4),
-                        child: Text(
-                          tailor.about!,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: const Color(0xFF4A7C59),
-                            fontWeight: FontWeight.w500,
-                            height: 1.2,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
+                    // ❌ REMOVED: About section from grid (only shown in detail page)
                   ],
                 ),
               ),

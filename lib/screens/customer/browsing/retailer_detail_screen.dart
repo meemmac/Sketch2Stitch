@@ -119,6 +119,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   }
 
 // In retailer_detail_screen.dart, replace the _loadProducts method with:
+// In retailer_detail_screen.dart, replace the _loadProducts method:
 
 Future<void> _loadProducts() async {
   setState(() => _isLoadingProducts = true);
@@ -129,11 +130,14 @@ Future<void> _loadProducts() async {
         .where((p) => p.retailerId == widget.retailer.id)
         .toList();
     
+    print('✅ Loaded ${retailerProducts.length} products for retailer ${widget.retailer.id}');
+    
     setState(() {
       _products = retailerProducts;
       _isLoadingProducts = false;
     });
   } catch (e) {
+    print('❌ Error loading products: $e');
     setState(() => _isLoadingProducts = false);
   }
 }

@@ -127,8 +127,17 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   }
 
   Future<void> _loadPortfolio() async {
-    setState(() => _isLoadingPortfolio = true);
-    try {
+  setState(() => _isLoadingPortfolio = true);
+  try {
+    // If portfolio service is not working, use the tailor's existing portfolio
+    if (widget.tailor.portfolio != null && widget.tailor.portfolio!.isNotEmpty) {
+      setState(() {
+        _portfolioItems = widget.tailor.portfolio!;
+        _isLoadingPortfolio = false;
+      });
+      print('✅ Loaded ${_portfolioItems.length} portfolio items from tailor');
+    } else {
+      // Otherwise try from service
       final result = await _portfolioService.getTailorPortfolio(
         widget.tailor.id,
         pageSize: 20,
@@ -137,11 +146,13 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         _portfolioItems = result.items;
         _isLoadingPortfolio = false;
       });
-    } catch (e) {
-      setState(() => _isLoadingPortfolio = false);
+      print('✅ Loaded ${_portfolioItems.length} portfolio items from service');
     }
+  } catch (e) {
+    print('❌ Error loading portfolio: $e');
+    setState(() => _isLoadingPortfolio = false);
   }
-
+}
   void _showPortfolioOverlay(Portfolio portfolioItem) {
     final imagePath = portfolioItem.image ?? '';
     final description = portfolioItem.description ?? 'No description available.';

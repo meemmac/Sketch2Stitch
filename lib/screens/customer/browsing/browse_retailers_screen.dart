@@ -492,33 +492,8 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                         ),
                       ],
                     ),
-                    if (retailer.about != null && retailer.about!.isNotEmpty)
-                      Padding(
-                        padding: EdgeInsets.only(top: isSmall ? 2 : 4),
-                        child: Text(
-                          retailer.about!,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: const Color(0xFF4A7C59),
-                            fontWeight: FontWeight.w500,
-                            height: 1.2,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    if (retailer.products != null && retailer.products!.isNotEmpty)
-                      Padding(
-                        padding: EdgeInsets.only(top: isSmall ? 2 : 4),
-                        child: Text(
-                          '${retailer.products!.length} products',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: const Color(0xFF4A7C59),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
+                    // ❌ REMOVED: About section from grid (only shown in detail page)
+                    // ❌ REMOVED: Products count from grid (optional)
                   ],
                 ),
               ),
