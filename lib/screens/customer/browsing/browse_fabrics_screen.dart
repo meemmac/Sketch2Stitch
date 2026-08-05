@@ -35,20 +35,13 @@ class FabricMaterialBlend {
     );
   }
 
-  factory FabricMaterialBlend.fromMaterialType(String materialType) {
-    final parts = materialType.split(',').map((s) => s.trim()).toList();
-    if (parts.length == 1 && parts.first.isNotEmpty) {
-      final part = parts.first;
-      final blendMatch = RegExp(r'(\d+)%\s*(.+)').firstMatch(part);
-      if (blendMatch != null) {
-        return FabricMaterialBlend(
-          material: blendMatch.group(2) ?? part,
-          blend: '${blendMatch.group(1)}%',
-        );
-      }
-      return FabricMaterialBlend(material: part);
-    }
-    return FabricMaterialBlend(material: materialType);
+  factory FabricMaterialBlend.fromMaterialType(Map<String, dynamic> materialType) {
+    final type = materialType['type'] as String? ?? '';
+    final blend = materialType['blend'] as int? ?? 0;
+    return FabricMaterialBlend(
+      material: type,
+      blend: blend > 0 ? '$blend%' : '',
+    );
   }
 }
 
@@ -87,22 +80,15 @@ class FabricProductData {
   factory FabricProductData.fromProduct(Product product) {
     List<FabricMaterialBlend> blends = [];
     
-    if (product.materialType.isNotEmpty) {
-      final parts = product.materialType.split(',').map((s) => s.trim()).toList();
-      for (final part in parts) {
-        if (part.contains('%')) {
-          final blendMatch = RegExp(r'(\d+)%\s*(.+)').firstMatch(part);
-          if (blendMatch != null) {
-            blends.add(FabricMaterialBlend(
-              material: blendMatch.group(2)?.trim() ?? part,
-              blend: '${blendMatch.group(1)}%',
-            ));
-          } else {
-            blends.add(FabricMaterialBlend(material: part));
-          }
-        } else {
-          blends.add(FabricMaterialBlend(material: part));
-        }
+    // Extract material blends from product's materialTypes
+    if (product.materialTypes.isNotEmpty) {
+      for (final materialType in product.materialTypes) {
+        blends.add(FabricMaterialBlend(
+          material: materialType.type,
+          blend: materialType.blend != null && materialType.blend! > 0 
+              ? '${materialType.blend!.toInt()}%' 
+              : '',
+        ));
       }
     }
     
@@ -144,6 +130,25 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
   String? _currentUserId;
   Map<String, String> _retailerNames = {};
   bool _isLoadingRetailers = true;
+
+  final List<String> _elementCategories = [
+    'Buttons',
+    'Threads',
+    'Embellishments',
+    'Trims',
+    'Ribbons',
+    'Fasteners',
+    'Lace',
+    'Beads',
+    'Sequins',
+    'Patches',
+    'Zippers',
+    'Elastics',
+    'Interfacing',
+  ];
+
+  bool _isElement(Product product) =>
+      _elementCategories.contains(product.category);
 
   @override
   void initState() {
@@ -199,11 +204,11 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         : null;
 
     // For "Elements" tab, we filter by category
-    final categoryFilter = widget.showFabrics ? null : 'Elements';
+    final categoryFilter = widget.showFabrics ? null : widget.filterData.materialTypes;
 
     return StreamBuilder<List<Product>>(
       stream: _browseService.getProductsByFilter(
-        category: categoryFilter,
+        category: categoryFilter?.contains('All') == true ? null : categoryFilter?.first,
         materialType: widget.filterData.materialTypes.contains('All') 
             ? null 
             : widget.filterData.materialTypes.first,
@@ -251,15 +256,25 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
             !snapshot.hasData) {
           return const Center(
             child: CircularProgressIndicator(
-              color: kSage,
+              color: Color(0xFF6B8F71),
             ),
           );
         }
 
         final products = snapshot.data ?? [];
         
+        // Filter products based on showFabrics
+        List<Product> filteredProducts;
+        if (widget.showFabrics) {
+          // Show only fabrics (non-element categories)
+          filteredProducts = products.where((p) => !_isElement(p)).toList();
+        } else {
+          // Show only elements
+          filteredProducts = products.where((p) => _isElement(p)).toList();
+        }
+        
         // Convert to FabricProductData
-        final fabricDataList = products
+        final fabricDataList = filteredProducts
             .map((product) => FabricProductData.fromProduct(product))
             .toList();
 
@@ -296,6 +311,13 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
           );
         }
 
+        // Apply sorting
+        if (widget.filterData.sortBy == 'lowToHigh') {
+          fabricDataList.sort((a, b) => a.product.minPrice.compareTo(b.product.minPrice));
+        } else if (widget.filterData.sortBy == 'highToLow') {
+          fabricDataList.sort((a, b) => b.product.minPrice.compareTo(a.product.minPrice));
+        }
+
         return Column(
           children: [
             _buildHeroSection(widget.showFabrics ? 'Fabrics' : 'Elements'),
@@ -317,7 +339,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       padding: EdgeInsets.all(isSmallScreen ? 14 : 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [kSageDark, kSage],
+          colors: [Color(0xFF4A7C59), Color(0xFF6B8F71)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -340,7 +362,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
             'High-quality materials for your style',
             style: TextStyle(
               fontSize: 13,
-              color: Colors.white.withValues(alpha: 0.9),
+              color: Colors.white.withOpacity(0.9),
             ),
           ),
           const SizedBox(height: 10),
@@ -360,7 +382,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
     return Container(
       padding: EdgeInsets.symmetric(horizontal: isSmall ? 10 : 12, vertical: isSmall ? 4 : 5),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.2),
+        color: Colors.white.withOpacity(0.2),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -382,6 +404,39 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
   }
 
   Widget _buildFabricGrid(List<FabricProductData> fabrics) {
+    if (fabrics.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off_rounded,
+              size: 64,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No Fabrics found',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try adjusting your filters or search terms',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[500],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
@@ -414,12 +469,12 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
           onTap: () => _showFabricDetailOverlay(context, fabricData),
           child: Container(
             decoration: BoxDecoration(
-              color: kCardBg,
+              color: Colors.white,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: kBorder, width: 0.5),
+              border: Border.all(color: const Color(0xFFE8ECF0), width: 0.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: Colors.black.withOpacity(0.05),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -439,18 +494,43 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                           width: double.infinity,
                           height: double.infinity,
                           child: coverImage != null && coverImage.isNotEmpty
-                              ? _buildProductImage(coverImage, isSmallScreen)
+                              ? (coverImage.startsWith('http')
+                                  ? Image.network(
+                                      coverImage,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => Container(
+                                        color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                        child: Icon(
+                                          Icons.texture,
+                                          size: isSmallScreen ? 36 : 40,
+                                          color: const Color(0xFF4A7C59),
+                                        ),
+                                      ),
+                                    )
+                                  : Image.asset(
+                                      coverImage,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => Container(
+                                        color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                        child: Icon(
+                                          Icons.texture,
+                                          size: isSmallScreen ? 36 : 40,
+                                          color: const Color(0xFF4A7C59),
+                                        ),
+                                      ),
+                                    )
+                                )
                               : Container(
-                                  color: kSage.withValues(alpha: 0.12),
+                                  color: const Color(0xFF6B8F71).withOpacity(0.12),
                                   child: Icon(
-                                    Icons.texture,
+                                    widget.showFabrics ? Icons.texture : Icons.category,
                                     size: isSmallScreen ? 36 : 40,
-                                    color: kSageDark,
+                                    color: const Color(0xFF4A7C59),
                                   ),
                                 ),
                         ),
                       ),
-                      if (materialDisplay != "N/A")
+                      if (widget.showFabrics && materialDisplay != "N/A")
                         Positioned(
                           top: 8,
                           right: 8,
@@ -460,10 +540,10 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                               vertical: isSmallScreen ? 3 : 4
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.75),
+                              color: Colors.black.withOpacity(0.75),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.2),
+                                color: Colors.white.withOpacity(0.2),
                                 width: 0.3,
                               ),
                             ),
@@ -490,10 +570,10 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                               vertical: isSmallScreen ? 4 : 5
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.85),
+                              color: Colors.red.withOpacity(0.85),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.2),
+                                color: Colors.white.withOpacity(0.2),
                                 width: 0.3,
                               ),
                             ),
@@ -550,7 +630,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: kSageDark,
+                            color: const Color(0xFF4A7C59),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -603,36 +683,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
     );
   }
 
-  Widget _buildProductImage(String imageUrl, bool isSmall) {
-    if (imageUrl.startsWith('http')) {
-      return Image.network(
-        imageUrl,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => Container(
-          color: kSage.withValues(alpha: 0.12),
-          child: Icon(
-            Icons.texture,
-            size: isSmall ? 36 : 40,
-            color: kSageDark,
-          ),
-        ),
-      );
-    } else {
-      return Image.asset(
-        imageUrl,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => Container(
-          color: kSage.withValues(alpha: 0.12),
-          child: Icon(
-            Icons.texture,
-            size: isSmall ? 36 : 40,
-            color: kSageDark,
-          ),
-        ),
-      );
-    }
-  }
-
   Widget _colorDot(String colorName, bool isSmall) {
     final color = _resolveColor(colorName);
     final double size = isSmall ? 14 : 16;
@@ -642,7 +692,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
-        border: Border.all(color: kBorder, width: 0.5),
+        border: Border.all(color: const Color(0xFFE8ECF0), width: 0.5),
       ),
     );
   }
@@ -685,8 +735,20 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         retailerName: _getRetailerName(fabricData.product.retailerId),
         materialBlends: fabricData.materialBlendList,
         userRole: widget.userRole,
-        customerId: _currentUserId,
-        favoriteService: _favoriteService,
+      ),
+    );
+  }
+
+  void _showElementDetailOverlay(BuildContext context, Product product) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ProductDetailOverlay(
+        product: product,
+        isFabric: false,
+        retailerName: _getRetailerName(product.retailerId),
+        userRole: widget.userRole,
       ),
     );
   }

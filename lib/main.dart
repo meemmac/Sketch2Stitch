@@ -16,7 +16,7 @@ void main() async {
   // ⚠️ RUN THIS ONCE to populate your Firestore with sample data
   // After running once, COMMENT OUT or REMOVE these lines
   // Uncomment the lines below to seed data:
-  
+  /*
   try {
     print('🌱 Seeding data...');
     final seedService = DataSeedService();
@@ -25,7 +25,7 @@ void main() async {
   } catch (e) {
     print('❌ Error seeding data: $e');
   }
-  
+  */
   // ─── END DATA SEEDING ──────────────────────────────────────────────────
   
   runApp(const Sketch2StitchApp());

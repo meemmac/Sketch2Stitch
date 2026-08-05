@@ -10,10 +10,11 @@ class DataSeedService {
       
       await _seedRetailers();
       await _seedTailors();
-      await _seedProducts();
-      await _seedElements(); // Add Elements seeding
+      await _seedFabrics();
+      await _seedElements();
       
       print('✅ Data seeding completed successfully!');
+      print('📊 Seeded: 3 Retailers, 3 Tailors, 5 Fabrics, 6 Elements');
     } catch (e) {
       print('❌ Error seeding data: $e');
       rethrow;
@@ -110,10 +111,10 @@ class DataSeedService {
     }
   }
 
-  Future<void> _seedProducts() async {
-    final products = [
+  Future<void> _seedFabrics() async {
+    final fabrics = [
       {
-        'id': 'prod1',
+        'id': 'fabric1',
         'retailerId': 'retailer1',
         'productName': 'Premium Egyptian Cotton',
         'productCode': 'COTTON-001',
@@ -122,12 +123,12 @@ class DataSeedService {
         'materialType': [
           {'type': 'Cotton', 'blend': 100},
         ],
-        'careSymbol': ['no_bleach', 'wash_40', 'no_tumble_dry', 'iron_medium', 'dry_clean'],
+        'careSymbol': ['Machine wash cold', 'Do not bleach', 'Tumble dry low', 'Iron medium'],
         'colorOptions': [
           {
             'optionId': 1,
             'color': 'White',
-            'image': 'https://picsum.photos/seed/cotton1/400/400',
+            'image': 'https://picsum.photos/seed/cotton_white/400/400',
             'video': '',
             'price': 650,
             'stock': 40,
@@ -135,7 +136,7 @@ class DataSeedService {
           {
             'optionId': 2,
             'color': 'Beige',
-            'image': 'https://picsum.photos/seed/cotton2/400/400',
+            'image': 'https://picsum.photos/seed/cotton_beige/400/400',
             'video': '',
             'price': 650,
             'stock': 25,
@@ -143,15 +144,23 @@ class DataSeedService {
           {
             'optionId': 3,
             'color': 'Blue',
-            'image': 'https://picsum.photos/seed/cotton3/400/400',
+            'image': 'https://picsum.photos/seed/cotton_blue/400/400',
             'video': '',
             'price': 700,
             'stock': 15,
           },
+          {
+            'optionId': 4,
+            'color': 'Black',
+            'image': 'https://picsum.photos/seed/cotton_black/400/400',
+            'video': '',
+            'price': 700,
+            'stock': 0,
+          },
         ],
       },
       {
-        'id': 'prod2',
+        'id': 'fabric2',
         'retailerId': 'retailer3',
         'productName': 'Pure Mulberry Silk',
         'productCode': 'SILK-001',
@@ -161,12 +170,12 @@ class DataSeedService {
           {'type': 'Silk', 'blend': 70},
           {'type': 'Viscose', 'blend': 30},
         ],
-        'careSymbol': ['dry_clean_only', 'iron_low'],
+        'careSymbol': ['Dry clean only', 'Iron on low heat'],
         'colorOptions': [
           {
             'optionId': 1,
             'color': 'Gold',
-            'image': 'https://picsum.photos/seed/silk1/400/400',
+            'image': 'https://picsum.photos/seed/silk_gold/400/400',
             'video': '',
             'price': 1800,
             'stock': 10,
@@ -174,7 +183,7 @@ class DataSeedService {
           {
             'optionId': 2,
             'color': 'Pink',
-            'image': 'https://picsum.photos/seed/silk2/400/400',
+            'image': 'https://picsum.photos/seed/silk_pink/400/400',
             'video': '',
             'price': 1750,
             'stock': 8,
@@ -182,15 +191,23 @@ class DataSeedService {
           {
             'optionId': 3,
             'color': 'Green',
-            'image': 'https://picsum.photos/seed/silk3/400/400',
+            'image': 'https://picsum.photos/seed/silk_green/400/400',
             'video': '',
             'price': 1750,
             'stock': 5,
           },
+          {
+            'optionId': 4,
+            'color': 'White',
+            'image': 'https://picsum.photos/seed/silk_white/400/400',
+            'video': '',
+            'price': 1700,
+            'stock': 12,
+          },
         ],
       },
       {
-        'id': 'prod3',
+        'id': 'fabric3',
         'retailerId': 'retailer2',
         'productName': 'Merino Wool Blend',
         'productCode': 'WOOL-001',
@@ -200,12 +217,12 @@ class DataSeedService {
           {'type': 'Wool', 'blend': 85},
           {'type': 'Nylon', 'blend': 15},
         ],
-        'careSymbol': ['hand_wash_cold', 'dry_flat'],
+        'careSymbol': ['Hand wash cold', 'Dry flat'],
         'colorOptions': [
           {
             'optionId': 1,
             'color': 'Brown',
-            'image': 'https://picsum.photos/seed/wool1/400/400',
+            'image': 'https://picsum.photos/seed/wool_brown/400/400',
             'video': '',
             'price': 950,
             'stock': 18,
@@ -213,7 +230,7 @@ class DataSeedService {
           {
             'optionId': 2,
             'color': 'Black',
-            'image': 'https://picsum.photos/seed/wool2/400/400',
+            'image': 'https://picsum.photos/seed/wool_black/400/400',
             'video': '',
             'price': 950,
             'stock': 20,
@@ -221,7 +238,7 @@ class DataSeedService {
           {
             'optionId': 3,
             'color': 'Beige',
-            'image': 'https://picsum.photos/seed/wool3/400/400',
+            'image': 'https://picsum.photos/seed/wool_beige/400/400',
             'video': '',
             'price': 900,
             'stock': 0,
@@ -229,7 +246,7 @@ class DataSeedService {
         ],
       },
       {
-        'id': 'prod4',
+        'id': 'fabric4',
         'retailerId': 'retailer1',
         'productName': 'Irish Linen Weave',
         'productCode': 'LINEN-001',
@@ -238,12 +255,12 @@ class DataSeedService {
         'materialType': [
           {'type': 'Linen', 'blend': 100},
         ],
-        'careSymbol': ['machine_wash_cold', 'iron_damp'],
+        'careSymbol': ['Machine wash cold', 'Iron while damp'],
         'colorOptions': [
           {
             'optionId': 1,
             'color': 'White',
-            'image': 'https://picsum.photos/seed/linen1/400/400',
+            'image': 'https://picsum.photos/seed/linen_white/400/400',
             'video': '',
             'price': 780,
             'stock': 30,
@@ -251,7 +268,7 @@ class DataSeedService {
           {
             'optionId': 2,
             'color': 'Beige',
-            'image': 'https://picsum.photos/seed/linen2/400/400',
+            'image': 'https://picsum.photos/seed/linen_beige/400/400',
             'video': '',
             'price': 780,
             'stock': 22,
@@ -259,7 +276,7 @@ class DataSeedService {
           {
             'optionId': 3,
             'color': 'Blue',
-            'image': 'https://picsum.photos/seed/linen3/400/400',
+            'image': 'https://picsum.photos/seed/linen_blue/400/400',
             'video': '',
             'price': 820,
             'stock': 14,
@@ -267,7 +284,7 @@ class DataSeedService {
         ],
       },
       {
-        'id': 'prod5',
+        'id': 'fabric5',
         'retailerId': 'retailer3',
         'productName': 'French Chantilly Lace',
         'productCode': 'LACE-001',
@@ -276,12 +293,12 @@ class DataSeedService {
         'materialType': [
           {'type': 'Polyester', 'blend': 100},
         ],
-        'careSymbol': ['dry_clean_only', 'no_bleach'],
+        'careSymbol': ['Dry clean only', 'Do not bleach'],
         'colorOptions': [
           {
             'optionId': 1,
             'color': 'White',
-            'image': 'https://picsum.photos/seed/lace1/400/400',
+            'image': 'https://picsum.photos/seed/lace_white/400/400',
             'video': '',
             'price': 1200,
             'stock': 6,
@@ -289,7 +306,7 @@ class DataSeedService {
           {
             'optionId': 2,
             'color': 'Black',
-            'image': 'https://picsum.photos/seed/lace2/400/400',
+            'image': 'https://picsum.photos/seed/lace_black/400/400',
             'video': '',
             'price': 1200,
             'stock': 4,
@@ -297,7 +314,7 @@ class DataSeedService {
           {
             'optionId': 3,
             'color': 'Pink',
-            'image': 'https://picsum.photos/seed/lace3/400/400',
+            'image': 'https://picsum.photos/seed/lace_pink/400/400',
             'video': '',
             'price': 1250,
             'stock': 0,
@@ -306,32 +323,30 @@ class DataSeedService {
       },
     ];
 
-    for (final product in products) {
-      final id = product['id'] as String;
-      product.remove('id');
-      await _db.collection('Products').doc(id).set(product);
-      print('✅ Seeded product: ${product['productName']}');
+    for (final fabric in fabrics) {
+      final id = fabric['id'] as String;
+      fabric.remove('id');
+      await _db.collection('Products').doc(id).set(fabric);
+      print('✅ Seeded fabric: ${fabric['productName']}');
     }
   }
 
   Future<void> _seedElements() async {
     final elements = [
       {
-        'id': 'elem1',
+        'id': 'element1',
         'retailerId': 'retailer1',
         'productName': 'Decorative Buttons Set',
         'productCode': 'BTN-001',
         'category': 'Buttons',
         'description': 'Elegant button sets in various sizes and finishes.',
-        'materialType': [
-          {'type': 'Plastic', 'blend': 100},
-        ],
-        'careSymbol': ['hand_wash', 'no_bleach'],
+        'materialType': [], // Elements don't have materialType
+        'careSymbol': [], // Elements don't have careSymbol
         'colorOptions': [
           {
             'optionId': 1,
             'color': 'White',
-            'image': 'https://picsum.photos/seed/buttons1/400/400',
+            'image': 'https://picsum.photos/seed/buttons_white/400/400',
             'video': '',
             'price': 80,
             'stock': 200,
@@ -339,7 +354,7 @@ class DataSeedService {
           {
             'optionId': 2,
             'color': 'Black',
-            'image': 'https://picsum.photos/seed/buttons2/400/400',
+            'image': 'https://picsum.photos/seed/buttons_black/400/400',
             'video': '',
             'price': 80,
             'stock': 150,
@@ -347,7 +362,7 @@ class DataSeedService {
           {
             'optionId': 3,
             'color': 'Gold',
-            'image': 'https://picsum.photos/seed/buttons3/400/400',
+            'image': 'https://picsum.photos/seed/buttons_gold/400/400',
             'video': '',
             'price': 100,
             'stock': 100,
@@ -355,21 +370,19 @@ class DataSeedService {
         ],
       },
       {
-        'id': 'elem2',
+        'id': 'element2',
         'retailerId': 'retailer2',
         'productName': 'Sewing Thread Collection',
         'productCode': 'THD-001',
         'category': 'Threads',
         'description': 'Premium quality sewing thread in essential colors.',
-        'materialType': [
-          {'type': 'Cotton', 'blend': 100},
-        ],
-        'careSymbol': ['store_cool_dry'],
+        'materialType': [],
+        'careSymbol': [],
         'colorOptions': [
           {
             'optionId': 1,
             'color': 'White',
-            'image': 'https://picsum.photos/seed/thread1/400/400',
+            'image': 'https://picsum.photos/seed/thread_white/400/400',
             'video': '',
             'price': 45,
             'stock': 300,
@@ -377,7 +390,7 @@ class DataSeedService {
           {
             'optionId': 2,
             'color': 'Black',
-            'image': 'https://picsum.photos/seed/thread2/400/400',
+            'image': 'https://picsum.photos/seed/thread_black/400/400',
             'video': '',
             'price': 45,
             'stock': 250,
@@ -385,7 +398,7 @@ class DataSeedService {
           {
             'optionId': 3,
             'color': 'Beige',
-            'image': 'https://picsum.photos/seed/thread3/400/400',
+            'image': 'https://picsum.photos/seed/thread_beige/400/400',
             'video': '',
             'price': 45,
             'stock': 200,
@@ -393,21 +406,19 @@ class DataSeedService {
         ],
       },
       {
-        'id': 'elem3',
+        'id': 'element3',
         'retailerId': 'retailer3',
         'productName': 'Pearl Embellishments',
         'productCode': 'PRL-001',
         'category': 'Embellishments',
         'description': 'Beautiful pearl embellishments for bridal and formal wear.',
-        'materialType': [
-          {'type': 'Glass', 'blend': 100},
-        ],
-        'careSymbol': ['dry_clean_only', 'handle_care'],
+        'materialType': [],
+        'careSymbol': [],
         'colorOptions': [
           {
             'optionId': 1,
             'color': 'White',
-            'image': 'https://picsum.photos/seed/pearls1/400/400',
+            'image': 'https://picsum.photos/seed/pearls_white/400/400',
             'video': '',
             'price': 200,
             'stock': 80,
@@ -415,7 +426,7 @@ class DataSeedService {
           {
             'optionId': 2,
             'color': 'Pink',
-            'image': 'https://picsum.photos/seed/pearls2/400/400',
+            'image': 'https://picsum.photos/seed/pearls_pink/400/400',
             'video': '',
             'price': 220,
             'stock': 60,
@@ -423,21 +434,19 @@ class DataSeedService {
         ],
       },
       {
-        'id': 'elem4',
+        'id': 'element4',
         'retailerId': 'retailer2',
         'productName': 'Lace Trim',
         'productCode': 'LCT-001',
         'category': 'Trims',
         'description': 'Fine lace trim with delicate patterns.',
-        'materialType': [
-          {'type': 'Lace', 'blend': 100},
-        ],
-        'careSymbol': ['hand_wash', 'no_bleach'],
+        'materialType': [],
+        'careSymbol': [],
         'colorOptions': [
           {
             'optionId': 1,
             'color': 'White',
-            'image': 'https://picsum.photos/seed/trims1/400/400',
+            'image': 'https://picsum.photos/seed/trims_white/400/400',
             'video': '',
             'price': 180,
             'stock': 40,
@@ -445,7 +454,7 @@ class DataSeedService {
           {
             'optionId': 2,
             'color': 'Black',
-            'image': 'https://picsum.photos/seed/trims2/400/400',
+            'image': 'https://picsum.photos/seed/trims_black/400/400',
             'video': '',
             'price': 180,
             'stock': 35,
@@ -453,21 +462,19 @@ class DataSeedService {
         ],
       },
       {
-        'id': 'elem5',
+        'id': 'element5',
         'retailerId': 'retailer1',
         'productName': 'Ribbon Collection',
         'productCode': 'RBN-001',
         'category': 'Ribbons',
         'description': 'Versatile satin ribbons in various colors and widths.',
-        'materialType': [
-          {'type': 'Satin', 'blend': 100},
-        ],
-        'careSymbol': ['iron_low', 'no_bleach'],
+        'materialType': [],
+        'careSymbol': [],
         'colorOptions': [
           {
             'optionId': 1,
             'color': 'White',
-            'image': 'https://picsum.photos/seed/ribbon1/400/400',
+            'image': 'https://picsum.photos/seed/ribbon_white/400/400',
             'video': '',
             'price': 60,
             'stock': 150,
@@ -475,7 +482,7 @@ class DataSeedService {
           {
             'optionId': 2,
             'color': 'Gold',
-            'image': 'https://picsum.photos/seed/ribbon2/400/400',
+            'image': 'https://picsum.photos/seed/ribbon_gold/400/400',
             'video': '',
             'price': 70,
             'stock': 120,
@@ -483,7 +490,7 @@ class DataSeedService {
           {
             'optionId': 3,
             'color': 'Blue',
-            'image': 'https://picsum.photos/seed/ribbon3/400/400',
+            'image': 'https://picsum.photos/seed/ribbon_blue/400/400',
             'video': '',
             'price': 65,
             'stock': 100,
@@ -491,21 +498,19 @@ class DataSeedService {
         ],
       },
       {
-        'id': 'elem6',
+        'id': 'element6',
         'retailerId': 'retailer3',
         'productName': 'Zipper Fastener Set',
         'productCode': 'ZIP-001',
         'category': 'Fasteners',
         'description': 'High-quality zipper fasteners for various garment types.',
-        'materialType': [
-          {'type': 'Metal', 'blend': 100},
-        ],
-        'careSymbol': ['dry_clean_only'],
+        'materialType': [],
+        'careSymbol': [],
         'colorOptions': [
           {
             'optionId': 1,
             'color': 'Silver',
-            'image': 'https://picsum.photos/seed/zipper1/400/400',
+            'image': 'https://picsum.photos/seed/zipper_silver/400/400',
             'video': '',
             'price': 120,
             'stock': 50,
@@ -513,7 +518,7 @@ class DataSeedService {
           {
             'optionId': 2,
             'color': 'Gold',
-            'image': 'https://picsum.photos/seed/zipper2/400/400',
+            'image': 'https://picsum.photos/seed/zipper_gold/400/400',
             'video': '',
             'price': 140,
             'stock': 30,

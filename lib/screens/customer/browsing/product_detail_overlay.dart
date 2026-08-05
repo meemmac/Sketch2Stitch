@@ -3,7 +3,6 @@ import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/models/favorite.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';
-import 'package:sketch2stitch/services/review_service.dart';
 import '../../../widgets/video_preview_player.dart';
 import '../../../widgets/care_info_tooltip.dart';
 
@@ -147,6 +146,9 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 380;
     final materialBlendDisplay = _materialBlendDisplay;
+    
+    // Check if careSymbol exists and is not empty
+    final bool hasCareInstructions = widget.product.careSymbol.isNotEmpty;
     
     return Container(
       constraints: BoxConstraints(
@@ -343,6 +345,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 10),
 
+                  // Only show material blend for fabrics
                   if (widget.isFabric && materialBlendDisplay != "N/A") ...[
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -476,7 +479,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: isSelected
-                                        ? Colors.white.withValues(alpha: 0.85)
+                                        ? Colors.white.withOpacity(0.85)
                                         : const Color.fromARGB(255, 59, 59, 59),
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -490,7 +493,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                                         Icons.inventory_2,
                                         size: 12,
                                         color: isSelected
-                                            ? Colors.white.withValues(alpha: 0.7)
+                                            ? Colors.white.withOpacity(0.7)
                                             : Colors.grey[500],
                                       ),
                                       const SizedBox(width: 3),
@@ -499,7 +502,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: isSelected
-                                              ? Colors.white.withValues(alpha: 0.7)
+                                              ? Colors.white.withOpacity(0.7)
                                               : const Color.fromARGB(255, 63, 63, 63),
                                           fontWeight: FontWeight.w400,
                                         ),
@@ -516,7 +519,8 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 24),
 
-                  if (widget.isFabric) ...[
+                  // Only show Care Instructions for Fabrics that have them
+                  if (widget.isFabric && hasCareInstructions) ...[
                     const SizedBox(height: 25),
                     const Text(
                       "Care Instructions",
@@ -592,16 +596,15 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                         onPressed: !_inStock
                             ? null
                             : () {
-                                // TODO: Implement add to cart functionality
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Added to cart!'),
-                                    backgroundColor: Color(0xFF4E8B6F),
-                                    duration: Duration(seconds: 2),
-                                  ),
-                                );
-                              },
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Added to cart!'),
+                              backgroundColor: Color(0xFF4E8B6F),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2C5C44),
                           foregroundColor: Colors.white,
