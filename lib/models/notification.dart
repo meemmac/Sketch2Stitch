@@ -1,4 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_role.dart';
+
 
 enum NotificationDbType {
   // customer
@@ -14,6 +16,7 @@ enum NotificationDbType {
   newMessage, reviewReceived,
 }
 
+
 class AppNotification {
   final String id;
   final String userId;
@@ -24,6 +27,7 @@ class AppNotification {
   final DateTime createdAt;
   final String orderId;
   final String? subOrderId;
+
 
   AppNotification({
     required this.id,
@@ -36,6 +40,7 @@ class AppNotification {
     required this.orderId,
     this.subOrderId,
   });
+
 
   AppNotification copyWith({
     String? id,
@@ -61,34 +66,39 @@ class AppNotification {
     );
   }
 
+
   Map<String, dynamic> toJson() => {
-    'id': id,
     'userId': userId,
-    'userRole': userRole.name,
+    'userRole': userRole.name[0].toUpperCase() + userRole.name.substring(1),
     'type': type.name,
     'message': message,
     'isRead': isRead,
-    'createdAt': createdAt.toIso8601String(),
+    'createdAt': Timestamp.fromDate(createdAt),
     'orderId': orderId,
     'subOrderId': subOrderId,
   };
 
-  factory AppNotification.fromJson(Map<String, dynamic> json) {
+
+  factory AppNotification.fromJson(Map<String, dynamic> json, [String? id]) {
     return AppNotification(
-      id: json['id'] ?? '',
+      id: id ?? json['id'] ?? '',
       userId: json['userId'] ?? '',
-      userRole: UserRole.values.byName(json['userRole'] ?? 'customer'),
+      userRole: UserRole.values.firstWhere(
+            (e) => e.name.toLowerCase() == (json['userRole'] as String?)?.toLowerCase(),
+        orElse: () => UserRole.customer,
+      ),
       type: NotificationDbType.values.firstWhere(
-        (t) => t.name == json['type'],
+            (t) => t.name == json['type'],
         orElse: () => NotificationDbType.newMessage,
       ),
       message: json['message'] ?? '',
       isRead: json['isRead'] ?? false,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
+      createdAt: json['createdAt'] is Timestamp
+          ? (json['createdAt'] as Timestamp).toDate()
           : DateTime.now(),
       orderId: json['orderId'] ?? '',
       subOrderId: json['subOrderId'],
     );
   }
 }
+
