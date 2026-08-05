@@ -47,29 +47,30 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-        canPop: true,
-        child: Scaffold(
+    return StreamBuilder<List<AppNotification>>(
+      stream: _notificationStream,
+      builder: (context, snapshot) {
+        final notifications = snapshot.data ?? [];
+        final count = notifications.length;
+
+
+        return PopScope(
+          canPop: true,
+          child: Scaffold(
             backgroundColor: const Color(0xFFF6FAF6),
             body: SafeArea(
-                child: Column(
-                    children: [
-                    _buildHeader(),
-                Expanded(
-                    child: _notificationCount == 0
-                        ? _buildEmptyState()
-                        : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                      itemCount: _notificationCount,
-                      separatorBuilder: (_, __) => const SizedBox(height: 14),
-                      itemBuilder: (context, index) => _buildNotificationCard(index),
-                    ),
-                ),
-              ],
+              child: Column(
+                children: [
+                  _buildHeader(count),
+                  Expanded(
+                    child: _buildBody(snapshot),
+                  ),
+                ],
+              ),
             ),
-
-            ),
-            ),
+          ),
+        );
+      },
     );
   }
 
@@ -269,14 +270,35 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
 
   _NotificationStyle _customerStyleFor(NotificationDbType type) {
     switch (type) {
-      case NotificationType.confirmed:
-        return _CustomerNotificationStyle(background: const Color(0xFFCDEFD3), icon: Icons.check_circle_rounded, iconColor: Colors.green.shade800, title: 'Order Confirmed', messagePrefix: 'Your order for', messageSuffix: ' has been confirmed.');
-      case NotificationType.delivered:
-        return _CustomerNotificationStyle(background: const Color(0xFFD3E9F7), icon: Icons.local_shipping_rounded, iconColor: Colors.blue.shade700, title: 'Order Delivered', messagePrefix: 'Your order for', messageSuffix: ' has been delivered.');
-      case NotificationType.cancelled:
-        return _CustomerNotificationStyle(background: const Color(0xFFF7D6D6), icon: Icons.cancel_rounded, iconColor: Colors.red.shade700, title: 'Order Cancelled', messagePrefix: 'Your order for', messageSuffix: ' was cancelled.');
-      case NotificationType.paymentDue:
-        return _CustomerNotificationStyle(background: const Color(0xFFFBE7C0), icon: Icons.payments_rounded, iconColor: Colors.orange.shade800, title: 'Payment Deadline Approaching', messagePrefix: 'Payment for', messageSuffix: '.');
+      case NotificationDbType.orderConfirmed:
+        return _NotificationStyle(
+          background: const Color(0xFFCDEFD3),
+          icon: Icons.check_circle_rounded,
+          iconColor: Colors.green.shade800,
+          title: 'Order Confirmed',
+        );
+      case NotificationDbType.orderCompleted:
+      case NotificationDbType.suborderDelivered:
+        return _NotificationStyle(
+          background: const Color(0xFFD3E9F7),
+          icon: Icons.local_shipping_rounded,
+          iconColor: Colors.blue.shade700,
+          title: 'Order Delivered',
+        );
+      case NotificationDbType.jobRejected:
+        return _NotificationStyle(
+          background: const Color(0xFFF7D6D6),
+          icon: Icons.cancel_rounded,
+          iconColor: Colors.red.shade700,
+          title: 'Order Cancelled',
+        );
+      default:
+        return _NotificationStyle(
+          background: const Color(0xFFFBE7C0),
+          icon: Icons.notifications_active,
+          iconColor: Colors.orange.shade800,
+          title: 'Notification',
+        );
     }
   }
 
