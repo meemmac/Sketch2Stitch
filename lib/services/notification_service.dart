@@ -3,30 +3,43 @@ import 'package:flutter/foundation.dart';
 import '../models/notification.dart';
 import '../models/user_role.dart';
 
+
 class NotificationService {
   NotificationService({FirebaseFirestore? firestore})
       : _db = firestore ?? FirebaseFirestore.instance;
 
+
   final FirebaseFirestore _db;
   static const String _collection = 'Notifications';
 
+
   // ─── Core Functions ────────────────────────────────────────────────────────
+
 
   /// Streams real-time notifications for a specific user.
   Stream<List<AppNotification>> streamNotifications(String uid) {
+    debugPrint('[NotificationService] Streaming for UID: "$uid"');
+    if (uid.isEmpty) {
+      debugPrint('[NotificationService] Warning: Empty UID provided');
+      return Stream.value([]);
+    }
+
+
     return _db
         .collection(_collection)
-        .where('userId', isEqualTo: uid)
-        .orderBy('createdAt', descending: true)
+        .where('userId', isEqualTo: uid.trim())
+    // Temporarily removed .orderBy to fix the "not working" issue
+    // This query requires a Firestore Index to work with .orderBy
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) {
-              final data = doc.data();
-              return AppNotification.fromJson({
-                ...data,
-                'id': doc.id,
-              });
-            }).toList());
+        .map((snapshot) {
+      debugPrint('[NotificationService] Snapshot received with ${snapshot.docs.length} docs');
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return AppNotification.fromJson(data, doc.id);
+      }).toList();
+    });
   }
+
 
   /// Marks a specific notification as read.
   Future<void> markAsRead(String notificationId) async {
@@ -37,8 +50,10 @@ class NotificationService {
     }
   }
 
+
   /// Alias for [markAsRead].
   Future<void> markNotificationRead(String notificationId) => markAsRead(notificationId);
+
 
   /// Deletes a specific notification.
   Future<void> deleteNotification(String notificationId) async {
@@ -49,13 +64,14 @@ class NotificationService {
     }
   }
 
+
   /// Fetches a paginated list of notifications.
   /// [lastDoc] is used for Firestore cursor-based pagination.
   Future<List<AppNotification>> getNotifications(
-    String userId, {
-    int limit = 20,
-    DocumentSnapshot? lastDoc,
-  }) async {
+      String userId, {
+        int limit = 20,
+        DocumentSnapshot? lastDoc,
+      }) async {
     try {
       Query query = _db
           .collection(_collection)
@@ -63,9 +79,11 @@ class NotificationService {
           .orderBy('createdAt', descending: true)
           .limit(limit);
 
+
       if (lastDoc != null) {
         query = query.startAfterDocument(lastDoc);
       }
+
 
       final snapshot = await query.get();
       return snapshot.docs.map((doc) {
@@ -81,6 +99,7 @@ class NotificationService {
     }
   }
 
+
   /// Marks all notifications for a user as read.
   Future<void> markAllNotificationsRead(String userId) async {
     try {
@@ -91,6 +110,7 @@ class NotificationService {
           .where('isRead', isEqualTo: false)
           .get();
 
+
       for (var doc in unread.docs) {
         batch.update(doc.reference, {'isRead': true});
       }
@@ -99,6 +119,7 @@ class NotificationService {
       debugPrint('Error marking all read: $e');
     }
   }
+
 
   /// Returns the count of unread notifications for a user.
   Stream<int> getUnreadNotificationCount(String userId) {
@@ -112,7 +133,12 @@ class NotificationService {
 
 
 
+
+
+
 // ─── Customer Notifications ────────────────────────────────────────────────
+
+
 
 
   Future<void> _sendNotification({
@@ -139,6 +165,8 @@ class NotificationService {
   }
 
 
+
+
   Future<void> notifyCustomerOrderDelivered(
       String customerId,
       String orderId,
@@ -153,6 +181,8 @@ class NotificationService {
       orderId: orderId,
     );
   }
+
+
 
 
   Future<void> notifyCustomerOrderConfirmed(
@@ -171,6 +201,8 @@ class NotificationService {
   }
 
 
+
+
   Future<void> notifyCustomerOrderCancelled(
       String customerId,
       String orderId,
@@ -187,7 +219,10 @@ class NotificationService {
     );
   }
 
+
   // ─── Tailor Notifications ──────────────────────────────────────────────────
+
+
 
 
   Future<void> notifyTailorNewOrder(
@@ -206,6 +241,8 @@ class NotificationService {
   }
 
 
+
+
   Future<void> notifyTailorConfirmOrder(
       String tailorId,
       String orderId,
@@ -222,6 +259,8 @@ class NotificationService {
   }
 
 
+
+
   Future<void> notifyTailorDeliveryDeadline(
       String tailorId,
       String orderId,
@@ -236,6 +275,8 @@ class NotificationService {
       orderId: orderId,
     );
   }
+
+
 
 
   Future<void> notifyTailorOrderCancelled(
@@ -256,7 +297,12 @@ class NotificationService {
 
 
 
+
+
+
 // ─── Retailer Notifications ────────────────────────────────────────────────
+
+
 
 
   Future<void> notifyRetailerNewOrder(
@@ -273,6 +319,8 @@ class NotificationService {
       orderId: orderId,
     );
   }
+
+
 
 
   Future<void> notifyRetailerStockAlert(
@@ -292,6 +340,8 @@ class NotificationService {
   }
 
 
+
+
   Future<void> notifyRetailerTailorAssigned(
       String retailerId,
       String orderId,
@@ -309,4 +359,9 @@ class NotificationService {
   }
 
 
+
+
 }
+
+
+
