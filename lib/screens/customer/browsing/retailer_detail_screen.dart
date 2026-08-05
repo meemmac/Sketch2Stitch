@@ -11,6 +11,7 @@ import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.d
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RetailerDetailScreen extends StatefulWidget {
   final Retailer retailer;
@@ -54,6 +55,8 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     'Embellishments',
     'Trims',
     'Ribbons',
+    'Lace',
+    'Beads',
   ];
 
   bool get _isCustomer => widget.userRole == UserRole.customer;
@@ -118,19 +121,95 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     }
   }
 
-// In retailer_detail_screen.dart, replace the _loadProducts method with:
-// In retailer_detail_screen.dart, replace the _loadProducts method:
-
-Future<void> _loadProducts() async {
+ Future<void> _loadProducts() async {
   setState(() => _isLoadingProducts = true);
   try {
-    // Get all products and filter by retailerId client-side
-    final allProducts = await _browseService.getProductsByFilter().first;
-    final retailerProducts = allProducts
-        .where((p) => p.retailerId == widget.retailer.id)
-        .toList();
+    // Get the retailer ID from the widget
+    String retailerId = widget.retailer.id;
+    print('🔍 Retailer ID from widget: "$retailerId"');
+    print('🔍 Retailer shop name: ${widget.retailer.shopName}');
     
-    print('✅ Loaded ${retailerProducts.length} products for retailer ${widget.retailer.id}');
+    // Get all products from Firestore
+    final allProducts = await _browseService.getProductsByFilter().first;
+    print('📦 Total products in Firestore: ${allProducts.length}');
+    
+    List<Product> retailerProducts = [];
+    
+    // Try multiple ways to find products:
+    
+    // 1. Try matching by the exact retailer ID (could be auto-generated or hardcoded)
+    if (retailerId.isNotEmpty) {
+      retailerProducts = allProducts
+          .where((p) => p.retailerId == retailerId)
+          .toList();
+      print('✅ Found ${retailerProducts.length} products matching retailer ID: $retailerId');
+    }
+    
+    // 2. If no products found, try to find the retailer in Firestore by shop name
+    if (retailerProducts.isEmpty) {
+      print('⚠️ No products found for retailer ID: $retailerId');
+      print('🔍 Looking for retailer by shop name: ${widget.retailer.shopName}');
+      
+      try {
+        final retailerSnapshot = await FirebaseFirestore.instance
+            .collection('Retailer')
+            .where('shopName', isEqualTo: widget.retailer.shopName)
+            .limit(1)
+            .get();
+        
+        if (retailerSnapshot.docs.isNotEmpty) {
+          final doc = retailerSnapshot.docs.first;
+          final foundRetailerId = doc.id;
+          print('✅ Found retailer in Firestore with ID: $foundRetailerId');
+          
+          // Try to find products with this retailer ID
+          retailerProducts = allProducts
+              .where((p) => p.retailerId == foundRetailerId)
+              .toList();
+          print('✅ Found ${retailerProducts.length} products for Firestore retailer ID: $foundRetailerId');
+        }
+      } catch (e) {
+        print('❌ Error finding retailer by shop name: $e');
+      }
+    }
+    
+    // 3. If still no products, try hardcoded retailer IDs (retailer1, retailer2, etc.)
+    if (retailerProducts.isEmpty) {
+      print('⚠️ No products found by Firestore ID, trying hardcoded IDs...');
+      
+      // Map of shop names to hardcoded IDs
+      final Map<String, String> hardcodedIds = {
+        'Dhaka Fabric House': 'retailer1',
+        'Chowdhury Textiles': 'retailer2',
+        'Silk & Lace Emporium': 'retailer3',
+      };
+      
+      final hardcodedId = hardcodedIds[widget.retailer.shopName];
+      if (hardcodedId != null) {
+        retailerProducts = allProducts
+            .where((p) => p.retailerId == hardcodedId)
+            .toList();
+        print('✅ Found ${retailerProducts.length} products for hardcoded ID: $hardcodedId');
+      } else {
+        print('❌ No hardcoded ID found for shop: ${widget.retailer.shopName}');
+      }
+    }
+    
+    // 4. If still no products, use retailer's existing products
+    if (retailerProducts.isEmpty && widget.retailer.products != null) {
+      print('📦 Using products from retailer object (${widget.retailer.products!.length})');
+      retailerProducts = widget.retailer.products!;
+    }
+    
+    // Print product details for debugging
+    if (retailerProducts.isNotEmpty) {
+      print('📄 Products found:');
+      for (final product in retailerProducts) {
+        print('   - ${product.productName} (Retailer ID: ${product.retailerId})');
+      }
+    } else {
+      print('❌ No products found for this retailer');
+    }
     
     setState(() {
       _products = retailerProducts;
@@ -138,31 +217,91 @@ Future<void> _loadProducts() async {
     });
   } catch (e) {
     print('❌ Error loading products: $e');
-    setState(() => _isLoadingProducts = false);
-  }
-}
-
-  Future<void> _loadReviews() async {
-    setState(() => _isLoading = true);
-    try {
-      final reviews = await _reviewService.getReviewsByTargetId(
-        widget.retailer.id,
-        ReviewTargetRole.retailer,
-        limit: 20,
-      );
-      
+    if (widget.retailer.products != null) {
       setState(() {
-        _reviews = reviews;
-        _isLoading = false;
-        if (_reviews.isNotEmpty) {
-          final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
-          _averageRating = sum / _reviews.length;
-        }
+        _products = widget.retailer.products!;
+        _isLoadingProducts = false;
       });
-    } catch (e) {
-      setState(() => _isLoading = false);
+    } else {
+      setState(() => _isLoadingProducts = false);
     }
   }
+}
+Future<void> _loadReviews() async {
+  setState(() => _isLoading = true);
+  try {
+    // Get retailer ID
+    String retailerId = widget.retailer.id;
+    print('🔍 Loading reviews for retailer: $retailerId');
+    
+    // Try to find the retailer by shop name if the ID doesn't work
+    if (retailerId.isNotEmpty) {
+      try {
+        final reviews = await _reviewService.getReviewsByTargetId(
+          retailerId,
+          ReviewTargetRole.retailer,
+          limit: 20,
+        );
+        
+        if (reviews.isNotEmpty) {
+          print('✅ Loaded ${reviews.length} reviews for retailer ID: $retailerId');
+          setState(() {
+            _reviews = reviews;
+            _isLoading = false;
+            if (_reviews.isNotEmpty) {
+              final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
+              _averageRating = sum / _reviews.length;
+            }
+          });
+          return;
+        }
+      } catch (e) {
+        print('❌ Error loading reviews for ID: $retailerId');
+      }
+    }
+    
+    // If no reviews found, try to find by shop name
+    print('🔍 Trying to find reviews by shop name...');
+    try {
+      final retailerSnapshot = await FirebaseFirestore.instance
+          .collection('Retailer')
+          .where('shopName', isEqualTo: widget.retailer.shopName)
+          .limit(1)
+          .get();
+      
+      if (retailerSnapshot.docs.isNotEmpty) {
+        final doc = retailerSnapshot.docs.first;
+        final foundRetailerId = doc.id;
+        print('✅ Found retailer by shop name with ID: $foundRetailerId');
+        
+        final reviews = await _reviewService.getReviewsByTargetId(
+          foundRetailerId,
+          ReviewTargetRole.retailer,
+          limit: 20,
+        );
+        
+        print('✅ Loaded ${reviews.length} reviews for retailer: ${widget.retailer.shopName}');
+        setState(() {
+          _reviews = reviews;
+          _isLoading = false;
+          if (_reviews.isNotEmpty) {
+            final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
+            _averageRating = sum / _reviews.length;
+          }
+        });
+      } else {
+        print('❌ No retailer found by shop name: ${widget.retailer.shopName}');
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      print('❌ Error finding retailer by shop name: $e');
+      setState(() => _isLoading = false);
+    }
+  } catch (e) {
+    print('❌ Error loading reviews: $e');
+    setState(() => _isLoading = false);
+  }
+}
 
   bool _isElement(Product product) =>
       _elementCategories.contains(product.category);
@@ -605,7 +744,7 @@ Future<void> _loadProducts() async {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(40.0),
-          child: CircularProgressIndicator(color: kSage),
+          child: CircularProgressIndicator(color: Color(0xFF6B8F71)),
         ),
       );
     }
@@ -712,9 +851,9 @@ Future<void> _loadProducts() async {
           onTap: () => _showProductDetailOverlay(context, product),
           child: Container(
             decoration: BoxDecoration(
-              color: kCardBg,
+              color: Colors.white,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: kBorder, width: 0.5),
+              border: Border.all(color: const Color(0xFFE8ECF0), width: 0.5),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.05),
@@ -744,13 +883,13 @@ Future<void> _loadProducts() async {
                                     fit: BoxFit.cover,
                                     errorBuilder: (context, error, stackTrace) =>
                                         Container(
-                                          color: kSage.withValues(alpha: 0.12),
+                                          color: const Color(0xFF6B8F71).withValues(alpha: 0.12),
                                           child: Icon(
                                             isElement
                                                 ? Icons.category
                                                 : Icons.texture,
                                             size: isSmallScreen ? 36 : 40,
-                                            color: kSageDark,
+                                            color: const Color(0xFF4A7C59),
                                           ),
                                         ),
                                   )
@@ -759,22 +898,22 @@ Future<void> _loadProducts() async {
                                     fit: BoxFit.cover,
                                     errorBuilder: (context, error, stackTrace) =>
                                         Container(
-                                          color: kSage.withValues(alpha: 0.12),
+                                          color: const Color(0xFF6B8F71).withValues(alpha: 0.12),
                                           child: Icon(
                                             isElement
                                                 ? Icons.category
                                                 : Icons.texture,
                                             size: isSmallScreen ? 36 : 40,
-                                            color: kSageDark,
+                                            color: const Color(0xFF4A7C59),
                                           ),
                                         ),
                                   ))
                             : Container(
-                                color: kSage.withValues(alpha: 0.12),
+                                color: const Color(0xFF6B8F71).withValues(alpha: 0.12),
                                 child: Icon(
                                   isElement ? Icons.category : Icons.texture,
                                   size: isSmallScreen ? 36 : 40,
-                                  color: kSageDark,
+                                  color: const Color(0xFF4A7C59),
                                 ),
                               ),
                       ),
@@ -860,7 +999,7 @@ Future<void> _loadProducts() async {
                         style: TextStyle(
                           fontSize: isSmallScreen ? 11 : 12,
                           fontWeight: FontWeight.w700,
-                          color: kSageDark,
+                          color: const Color(0xFF4A7C59),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -899,7 +1038,7 @@ Future<void> _loadProducts() async {
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
-          border: Border.all(color: kBorder, width: 0.5),
+          border: Border.all(color: const Color(0xFFE8ECF0), width: 0.5),
         ),
       ),
     );
@@ -1056,9 +1195,6 @@ Future<void> _loadProducts() async {
     );
   }
 
-  // [Rest of the review methods remain the same as your existing code]
-  // I'll include them in the final output
-
   List<Review> _getFilteredReviews() {
     List<Review> sortedList = List.from(_reviews);
     switch (_selectedFilter) {
@@ -1092,31 +1228,38 @@ Future<void> _loadProducts() async {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Customer ${index + 1}',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          const SizedBox(height: 8),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: List.generate(
-                  5,
-                  (starIndex) => Icon(
-                    starIndex < review.rating.floor()
-                        ? Icons.star
-                        : Icons.star_border,
-                    color: Colors.orange,
-                    size: 14,
+              Expanded(
+                child: Text(
+                  'Customer ${index + 1}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 8),
               Text(
-                "• ${review.timeAgo}",
+                review.timeAgo,
                 style: const TextStyle(color: Colors.grey, fontSize: 12),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: List.generate(
+              5,
+              (starIndex) => Icon(
+                starIndex < review.rating.floor()
+                    ? Icons.star
+                    : Icons.star_border,
+                color: Colors.orange,
+                size: 14,
+              ),
+            ),
           ),
           const SizedBox(height: 12),
           Text(
@@ -1167,7 +1310,7 @@ Future<void> _loadProducts() async {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  "${_reviews.length}+ All ratings",
+                  "${_reviews.length} reviews",
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ],

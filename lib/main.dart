@@ -14,7 +14,7 @@ void main() async {
   
 
 
-  // In main.dart, uncomment this:
+ /* // In main.dart, uncomment this:
 try {
   print('🌱 Seeding reviews...');
   final seedService = DataSeedService();
@@ -23,7 +23,7 @@ try {
 } catch (e) {
   print('❌ Error seeding reviews: $e');
 }
-  
+  */
   // ─── END DATA SEEDING ──────────────────────────────────────────────────
   
   runApp(const Sketch2StitchApp());
