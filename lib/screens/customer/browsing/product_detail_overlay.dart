@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/user_role.dart';
+import 'package:sketch2stitch/models/favorite.dart';
+import 'package:sketch2stitch/services/favorite_service.dart';
 import '../../../widgets/video_preview_player.dart';
 import '../../../widgets/care_info_tooltip.dart';
 
@@ -10,6 +12,8 @@ class ProductDetailOverlay extends StatefulWidget {
   final String retailerName;
   final List<String>? materialBlends;
   final UserRole userRole;
+  final String? customerId;
+  final FavoriteService? favoriteService;
 
   const ProductDetailOverlay({
     super.key,
@@ -18,6 +22,8 @@ class ProductDetailOverlay extends StatefulWidget {
     this.retailerName = 'Unknown Retailer',
     this.materialBlends,
     this.userRole = UserRole.customer,
+    this.customerId,
+    this.favoriteService,
   });
 
   @override
@@ -28,6 +34,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
   int _quantity = 1;
   late ColorOption? _selectedOption;
   bool _isFavorite = false;
+  bool _isLoadingFavorite = true;
 
   @override
   void initState() {
@@ -36,6 +43,57 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
     _selectedOption = options.isEmpty
         ? null
         : options.firstWhere((o) => o.stock > 0, orElse: () => options.first);
+    
+    _checkFavoriteStatus();
+  }
+
+  Future<void> _checkFavoriteStatus() async {
+    if (widget.customerId != null && widget.favoriteService != null) {
+      try {
+        final isFav = await widget.favoriteService!
+            .isFavoriteProduct(widget.customerId!, widget.product.id)
+            .first;
+        setState(() {
+          _isFavorite = isFav;
+          _isLoadingFavorite = false;
+        });
+      } catch (e) {
+        setState(() {
+          _isLoadingFavorite = false;
+        });
+      }
+    } else {
+      setState(() {
+        _isLoadingFavorite = false;
+      });
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (widget.customerId == null || widget.favoriteService == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please login to add favorites'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      await widget.favoriteService!
+          .toggleFavoriteProduct(widget.customerId!, widget.product.id);
+      setState(() {
+        _isFavorite = !_isFavorite;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   bool get _inStock => (_selectedOption?.stock ?? 0) > 0;
@@ -138,15 +196,15 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                           padding: const EdgeInsets.only(left: 8),
                           child: IconButton(
                             icon: Icon(
-                              _isFavorite ? Icons.favorite : Icons.favorite_border,
-                              color: _isFavorite ? Colors.red : Colors.grey,
+                              _isLoadingFavorite 
+                                  ? Icons.favorite_border 
+                                  : (_isFavorite ? Icons.favorite : Icons.favorite_border),
+                              color: _isLoadingFavorite 
+                                  ? Colors.grey 
+                                  : (_isFavorite ? Colors.red : Colors.grey),
                               size: 28,
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _isFavorite = !_isFavorite;
-                              });
-                            },
+                            onPressed: _isLoadingFavorite ? null : _toggleFavorite,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
                               minWidth: 44,
@@ -518,8 +576,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Add to Cart Button - only for customers
-                  // Add to Cart Button - only for customers
                   if (_isCustomer)
                     SizedBox(
                       width: double.infinity,
@@ -527,23 +583,23 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                         onPressed: !_inStock
                             ? null
                             : () {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Added to cart!'),
-                              backgroundColor: Color(0xFF4E8B6F),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        },
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Added to cart!'),
+                                    backgroundColor: Color(0xFF4E8B6F),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2C5C44), // ✅ Dark green background
-                          foregroundColor: Colors.white, // ✅ White text
+                          backgroundColor: const Color(0xFF2C5C44),
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          elevation: 2, // ✅ Slight elevation for better visibility
+                          elevation: 2,
                         ),
                         child: const Text(
                           'Add to Cart',
@@ -555,9 +611,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                         ),
                       ),
                     ),
-
-                  // ❌ REMOVED: "View product details" button and text for Tailors/Retailers
-
                   const SizedBox(height: 30),
                 ],
               ),
@@ -679,44 +732,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
       ],
     );
   }
-
-  // Widget _careInfoRow(
-  //   IconData icon,
-  //   String label,
-  //   bool isOk, {
-  //   String? trailing,
-  // }) {
-  //   return Padding(
-  //     padding: const EdgeInsets.only(bottom: 10),
-  //     child: Row(
-  //       children: [
-  //         Icon(icon, size: 20, color: isOk ? Colors.green : Colors.grey),
-  //         const SizedBox(width: 12),
-  //         Expanded(
-  //           child: Text(
-  //             label,
-  //             maxLines: 1,
-  //             overflow: TextOverflow.ellipsis,
-  //             style: TextStyle(color: isOk ? Colors.black87 : Colors.grey),
-  //           ),
-  //         ),
-  //         const SizedBox(width: 12),
-  //         Flexible(
-  //           child: Text(
-  //             trailing ?? (isOk ? "Yes" : "No"),
-  //             maxLines: 1,
-  //             overflow: TextOverflow.ellipsis,
-  //             textAlign: TextAlign.right,
-  //             style: TextStyle(
-  //               fontWeight: FontWeight.bold,
-  //               color: isOk ? Colors.green.shade800 : Colors.grey,
-  //             ),
-  //           ),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
 
   bool _canMachineWash() {
     final careSymbols = widget.product.careSymbol.map((s) => s.toLowerCase()).toList();
