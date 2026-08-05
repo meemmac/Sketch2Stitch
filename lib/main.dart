@@ -3,7 +3,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'screens/shared/auth_wrapper.dart';
 import 'firebase_options.dart';
-import 'services/data_seed_service.dart'; // Add this import
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,19 +12,6 @@ void main() async {
   );
   
 
-
- /* // In main.dart, uncomment this:
-try {
-  print('🌱 Seeding reviews...');
-  final seedService = DataSeedService();
-  await seedService.seedAllData();
-  print('✅ Reviews seeded successfully!');
-} catch (e) {
-  print('❌ Error seeding reviews: $e');
-}
-  */
-  // ─── END DATA SEEDING ──────────────────────────────────────────────────
-  
   runApp(const Sketch2StitchApp());
 }
 

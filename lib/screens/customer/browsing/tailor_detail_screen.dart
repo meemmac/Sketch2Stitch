@@ -9,6 +9,7 @@ import 'package:sketch2stitch/services/portfolio_service.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class TailorDetailScreen extends StatefulWidget {
   final Tailor tailor;
@@ -44,6 +45,14 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
 
   bool get _isCustomer => widget.userRole == UserRole.customer;
 
+  // Map of tailor names to hardcoded IDs
+  final Map<String, String> _hardcodedIds = {
+    'Rahul Ahmed': 'tailor1',
+    'Sadia Rahman': 'tailor2',
+    'Kamal Hossain': 'tailor3',
+    'Fatima Noor': 'tailor4',
+  };
+
   @override
   void initState() {
     super.initState();
@@ -51,6 +60,11 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     _loadReviews();
     _loadPortfolio();
     _checkFavoriteStatus();
+    
+    // Debug: Check if onTailorSelected is passed
+    print('🔍 TailorDetailScreen - onTailorSelected: ${widget.onTailorSelected != null}');
+    print('🔍 TailorDetailScreen - userRole: ${widget.userRole}');
+    print('🔍 TailorDetailScreen - isCustomer: $_isCustomer');
   }
 
   void _getCurrentUser() {
@@ -63,9 +77,26 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   Future<void> _checkFavoriteStatus() async {
     if (_currentUserId != null) {
       try {
-        final isFav = await _favoriteService
-            .isFavoriteTailor(_currentUserId!, widget.tailor.id)
-            .first;
+        String tailorId = widget.tailor.id;
+        bool isFav = false;
+        
+        try {
+          isFav = await _favoriteService
+              .isFavoriteTailor(_currentUserId!, tailorId)
+              .first;
+        } catch (e) {
+          final hardcodedId = _hardcodedIds[widget.tailor.name];
+          if (hardcodedId != null) {
+            try {
+              isFav = await _favoriteService
+                  .isFavoriteTailor(_currentUserId!, hardcodedId)
+                  .first;
+            } catch (e2) {
+              // Ignore
+            }
+          }
+        }
+        
         setState(() {
           _isFavorite = isFav;
         });
@@ -87,10 +118,17 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     }
 
     try {
-      await _favoriteService.toggleFavoriteTailor(
-        _currentUserId!, 
-        widget.tailor.id
-      );
+      String tailorId = widget.tailor.id;
+      
+      try {
+        await _favoriteService.toggleFavoriteTailor(_currentUserId!, tailorId);
+      } catch (e) {
+        final hardcodedId = _hardcodedIds[widget.tailor.name];
+        if (hardcodedId != null) {
+          await _favoriteService.toggleFavoriteTailor(_currentUserId!, hardcodedId);
+        }
+      }
+      
       setState(() {
         _isFavorite = !_isFavorite;
       });
@@ -107,11 +145,29 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   Future<void> _loadReviews() async {
     setState(() => _isLoading = true);
     try {
-      final reviews = await _reviewService.getReviewsByTargetId(
-        widget.tailor.id,
-        ReviewTargetRole.tailor,
-        limit: 20,
-      );
+      String tailorId = widget.tailor.id;
+      List<Review> reviews = [];
+      
+      try {
+        reviews = await _reviewService.getReviewsByTargetId(
+          tailorId,
+          ReviewTargetRole.tailor,
+          limit: 20,
+        );
+      } catch (e) {
+        final hardcodedId = _hardcodedIds[widget.tailor.name];
+        if (hardcodedId != null) {
+          try {
+            reviews = await _reviewService.getReviewsByTargetId(
+              hardcodedId,
+              ReviewTargetRole.tailor,
+              limit: 20,
+            );
+          } catch (e2) {
+            // Ignore
+          }
+        }
+      }
       
       setState(() {
         _reviews = reviews;
@@ -127,32 +183,87 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   }
 
   Future<void> _loadPortfolio() async {
-  setState(() => _isLoadingPortfolio = true);
-  try {
-    // If portfolio service is not working, use the tailor's existing portfolio
-    if (widget.tailor.portfolio != null && widget.tailor.portfolio!.isNotEmpty) {
+    setState(() => _isLoadingPortfolio = true);
+    try {
+      String tailorId = widget.tailor.id;
+      List<Portfolio> portfolio = [];
+      
+      // First check if tailor has portfolio in the object
+      if (widget.tailor.portfolio != null && widget.tailor.portfolio!.isNotEmpty) {
+        setState(() {
+          _portfolioItems = widget.tailor.portfolio!;
+          _isLoadingPortfolio = false;
+        });
+        print('✅ Loaded ${_portfolioItems.length} portfolio items from tailor object');
+        return;
+      }
+      
+      // Try with the actual ID
+      try {
+        final result = await _portfolioService.getTailorPortfolio(
+          tailorId,
+          pageSize: 20,
+        );
+        portfolio = result.items;
+        print('✅ Loaded ${portfolio.length} portfolio items for ID: $tailorId');
+      } catch (e) {
+        print('⚠️ Error loading portfolio with ID: $tailorId');
+        
+        // Try with hardcoded ID
+        final hardcodedId = _hardcodedIds[widget.tailor.name];
+        if (hardcodedId != null) {
+          try {
+            final result = await _portfolioService.getTailorPortfolio(
+              hardcodedId,
+              pageSize: 20,
+            );
+            portfolio = result.items;
+            print('✅ Loaded ${portfolio.length} portfolio items for hardcoded ID: $hardcodedId');
+          } catch (e2) {
+            print('❌ Error loading portfolio with hardcoded ID: $e2');
+          }
+        }
+        
+        // If still no portfolio, try to find tailor by name in Firestore
+        if (portfolio.isEmpty) {
+          print('🔍 Trying to find tailor by name: ${widget.tailor.name}');
+          try {
+            final tailorSnapshot = await FirebaseFirestore.instance
+                .collection('Tailor')
+                .where('name', isEqualTo: widget.tailor.name)
+                .limit(1)
+                .get();
+            
+            if (tailorSnapshot.docs.isNotEmpty) {
+              final foundId = tailorSnapshot.docs.first.id;
+              print('✅ Found tailor by name with ID: $foundId');
+              try {
+                final result = await _portfolioService.getTailorPortfolio(
+                  foundId,
+                  pageSize: 20,
+                );
+                portfolio = result.items;
+                print('✅ Loaded ${portfolio.length} portfolio items for found tailor ID: $foundId');
+              } catch (e3) {
+                print('❌ Error loading portfolio for found ID: $e3');
+              }
+            }
+          } catch (e3) {
+            print('❌ Error finding tailor by name: $e3');
+          }
+        }
+      }
+      
       setState(() {
-        _portfolioItems = widget.tailor.portfolio!;
+        _portfolioItems = portfolio;
         _isLoadingPortfolio = false;
       });
-      print('✅ Loaded ${_portfolioItems.length} portfolio items from tailor');
-    } else {
-      // Otherwise try from service
-      final result = await _portfolioService.getTailorPortfolio(
-        widget.tailor.id,
-        pageSize: 20,
-      );
-      setState(() {
-        _portfolioItems = result.items;
-        _isLoadingPortfolio = false;
-      });
-      print('✅ Loaded ${_portfolioItems.length} portfolio items from service');
+    } catch (e) {
+      print('❌ Error loading portfolio: $e');
+      setState(() => _isLoadingPortfolio = false);
     }
-  } catch (e) {
-    print('❌ Error loading portfolio: $e');
-    setState(() => _isLoadingPortfolio = false);
   }
-}
+
   void _showPortfolioOverlay(Portfolio portfolioItem) {
     final imagePath = portfolioItem.image ?? '';
     final description = portfolioItem.description ?? 'No description available.';
@@ -290,6 +401,12 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 380;
     final isMediumScreen = screenWidth >= 380 && screenWidth < 600;
+
+    // Debug: Check book button visibility
+    print('🔍 Building TailorDetailScreen');
+    print('🔍 _isCustomer: $_isCustomer');
+    print('🔍 onTailorSelected: ${widget.onTailorSelected != null}');
+    print('🔍 Should show book button: ${_isCustomer && widget.onTailorSelected != null}');
 
     return Scaffold(
       bottomNavigationBar: (_isCustomer && widget.onTailorSelected != null)
@@ -593,6 +710,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   }
 
   Widget _buildBookButton() {
+    print('🔍 Building Book Button');
     return Container(
       padding: EdgeInsets.fromLTRB(
         20,
@@ -613,7 +731,20 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton(
-          onPressed: () => widget.onTailorSelected!(widget.tailor.id),
+          onPressed: () {
+            print('📚 Book button pressed for tailor: ${widget.tailor.id}');
+            if (widget.onTailorSelected != null) {
+              widget.onTailorSelected!(widget.tailor.id);
+            } else {
+              print('❌ onTailorSelected is null!');
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Booking feature coming soon!'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            }
+          },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.green.shade800,
             foregroundColor: Colors.white,
@@ -666,18 +797,23 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   }
 
   Widget _buildPortfolioSection(bool isSmallScreen, bool isMediumScreen) {
+    print('🔍 Building Portfolio Section - isLoading: $_isLoadingPortfolio, items: ${_portfolioItems.length}');
+    
     if (_isLoadingPortfolio) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(20.0),
-          child: CircularProgressIndicator(color:  const Color(0xFF6B8F71)),
+          child: CircularProgressIndicator(color: Color(0xFF6B8F71)),
         ),
       );
     }
 
     if (_portfolioItems.isEmpty) {
+      print('⚠️ No portfolio items found');
       return const SizedBox.shrink();
     }
+
+    print('✅ Showing ${_portfolioItems.length} portfolio items');
 
     final displayItems = _showAllPortfolio
         ? _portfolioItems
@@ -822,6 +958,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     );
   }
 
+  // ... rest of review methods remain the same
   void _showReviewsOverlay(BuildContext context) {
     Navigator.push(
       context,
@@ -927,7 +1064,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     );
   }
 
-  // [Rest of the review methods remain the same as your existing code]
   Widget _buildReviewsPageSummary() {
     return Container(
       margin: const EdgeInsets.all(16),
