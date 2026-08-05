@@ -7,6 +7,7 @@ import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
 import 'package:sketch2stitch/services/browse_service.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ─── Material Blend Class ─────────────────────────────────────────────
 
@@ -35,7 +36,6 @@ class FabricMaterialBlend {
   }
 
   factory FabricMaterialBlend.fromMaterialType(String materialType) {
-    // Try to parse material type with percentage
     final parts = materialType.split(',').map((s) => s.trim()).toList();
     if (parts.length == 1 && parts.first.isNotEmpty) {
       final part = parts.first;
@@ -87,7 +87,6 @@ class FabricProductData {
   factory FabricProductData.fromProduct(Product product) {
     List<FabricMaterialBlend> blends = [];
     
-    // Try to parse material type into blends
     if (product.materialType.isNotEmpty) {
       final parts = product.materialType.split(',').map((s) => s.trim()).toList();
       for (final part in parts) {
@@ -113,11 +112,6 @@ class FabricProductData {
     );
   }
 }
-
-// ─── Retailer Name Mapping ─────────────────────────────────────────────
-
-// This will be fetched from the database dynamically
-// We'll use a service to get retailer names
 
 // ─── FabricsPageBody ────────────────────────────────────────────────────
 
@@ -196,11 +190,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
   Widget build(BuildContext context) {
     super.build(context);
     
-    final category = widget.showFabrics ? null : 'Elements'; // You can adjust this based on your data
-    final materialType = widget.filterData.materialTypes.contains('All') 
-        ? null 
-        : widget.filterData.materialTypes.first;
-    
     final selectedColors = widget.filterData.colors.contains('All')
         ? null
         : widget.filterData.colors;
@@ -209,113 +198,111 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         ? widget.searchQuery.value 
         : null;
 
-    return ValueListenableBuilder<String>(
-      valueListenable: widget.searchQuery,
-      builder: (context, searchQuery, _) {
-        final categoryFilter = widget.showFabrics ? null : 'Elements';
-        
-        return StreamBuilder<List<Product>>(
-          stream: _browseService.getProductsByFilter(
-            category: categoryFilter,
-            materialType: materialType,
-            minPrice: widget.filterData.minPrice > 0 ? widget.filterData.minPrice : null,
-            maxPrice: widget.filterData.maxPrice < 5000 ? widget.filterData.maxPrice : null,
-            colors: selectedColors,
-            sortBy: widget.filterData.sortBy,
-            search: searchTerm.isNotEmpty ? searchTerm : null,
-          ),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 64,
-                      color: Colors.red[300],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Error loading products',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      snapshot.error?.toString() ?? 'Unknown error',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[500],
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              );
-            }
+    // For "Elements" tab, we filter by category
+    final categoryFilter = widget.showFabrics ? null : 'Elements';
 
-            if (snapshot.connectionState == ConnectionState.waiting && 
-                !snapshot.hasData) {
-              return const Center(
-                child: CircularProgressIndicator(
-                  color: kSage,
-                ),
-              );
-            }
-
-            final products = snapshot.data ?? [];
-            
-            // Convert to FabricProductData
-            final fabricDataList = products
-                .map((product) => FabricProductData.fromProduct(product))
-                .toList();
-
-            if (fabricDataList.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.search_off_rounded,
-                      size: 64,
-                      color: Colors.grey[400],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      widget.showFabrics ? 'No Fabrics found' : 'No Elements found',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Try adjusting your filters or search terms',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            return Column(
+    return StreamBuilder<List<Product>>(
+      stream: _browseService.getProductsByFilter(
+        category: categoryFilter,
+        materialType: widget.filterData.materialTypes.contains('All') 
+            ? null 
+            : widget.filterData.materialTypes.first,
+        minPrice: widget.filterData.minPrice > 0 ? widget.filterData.minPrice : null,
+        maxPrice: widget.filterData.maxPrice < 5000 ? widget.filterData.maxPrice : null,
+        colors: selectedColors,
+        sortBy: widget.filterData.sortBy,
+        search: searchTerm,
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _buildHeroSection(widget.showFabrics ? 'Fabrics' : 'Elements'),
-                Expanded(
-                  child: _buildFabricGrid(fabricDataList),
+                Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: Colors.red[300],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Error loading products',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  snapshot.error?.toString() ?? 'Unknown error',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[500],
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ],
-            );
-          },
+            ),
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting && 
+            !snapshot.hasData) {
+          return const Center(
+            child: CircularProgressIndicator(
+              color: kSage,
+            ),
+          );
+        }
+
+        final products = snapshot.data ?? [];
+        
+        // Convert to FabricProductData
+        final fabricDataList = products
+            .map((product) => FabricProductData.fromProduct(product))
+            .toList();
+
+        if (fabricDataList.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.search_off_rounded,
+                  size: 64,
+                  color: Colors.grey[400],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  widget.showFabrics ? 'No Fabrics found' : 'No Elements found',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Try adjusting your filters or search terms',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey[500],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Column(
+          children: [
+            _buildHeroSection(widget.showFabrics ? 'Fabrics' : 'Elements'),
+            Expanded(
+              child: _buildFabricGrid(fabricDataList),
+            ),
+          ],
         );
       },
     );
@@ -697,22 +684,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         isFabric: true,
         retailerName: _getRetailerName(fabricData.product.retailerId),
         materialBlends: fabricData.materialBlendList,
-        userRole: widget.userRole,
-        customerId: _currentUserId,
-        favoriteService: _favoriteService,
-      ),
-    );
-  }
-
-  void _showElementDetailOverlay(BuildContext context, Product product) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => ProductDetailOverlay(
-        product: product,
-        isFabric: false,
-        retailerName: _getRetailerName(product.retailerId),
         userRole: widget.userRole,
         customerId: _currentUserId,
         favoriteService: _favoriteService,

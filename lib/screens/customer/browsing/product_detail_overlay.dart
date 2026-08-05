@@ -3,6 +3,7 @@ import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/models/favorite.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';
+import 'package:sketch2stitch/services/review_service.dart';
 import '../../../widgets/video_preview_player.dart';
 import '../../../widgets/care_info_tooltip.dart';
 
@@ -86,6 +87,14 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
       setState(() {
         _isFavorite = !_isFavorite;
       });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_isFavorite ? 'Added to favorites' : 'Removed from favorites'),
+          backgroundColor: _isFavorite ? const Color(0xFF4E8B6F) : Colors.grey,
+          duration: const Duration(seconds: 1),
+        ),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -583,6 +592,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                         onPressed: !_inStock
                             ? null
                             : () {
+                                // TODO: Implement add to cart functionality
                                 Navigator.pop(context);
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(

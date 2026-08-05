@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/review.dart';
+import 'package:sketch2stitch/models/user_role.dart';
+import 'package:sketch2stitch/services/review_service.dart';
+import 'package:sketch2stitch/services/favorite_service.dart';
+import 'package:sketch2stitch/services/browse_service.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
-import 'package:sketch2stitch/models/user_role.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class RetailerDetailScreen extends StatefulWidget {
   final Retailer retailer;
@@ -34,25 +38,14 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   bool _isLoading = true;
   double _averageRating = 0.0;
   String _selectedFilter = "Top reviews";
+  
+  final ReviewService _reviewService = ReviewService();
+  final FavoriteService _favoriteService = FavoriteService();
+  final BrowseService _browseService = BrowseService();
+  String? _currentUserId;
 
-  final List<String> _customerNames = [
-    'Priya Sharma',
-    'Amina Rahman',
-    'Nusrat Jahan',
-    'Tahsin Ahmed',
-    'Farhana Islam',
-    'Rafi Hasan',
-    'Sadia Akhter',
-  ];
-
-  final List<String> _productImages = [
-    'assets/images/fab.jpg',
-    'assets/images/silk.jpg',
-    'assets/images/lace.jpg',
-    'assets/images/textile.jpg',
-    'assets/images/fab2.jpg',
-    'assets/images/gorgeous.jpg',
-  ];
+  List<Product> _products = [];
+  bool _isLoadingProducts = true;
 
   final List<String> _elementCategories = [
     'Fasteners',
@@ -68,99 +61,106 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _getCurrentUser();
     _loadReviews();
+    _loadProducts();
+    _checkFavoriteStatus();
+  }
+
+  void _getCurrentUser() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _currentUserId = user.uid;
+    }
+  }
+
+  Future<void> _checkFavoriteStatus() async {
+    if (_currentUserId != null) {
+      try {
+        final isFav = await _favoriteService
+            .isFavoriteRetailer(_currentUserId!, widget.retailer.id)
+            .first;
+        setState(() {
+          _isFavorite = isFav;
+        });
+      } catch (e) {
+        // Ignore
+      }
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (_currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please login to add favorites'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      await _favoriteService.toggleFavoriteRetailer(
+        _currentUserId!, 
+        widget.retailer.id
+      );
+      setState(() {
+        _isFavorite = !_isFavorite;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _loadProducts() async {
+    setState(() => _isLoadingProducts = true);
+    try {
+      final products = await _browseService
+          .getProductsByFilter(retailerId: widget.retailer.id)
+          .first;
+      setState(() {
+        _products = products;
+        _isLoadingProducts = false;
+      });
+    } catch (e) {
+      setState(() => _isLoadingProducts = false);
+    }
   }
 
   Future<void> _loadReviews() async {
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    final sampleReviews = [
-      Review(
-        id: 'R001',
-        customerId: 'C001',
-        targetId: widget.retailer.id,
-        targetRole: ReviewTargetRole.retailer,
-        orderId: 'O001',
-        rating: 5.0,
-        comment:
-            'Great quality products! Everything matched the description perfectly.',
-        createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      ),
-      Review(
-        id: 'R002',
-        customerId: 'C002',
-        targetId: widget.retailer.id,
-        targetRole: ReviewTargetRole.retailer,
-        orderId: 'O002',
-        rating: 4.5,
-        comment: 'Quick delivery and excellent packaging. Will order again.',
-        createdAt: DateTime.now().subtract(const Duration(days: 5)),
-      ),
-      Review(
-        id: 'R003',
-        customerId: 'C003',
-        targetId: widget.retailer.id,
-        targetRole: ReviewTargetRole.retailer,
-        orderId: 'O003',
-        rating: 4.0,
-        comment: 'Good products but shipping was a bit delayed.',
-        createdAt: DateTime.now().subtract(const Duration(days: 7)),
-      ),
-      Review(
-        id: 'R004',
-        customerId: 'C004',
-        targetId: widget.retailer.id,
-        targetRole: ReviewTargetRole.retailer,
-        orderId: 'O004',
-        rating: 4.5,
-        comment: 'Great quality and fast delivery.',
-        createdAt: DateTime.now().subtract(const Duration(days: 10)),
-      ),
-      Review(
-        id: 'R005',
-        customerId: 'C005',
-        targetId: widget.retailer.id,
-        targetRole: ReviewTargetRole.retailer,
-        orderId: 'O005',
-        rating: 3.5,
-        comment: 'Good product but packaging could be better.',
-        createdAt: DateTime.now().subtract(const Duration(days: 12)),
-      ),
-    ];
-
-    setState(() {
-      _reviews = sampleReviews;
-      _isLoading = false;
-      if (_reviews.isNotEmpty) {
-        final sum = _reviews.fold(
-          0.0,
-          (total, review) => total + review.rating,
-        );
-        _averageRating = sum / _reviews.length;
-      }
-    });
+    try {
+      final reviews = await _reviewService.getReviewsByTargetId(
+        widget.retailer.id,
+        ReviewTargetRole.retailer,
+        limit: 20,
+      );
+      
+      setState(() {
+        _reviews = reviews;
+        _isLoading = false;
+        if (_reviews.isNotEmpty) {
+          final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
+          _averageRating = sum / _reviews.length;
+        }
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
   }
-
-  String _getCustomerName(int index) =>
-      _customerNames[index % _customerNames.length];
-  String _getProductName(int index, List<String> productNames) =>
-      productNames.isEmpty
-      ? 'Product ${index + 1}'
-      : productNames[index % productNames.length];
-  String _getProductImage(int index) =>
-      _productImages[index % _productImages.length];
-  double _getProductPrice(int index, List<double> productPrices) =>
-      productPrices.isEmpty ? 0 : productPrices[index % productPrices.length];
 
   bool _isElement(Product product) =>
       _elementCategories.contains(product.category);
   bool _isFabric(Product product) => !_isElement(product);
 
-  List<Product> get _fabrics =>
-      widget.retailer.products?.where((p) => _isFabric(p)).toList() ?? [];
-  List<Product> get _elements =>
-      widget.retailer.products?.where((p) => _isElement(p)).toList() ?? [];
+  List<Product> get _fabrics => _products.where((p) => _isFabric(p)).toList();
+  List<Product> get _elements => _products.where((p) => _isElement(p)).toList();
 
   void _startConversation() {
     Navigator.push(
@@ -168,7 +168,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
       MaterialPageRoute(
         builder: (context) => ChatScreen(
           conversationId: 'current_customer_id_${widget.retailer.id}',
-          customerId: 'current_customer_id',
+          customerId: _currentUserId ?? 'current_customer_id',
           otherUserId: widget.retailer.id,
           otherUserName: widget.retailer.shopName,
           otherUserRole: UserRole.retailer,
@@ -202,74 +202,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                   _buildProductsSection(isSmallScreen, isMediumScreen),
                   const SizedBox(height: 80),
                 ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategoryToggle(bool isSmallScreen) {
-    return Container(
-      padding: EdgeInsets.all(isSmallScreen ? 4.0 : 6.0),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _showFabrics = true),
-              child: Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isSmallScreen ? 12.0 : 16.0,
-                  vertical: isSmallScreen ? 8.0 : 10.0,
-                ),
-                decoration: BoxDecoration(
-                  color: _showFabrics
-                      ? const Color(0xFF2C5C44)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Center(
-                  child: Text(
-                    'Fabrics (${_fabrics.length})',
-                    style: TextStyle(
-                      fontSize: isSmallScreen ? 13.0 : 14.0,
-                      fontWeight: FontWeight.w600,
-                      color: _showFabrics ? Colors.white : Colors.grey[700],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _showFabrics = false),
-              child: Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isSmallScreen ? 12.0 : 16.0,
-                  vertical: isSmallScreen ? 8.0 : 10.0,
-                ),
-                decoration: BoxDecoration(
-                  color: !_showFabrics
-                      ? const Color(0xFF2C5C44)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Center(
-                  child: Text(
-                    'Elements (${_elements.length})',
-                    style: TextStyle(
-                      fontSize: isSmallScreen ? 13.0 : 14.0,
-                      fontWeight: FontWeight.w600,
-                      color: !_showFabrics ? Colors.white : Colors.grey[700],
-                    ),
-                  ),
-                ),
               ),
             ),
           ),
@@ -516,7 +448,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                   color: _isFavorite ? Colors.red : Colors.white,
                   size: isSmallScreen ? 22 : 24,
                 ),
-                onPressed: () => setState(() => _isFavorite = !_isFavorite),
+                onPressed: _toggleFavorite,
               ),
             ]
           : [],
@@ -525,9 +457,9 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
 
   Widget _buildCoverImage() {
     String imageUrl = 'assets/images/fab.jpg';
-    if (widget.retailer.products != null &&
-        widget.retailer.products!.isNotEmpty) {
-      final firstProduct = widget.retailer.products!.first;
+    
+    if (_products.isNotEmpty) {
+      final firstProduct = _products.first;
       if (firstProduct.colorOptions.isNotEmpty) {
         final firstColor = firstProduct.colorOptions.first;
         if (firstColor.image != null && firstColor.image!.isNotEmpty) {
@@ -535,9 +467,23 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         }
       }
     }
-    if (widget.retailer.profilePicture != null) {
+    
+    if (widget.retailer.profilePicture != null && 
+        widget.retailer.profilePicture!.isNotEmpty) {
       imageUrl = widget.retailer.profilePicture!;
     }
+    
+    if (imageUrl.startsWith('http')) {
+      return Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => Container(
+          color: Colors.grey[300],
+          child: const Icon(Icons.store, size: 80, color: Colors.grey),
+        ),
+      );
+    }
+    
     return Image.asset(
       imageUrl,
       fit: BoxFit.cover,
@@ -549,8 +495,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   }
 
   Widget _buildAboutSection(bool isSmallScreen) {
-    String description =
-        widget.retailer.about ??
+    String description = widget.retailer.about ?? 
         'Quality products with excellent customer service.';
 
     return Column(
@@ -576,8 +521,85 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     );
   }
 
+  Widget _buildCategoryToggle(bool isSmallScreen) {
+    return Container(
+      padding: EdgeInsets.all(isSmallScreen ? 4.0 : 6.0),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _showFabrics = true),
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isSmallScreen ? 12.0 : 16.0,
+                  vertical: isSmallScreen ? 8.0 : 10.0,
+                ),
+                decoration: BoxDecoration(
+                  color: _showFabrics
+                      ? const Color(0xFF2C5C44)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: Text(
+                    'Fabrics (${_fabrics.length})',
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 13.0 : 14.0,
+                      fontWeight: FontWeight.w600,
+                      color: _showFabrics ? Colors.white : Colors.grey[700],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _showFabrics = false),
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isSmallScreen ? 12.0 : 16.0,
+                  vertical: isSmallScreen ? 8.0 : 10.0,
+                ),
+                decoration: BoxDecoration(
+                  color: !_showFabrics
+                      ? const Color(0xFF2C5C44)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: Text(
+                    'Elements (${_elements.length})',
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 13.0 : 14.0,
+                      fontWeight: FontWeight.w600,
+                      color: !_showFabrics ? Colors.white : Colors.grey[700],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildProductsSection(bool isSmallScreen, bool isMediumScreen) {
     final products = _showFabrics ? _fabrics : _elements;
+
+    if (_isLoadingProducts) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(40.0),
+          child: CircularProgressIndicator(color: kSage),
+        ),
+      );
+    }
 
     if (products.isEmpty) {
       return Center(
@@ -706,22 +728,38 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                         width: double.infinity,
                         height: imageHeight,
                         color: Colors.grey[100],
-                        child: coverImage != null
-                            ? Image.asset(
-                                coverImage,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Container(
-                                      color: kSage.withValues(alpha: 0.12),
-                                      child: Icon(
-                                        isElement
-                                            ? Icons.category
-                                            : Icons.texture,
-                                        size: isSmallScreen ? 36 : 40,
-                                        color: kSageDark,
-                                      ),
-                                    ),
-                              )
+                        child: coverImage != null && coverImage.isNotEmpty
+                            ? (coverImage.startsWith('http')
+                                ? Image.network(
+                                    coverImage,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        Container(
+                                          color: kSage.withValues(alpha: 0.12),
+                                          child: Icon(
+                                            isElement
+                                                ? Icons.category
+                                                : Icons.texture,
+                                            size: isSmallScreen ? 36 : 40,
+                                            color: kSageDark,
+                                          ),
+                                        ),
+                                  )
+                                : Image.asset(
+                                    coverImage,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        Container(
+                                          color: kSage.withValues(alpha: 0.12),
+                                          child: Icon(
+                                            isElement
+                                                ? Icons.category
+                                                : Icons.texture,
+                                            size: isSmallScreen ? 36 : 40,
+                                            color: kSageDark,
+                                          ),
+                                        ),
+                                  ))
                             : Container(
                                 color: kSage.withValues(alpha: 0.12),
                                 child: Icon(
@@ -1009,6 +1047,78 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     );
   }
 
+  // [Rest of the review methods remain the same as your existing code]
+  // I'll include them in the final output
+
+  List<Review> _getFilteredReviews() {
+    List<Review> sortedList = List.from(_reviews);
+    switch (_selectedFilter) {
+      case "Top reviews":
+        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
+        break;
+      case "Newest":
+        sortedList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        break;
+      case "Highest rating":
+        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
+        break;
+      case "Lowest rating":
+        sortedList.sort((a, b) => a.rating.compareTo(b.rating));
+        break;
+    }
+    return sortedList;
+  }
+
+  int _getRatingCount(double rating) =>
+      _reviews.where((r) => r.rating == rating).length;
+
+  Widget _buildReviewsPageItem(Review review, int index) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Customer ${index + 1}',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Row(
+                children: List.generate(
+                  5,
+                  (starIndex) => Icon(
+                    starIndex < review.rating.floor()
+                        ? Icons.star
+                        : Icons.star_border,
+                    color: Colors.orange,
+                    size: 14,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                "• ${review.timeAgo}",
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            review.comment,
+            style: const TextStyle(fontSize: 14, height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildReviewsPageSummary() {
     return Container(
       margin: const EdgeInsets.all(16),
@@ -1141,183 +1251,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     );
   }
 
-  List<Review> _getFilteredReviews() {
-    List<Review> sortedList = List.from(_reviews);
-    switch (_selectedFilter) {
-      case "Top reviews":
-        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
-        break;
-      case "Newest":
-        sortedList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        break;
-      case "Highest rating":
-        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
-        break;
-      case "Lowest rating":
-        sortedList.sort((a, b) => a.rating.compareTo(b.rating));
-        break;
-    }
-    return sortedList;
-  }
-
-  int _getRatingCount(double rating) =>
-      _reviews.where((r) => r.rating == rating).length;
-
-  Widget _buildReviewsPageItem(Review review, int index) {
-    final customerName = _getCustomerName(index);
-    final productNames =
-        widget.retailer.products?.map((p) => p.productName).toList() ?? [];
-    final productPrices =
-        widget.retailer.products?.map((p) => p.minPrice).toList() ?? [];
-    final products = _getReviewProducts(index, productNames, productPrices);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            customerName,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Row(
-                children: List.generate(
-                  5,
-                  (starIndex) => Icon(
-                    starIndex < review.rating.floor()
-                        ? Icons.star
-                        : Icons.star_border,
-                    color: Colors.orange,
-                    size: 14,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                "• ${review.timeAgo}",
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            review.comment,
-            style: const TextStyle(fontSize: 14, height: 1.5),
-          ),
-          if (products.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            const Text(
-              "Liked products",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 70,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: products.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 12),
-                itemBuilder: (context, i) =>
-                    _buildReviewsPageProductCard(products[i]),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReviewsPageProductCard(Map<String, dynamic> product) {
-    return Container(
-      width: 220,
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.asset(
-              product['image'],
-              width: 50,
-              height: 50,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                width: 50,
-                height: 50,
-                color: Colors.grey[200],
-                child: const Icon(Icons.texture, size: 20, color: Colors.grey),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product['name'],
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  "Tk ${(product['price'] as double).toInt()}",
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<Map<String, dynamic>> _getReviewProducts(
-    int index,
-    List<String> productNames,
-    List<double> productPrices,
-  ) {
-    final products = <Map<String, dynamic>>[];
-    final productName = _getProductName(index, productNames);
-    final productImage = _getProductImage(index);
-    final productPrice = _getProductPrice(index, productPrices);
-
-    if (productName.isNotEmpty) {
-      products.add({
-        'name': productName,
-        'image': productImage,
-        'price': productPrice,
-      });
-    }
-
-    if (productNames.length > index + 1) {
-      products.add({
-        'name': productNames[index + 1],
-        'image': _getProductImage(index + 1),
-        'price': productPrices[index + 1],
-      });
-    }
-
-    return products;
-  }
-
   void _showProductDetailOverlay(BuildContext context, Product product) {
     showModalBottomSheet(
       context: context,
@@ -1328,6 +1261,8 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         isFabric: _isFabric(product),
         retailerName: widget.retailer.shopName,
         userRole: widget.userRole,
+        customerId: _currentUserId,
+        favoriteService: _favoriteService,
       ),
     );
   }

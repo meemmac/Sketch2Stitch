@@ -5,18 +5,21 @@ import 'package:sketch2stitch/services/browse_service.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
+import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class RetailersPageBody extends StatefulWidget {
   final ValueNotifier<String> searchQuery;
   final RetailersFilterData filterData;
   final UserRole userRole;
+  final void Function(String retailerId)? onRetailerSelected;
 
   const RetailersPageBody({
     super.key,
     required this.searchQuery,
     required this.filterData,
     this.userRole = UserRole.customer,
+    this.onRetailerSelected,
   });
 
   @override
@@ -110,7 +113,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.storefront_off_rounded,
+                      Icons.storefront_outlined, // Fixed: Changed from storefront_off_rounded
                       size: 64,
                       color: Colors.grey[400],
                     ),
@@ -202,103 +205,121 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
       itemBuilder: (context, index) {
         final retailer = retailers[index];
 
-        return Container(
-          margin: EdgeInsets.only(bottom: spacing),
-          decoration: BoxDecoration(
-            color: kCardBg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: kBorder, width: 0.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                _buildRetailerAvatar(retailer, isSmallScreen),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        retailer.shopName,
-                        style: TextStyle(
-                          fontSize: isSmallScreen ? 14 : 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.star,
-                            size: 14,
-                            color: Colors.amber,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            retailer.rating.toStringAsFixed(1),
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Icon(
-                            Icons.location_on,
-                            size: 14,
-                            color: Colors.grey[500],
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              retailer.generalArea,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (retailer.about != null && retailer.about!.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          retailer.about!,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[500],
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                      const SizedBox(height: 4),
-                      Text(
-                        '${retailer.products?.length ?? 0} products available',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: kSageDark,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+        return GestureDetector(
+          onTap: () {
+            if (widget.onRetailerSelected != null) {
+              widget.onRetailerSelected!(retailer.id);
+            } else {
+              // Navigate to retailer detail
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => RetailerDetailScreen(
+                    retailer: retailer,
+                    userRole: widget.userRole,
                   ),
                 ),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: Colors.grey[400],
+              );
+            }
+          },
+          child: Container(
+            margin: EdgeInsets.only(bottom: spacing),
+            decoration: BoxDecoration(
+              color: kCardBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: kBorder, width: 0.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
               ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  _buildRetailerAvatar(retailer, isSmallScreen),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          retailer.shopName,
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 14 : 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.star,
+                              size: 14,
+                              color: Colors.amber,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              retailer.rating.toStringAsFixed(1),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Icon(
+                              Icons.location_on,
+                              size: 14,
+                              color: Colors.grey[500],
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                retailer.generalArea,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (retailer.about != null && retailer.about!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            retailer.about!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[500],
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                        const SizedBox(height: 4),
+                        Text(
+                          '${retailer.products?.length ?? 0} products available',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: kSageDark,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 16,
+                    color: Colors.grey[400],
+                  ),
+                ],
+              ),
             ),
           ),
         );

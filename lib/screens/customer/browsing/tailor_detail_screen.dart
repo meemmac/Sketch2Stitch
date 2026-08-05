@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/review.dart';
+import 'package:sketch2stitch/models/user_role.dart';
+import 'package:sketch2stitch/models/portfolio.dart';
+import 'package:sketch2stitch/services/review_service.dart';
+import 'package:sketch2stitch/services/favorite_service.dart';
+import 'package:sketch2stitch/services/portfolio_service.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
-import 'package:sketch2stitch/models/user_role.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class TailorDetailScreen extends StatefulWidget {
   final Tailor tailor;
@@ -28,104 +33,118 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   bool _isLoading = true;
   double _averageRating = 0.0;
   String _selectedFilter = "All reviews";
-
-  final List<String> _customerNames = [
-    'Rahul Ahmed',
-    'Sadia Rahman',
-    'Kamal Hossain',
-    'Tania Akhter',
-    'Shahid Khan',
-    'Nadia Islam',
-    'Faisal Ahmed',
-  ];
+  
+  final ReviewService _reviewService = ReviewService();
+  final FavoriteService _favoriteService = FavoriteService();
+  final PortfolioService _portfolioService = PortfolioService();
+  String? _currentUserId;
+  
+  List<Portfolio> _portfolioItems = [];
+  bool _isLoadingPortfolio = true;
 
   bool get _isCustomer => widget.userRole == UserRole.customer;
 
   @override
   void initState() {
     super.initState();
+    _getCurrentUser();
     _loadReviews();
+    _loadPortfolio();
+    _checkFavoriteStatus();
+  }
+
+  void _getCurrentUser() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _currentUserId = user.uid;
+    }
+  }
+
+  Future<void> _checkFavoriteStatus() async {
+    if (_currentUserId != null) {
+      try {
+        final isFav = await _favoriteService
+            .isFavoriteTailor(_currentUserId!, widget.tailor.id)
+            .first;
+        setState(() {
+          _isFavorite = isFav;
+        });
+      } catch (e) {
+        // Ignore
+      }
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (_currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please login to add favorites'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      await _favoriteService.toggleFavoriteTailor(
+        _currentUserId!, 
+        widget.tailor.id
+      );
+      setState(() {
+        _isFavorite = !_isFavorite;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _loadReviews() async {
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    final sampleReviews = [
-      Review(
-        id: 'R001',
-        customerId: 'C001',
-        targetId: widget.tailor.id,
-        targetRole: ReviewTargetRole.tailor,
-        orderId: 'O001',
-        rating: 5.0,
-        comment:
-            'Excellent work! The suit fit perfectly and the quality was outstanding.',
-        createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      ),
-      Review(
-        id: 'R002',
-        customerId: 'C002',
-        targetId: widget.tailor.id,
-        targetRole: ReviewTargetRole.tailor,
-        orderId: 'O002',
-        rating: 4.5,
-        comment:
-            'Very professional and timely delivery. Would recommend to friends.',
-        createdAt: DateTime.now().subtract(const Duration(days: 5)),
-      ),
-      Review(
-        id: 'R003',
-        customerId: 'C003',
-        targetId: widget.tailor.id,
-        targetRole: ReviewTargetRole.tailor,
-        orderId: 'O003',
-        rating: 4.0,
-        comment: 'Good quality work but delivery was a bit delayed.',
-        createdAt: DateTime.now().subtract(const Duration(days: 7)),
-      ),
-      Review(
-        id: 'R004',
-        customerId: 'C004',
-        targetId: widget.tailor.id,
-        targetRole: ReviewTargetRole.tailor,
-        orderId: 'O004',
-        rating: 5.0,
-        comment: 'Amazing attention to detail. Will definitely come back!',
-        createdAt: DateTime.now().subtract(const Duration(days: 10)),
-      ),
-      Review(
-        id: 'R005',
-        customerId: 'C005',
-        targetId: widget.tailor.id,
-        targetRole: ReviewTargetRole.tailor,
-        orderId: 'O005',
-        rating: 4.5,
-        comment: 'Great craftsmanship and very friendly service.',
-        createdAt: DateTime.now().subtract(const Duration(days: 14)),
-      ),
-    ];
-
-    setState(() {
-      _reviews = sampleReviews;
-      _isLoading = false;
-      if (_reviews.isNotEmpty) {
-        final sum = _reviews.fold(
-          0.0,
-          (total, review) => total + review.rating,
-        );
-        _averageRating = sum / _reviews.length;
-      }
-    });
+    try {
+      final reviews = await _reviewService.getReviewsByTargetId(
+        widget.tailor.id,
+        ReviewTargetRole.tailor,
+        limit: 20,
+      );
+      
+      setState(() {
+        _reviews = reviews;
+        _isLoading = false;
+        if (_reviews.isNotEmpty) {
+          final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
+          _averageRating = sum / _reviews.length;
+        }
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
   }
 
-  String _getCustomerName(int index) =>
-      _customerNames[index % _customerNames.length];
+  Future<void> _loadPortfolio() async {
+    setState(() => _isLoadingPortfolio = true);
+    try {
+      final result = await _portfolioService.getTailorPortfolio(
+        widget.tailor.id,
+        pageSize: 20,
+      );
+      setState(() {
+        _portfolioItems = result.items;
+        _isLoadingPortfolio = false;
+      });
+    } catch (e) {
+      setState(() => _isLoadingPortfolio = false);
+    }
+  }
 
-  void _showPortfolioOverlay(dynamic portfolioItem) {
+  void _showPortfolioOverlay(Portfolio portfolioItem) {
     final imagePath = portfolioItem.image ?? '';
-    final description =
-        portfolioItem.description ?? 'No description available.';
+    final description = portfolioItem.description ?? 'No description available.';
 
     showModalBottomSheet(
       context: context,
@@ -174,19 +193,33 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                         width: double.infinity,
                         height: 320,
                         child: imagePath.isNotEmpty
-                            ? Image.asset(
-                                imagePath,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Container(
-                                      color: Colors.green.shade50,
-                                      child: const Icon(
-                                        Icons.image_not_supported_outlined,
-                                        size: 48,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                              )
+                            ? (imagePath.startsWith('http')
+                                ? Image.network(
+                                    imagePath,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        Container(
+                                          color: Colors.green.shade50,
+                                          child: const Icon(
+                                            Icons.image_not_supported_outlined,
+                                            size: 48,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                  )
+                                : Image.asset(
+                                    imagePath,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        Container(
+                                          color: Colors.green.shade50,
+                                          child: const Icon(
+                                            Icons.image_not_supported_outlined,
+                                            size: 48,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                  ))
                             : Container(
                                 color: Colors.green.shade50,
                                 child: const Icon(
@@ -230,8 +263,8 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => ChatScreen(
-          conversationId: 'current_customer_id_${widget.tailor.id}',
-          customerId: 'current_customer_id',
+          conversationId: '${_currentUserId ?? 'customer'}_${widget.tailor.id}',
+          customerId: _currentUserId ?? 'current_customer_id',
           otherUserId: widget.tailor.id,
           otherUserName: widget.tailor.name,
           otherUserRole: UserRole.tailor,
@@ -505,7 +538,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                   color: _isFavorite ? Colors.red : Colors.white,
                   size: isSmallScreen ? 22 : 24,
                 ),
-                onPressed: () => setState(() => _isFavorite = !_isFavorite),
+                onPressed: _toggleFavorite,
               ),
             ]
           : [],
@@ -515,14 +548,27 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   Widget _buildCoverImage() {
     String imageUrl = 'assets/images/fab.jpg';
 
-    if (widget.tailor.portfolio != null &&
-        widget.tailor.portfolio!.isNotEmpty) {
-      imageUrl =
-          widget.tailor.portfolio!.first.image ?? 'assets/images/fab.jpg';
+    if (_portfolioItems.isNotEmpty) {
+      final firstItem = _portfolioItems.first;
+      if (firstItem.image != null && firstItem.image!.isNotEmpty) {
+        imageUrl = firstItem.image!;
+      }
     }
 
-    if (widget.tailor.profilePicture != null) {
+    if (widget.tailor.profilePicture != null && 
+        widget.tailor.profilePicture!.isNotEmpty) {
       imageUrl = widget.tailor.profilePicture!;
+    }
+
+    if (imageUrl.startsWith('http')) {
+      return Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => Container(
+          color: Colors.grey[300],
+          child: const Icon(Icons.person, size: 80, color: Colors.grey),
+        ),
+      );
     }
 
     return Image.asset(
@@ -575,12 +621,11 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   }
 
   Widget _buildAboutSection(bool isSmallScreen) {
-    String description =
-        widget.tailor.about ??
+    String description = widget.tailor.about ?? 
         'Professional tailoring services with years of experience.';
-    if (widget.tailor.portfolio != null &&
-        widget.tailor.portfolio!.isNotEmpty) {
-      final desc = widget.tailor.portfolio!.first.description;
+    
+    if (_portfolioItems.isNotEmpty) {
+      final desc = _portfolioItems.first.description;
       if (desc != null && desc.isNotEmpty) {
         description = desc;
       }
@@ -610,17 +655,24 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   }
 
   Widget _buildPortfolioSection(bool isSmallScreen, bool isMediumScreen) {
-    final portfolioItems = widget.tailor.portfolio ?? [];
+    if (_isLoadingPortfolio) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20.0),
+          child: CircularProgressIndicator(color: kSage),
+        ),
+      );
+    }
 
-    if (portfolioItems.isEmpty) {
+    if (_portfolioItems.isEmpty) {
       return const SizedBox.shrink();
     }
 
     final displayItems = _showAllPortfolio
-        ? portfolioItems
-        : (portfolioItems.length > 4
-              ? portfolioItems.take(4).toList()
-              : portfolioItems);
+        ? _portfolioItems
+        : (_portfolioItems.length > 4
+              ? _portfolioItems.take(4).toList()
+              : _portfolioItems);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -635,7 +687,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            if (portfolioItems.length > 4)
+            if (_portfolioItems.length > 4)
               TextButton(
                 onPressed: () =>
                     setState(() => _showAllPortfolio = !_showAllPortfolio),
@@ -694,22 +746,35 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                         child: SizedBox(
                           width: double.infinity,
                           height: double.infinity,
-                          child:
-                              portfolio.image != null &&
-                                  portfolio.image!.isNotEmpty
-                              ? Image.asset(
-                                  portfolio.image!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      Container(
-                                        color: Colors.grey[200],
-                                        child: const Icon(
-                                          Icons.image,
-                                          size: 32,
-                                          color: Colors.grey,
-                                        ),
-                                      ),
-                                )
+                          child: portfolio.image != null &&
+                              portfolio.image!.isNotEmpty
+                              ? (portfolio.image!.startsWith('http')
+                                  ? Image.network(
+                                      portfolio.image!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) =>
+                                          Container(
+                                            color: Colors.grey[200],
+                                            child: const Icon(
+                                              Icons.image,
+                                              size: 32,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                    )
+                                  : Image.asset(
+                                      portfolio.image!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) =>
+                                          Container(
+                                            color: Colors.grey[200],
+                                            child: const Icon(
+                                              Icons.image,
+                                              size: 32,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                    ))
                               : Container(
                                   color: Colors.grey[200],
                                   child: const Icon(
@@ -851,6 +916,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     );
   }
 
+  // [Rest of the review methods remain the same as your existing code]
   Widget _buildReviewsPageSummary() {
     return Container(
       margin: const EdgeInsets.all(16),
@@ -999,8 +1065,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       _reviews.where((r) => r.rating == rating).length;
 
   Widget _buildReviewsPageItem(Review review, int index) {
-    final customerName = _getCustomerName(index);
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1016,7 +1080,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
             children: [
               Expanded(
                 child: Text(
-                  customerName,
+                  'Customer ${index + 1}',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
