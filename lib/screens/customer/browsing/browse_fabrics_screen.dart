@@ -129,7 +129,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
   
   String? _currentUserId;
   Map<String, String> _retailerNames = {};
-  bool _isLoadingRetailers = true;
 
   final List<String> _elementCategories = [
     'Buttons',
@@ -178,12 +177,9 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       
       setState(() {
         _retailerNames = names;
-        _isLoadingRetailers = false;
       });
     } catch (e) {
-      setState(() {
-        _isLoadingRetailers = false;
-      });
+      print('Error loading retailer names: $e');
     }
   }
 
@@ -195,136 +191,144 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
   Widget build(BuildContext context) {
     super.build(context);
     
-    final selectedColors = widget.filterData.colors.contains('All')
-        ? null
-        : widget.filterData.colors;
-    
-    final searchTerm = widget.searchQuery.value.isNotEmpty 
-        ? widget.searchQuery.value 
-        : null;
-
-    // For "Elements" tab, we filter by category
-    final categoryFilter = widget.showFabrics ? null : widget.filterData.materialTypes;
-
-    return StreamBuilder<List<Product>>(
-      stream: _browseService.getProductsByFilter(
-        category: categoryFilter?.contains('All') == true ? null : categoryFilter?.first,
-        materialType: widget.filterData.materialTypes.contains('All') 
+    return ValueListenableBuilder<String>(
+      valueListenable: widget.searchQuery,
+      builder: (context, searchQuery, _) {
+        // Determine category filter
+        final categoryFilter = widget.showFabrics ? null : 'Elements';
+        
+        // Get selected materials (remove 'All' if present)
+        final materialFilter = widget.filterData.materialTypes.contains('All') 
             ? null 
-            : widget.filterData.materialTypes.first,
-        minPrice: widget.filterData.minPrice > 0 ? widget.filterData.minPrice : null,
-        maxPrice: widget.filterData.maxPrice < 5000 ? widget.filterData.maxPrice : null,
-        colors: selectedColors,
-        sortBy: widget.filterData.sortBy,
-        search: searchTerm,
-      ),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+            : widget.filterData.materialTypes.first;
+        
+        // Get selected colors
+        final selectedColors = widget.filterData.colors.contains('All')
+            ? null
+            : widget.filterData.colors;
+        
+        // Get search term
+        final searchTerm = searchQuery.isNotEmpty ? searchQuery : null;
+
+        return StreamBuilder<List<Product>>(
+          stream: _browseService.getProductsByFilter(
+            category: categoryFilter,
+            materialType: materialFilter,
+            minPrice: widget.filterData.minPrice > 0 ? widget.filterData.minPrice : null,
+            maxPrice: widget.filterData.maxPrice < 5000 ? widget.filterData.maxPrice : null,
+            colors: selectedColors,
+            sortBy: widget.filterData.sortBy,
+            search: searchTerm,
+          ),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Colors.red[300],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Error loading products',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      snapshot.error?.toString() ?? 'Unknown error',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[500],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            if (snapshot.connectionState == ConnectionState.waiting && 
+                !snapshot.hasData) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  color: Color(0xFF6B8F71),
+                ),
+              );
+            }
+
+            final products = snapshot.data ?? [];
+            
+            // Filter products based on showFabrics
+            List<Product> filteredProducts;
+            if (widget.showFabrics) {
+              // Show only fabrics (non-element categories)
+              filteredProducts = products.where((p) => !_isElement(p)).toList();
+            } else {
+              // Show only elements
+              filteredProducts = products.where((p) => _isElement(p)).toList();
+            }
+            
+            // Convert to FabricProductData
+            final fabricDataList = filteredProducts
+                .map((product) => FabricProductData.fromProduct(product))
+                .toList();
+
+            if (fabricDataList.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.search_off_rounded,
+                      size: 64,
+                      color: Colors.grey[400],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      widget.showFabrics ? 'No Fabrics found' : 'No Elements found',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Try adjusting your filters or search terms',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            // Apply sorting (already handled by service, but apply additional sorting if needed)
+            if (widget.filterData.sortBy == 'lowToHigh') {
+              fabricDataList.sort((a, b) => a.product.minPrice.compareTo(b.product.minPrice));
+            } else if (widget.filterData.sortBy == 'highToLow') {
+              fabricDataList.sort((a, b) => b.product.minPrice.compareTo(a.product.minPrice));
+            }
+
+            return Column(
               children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: Colors.red[300],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Error loading products',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[700],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  snapshot.error?.toString() ?? 'Unknown error',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[500],
-                  ),
-                  textAlign: TextAlign.center,
+                _buildHeroSection(widget.showFabrics ? 'Fabrics' : 'Elements'),
+                Expanded(
+                  child: _buildFabricGrid(fabricDataList),
                 ),
               ],
-            ),
-          );
-        }
-
-        if (snapshot.connectionState == ConnectionState.waiting && 
-            !snapshot.hasData) {
-          return const Center(
-            child: CircularProgressIndicator(
-              color: Color(0xFF6B8F71),
-            ),
-          );
-        }
-
-        final products = snapshot.data ?? [];
-        
-        // Filter products based on showFabrics
-        List<Product> filteredProducts;
-        if (widget.showFabrics) {
-          // Show only fabrics (non-element categories)
-          filteredProducts = products.where((p) => !_isElement(p)).toList();
-        } else {
-          // Show only elements
-          filteredProducts = products.where((p) => _isElement(p)).toList();
-        }
-        
-        // Convert to FabricProductData
-        final fabricDataList = filteredProducts
-            .map((product) => FabricProductData.fromProduct(product))
-            .toList();
-
-        if (fabricDataList.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.search_off_rounded,
-                  size: 64,
-                  color: Colors.grey[400],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  widget.showFabrics ? 'No Fabrics found' : 'No Elements found',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Try adjusting your filters or search terms',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[500],
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        // Apply sorting
-        if (widget.filterData.sortBy == 'lowToHigh') {
-          fabricDataList.sort((a, b) => a.product.minPrice.compareTo(b.product.minPrice));
-        } else if (widget.filterData.sortBy == 'highToLow') {
-          fabricDataList.sort((a, b) => b.product.minPrice.compareTo(a.product.minPrice));
-        }
-
-        return Column(
-          children: [
-            _buildHeroSection(widget.showFabrics ? 'Fabrics' : 'Elements'),
-            Expanded(
-              child: _buildFabricGrid(fabricDataList),
-            ),
-          ],
+            );
+          },
         );
       },
     );
@@ -735,6 +739,8 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         retailerName: _getRetailerName(fabricData.product.retailerId),
         materialBlends: fabricData.materialBlendList,
         userRole: widget.userRole,
+        customerId: _currentUserId,
+        favoriteService: _favoriteService,
       ),
     );
   }
@@ -749,6 +755,8 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         isFabric: false,
         retailerName: _getRetailerName(product.retailerId),
         userRole: widget.userRole,
+        customerId: _currentUserId,
+        favoriteService: _favoriteService,
       ),
     );
   }
