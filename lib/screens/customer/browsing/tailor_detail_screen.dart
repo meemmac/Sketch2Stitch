@@ -659,7 +659,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(20.0),
-          child: CircularProgressIndicator(color: kSage),
+          child: CircularProgressIndicator(color:  const Color(0xFF6B8F71)),
         ),
       );
     }

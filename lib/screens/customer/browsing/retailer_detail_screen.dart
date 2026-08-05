@@ -118,20 +118,25 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     }
   }
 
-  Future<void> _loadProducts() async {
-    setState(() => _isLoadingProducts = true);
-    try {
-      final products = await _browseService
-          .getProductsByFilter(retailerId: widget.retailer.id)
-          .first;
-      setState(() {
-        _products = products;
-        _isLoadingProducts = false;
-      });
-    } catch (e) {
-      setState(() => _isLoadingProducts = false);
-    }
+// In retailer_detail_screen.dart, replace the _loadProducts method with:
+
+Future<void> _loadProducts() async {
+  setState(() => _isLoadingProducts = true);
+  try {
+    // Get all products and filter by retailerId client-side
+    final allProducts = await _browseService.getProductsByFilter().first;
+    final retailerProducts = allProducts
+        .where((p) => p.retailerId == widget.retailer.id)
+        .toList();
+    
+    setState(() {
+      _products = retailerProducts;
+      _isLoadingProducts = false;
+    });
+  } catch (e) {
+    setState(() => _isLoadingProducts = false);
   }
+}
 
   Future<void> _loadReviews() async {
     setState(() => _isLoading = true);
