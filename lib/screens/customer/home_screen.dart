@@ -58,42 +58,48 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   List<Retailer> _allRetailers = [];
   Map<String, String> _retailerNames = {};
   bool _isLoading = true;
+  bool _hasError = false;
+  String _errorMessage = '';
 
-  List<String> get _elementCategories => [
-    'Fasteners', 'Buttons', 'Threads', 'Embellishments', 'Trims', 'Ribbons',
+  final List<String> _elementCategories = [
+    'Fasteners',
+    'Buttons',
+    'Threads',
+    'Embellishments',
+    'Trims',
+    'Ribbons',
   ];
 
-  bool _isElement(Product product) => _elementCategories.contains(product.category);
+  bool _isElement(Product product) =>
+      _elementCategories.contains(product.category);
 
-  // ─── Getter for Fabric Products ──────────────────────────────────────
-  List<Product> get _fabricProducts => _allProducts.where((p) => !_isElement(p)).toList();
-  List<Product> get _elementProducts => _allProducts.where((p) => _isElement(p)).toList();
+  // ─── Getters ──────────────────────────────────────────────────────────
+  List<Product> get _allFabricProducts => _allProducts.where((p) => !_isElement(p)).toList();
+  List<Product> get _allElementProducts => _allProducts.where((p) => _isElement(p)).toList();
 
-  // ─── Last Viewed ──────────────────────────────────────────────────────
   List<Product> get _lastViewedProducts {
-    return _fabricProducts.isNotEmpty ? _fabricProducts.take(3).toList() : [];
+    final fabrics = _allFabricProducts;
+    return fabrics.isNotEmpty ? fabrics.take(3).toList() : [];
   }
 
-  // ─── Favorites ────────────────────────────────────────────────────────
   List<Product> get _favoriteFabricProducts {
-    return _fabricProducts.length > 3 ? _fabricProducts.skip(2).take(3).toList() : _fabricProducts.take(3).toList();
+    final fabrics = _allFabricProducts;
+    return fabrics.length > 3 ? fabrics.skip(2).take(3).toList() : fabrics.take(3).toList();
   }
 
   List<Tailor> get _favoriteTailors => _allTailors.take(3).toList();
   List<Retailer> get _favoriteRetailers => _allRetailers.take(3).toList();
 
-  // ─── Section Products ────────────────────────────────────────────────
   List<Product> get _fabricSectionProducts {
-    final fabrics = _fabricProducts;
+    final fabrics = _allFabricProducts;
     return fabrics.take(6).toList();
   }
 
   List<Product> get _elementSectionProducts {
-    final elements = _elementProducts;
+    final elements = _allElementProducts;
     return elements.take(6).toList();
   }
 
-  // ─── Get Retailer Name ───────────────────────────────────────────────
   String _getRetailerName(String retailerId) {
     return _retailerNames[retailerId] ?? 'Unknown Retailer';
   }
@@ -107,46 +113,154 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   }
 
   void _getCurrentUser() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      _currentUserId = user.uid;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        _currentUserId = user.uid;
+      }
+    } catch (e) {
+      print('Error getting current user: $e');
     }
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+  setState(() {
+    _isLoading = true;
+    _hasError = false;
+    _errorMessage = '';
+  });
+  
+  try {
+    print('🔄 Loading data from Firestore...');
+    
+    // Direct test - check if we can read products
     try {
-      // Load products
-      final products = await _browseService.getProductsByFilter().first;
+      final testSnapshot = await FirebaseFirestore.instance
+          .collection('Products')
+          .limit(2)
+          .get();
       
-      // Load tailors
-      final tailors = await _browseService.getTailorsByFilter().first;
+      print('📊 Found ${testSnapshot.docs.length} products in Firestore');
       
-      // Load retailers
-      final retailers = await _browseService.getRetailersByFilter().first;
-      
-      // Load retailer names
+      if (testSnapshot.docs.isNotEmpty) {
+        final firstDoc = testSnapshot.docs.first;
+        final data = firstDoc.data();
+        print('📄 First product ID: ${firstDoc.id}');
+        print('📄 First product name: ${data['productName']}');
+        print('📄 Data keys: ${data.keys}');
+        print('📄 materialType: ${data['materialType']}');
+        print('📄 materialType type: ${data['materialType'].runtimeType}');
+      } else {
+        print('⚠️ Products collection is EMPTY!');
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage = 'Products collection is empty. Please add products.';
+        });
+        return;
+      }
+    } catch (e) {
+      print('❌ Error reading Products: $e');
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+        _errorMessage = 'Error reading Firestore: $e';
+      });
+      return;
+    }
+    
+    // Load products with detailed logging
+    print('📦 Calling getProductsByFilter...');
+    List<Product> products = [];
+    try {
+      products = await _browseService.getProductsByFilter().first;
+      print('✅ Loaded ${products.length} products');
+      if (products.isNotEmpty) {
+        print('📄 First product name: ${products.first.productName}');
+        print('📄 First product materialTypes: ${products.first.materialTypes.length}');
+        print('📄 First product materialType: ${products.first.materialType}');
+      }
+    } catch (e) {
+      print('❌ Error loading products: $e');
+      print('❌ Stack trace: ${StackTrace.current}');
+      products = [];
+    }
+    
+    // Load tailors
+    print('👤 Loading tailors...');
+    List<Tailor> tailors = [];
+    try {
+      tailors = await _browseService.getTailorsByFilter().first;
+      print('✅ Loaded ${tailors.length} tailors');
+    } catch (e) {
+      print('❌ Error loading tailors: $e');
+      tailors = [];
+    }
+    
+    // Load retailers
+    print('🏪 Loading retailers...');
+    List<Retailer> retailers = [];
+    try {
+      retailers = await _browseService.getRetailersByFilter().first;
+      print('✅ Loaded ${retailers.length} retailers');
+    } catch (e) {
+      print('❌ Error loading retailers: $e');
+      retailers = [];
+    }
+    
+    // Load retailer names
+    print('📋 Loading retailer names...');
+    Map<String, String> names = {};
+    try {
       final retailerSnapshot = await FirebaseFirestore.instance
           .collection('Retailer')
           .get();
       
-      final Map<String, String> names = {};
       for (final doc in retailerSnapshot.docs) {
         final data = doc.data();
         names[doc.id] = data['shopName'] as String? ?? 'Unknown Retailer';
       }
+      print('✅ Loaded ${names.length} retailer names');
+    } catch (e) {
+      print('❌ Error loading retailer names: $e');
+    }
 
+    // Check if we got any data
+    if (products.isEmpty && tailors.isEmpty && retailers.isEmpty) {
+      print('⚠️ ALL DATA IS EMPTY!');
       setState(() {
-        _allProducts = products;
-        _allTailors = tailors;
-        _allRetailers = retailers;
+        _allProducts = [];
+        _allTailors = [];
+        _allRetailers = [];
         _retailerNames = names;
         _isLoading = false;
+        _hasError = true;
+        _errorMessage = 'No data found. Please seed your database.';
       });
-    } catch (e) {
-      setState(() => _isLoading = false);
+      return;
     }
+
+    print('✅ Setting state with ${products.length} products, ${tailors.length} tailors, ${retailers.length} retailers');
+    setState(() {
+      _allProducts = products;
+      _allTailors = tailors;
+      _allRetailers = retailers;
+      _retailerNames = names;
+      _isLoading = false;
+      _hasError = false;
+    });
+    
+  } catch (e) {
+    print('❌ Error loading data: $e');
+    print('❌ Stack trace: ${StackTrace.current}');
+    setState(() {
+      _isLoading = false;
+      _hasError = true;
+      _errorMessage = 'Failed to load data: ${e.toString()}';
+    });
   }
+}
+
 
   void _openNotifications() async {
     final result = await Navigator.push<bool>(
@@ -176,7 +290,10 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => BrowseShell(initialIndex: index, userRole: _currentRole),
+        builder: (_) => BrowseShell(
+          initialIndex: index,
+          userRole: _currentRole,
+        ),
       ),
     );
   }
@@ -185,7 +302,6 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     final bool isFabric = !_isElement(product);
     List<String>? materialBlends;
     
-    // Try to extract material blends from product
     if (isFabric && product.materialType.isNotEmpty) {
       final parts = product.materialType.split(',').map((s) => s.trim()).toList();
       materialBlends = parts;
@@ -214,12 +330,6 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         builder: (context) => TailorDetailScreen(
           tailor: tailor,
           userRole: _currentRole,
-          onTailorSelected: _currentRole == UserRole.customer 
-              ? (id) {
-                  // Navigate to tailor booking flow
-                  Navigator.pop(context);
-                }
-              : null,
         ),
       ),
     );
@@ -310,28 +420,99 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
             _buildTopBar(),
             _buildSectionNavBar(),
             Expanded(
-              child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: kSage,
-                      ),
-                    )
-                  : SingleChildScrollView(
-                      controller: _scrollController,
-                      physics: const BouncingScrollPhysics(),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 16),
-                          Container(key: _heroKey, child: _buildHeroSection()),
-                          const SizedBox(height: 20),
-                          _buildRoleSpecificSections(),
-                        ],
-                      ),
-                    ),
+              child: _buildBody(),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              color: Color(0xFF6B8F71),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Loading...',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_hasError) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Colors.red[300],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Unable to load data',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[700],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _errorMessage,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[500],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _loadData,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6B8F71),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Retry',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      controller: _scrollController,
+      physics: const BouncingScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 16),
+          Container(key: _heroKey, child: _buildHeroSection()),
+          const SizedBox(height: 20),
+          _buildRoleSpecificSections(),
+        ],
       ),
     );
   }
@@ -858,6 +1039,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     switch (_favoritesFilter) {
       case 'Retailers':
         final items = _favoriteRetailers;
+        if (items.isEmpty) return const SizedBox.shrink();
         return Column(
           children: [
             _buildRetailerRow(items),
@@ -868,6 +1050,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         );
       case 'Tailors':
         final items = _favoriteTailors;
+        if (items.isEmpty) return const SizedBox.shrink();
         return Column(
           children: [
             _buildTailorRow(items),
@@ -878,6 +1061,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         );
       default:
         final items = _favoriteFabricProducts;
+        if (items.isEmpty) return const SizedBox.shrink();
         return Column(
           children: [
             _buildFabricRow(items),
@@ -1017,7 +1201,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Inventory Management',
+                  ' Inventory Management',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -1123,9 +1307,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
 
   // ---------------- Fabric product row & card ----------------
   Widget _buildFabricRow(List<Product> products) {
-    if (products.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    if (products.isEmpty) return const SizedBox.shrink();
     
     return SizedBox(
       height: 220,
@@ -1150,9 +1332,16 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
       child: Container(
         margin: const EdgeInsets.only(right: 14),
         decoration: BoxDecoration(
-          color: kCardBg,
+          color: const Color(0xFFFFFFFF),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: kBorder, width: 0.5),
+          border: Border.all(color: const Color(0xFFE8ECF0), width: 0.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1174,11 +1363,11 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                                 fit: BoxFit.cover,
                                 errorBuilder: (context, error, stackTrace) =>
                                     Container(
-                                      color: kSage.withOpacity(0.12),
+                                      color: const Color(0xFF6B8F71).withOpacity(0.12),
                                       child: Icon(
                                         Icons.texture,
                                         size: 34,
-                                        color: kSageDark,
+                                        color: const Color(0xFF4A7C59),
                                       ),
                                     ),
                               )
@@ -1187,20 +1376,20 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                                 fit: BoxFit.cover,
                                 errorBuilder: (context, error, stackTrace) =>
                                     Container(
-                                      color: kSage.withOpacity(0.12),
+                                      color: const Color(0xFF6B8F71).withOpacity(0.12),
                                       child: Icon(
                                         Icons.texture,
                                         size: 34,
-                                        color: kSageDark,
+                                        color: const Color(0xFF4A7C59),
                                       ),
                                     ),
                               ))
                         : Container(
-                            color: kSage.withOpacity(0.12),
+                            color: const Color(0xFF6B8F71).withOpacity(0.12),
                             child: Icon(
                               Icons.texture,
                               size: 34,
-                              color: kSageDark,
+                              color: const Color(0xFF4A7C59),
                             ),
                           ),
                   ),
@@ -1274,7 +1463,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: kSageDark,
+                      color: const Color(0xFF4A7C59),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1360,7 +1549,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         decoration: BoxDecoration(
           color: _resolveColor(option.color),
           shape: BoxShape.circle,
-          border: Border.all(color: kBorder, width: 0.5),
+          border: Border.all(color: const Color(0xFFE8ECF0), width: 0.5),
         ),
       ),
     );
@@ -1408,9 +1597,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
 
   // ---------------- Tailor row & card ----------------
   Widget _buildTailorRow(List<Tailor> tailors) {
-    if (tailors.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    if (tailors.isEmpty) return const SizedBox.shrink();
     
     return SizedBox(
       height: 200,
@@ -1433,9 +1620,16 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
       child: Container(
         margin: const EdgeInsets.only(right: 14),
         decoration: BoxDecoration(
-          color: kCardBg,
+          color: const Color(0xFFFFFFFF),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: kBorder, width: 0.5),
+          border: Border.all(color: const Color(0xFFE8ECF0), width: 0.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1456,8 +1650,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
                                 Container(
-                                  color: kSage.withOpacity(0.12),
-                                  child: Icon(Icons.person, size: 34, color: kSageDark),
+                                  color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                  child: Icon(Icons.person, size: 34, color: const Color(0xFF4A7C59)),
                                 ),
                           )
                         : Image.asset(
@@ -1465,8 +1659,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
                                 Container(
-                                  color: kSage.withOpacity(0.12),
-                                  child: Icon(Icons.person, size: 34, color: kSageDark),
+                                  color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                  child: Icon(Icons.person, size: 34, color: const Color(0xFF4A7C59)),
                                 ),
                           ),
                   ),
@@ -1481,7 +1675,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: kSage,
+                        color: const Color(0xFF6B8F71),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Text(
@@ -1567,7 +1761,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                           vertical: 1,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.1),
+                          color: Colors.green.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -1615,9 +1809,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
 
   // ---------------- Retailer row & card ----------------
   Widget _buildRetailerRow(List<Retailer> retailers) {
-    if (retailers.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    if (retailers.isEmpty) return const SizedBox.shrink();
     
     return SizedBox(
       height: 200,
@@ -1640,9 +1832,16 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
       child: Container(
         margin: const EdgeInsets.only(right: 14),
         decoration: BoxDecoration(
-          color: kCardBg,
+          color: const Color(0xFFFFFFFF),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: kBorder, width: 0.5),
+          border: Border.all(color: const Color(0xFFE8ECF0), width: 0.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1663,8 +1862,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
                                 Container(
-                                  color: kSage.withOpacity(0.12),
-                                  child: Icon(Icons.store, size: 34, color: kSageDark),
+                                  color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                  child: Icon(Icons.store, size: 34, color: const Color(0xFF4A7C59)),
                                 ),
                           )
                         : Image.asset(
@@ -1672,8 +1871,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
                                 Container(
-                                  color: kSage.withOpacity(0.12),
-                                  child: Icon(Icons.store, size: 34, color: kSageDark),
+                                  color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                  child: Icon(Icons.store, size: 34, color: const Color(0xFF4A7C59)),
                                 ),
                           ),
                   ),
@@ -1688,7 +1887,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: kSage,
+                        color: const Color(0xFF6B8F71),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Text(
@@ -1774,7 +1973,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                           vertical: 1,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.1),
+                          color: Colors.green.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(

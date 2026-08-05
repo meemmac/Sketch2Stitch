@@ -12,58 +12,68 @@ class BrowseService {
 
   // ─── Products ─────────────────────────────────────────────────────────────
 
-  /// Filters products based on multiple criteria.
-  Stream<List<Product>> getProductsByFilter({
-    String? category,
-    String? materialType,
-    double? minPrice,
-    double? maxPrice,
-    List<String>? colors,
-    String sortBy = 'default',
-    String? search,
-  }) {
-    Query query = _db.collection('Products');
+Stream<List<Product>> getProductsByFilter({
+  String? category,
+  String? materialType,
+  double? minPrice,
+  double? maxPrice,
+  List<String>? colors,
+  String sortBy = 'default',
+  String? search,
+}) {
+  print('🔍 getProductsByFilter called');
+  Query query = _db.collection('Products');
+  print('📂 Querying Products collection');
 
-    if (category != null && category != 'All') {
-      query = query.where('category', isEqualTo: category);
-    }
-
-    // Apply sorting logic
-    if (sortBy == 'lowToHigh') {
-      query = query.orderBy('minPrice', descending: false);
-    } else if (sortBy == 'highToLow') {
-      query = query.orderBy('maxPrice', descending: true);
-    }
-
-    return query.snapshots().map((snapshot) {
-      var products = snapshot.docs.map((doc) => Product.fromJson(doc.data() as Map<String, dynamic>)).toList();
-
-      // Client-side filtering for more complex logic not easily handled by Firestore queries
-      if (minPrice != null || maxPrice != null) {
-        products = products.where((p) {
-          final price = p.minPrice;
-          return (minPrice == null || price >= minPrice) && (maxPrice == null || price <= maxPrice);
-        }).toList();
-      }
-
-      if (materialType != null && materialType != 'All') {
-        products = products.where((p) => p.materialType.toLowerCase().contains(materialType.toLowerCase())).toList();
-      }
-
-      if (colors != null && colors.isNotEmpty && !colors.contains('All')) {
-        products = products.where((p) {
-          final productColors = p.colorOptions.map((c) => c.color.toLowerCase()).toList();
-          return colors.any((c) => productColors.contains(c.toLowerCase()));
-        }).toList();
-      }
-
-      if (search != null && search.isNotEmpty) {
-        products = products.where((p) => p.productName.toLowerCase().contains(search.toLowerCase())).toList();
-      }
-
-      return products;
-    });
+  if (category != null && category != 'All') {
+    query = query.where('category', isEqualTo: category);
+    print('🔍 Filtering by category: $category');
   }
+
+  return query.snapshots().map((snapshot) {
+    print('📦 Received ${snapshot.docs.length} documents from Firestore');
+    
+    if (snapshot.docs.isEmpty) {
+      print('⚠️ No documents found in Products collection');
+      return <Product>[];
+    }
+    
+    var products = snapshot.docs.map((doc) {
+      try {
+        final data = doc.data() as Map<String, dynamic>;
+        print('📄 Processing doc ${doc.id}: ${data['productName']}');
+        print('📄 materialType value: ${data['materialType']}');
+        print('📄 materialType type: ${data['materialType'].runtimeType}');
+        return Product.fromJson(data);
+      } catch (e) {
+        print('❌ Error parsing product ${doc.id}: $e');
+        print('📄 Raw data: ${doc.data()}');
+        // Return a default product with error info
+        return Product(
+          id: doc.id,
+          retailerId: '',
+          productName: 'Error: ${doc.id}',
+          productCode: '',
+          category: '',
+          materialTypes: [],
+          colorOptions: [],
+          description: '',
+          careSymbol: [],
+        );
+      }
+    }).toList();
+
+    print('✅ Successfully parsed ${products.length} products');
+    
+    // Check if any products have errors
+    final errorProducts = products.where((p) => p.productName.startsWith('Error:')).toList();
+    if (errorProducts.isNotEmpty) {
+      print('⚠️ ${errorProducts.length} products failed to parse');
+    }
+    
+    return products;
+  });
+}
 
   /// Performs a prefix search on product names.
   Future<List<Product>> searchProductsByQuery(String query) async {
