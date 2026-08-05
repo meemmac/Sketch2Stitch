@@ -1080,6 +1080,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     ];
 
     return IconButton(
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(),
       icon: Icon(Icons.palette_outlined, color: Colors.green.shade800),
       onPressed: () {
         showDialog(
@@ -1430,6 +1432,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
+                                  flex: 2,
                                   child: SingleChildScrollView(
                                     scrollDirection: Axis.horizontal,
                                     child: Row(
@@ -1454,8 +1457,9 @@ class _InventoryScreenState extends State<InventoryScreen>
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 15),
+                                const SizedBox(width: 10),
                                 Expanded(
+                                  flex: 3,
                                   child: Row(
                                     children: [
                                       Expanded(
@@ -1475,11 +1479,14 @@ class _InventoryScreenState extends State<InventoryScreen>
                                                       ),
                                                     ),
                                           decoration: const InputDecoration(
-                                            hintText: "Color Name (e.g. Red)",
+                                            hintText: "Color",
                                             border: InputBorder.none,
+                                            isDense: true,
+                                            contentPadding: EdgeInsets.symmetric(vertical: 8),
                                           ),
                                         ),
                                       ),
+                                      const SizedBox(width: 4),
                                       _buildColorPicker(variant, setM),
                                     ],
                                   ),
