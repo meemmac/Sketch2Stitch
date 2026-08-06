@@ -20,6 +20,25 @@ import '../screens/customer/cart_screen.dart';
 import '../screens/customer/orders/order_detail_screen.dart';
 import '../screens/customer/messaging/conversations_screen.dart';
 
+/// Placeholder avatar showing the first letter of [name] on a tinted
+/// background — used wherever no profile picture has been set yet.
+Widget _initialAvatar(String name, Color themeColor, {double fontSize = 22}) {
+  final trimmed = name.trim();
+  final letter = trimmed.isNotEmpty ? trimmed[0].toUpperCase() : '?';
+  return Container(
+    color: themeColor.withValues(alpha: 0.15),
+    alignment: Alignment.center,
+    child: Text(
+      letter,
+      style: TextStyle(
+        color: themeColor,
+        fontWeight: FontWeight.bold,
+        fontSize: fontSize,
+      ),
+    ),
+  );
+}
+
 /// Model class representing the profile information for the drawer.
 class DrawerProfileData {
   final String name;
@@ -415,12 +434,15 @@ class DrawerProfileSection extends StatelessWidget {
   }
 
   /// Renders the drawer avatar: a Cloudinary-hosted image if `profilePicture`
-  /// is a URL, a local file if it's a not-yet-uploaded path, or a placeholder
-  /// icon if there's no picture at all.
+  /// is a URL, a local file if it's a not-yet-uploaded path, or the first
+  /// letter of the user's (or shop's) name if there's no picture at all.
   Widget _buildDrawerAvatar(Color themeColor) {
     final pic = profile.profilePicture;
     if (pic == null || pic.isEmpty) {
-      return Icon(Icons.person_rounded, color: themeColor, size: 32);
+      final displayName = role == UserRole.retailer
+          ? profile.shopName
+          : profile.name;
+      return _initialAvatar(displayName, themeColor);
     }
     if (pic.startsWith('http')) {
       return CloudinaryImage(
@@ -764,11 +786,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   /// Renders the current avatar selection: a Cloudinary-hosted image once
   /// uploaded, a local file preview while the upload is in flight, or the
-  /// default placeholder if nothing has been picked yet.
+  /// first letter of the user's (or shop's) name if nothing has been
+  /// picked yet.
   Widget _buildAvatarPreview() {
     final pic = _profilePicturePath;
     if (pic == null || pic.isEmpty) {
-      return Image.asset('assets/images/fab.jpg', fit: BoxFit.cover);
+      final displayName = widget.role == UserRole.retailer
+          ? _shopNameController.text
+          : _nameController.text;
+      return _initialAvatar(displayName, const Color(0xFF6C9985), fontSize: 36);
     }
     if (pic.startsWith('http')) {
       return CloudinaryImage(
