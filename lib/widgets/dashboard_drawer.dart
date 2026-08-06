@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -94,8 +95,50 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
   String? get _customerId => UserSession.instance.uid ?? AuthService().currentUser?.uid;
 
   void _updateProfile(DrawerProfileData updated) {
-    UserSession.instance.currentProfile.value = updated;
-    debugPrint("Profile updated: ${updated.name} (${_currentRole.name})");
+    // Persist to Firestore first; only reflect it in the UI once the
+    // write actually succeeds. Previously this just set the ValueNotifier
+    // with no backend call at all, so edits were lost on app restart.
+    unawaited(_saveProfile(updated));
+  }
+
+  Future<void> _saveProfile(DrawerProfileData updated) async {
+    final uid = UserSession.instance.uid ?? AuthService().currentUser?.uid;
+    if (uid == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save — please sign in again.')),
+        );
+      }
+      return;
+    }
+
+    try {
+      await AuthService().updateProfile(uid, _currentRole, {
+        'name': updated.name,
+        if (_currentRole == UserRole.retailer) 'shopName': updated.shopName,
+        'email': updated.email,
+        'phone': updated.phone,
+        'address': updated.address,
+        if (_currentRole != UserRole.customer) 'about': updated.about,
+        if (updated.profilePicture != null) 'profilePicture': updated.profilePicture,
+        if (updated.location != null) 'location': updated.location,
+      });
+
+      UserSession.instance.currentProfile.value = updated;
+      debugPrint("Profile updated: ${updated.name} (${_currentRole.name})");
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile updated successfully.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save profile: $e')),
+        );
+      }
+    }
   }
 
   @override
