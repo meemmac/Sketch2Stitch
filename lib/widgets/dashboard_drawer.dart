@@ -129,8 +129,9 @@ class TopFeedbackBanner extends StatelessWidget {
                         style: const TextStyle(
                           color: Color(0xFF222222),
                           fontWeight: FontWeight.w600,
-                          fontSize: 14,
+                          fontSize: 12,
                           height: 1.35,
+                          decoration: TextDecoration.none,
                         ),
                       ),
                     ),
@@ -198,6 +199,7 @@ class DrawerProfileData {
     String? address,
     double? rating,
     String? profilePicture,
+    bool removeProfilePicture = false, // NEW
     String? about,
     GeoPoint? location,
   }) {
@@ -208,7 +210,9 @@ class DrawerProfileData {
       phone: phone ?? this.phone,
       address: address ?? this.address,
       rating: rating ?? this.rating,
-      profilePicture: profilePicture ?? this.profilePicture,
+      profilePicture: removeProfilePicture
+          ? null
+          : (profilePicture ?? this.profilePicture),
       about: about ?? this.about,
       location: location ?? this.location,
     );
@@ -259,7 +263,8 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
 
   // Reads from UserSession first (captured once, right when the session
   // started) — falls back to AuthService directly just in case.
-  String? get _customerId => UserSession.instance.uid ?? AuthService().currentUser?.uid;
+  String? get _customerId =>
+      UserSession.instance.uid ?? AuthService().currentUser?.uid;
 
   void _updateProfile(DrawerProfileData updated) {
     // Persist to Firestore first; only reflect it in the UI once the
@@ -285,7 +290,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
         'phone': updated.phone,
         'address': updated.address,
         if (_currentRole != UserRole.customer) 'about': updated.about,
-        if (updated.profilePicture != null) 'profilePicture': updated.profilePicture,
+        'profilePicture': updated.profilePicture ?? '',
         if (updated.location != null) 'location': updated.location,
       });
 
@@ -309,7 +314,10 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
     return ValueListenableBuilder<DrawerProfileData?>(
       valueListenable: UserSession.instance.currentProfile,
       builder: (context, profile, _) {
-        if (profile == null) return const Drawer(child: Center(child: CircularProgressIndicator()));
+        if (profile == null)
+          return const Drawer(
+            child: Center(child: CircularProgressIndicator()),
+          );
 
         return Stack(
           children: [
@@ -323,66 +331,67 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
               child: SafeArea(
                 child: Column(
                   children: [
-                // Profile Section
-                Expanded(
-                  child: CustomScrollView(
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: DrawerProfileSection(
-                          role: _currentRole,
-                          profile: profile,
-                          themeColor: themeColor,
-                          onEditPressed: () => _openEditScreen(context, profile),
-                        ),
-                      ),
-                      const SliverToBoxAdapter(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16.0),
-                          child: Divider(),
-                        ),
-                      ),
-
-                      // Navigation Section
-                      SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              child: DrawerNavigationSection(
-                                role: _currentRole,
-                                themeColor: themeColor,
-                                customerId: _customerId,
-                                onFeedback: _showFeedback,
-                              ),
+                    // Profile Section
+                    Expanded(
+                      child: CustomScrollView(
+                        slivers: [
+                          SliverToBoxAdapter(
+                            child: DrawerProfileSection(
+                              role: _currentRole,
+                              profile: profile,
+                              themeColor: themeColor,
+                              onEditPressed: () =>
+                                  _openEditScreen(context, profile),
                             ),
-                            const Divider(height: 1),
+                          ),
+                          const SliverToBoxAdapter(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16.0),
+                              child: Divider(),
+                            ),
+                          ),
 
-                            // Logout Section
-                            DrawerLogoutButton(
-                              onLogoutPressed: () async {
-                                debugPrint("Logout pressed");
-                                await AuthService().signOut();
-                                UserSession.instance.logout();
-                                
-                                if (!mounted) return;
-                                _showFeedback("Logged out successfully!");
-                                Navigator.pushAndRemoveUntil(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const WelcomeScreen(),
+                          // Navigation Section
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  child: DrawerNavigationSection(
+                                    role: _currentRole,
+                                    themeColor: themeColor,
+                                    customerId: _customerId,
+                                    onFeedback: _showFeedback,
                                   ),
-                                  (route) => false,
-                                );
-                              },
+                                ),
+                                const Divider(height: 1),
+
+                                // Logout Section
+                                DrawerLogoutButton(
+                                  onLogoutPressed: () async {
+                                    debugPrint("Logout pressed");
+                                    await AuthService().signOut();
+                                    UserSession.instance.logout();
+
+                                    if (!mounted) return;
+                                    _showFeedback("Logged out successfully!");
+                                    Navigator.pushAndRemoveUntil(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const WelcomeScreen(),
+                                      ),
+                                      (route) => false,
+                                    );
+                                  },
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-              ],
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -398,7 +407,10 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
     );
   }
 
-  Future<void> _openEditScreen(BuildContext context, DrawerProfileData currentProfile) async {
+  Future<void> _openEditScreen(
+    BuildContext context,
+    DrawerProfileData currentProfile,
+  ) async {
     // Close the drawer first
     Navigator.pop(context);
 
@@ -884,6 +896,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _feedbackIsError = false;
   Timer? _feedbackTimer;
 
+  bool _pictureRemoved = false;
+
+  void _removePicture() {
+    setState(() {
+      _profilePicturePath = null;
+      _pictureRemoved = true;
+    });
+  }
+
   void _showFeedback(String message, {bool isError = false}) {
     _feedbackTimer?.cancel();
     setState(() {
@@ -935,9 +956,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     setState(() {
       _isUploadingPhoto = false;
       if (url != null) {
-        _profilePicturePath = url; // now a Cloudinary URL — this is what gets saved
+        _profilePicturePath = url;
+        _pictureRemoved = false;
       } else {
-        _showFeedback('Failed to upload photo. Please try again.', isError: true);
+        _showFeedback(
+          'Failed to upload photo. Please try again.',
+          isError: true,
+        );
       }
     });
   }
@@ -962,7 +987,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         heightParam: 200,
       );
     }
-    return Image.file(File(pic), fit: BoxFit.cover); // not-yet-uploaded local pick
+    return Image.file(
+      File(pic),
+      fit: BoxFit.cover,
+    ); // not-yet-uploaded local pick
   }
 
   Future<void> _pickLocation() async {
@@ -1010,7 +1038,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final address = _addressController.text.trim();
     if (address.isEmpty) {
       _showFeedback(
-        isRetailer ? 'Please enter your shop address.' : 'Please enter your address.',
+        isRetailer
+            ? 'Please enter your shop address.'
+            : 'Please enter your address.',
         isError: true,
       );
       return;
@@ -1030,6 +1060,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       address: address,
       about: _aboutController.text.trim(),
       profilePicture: _profilePicturePath,
+      removeProfilePicture: _pictureRemoved, // NEW
       location: _selectedLocation,
     );
     Navigator.pop(context, updated);
@@ -1092,40 +1123,63 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             children: [
               if (!isCustomer) ...[
                 Center(
-                  child: Stack(
+                  child: Column(
                     children: [
-                      ClipOval(
-                        child: SizedBox(
-                          width: 96,
-                          height: 96,
-                          child: _buildAvatarPreview(),
-                        ),
+                      Stack(
+                        children: [
+                          GestureDetector(
+                            // NEW — whole avatar tappable
+                            onTap: _isUploadingPhoto ? null : _pickImage,
+                            child: ClipOval(
+                              child: SizedBox(
+                                width: 96,
+                                height: 96,
+                                child: _buildAvatarPreview(),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: GestureDetector(
+                              onTap: _isUploadingPhoto ? null : _pickImage,
+                              child: CircleAvatar(
+                                radius: 16,
+                                backgroundColor: themeColor,
+                                child: _isUploadingPhoto
+                                    ? const SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.camera_alt,
+                                        size: 16,
+                                        color: Colors.white,
+                                      ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: GestureDetector(
-                          onTap: _isUploadingPhoto ? null : _pickImage,
-                          child: CircleAvatar(
-                            radius: 16,
-                            backgroundColor: themeColor,
-                            child: _isUploadingPhoto
-                                ? const SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.camera_alt,
-                                    size: 16,
-                                    color: Colors.white,
-                                  ),
+                      if (_profilePicturePath != null &&
+                          _profilePicturePath!.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          onPressed: _isUploadingPhoto ? null : _removePicture,
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.red.shade400,
+                          ),
+                          icon: const Icon(Icons.delete_outline, size: 16),
+                          label: const Text(
+                            'Remove photo',
+                            style: TextStyle(fontSize: 12),
                           ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
