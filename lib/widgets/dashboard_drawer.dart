@@ -836,6 +836,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
+  Widget _buildAvatarPreview() {
+  final pic = _profilePicturePath;
+  if (pic == null || pic.isEmpty) {
+    return Image.asset('assets/images/fab.jpg', fit: BoxFit.cover);
+  }
+  if (pic.startsWith('http')) {
+    return CloudinaryImage(imageUrl: pic, fit: BoxFit.cover, widthParam: 200, heightParam: 200);
+  }
+  return Image.file(File(pic), fit: BoxFit.cover); // not-yet-uploaded local pick
+}
+Widget _buildDrawerAvatar(Color themeColor) {
+  final pic = profile.profilePicture;
+  if (pic == null || pic.isEmpty) {
+    return Icon(Icons.person_rounded, color: themeColor, size: 32);
+  }
+  if (pic.startsWith('http')) {
+    return CloudinaryImage(imageUrl: pic, fit: BoxFit.cover, widthParam: 112, heightParam: 112);
+  }
+  return Image.file(File(pic), fit: BoxFit.cover);
+}
+
   @override
   Widget build(BuildContext context) {
     final bool isRetailer = widget.role == UserRole.retailer;
@@ -867,37 +888,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             children: [
               if (!isCustomer) ...[
                 Center(
-                  child: Stack(
-                    children: [
-                      CircleAvatar(
-                        radius: 48,
-                        backgroundColor: Colors.grey.shade200,
-                        backgroundImage:
-                            _profilePicturePath != null &&
-                                _profilePicturePath!.isNotEmpty
-                            ? FileImage(File(_profilePicturePath!))
-                                  as ImageProvider
-                            : const AssetImage('assets/images/fab.jpg'),
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: GestureDetector(
-                          onTap: _pickImage,
-                          child: const CircleAvatar(
-                            radius: 16,
-                            backgroundColor: themeColor,
-                            child: Icon(
-                              Icons.camera_alt,
-                              size: 16,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+  child: Stack(
+    children: [
+      ClipOval(
+        child: SizedBox(width: 96, height: 96, child: _buildAvatarPreview()),
+      ),
+      Positioned(
+        bottom: 0,
+        right: 0,
+        child: GestureDetector(
+          onTap: _isUploadingPhoto ? null : _pickImage,
+          child: CircleAvatar(
+  radius: 28,
+  backgroundColor: themeColor.withValues(alpha: 0.15),
+  child: ClipOval(
+    child: SizedBox(width: 56, height: 56, child: _buildDrawerAvatar(themeColor)),
+  ),
+),
+        ),
+      ),
+    ],
+  ),
+),
                 const SizedBox(height: 24),
               ],
               if (isRetailer) ...[
