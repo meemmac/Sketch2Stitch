@@ -147,6 +147,7 @@ class NotificationService {
     required NotificationDbType type,
     required String message,
     required String orderId,
+    String? senderName,
     String? subOrderId,
   }) async {
     final docRef = _db.collection(_collection).doc();
@@ -156,6 +157,7 @@ class NotificationService {
       userRole: userRole,
       type: type,
       message: message,
+      senderName: senderName,
       createdAt: DateTime.now(),
       orderId: orderId,
       subOrderId: subOrderId,
@@ -177,7 +179,8 @@ class NotificationService {
       userId: customerId,
       userRole: UserRole.customer,
       type: NotificationDbType.orderCompleted,
-      message: 'Your order #$orderId has been delivered by $partyName ($partyRole).',
+      message: 'Your order #$orderId has been delivered by $partyName.',
+      senderName: partyName,
       orderId: orderId,
     );
   }
@@ -195,7 +198,8 @@ class NotificationService {
       userId: customerId,
       userRole: UserRole.customer,
       type: NotificationDbType.orderConfirmed,
-      message: 'Your order #$orderId has been confirmed by $partyName ($partyRole).',
+      message: 'Your order #$orderId has been confirmed by $partyName.',
+      senderName: partyName,
       orderId: orderId,
     );
   }
@@ -213,8 +217,9 @@ class NotificationService {
     await _sendNotification(
       userId: customerId,
       userRole: UserRole.customer,
-      type: NotificationDbType.jobRejected, // Best fit for cancellation
+      type: NotificationDbType.jobRejected,
       message: 'Order #$orderId was cancelled by $partyName. Reason: $cancelReason',
+      senderName: partyName,
       orderId: orderId,
     );
   }
@@ -236,6 +241,7 @@ class NotificationService {
       userRole: UserRole.tailor,
       type: NotificationDbType.jobRequested,
       message: 'New stitching request from $customerName for $itemName. Order #$orderId',
+      senderName: customerName,
       orderId: orderId,
     );
   }
@@ -254,6 +260,7 @@ class NotificationService {
       userRole: UserRole.tailor,
       type: NotificationDbType.selectionDeadlineReminder,
       message: 'Reminder: Please confirm the stitching request for $customerName ($itemName).',
+      senderName: customerName,
       orderId: orderId,
     );
   }
@@ -272,6 +279,7 @@ class NotificationService {
       userRole: UserRole.tailor,
       type: NotificationDbType.selectionDeadlineReminder,
       message: 'Delivery deadline approaching for $customerName\'s order #$orderId.',
+      senderName: customerName,
       orderId: orderId,
     );
   }
@@ -291,6 +299,7 @@ class NotificationService {
       userRole: UserRole.tailor,
       type: NotificationDbType.jobRejected,
       message: '$customerName cancelled their order for $itemName. Reason: $cancelReason',
+      senderName: customerName,
       orderId: orderId,
     );
   }
@@ -316,6 +325,7 @@ class NotificationService {
       userRole: UserRole.retailer,
       type: NotificationDbType.suborderPlaced,
       message: 'New material order from $customerName for $itemName. Order #$orderId',
+      senderName: customerName,
       orderId: orderId,
     );
   }

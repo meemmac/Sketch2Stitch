@@ -188,6 +188,46 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     );
   }
 
+  Widget _buildAvatar(AppNotification n, _NotificationStyle style) {
+    String? name = n.senderName;
+
+
+    // 🧠 Smart Name Parser
+    // If no senderName field exists, we try to "guess" the name from the message text
+    if (name == null || name.trim().isEmpty) {
+      final msg = n.message.toLowerCase();
+      if (msg.contains('from ')) {
+        // Extracts the word after "from" (e.g. "from Sarah" -> "Sarah")
+        final parts = n.message.split(RegExp(r'from ', caseSensitive: false));
+        if (parts.length > 1) name = parts[1].trim().split(' ')[0];
+      } else if (msg.contains('by ')) {
+        // Extracts the word after "by" (e.g. "by Karim" -> "Karim")
+        final parts = n.message.split(RegExp(r'by ', caseSensitive: false));
+        if (parts.length > 1) name = parts[1].trim().split(' ')[0];
+      }
+    }
+
+
+    final initial = (name != null && name.trim().isNotEmpty)
+        ? name.trim()[0].toUpperCase()
+        : null;
+
+
+    return CircleAvatar(
+      radius: 22,
+      backgroundColor: style.iconColor.withOpacity(0.12),
+      child: initial != null
+          ? Text(
+              initial,
+              style: TextStyle(
+                color: style.iconColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            )
+          : Icon(Icons.person, color: style.iconColor),
+    );
+  }
 
   Widget _buildNotificationItem(AppNotification n) {
     switch (widget.role) {
@@ -223,10 +263,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const CircleAvatar(
-                      radius: 22,
-                      backgroundColor: Colors.white,
-                      backgroundImage: AssetImage('assets/images/fab.jpg')),
+                  _buildAvatar(n, style),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -325,13 +362,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: n.type == NotificationDbType.deliveryReminder
-                        ? Colors.red.shade200
-                        : (n.type == NotificationDbType.jobConfirmed ? Colors.blue.shade200 : style.iconColor.withOpacity(0.2)),
-                    backgroundImage: const AssetImage('assets/images/textile.jpg'),
-                  ),
+                  _buildAvatar(n, style),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -423,11 +454,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: style.iconColor.withOpacity(0.2),
-                    backgroundImage: const AssetImage('assets/images/silk.jpg'),
-                  ),
+                  _buildAvatar(n, style),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(

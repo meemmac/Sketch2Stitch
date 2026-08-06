@@ -23,6 +23,7 @@ class AppNotification {
   final UserRole userRole;
   final NotificationDbType type;
   final String message;
+  final String? senderName;
   final bool isRead;
   final DateTime createdAt;
   final String orderId;
@@ -35,6 +36,7 @@ class AppNotification {
     required this.userRole,
     required this.type,
     required this.message,
+    this.senderName,
     this.isRead = false,
     required this.createdAt,
     required this.orderId,
@@ -48,6 +50,7 @@ class AppNotification {
     UserRole? userRole,
     NotificationDbType? type,
     String? message,
+    String? senderName,
     bool? isRead,
     DateTime? createdAt,
     String? orderId,
@@ -59,6 +62,7 @@ class AppNotification {
       userRole: userRole ?? this.userRole,
       type: type ?? this.type,
       message: message ?? this.message,
+      senderName: senderName ?? this.senderName,
       isRead: isRead ?? this.isRead,
       createdAt: createdAt ?? this.createdAt,
       orderId: orderId ?? this.orderId,
@@ -72,6 +76,7 @@ class AppNotification {
     'userRole': userRole.name[0].toUpperCase() + userRole.name.substring(1),
     'type': type.name,
     'message': message,
+    'senderName': senderName,
     'isRead': isRead,
     'createdAt': Timestamp.fromDate(createdAt),
     'orderId': orderId,
@@ -92,6 +97,7 @@ class AppNotification {
         orElse: () => NotificationDbType.newMessage,
       ),
       message: json['message'] ?? '',
+      senderName: json['senderName'],
       isRead: json['isRead'] ?? false,
       createdAt: json['createdAt'] is Timestamp
           ? (json['createdAt'] as Timestamp).toDate()
@@ -101,4 +107,3 @@ class AppNotification {
     );
   }
 }
-
