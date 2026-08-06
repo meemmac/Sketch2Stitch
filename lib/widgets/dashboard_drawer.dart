@@ -92,7 +92,8 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
 
   // Reads from UserSession first (captured once, right when the session
   // started) — falls back to AuthService directly just in case.
-  String? get _customerId => UserSession.instance.uid ?? AuthService().currentUser?.uid;
+  String? get _customerId =>
+      UserSession.instance.uid ?? AuthService().currentUser?.uid;
 
   void _updateProfile(DrawerProfileData updated) {
     // Persist to Firestore first; only reflect it in the UI once the
@@ -106,7 +107,9 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
     if (uid == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not save — please sign in again.')),
+          const SnackBar(
+            content: Text('Could not save — please sign in again.'),
+          ),
         );
       }
       return;
@@ -120,7 +123,8 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
         'phone': updated.phone,
         'address': updated.address,
         if (_currentRole != UserRole.customer) 'about': updated.about,
-        if (updated.profilePicture != null) 'profilePicture': updated.profilePicture,
+        if (updated.profilePicture != null)
+          'profilePicture': updated.profilePicture,
         if (updated.location != null) 'location': updated.location,
       });
 
@@ -134,9 +138,9 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save profile: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to save profile: $e')));
       }
     }
   }
@@ -148,7 +152,10 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
     return ValueListenableBuilder<DrawerProfileData?>(
       valueListenable: UserSession.instance.currentProfile,
       builder: (context, profile, _) {
-        if (profile == null) return const Drawer(child: Center(child: CircularProgressIndicator()));
+        if (profile == null)
+          return const Drawer(
+            child: Center(child: CircularProgressIndicator()),
+          );
 
         return Drawer(
           shape: const RoundedRectangleBorder(
@@ -169,7 +176,8 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                           role: _currentRole,
                           profile: profile,
                           themeColor: themeColor,
-                          onEditPressed: () => _openEditScreen(context, profile),
+                          onEditPressed: () =>
+                              _openEditScreen(context, profile),
                         ),
                       ),
                       const SliverToBoxAdapter(
@@ -200,7 +208,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                                 debugPrint("Logout pressed");
                                 await AuthService().signOut();
                                 UserSession.instance.logout();
-                                
+
                                 if (!mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
@@ -230,7 +238,10 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
     );
   }
 
-  Future<void> _openEditScreen(BuildContext context, DrawerProfileData currentProfile) async {
+  Future<void> _openEditScreen(
+    BuildContext context,
+    DrawerProfileData currentProfile,
+  ) async {
     // Close the drawer first
     Navigator.pop(context);
 
@@ -752,6 +763,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   void _save() {
+    final isRetailer = widget.role == UserRole.retailer;
+
+    final emptyFieldErrors = <String>[];
+    if (isRetailer && _shopNameController.text.trim().isEmpty) {
+      emptyFieldErrors.add('Shop Name');
+    }
+    if (!isRetailer && _nameController.text.trim().isEmpty) {
+      emptyFieldErrors.add('Name');
+    }
+    if (_emailController.text.trim().isEmpty) emptyFieldErrors.add('Email');
+    if (_phoneController.text.trim().isEmpty) emptyFieldErrors.add('Phone');
+    if (_addressController.text.trim().isEmpty) emptyFieldErrors.add('Address');
+
+    if (emptyFieldErrors.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please fill in: ${emptyFieldErrors.join(', ')}'),
+        ),
+      );
+      return;
+    }
+
     if (_selectedLocation == null) {
       setState(() => _locationError = true);
       ScaffoldMessenger.of(context).showSnackBar(
