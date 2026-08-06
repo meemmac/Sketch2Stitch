@@ -17,10 +17,6 @@ import '../screens/tailor/orders_screen.dart';
 import '../screens/customer/cart_screen.dart';
 import '../screens/customer/orders/order_detail_screen.dart';
 import '../screens/customer/messaging/conversations_screen.dart';
-import 'package:sketch2stitch/services/cloudinary_service.dart';
-import 'package:sketch2stitch/widgets/cloudinary_image.dart';
-
-bool _isUploadingPhoto = false;
 
 /// Model class representing the profile information for the drawer.
 class DrawerProfileData {
@@ -96,8 +92,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
 
   // Reads from UserSession first (captured once, right when the session
   // started) — falls back to AuthService directly just in case.
-  String? get _customerId =>
-      UserSession.instance.uid ?? AuthService().currentUser?.uid;
+  String? get _customerId => UserSession.instance.uid ?? AuthService().currentUser?.uid;
 
   void _updateProfile(DrawerProfileData updated) {
     // Persist to Firestore first; only reflect it in the UI once the
@@ -111,9 +106,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
     if (uid == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not save — please sign in again.'),
-          ),
+          const SnackBar(content: Text('Could not save — please sign in again.')),
         );
       }
       return;
@@ -127,8 +120,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
         'phone': updated.phone,
         'address': updated.address,
         if (_currentRole != UserRole.customer) 'about': updated.about,
-        if (updated.profilePicture != null)
-          'profilePicture': updated.profilePicture,
+        if (updated.profilePicture != null) 'profilePicture': updated.profilePicture,
         if (updated.location != null) 'location': updated.location,
       });
 
@@ -142,9 +134,9 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to save profile: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save profile: $e')),
+        );
       }
     }
   }
@@ -156,10 +148,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
     return ValueListenableBuilder<DrawerProfileData?>(
       valueListenable: UserSession.instance.currentProfile,
       builder: (context, profile, _) {
-        if (profile == null)
-          return const Drawer(
-            child: Center(child: CircularProgressIndicator()),
-          );
+        if (profile == null) return const Drawer(child: Center(child: CircularProgressIndicator()));
 
         return Drawer(
           shape: const RoundedRectangleBorder(
@@ -180,8 +169,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                           role: _currentRole,
                           profile: profile,
                           themeColor: themeColor,
-                          onEditPressed: () =>
-                              _openEditScreen(context, profile),
+                          onEditPressed: () => _openEditScreen(context, profile),
                         ),
                       ),
                       const SliverToBoxAdapter(
@@ -212,7 +200,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                                 debugPrint("Logout pressed");
                                 await AuthService().signOut();
                                 UserSession.instance.logout();
-
+                                
                                 if (!mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
@@ -242,10 +230,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
     );
   }
 
-  Future<void> _openEditScreen(
-    BuildContext context,
-    DrawerProfileData currentProfile,
-  ) async {
+  Future<void> _openEditScreen(BuildContext context, DrawerProfileData currentProfile) async {
     // Close the drawer first
     Navigator.pop(context);
 
@@ -737,29 +722,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _pickImage() async {
-  final cloudinary = CloudinaryService();
-  final file = await cloudinary.pickImageFromGallery();
-  if (file == null) return;
-
-  setState(() {
-    _profilePicturePath = file.path; // local preview while it uploads
-    _isUploadingPhoto = true;
-  });
-
-  final url = await cloudinary.uploadImage(file, folder: 'profiles/${widget.role.name}');
-
-  if (!mounted) return;
-  setState(() {
-    _isUploadingPhoto = false;
-    if (url != null) {
-      _profilePicturePath = url; // now a Cloudinary URL — this is what gets saved
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to upload photo. Please try again.')),
-      );
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: ImageSource.gallery);
+      if (picked != null) {
+        setState(() {
+          _profilePicturePath = picked.path;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error picking profile image: $e");
     }
-  });
-}
+  }
 
   Future<void> _pickLocation() async {
     final result = await Navigator.push<GeoPoint>(
@@ -778,28 +752,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   void _save() {
-    final isRetailer = widget.role == UserRole.retailer;
-
-    final emptyFieldErrors = <String>[];
-    if (isRetailer && _shopNameController.text.trim().isEmpty) {
-      emptyFieldErrors.add('Shop Name');
-    }
-    if (!isRetailer && _nameController.text.trim().isEmpty) {
-      emptyFieldErrors.add('Name');
-    }
-    if (_emailController.text.trim().isEmpty) emptyFieldErrors.add('Email');
-    if (_phoneController.text.trim().isEmpty) emptyFieldErrors.add('Phone');
-    if (_addressController.text.trim().isEmpty) emptyFieldErrors.add('Address');
-
-    if (emptyFieldErrors.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Please fill in: ${emptyFieldErrors.join(', ')}'),
-        ),
-      );
-      return;
-    }
-
     if (_selectedLocation == null) {
       setState(() => _locationError = true);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -836,27 +788,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
-  Widget _buildAvatarPreview() {
-  final pic = _profilePicturePath;
-  if (pic == null || pic.isEmpty) {
-    return Image.asset('assets/images/fab.jpg', fit: BoxFit.cover);
-  }
-  if (pic.startsWith('http')) {
-    return CloudinaryImage(imageUrl: pic, fit: BoxFit.cover, widthParam: 200, heightParam: 200);
-  }
-  return Image.file(File(pic), fit: BoxFit.cover); // not-yet-uploaded local pick
-}
-Widget _buildDrawerAvatar(Color themeColor) {
-  final pic = profile.profilePicture;
-  if (pic == null || pic.isEmpty) {
-    return Icon(Icons.person_rounded, color: themeColor, size: 32);
-  }
-  if (pic.startsWith('http')) {
-    return CloudinaryImage(imageUrl: pic, fit: BoxFit.cover, widthParam: 112, heightParam: 112);
-  }
-  return Image.file(File(pic), fit: BoxFit.cover);
-}
-
   @override
   Widget build(BuildContext context) {
     final bool isRetailer = widget.role == UserRole.retailer;
@@ -888,28 +819,37 @@ Widget _buildDrawerAvatar(Color themeColor) {
             children: [
               if (!isCustomer) ...[
                 Center(
-  child: Stack(
-    children: [
-      ClipOval(
-        child: SizedBox(width: 96, height: 96, child: _buildAvatarPreview()),
-      ),
-      Positioned(
-        bottom: 0,
-        right: 0,
-        child: GestureDetector(
-          onTap: _isUploadingPhoto ? null : _pickImage,
-          child: CircleAvatar(
-  radius: 28,
-  backgroundColor: themeColor.withValues(alpha: 0.15),
-  child: ClipOval(
-    child: SizedBox(width: 56, height: 56, child: _buildDrawerAvatar(themeColor)),
-  ),
-),
-        ),
-      ),
-    ],
-  ),
-),
+                  child: Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 48,
+                        backgroundColor: Colors.grey.shade200,
+                        backgroundImage:
+                            _profilePicturePath != null &&
+                                _profilePicturePath!.isNotEmpty
+                            ? FileImage(File(_profilePicturePath!))
+                                  as ImageProvider
+                            : const AssetImage('assets/images/fab.jpg'),
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: GestureDetector(
+                          onTap: _pickImage,
+                          child: const CircleAvatar(
+                            radius: 16,
+                            backgroundColor: themeColor,
+                            child: Icon(
+                              Icons.camera_alt,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 24),
               ],
               if (isRetailer) ...[
