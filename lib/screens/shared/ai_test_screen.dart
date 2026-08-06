@@ -219,22 +219,11 @@ class _AITestScreenState extends State<AITestScreen> {
         _statusMessage = "Generating try-on trial image using Google Gemini...";
       });
 
-      try {
-        resultBytes = await AIService.generateImageWithGemini(
-          apiKey: geminiKey,
-          prompt: generatedPrompt,
-          inputImages: inputImages,
-        );
-      } catch (geminiImgError) {
-        debugPrint("Gemini image generation failed, falling back to Hugging Face FLUX: $geminiImgError");
-        setState(() {
-          _statusMessage = "Gemini image generation failed. Retrying with Hugging Face FLUX...";
-        });
-        resultBytes = await AIService.testHuggingFace(
-          token: hfToken,
-          prompt: generatedPrompt,
-        );
-      }
+      resultBytes = await AIService.generateImageWithGemini(
+        apiKey: geminiKey,
+        prompt: generatedPrompt,
+        inputImages: inputImages,
+      );
 
       setState(() {
         _generatedImageBytes = resultBytes;

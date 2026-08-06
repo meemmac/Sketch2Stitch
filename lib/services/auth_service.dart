@@ -106,6 +106,28 @@ class AuthService {
   }
 
 
+  /// Merges [data] into the existing profile document for [uid] in the
+  /// collection matching [role]. Only the supplied keys are overwritten —
+  /// everything else in the document is left untouched.
+  ///
+  /// Use this from any profile-edit screen (customer/tailor/retailer) to
+  /// persist changes. Throws [AuthServiceException] on failure.
+  Future<void> updateProfile(
+    String uid,
+    UserRole role,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final collection = _getCollectionForRole(role);
+      await _firestore.collection(collection).doc(uid).update(data);
+    } on FirebaseException catch (e) {
+      throw AuthServiceException(
+        'Failed to update profile: ${e.message ?? e.code}',
+      );
+    } catch (e) {
+      throw AuthServiceException('Failed to update profile: ${e.toString()}');
+    }
+  }
 
 
   /// Handle "Forgot Password" requests.
@@ -313,6 +335,3 @@ class AuthService {
     }
   }
 }
-
-
-
