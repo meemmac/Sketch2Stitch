@@ -6,6 +6,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/services/auth_service.dart';
 import 'package:sketch2stitch/services/user_session.dart';
+import 'package:sketch2stitch/services/cloudinary_service.dart';
+import 'package:sketch2stitch/widgets/cloudinary_image.dart';
 import '../screens/customer/virtual_trial_screen.dart';
 import '../screens/retailer/inventory_screen.dart';
 import '../screens/retailer/orders_screen.dart';
@@ -281,22 +283,13 @@ class DrawerProfileSection extends StatelessWidget {
               CircleAvatar(
                 radius: 28,
                 backgroundColor: themeColor.withValues(alpha: 0.15),
-                backgroundImage: isCustomer
-                    ? (profile.profilePicture != null &&
-                              profile.profilePicture!.isNotEmpty
-                          ? FileImage(File(profile.profilePicture!))
-                          : null)
-                    : (profile.profilePicture != null &&
-                              profile.profilePicture!.isNotEmpty
-                          ? FileImage(File(profile.profilePicture!))
-                                as ImageProvider
-                          : const AssetImage('assets/images/fab.jpg')),
-                child:
-                    isCustomer &&
-                        (profile.profilePicture == null ||
-                            profile.profilePicture!.isEmpty)
-                    ? Icon(Icons.person_rounded, color: themeColor, size: 32)
-                    : null,
+                child: ClipOval(
+                  child: SizedBox(
+                    width: 56,
+                    height: 56,
+                    child: _buildDrawerAvatar(themeColor),
+                  ),
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -419,6 +412,25 @@ class DrawerProfileSection extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Renders the drawer avatar: a Cloudinary-hosted image if `profilePicture`
+  /// is a URL, a local file if it's a not-yet-uploaded path, or a placeholder
+  /// icon if there's no picture at all.
+  Widget _buildDrawerAvatar(Color themeColor) {
+    final pic = profile.profilePicture;
+    if (pic == null || pic.isEmpty) {
+      return Icon(Icons.person_rounded, color: themeColor, size: 32);
+    }
+    if (pic.startsWith('http')) {
+      return CloudinaryImage(
+        imageUrl: pic,
+        fit: BoxFit.cover,
+        widthParam: 112,
+        heightParam: 112,
+      );
+    }
+    return Image.file(File(pic), fit: BoxFit.cover);
   }
 
   Widget _buildInfoRow(IconData icon, String text) {
@@ -699,6 +711,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   GeoPoint? _selectedLocation;
   bool _locationError =
       false; // true once the user has tried to save without pinning
+  bool _isUploadingPhoto = false;
 
   @override
   void initState() {
@@ -722,17 +735,50 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _pickImage() async {
-    try {
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(source: ImageSource.gallery);
-      if (picked != null) {
-        setState(() {
-          _profilePicturePath = picked.path;
-        });
+    final cloudinary = CloudinaryService();
+    final file = await cloudinary.pickImageFromGallery();
+    if (file == null) return;
+
+    setState(() {
+      _profilePicturePath = file.path; // local preview while it uploads
+      _isUploadingPhoto = true;
+    });
+
+    final url = await cloudinary.uploadImage(
+      file,
+      folder: 'profiles/${widget.role.name}',
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _isUploadingPhoto = false;
+      if (url != null) {
+        _profilePicturePath = url; // now a Cloudinary URL — this is what gets saved
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to upload photo. Please try again.')),
+        );
       }
-    } catch (e) {
-      debugPrint("Error picking profile image: $e");
+    });
+  }
+
+  /// Renders the current avatar selection: a Cloudinary-hosted image once
+  /// uploaded, a local file preview while the upload is in flight, or the
+  /// default placeholder if nothing has been picked yet.
+  Widget _buildAvatarPreview() {
+    final pic = _profilePicturePath;
+    if (pic == null || pic.isEmpty) {
+      return Image.asset('assets/images/fab.jpg', fit: BoxFit.cover);
     }
+    if (pic.startsWith('http')) {
+      return CloudinaryImage(
+        imageUrl: pic,
+        fit: BoxFit.cover,
+        widthParam: 200,
+        heightParam: 200,
+      );
+    }
+    return Image.file(File(pic), fit: BoxFit.cover); // not-yet-uploaded local pick
   }
 
   Future<void> _pickLocation() async {
@@ -821,29 +867,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 Center(
                   child: Stack(
                     children: [
-                      CircleAvatar(
-                        radius: 48,
-                        backgroundColor: Colors.grey.shade200,
-                        backgroundImage:
-                            _profilePicturePath != null &&
-                                _profilePicturePath!.isNotEmpty
-                            ? FileImage(File(_profilePicturePath!))
-                                  as ImageProvider
-                            : const AssetImage('assets/images/fab.jpg'),
+                      ClipOval(
+                        child: SizedBox(
+                          width: 96,
+                          height: 96,
+                          child: _buildAvatarPreview(),
+                        ),
                       ),
                       Positioned(
                         bottom: 0,
                         right: 0,
                         child: GestureDetector(
-                          onTap: _pickImage,
-                          child: const CircleAvatar(
+                          onTap: _isUploadingPhoto ? null : _pickImage,
+                          child: CircleAvatar(
                             radius: 16,
                             backgroundColor: themeColor,
-                            child: Icon(
-                              Icons.camera_alt,
-                              size: 16,
-                              color: Colors.white,
-                            ),
+                            child: _isUploadingPhoto
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.camera_alt,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
                           ),
                         ),
                       ),
