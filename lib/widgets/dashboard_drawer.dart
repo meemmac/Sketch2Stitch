@@ -17,6 +17,10 @@ import '../screens/tailor/orders_screen.dart';
 import '../screens/customer/cart_screen.dart';
 import '../screens/customer/orders/order_detail_screen.dart';
 import '../screens/customer/messaging/conversations_screen.dart';
+import 'package:sketch2stitch/services/cloudinary_service.dart';
+import 'package:sketch2stitch/widgets/cloudinary_image.dart';
+
+bool _isUploadingPhoto = false;
 
 /// Model class representing the profile information for the drawer.
 class DrawerProfileData {
@@ -733,18 +737,29 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _pickImage() async {
-    try {
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(source: ImageSource.gallery);
-      if (picked != null) {
-        setState(() {
-          _profilePicturePath = picked.path;
-        });
-      }
-    } catch (e) {
-      debugPrint("Error picking profile image: $e");
+  final cloudinary = CloudinaryService();
+  final file = await cloudinary.pickImageFromGallery();
+  if (file == null) return;
+
+  setState(() {
+    _profilePicturePath = file.path; // local preview while it uploads
+    _isUploadingPhoto = true;
+  });
+
+  final url = await cloudinary.uploadImage(file, folder: 'profiles/${widget.role.name}');
+
+  if (!mounted) return;
+  setState(() {
+    _isUploadingPhoto = false;
+    if (url != null) {
+      _profilePicturePath = url; // now a Cloudinary URL — this is what gets saved
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to upload photo. Please try again.')),
+      );
     }
-  }
+  });
+}
 
   Future<void> _pickLocation() async {
     final result = await Navigator.push<GeoPoint>(
