@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -19,6 +20,7 @@ import '../screens/tailor/orders_screen.dart';
 import '../screens/customer/cart_screen.dart';
 import '../screens/customer/orders/order_detail_screen.dart';
 import '../screens/customer/messaging/conversations_screen.dart';
+import '../utils/validation_utils.dart';
 
 /// Placeholder avatar showing the first letter of [name] on a tinted
 /// background — used wherever no profile picture has been set yet.
@@ -37,6 +39,127 @@ Widget _initialAvatar(String name, Color themeColor, {double fontSize = 22}) {
       ),
     ),
   );
+}
+
+/// Glassmorphic feedback banner shown pinned to the top of the screen —
+/// mirrors the banner used on the registration flow so success/error
+/// messages read consistently across the app instead of a bottom SnackBar.
+class TopFeedbackBanner extends StatelessWidget {
+  final String message;
+  final bool isError;
+  final VoidCallback onClose;
+
+  const TopFeedbackBanner({
+    super.key,
+    required this.message,
+    required this.isError,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: SafeArea(
+          bottom: false,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: isError
+                      ? const Color(0xFFFFEBEE).withValues(alpha: 0.92)
+                      : const Color(0xFFC8E6C9).withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: isError
+                        ? const Color(0xFFFFCDD2)
+                        : const Color(0xFF9CCC9F),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color:
+                          (isError
+                                  ? const Color(0xFFD32F2F)
+                                  : const Color(0xFF2E7D32))
+                              .withValues(alpha: 0.10),
+                      blurRadius: 20,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isError
+                            ? const Color(0xFFE53935)
+                            : const Color(0xFF4CAF50),
+                        border: Border.all(
+                          color: isError
+                              ? const Color(0xFFEF9A9A)
+                              : const Color(0xFFA5D6A7),
+                          width: 1,
+                        ),
+                      ),
+                      child: Icon(
+                        isError ? Icons.close_rounded : Icons.check_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        message,
+                        style: const TextStyle(
+                          color: Color(0xFF222222),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: onClose,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withValues(alpha: 0.35),
+                        ),
+                        child: Icon(
+                          Icons.close_rounded,
+                          color: Colors.black.withValues(alpha: 0.45),
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Model class representing the profile information for the drawer.
@@ -105,10 +228,33 @@ class DashboardDrawer extends StatefulWidget {
 class _DashboardDrawerState extends State<DashboardDrawer> {
   late UserRole _currentRole;
 
+  // Top feedback banner state — replaces bottom SnackBars so messages read
+  // consistently with the registration flow.
+  String? _feedbackMessage;
+  bool _feedbackIsError = false;
+  Timer? _feedbackTimer;
+
   @override
   void initState() {
     super.initState();
     _currentRole = widget.initialRole;
+  }
+
+  @override
+  void dispose() {
+    _feedbackTimer?.cancel();
+    super.dispose();
+  }
+
+  void _showFeedback(String message, {bool isError = false}) {
+    _feedbackTimer?.cancel();
+    setState(() {
+      _feedbackMessage = message;
+      _feedbackIsError = isError;
+    });
+    _feedbackTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _feedbackMessage = null);
+    });
   }
 
   // Reads from UserSession first (captured once, right when the session
@@ -126,9 +272,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
     final uid = UserSession.instance.uid ?? AuthService().currentUser?.uid;
     if (uid == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not save — please sign in again.')),
-        );
+        _showFeedback('Could not save — please sign in again.', isError: true);
       }
       return;
     }
@@ -149,15 +293,11 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       debugPrint("Profile updated: ${updated.name} (${_currentRole.name})");
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated successfully.')),
-        );
+        _showFeedback('Profile updated successfully.');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save profile: $e')),
-        );
+        _showFeedback('Failed to save profile: $e', isError: true);
       }
     }
   }
@@ -171,16 +311,18 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       builder: (context, profile, _) {
         if (profile == null) return const Drawer(child: Center(child: CircularProgressIndicator()));
 
-        return Drawer(
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.only(
-              topRight: Radius.circular(24),
-              bottomRight: Radius.circular(24),
-            ),
-          ),
-          child: SafeArea(
-            child: Column(
-              children: [
+        return Stack(
+          children: [
+            Drawer(
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.only(
+                  topRight: Radius.circular(24),
+                  bottomRight: Radius.circular(24),
+                ),
+              ),
+              child: SafeArea(
+                child: Column(
+                  children: [
                 // Profile Section
                 Expanded(
                   child: CustomScrollView(
@@ -211,6 +353,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                                 role: _currentRole,
                                 themeColor: themeColor,
                                 customerId: _customerId,
+                                onFeedback: _showFeedback,
                               ),
                             ),
                             const Divider(height: 1),
@@ -223,11 +366,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                                 UserSession.instance.logout();
                                 
                                 if (!mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text("Logged out successfully!"),
-                                  ),
-                                );
+                                _showFeedback("Logged out successfully!");
                                 Navigator.pushAndRemoveUntil(
                                   context,
                                   MaterialPageRoute(
@@ -244,8 +383,16 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                   ),
                 ),
               ],
+                ),
+              ),
             ),
-          ),
+            if (_feedbackMessage != null)
+              TopFeedbackBanner(
+                message: _feedbackMessage!,
+                isError: _feedbackIsError,
+                onClose: () => setState(() => _feedbackMessage = null),
+              ),
+          ],
         );
       },
     );
@@ -481,11 +628,13 @@ class DrawerNavigationSection extends StatelessWidget {
   final UserRole role;
   final Color themeColor;
   final String? customerId;
+  final void Function(String message, {bool isError}) onFeedback;
 
   const DrawerNavigationSection({
     super.key,
     required this.role,
     required this.themeColor,
+    required this.onFeedback,
     this.customerId,
   });
 
@@ -540,10 +689,9 @@ class DrawerNavigationSection extends StatelessWidget {
                     ),
                   );
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please sign in to view measurements.'),
-                    ),
+                  onFeedback(
+                    'Please sign in to view measurements.',
+                    isError: true,
                   );
                 }
               } else if (item['title'] == 'Cart') {
@@ -575,12 +723,7 @@ class DrawerNavigationSection extends StatelessWidget {
                 );
               } else {
                 debugPrint("Navigation clicked: ${item['title']}");
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text("Navigation trigger: ${item['title']}"),
-                    duration: const Duration(seconds: 1),
-                  ),
-                );
+                onFeedback("Navigation trigger: ${item['title']}");
               }
             },
           );
@@ -735,6 +878,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       false; // true once the user has tried to save without pinning
   bool _isUploadingPhoto = false;
 
+  // Top feedback banner state — replaces bottom SnackBars so messages read
+  // consistently with the registration flow.
+  String? _feedbackMessage;
+  bool _feedbackIsError = false;
+  Timer? _feedbackTimer;
+
+  void _showFeedback(String message, {bool isError = false}) {
+    _feedbackTimer?.cancel();
+    setState(() {
+      _feedbackMessage = message;
+      _feedbackIsError = isError;
+    });
+    _feedbackTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _feedbackMessage = null);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -777,9 +937,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (url != null) {
         _profilePicturePath = url; // now a Cloudinary URL — this is what gets saved
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to upload photo. Please try again.')),
-        );
+        _showFeedback('Failed to upload photo. Please try again.', isError: true);
       }
     });
   }
@@ -824,25 +982,53 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   void _save() {
-    if (_selectedLocation == null) {
-      setState(() => _locationError = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please pin your location before saving.'),
-        ),
+    final isRetailer = widget.role == UserRole.retailer;
+    final displayName = isRetailer
+        ? _shopNameController.text.trim()
+        : _nameController.text.trim();
+
+    if (displayName.isEmpty) {
+      _showFeedback(
+        isRetailer ? 'Please enter your shop name.' : 'Please enter your name.',
+        isError: true,
       );
       return;
     }
 
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !ValidationUtils.isValidEmail(email)) {
+      _showFeedback('Please enter a valid email address.', isError: true);
+      return;
+    }
+
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty || !ValidationUtils.isValidPhone(phone)) {
+      _showFeedback('Please enter a valid phone number.', isError: true);
+      return;
+    }
+
+    final address = _addressController.text.trim();
+    if (address.isEmpty) {
+      _showFeedback(
+        isRetailer ? 'Please enter your shop address.' : 'Please enter your address.',
+        isError: true,
+      );
+      return;
+    }
+
+    if (_selectedLocation == null) {
+      setState(() => _locationError = true);
+      _showFeedback('Please pin your location before saving.', isError: true);
+      return;
+    }
+
     final updated = widget.initialProfile.copyWith(
-      name: _nameController.text,
-      shopName: widget.role == UserRole.retailer
-          ? _shopNameController.text
-          : null,
-      email: _emailController.text,
-      phone: _phoneController.text,
-      address: _addressController.text,
-      about: _aboutController.text,
+      name: _nameController.text.trim(),
+      shopName: isRetailer ? _shopNameController.text.trim() : null,
+      email: email,
+      phone: phone,
+      address: address,
+      about: _aboutController.text.trim(),
       profilePicture: _profilePicturePath,
       location: _selectedLocation,
     );
@@ -851,6 +1037,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   void dispose() {
+    _feedbackTimer?.cancel();
     _nameController.dispose();
     _shopNameController.dispose();
     _emailController.dispose();
@@ -866,6 +1053,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final bool isCustomer = widget.role == UserRole.customer;
     const themeColor = Color(0xFF6C9985);
 
+    return Stack(
+      children: [
+        _buildScaffold(isRetailer, isCustomer, themeColor),
+        if (_feedbackMessage != null)
+          TopFeedbackBanner(
+            message: _feedbackMessage!,
+            isError: _feedbackIsError,
+            onClose: () => setState(() => _feedbackMessage = null),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildScaffold(bool isRetailer, bool isCustomer, Color themeColor) {
     const fieldTextStyle = TextStyle(fontSize: 14);
     const fieldLabelStyle = TextStyle(fontSize: 14);
 
@@ -934,7 +1135,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 TextField(
                   controller: _shopNameController,
                   style: fieldTextStyle,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: "Shop Name",
                     labelStyle: fieldLabelStyle,
                     border: OutlineInputBorder(),
@@ -946,7 +1147,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 TextField(
                   controller: _nameController,
                   style: fieldTextStyle,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: "Name",
                     labelStyle: fieldLabelStyle,
                     border: OutlineInputBorder(),
@@ -958,7 +1159,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               TextField(
                 controller: _emailController,
                 style: fieldTextStyle,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: "Email",
                   labelStyle: fieldLabelStyle,
                   border: OutlineInputBorder(),
@@ -970,7 +1171,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               TextField(
                 controller: _phoneController,
                 style: fieldTextStyle,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: "Phone",
                   labelStyle: fieldLabelStyle,
                   border: OutlineInputBorder(),
@@ -982,7 +1183,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               TextField(
                 controller: _addressController,
                 style: fieldTextStyle,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: "Address",
                   labelStyle: fieldLabelStyle,
                   border: OutlineInputBorder(),
@@ -1083,7 +1284,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 TextField(
                   controller: _aboutController,
                   style: fieldTextStyle,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: "About / Biography",
                     labelStyle: fieldLabelStyle,
                     border: OutlineInputBorder(),
