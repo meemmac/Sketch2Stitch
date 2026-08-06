@@ -8,8 +8,7 @@ import 'package:sketch2stitch/services/user_session.dart';
 import '../screens/customer/virtual_trial_screen.dart';
 import '../screens/retailer/inventory_screen.dart';
 import '../screens/retailer/orders_screen.dart';
-import '../screens/customer/measurement_screen.dart';
-import '../models/measurement.dart';
+import '../screens/customer/measurement_page.dart';
 import '../screens/shared/welcome_screen.dart';
 import '../screens/shared/location_picker_screen.dart';
 import '../screens/tailor/portfolio_screen.dart';
@@ -83,32 +82,16 @@ class DashboardDrawer extends StatefulWidget {
 
 class _DashboardDrawerState extends State<DashboardDrawer> {
   late UserRole _currentRole;
-  late Measurement _customerMeasurement;
 
   @override
   void initState() {
     super.initState();
     _currentRole = widget.initialRole;
-
-    _customerMeasurement = Measurement(
-      id: "meas_1",
-      customerId: "maria_doe",
-      upperBustCircumference: 34.0,
-      roundShoulderCircumference: 38.0,
-      hipsCircumference: 36.0,
-      underBustCircumference: 32.0,
-      bustCircumference: 35.0,
-      waist: 28.0,
-      shoulderToKnee: 38.0,
-      shoulderToUnderBust: 12.5,
-      shoulderToBust: 10.0,
-      thigh: 21.0,
-      knee: 14.0,
-      ankle: 9.0,
-      waistToAnkle: 40.0,
-      shoulderToAnkle: 57.0,
-    );
   }
+
+  // Reads from UserSession first (captured once, right when the session
+  // started) — falls back to AuthService directly just in case.
+  String? get _customerId => UserSession.instance.uid ?? AuthService().currentUser?.uid;
 
   void _updateProfile(DrawerProfileData updated) {
     UserSession.instance.currentProfile.value = updated;
@@ -163,16 +146,7 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                               child: DrawerNavigationSection(
                                 role: _currentRole,
                                 themeColor: themeColor,
-                                measurement: _customerMeasurement,
-                                onSave: (updated) async {
-                                  await Future.delayed(
-                                    const Duration(milliseconds: 500),
-                                  );
-                                  if (!mounted) return;
-                                  setState(() {
-                                    _customerMeasurement = updated;
-                                  });
-                                },
+                                customerId: _customerId,
                               ),
                             ),
                             const Divider(height: 1),
@@ -429,15 +403,13 @@ class DrawerProfileSection extends StatelessWidget {
 class DrawerNavigationSection extends StatelessWidget {
   final UserRole role;
   final Color themeColor;
-  final Measurement? measurement;
-  final Future<void> Function(Measurement)? onSave;
+  final String? customerId;
 
   const DrawerNavigationSection({
     super.key,
     required this.role,
     required this.themeColor,
-    this.measurement,
-    this.onSave,
+    this.customerId,
   });
 
   @override
@@ -483,14 +455,17 @@ class DrawerNavigationSection extends StatelessWidget {
                   );
                 }
               } else if (item['title'] == 'Measurements') {
-                if (measurement != null && onSave != null) {
+                if (customerId != null) {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => MeasurementScreen(
-                        measurement: measurement!,
-                        onSave: onSave!,
-                      ),
+                      builder: (_) => MeasurementPage(customerId: customerId!),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please sign in to view measurements.'),
                     ),
                   );
                 }
