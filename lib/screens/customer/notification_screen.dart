@@ -189,19 +189,24 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   }
 
   Widget _buildAvatar(AppNotification n, _NotificationStyle style) {
+    // 1. Check for Real Profile Picture first (Tailor/Retailer)
+    if (n.senderProfilePicture != null && n.senderProfilePicture!.isNotEmpty) {
+      return CircleAvatar(
+        radius: 22,
+        backgroundColor: Colors.white,
+        backgroundImage: NetworkImage(n.senderProfilePicture!),
+      );
+    }
+
+
+    // 2. If no picture, use Smart Name Parser for Initials (Customer)
     String? name = n.senderName;
-
-
-    // 🧠 Smart Name Parser
-    // If no senderName field exists, we try to "guess" the name from the message text
     if (name == null || name.trim().isEmpty) {
       final msg = n.message.toLowerCase();
       if (msg.contains('from ')) {
-        // Extracts the word after "from" (e.g. "from Sarah" -> "Sarah")
         final parts = n.message.split(RegExp(r'from ', caseSensitive: false));
         if (parts.length > 1) name = parts[1].trim().split(' ')[0];
       } else if (msg.contains('by ')) {
-        // Extracts the word after "by" (e.g. "by Karim" -> "Karim")
         final parts = n.message.split(RegExp(r'by ', caseSensitive: false));
         if (parts.length > 1) name = parts[1].trim().split(' ')[0];
       }

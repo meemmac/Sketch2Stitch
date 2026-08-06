@@ -24,6 +24,7 @@ class AppNotification {
   final NotificationDbType type;
   final String message;
   final String? senderName;
+  final String? senderProfilePicture;
   final bool isRead;
   final DateTime createdAt;
   final String orderId;
@@ -37,6 +38,7 @@ class AppNotification {
     required this.type,
     required this.message,
     this.senderName,
+    this.senderProfilePicture,
     this.isRead = false,
     required this.createdAt,
     required this.orderId,
@@ -51,6 +53,7 @@ class AppNotification {
     NotificationDbType? type,
     String? message,
     String? senderName,
+    String? senderProfilePicture,
     bool? isRead,
     DateTime? createdAt,
     String? orderId,
@@ -63,6 +66,7 @@ class AppNotification {
       type: type ?? this.type,
       message: message ?? this.message,
       senderName: senderName ?? this.senderName,
+      senderProfilePicture: senderProfilePicture ?? this.senderProfilePicture,
       isRead: isRead ?? this.isRead,
       createdAt: createdAt ?? this.createdAt,
       orderId: orderId ?? this.orderId,
@@ -77,6 +81,7 @@ class AppNotification {
     'type': type.name,
     'message': message,
     'senderName': senderName,
+    'senderProfilePicture': senderProfilePicture,
     'isRead': isRead,
     'createdAt': Timestamp.fromDate(createdAt),
     'orderId': orderId,
@@ -98,6 +103,7 @@ class AppNotification {
       ),
       message: json['message'] ?? '',
       senderName: json['senderName'],
+      senderProfilePicture: json['senderProfilePicture'],
       isRead: json['isRead'] ?? false,
       createdAt: json['createdAt'] is Timestamp
           ? (json['createdAt'] as Timestamp).toDate()

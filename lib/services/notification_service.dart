@@ -148,6 +148,7 @@ class NotificationService {
     required String message,
     required String orderId,
     String? senderName,
+    String? senderProfilePicture,
     String? subOrderId,
   }) async {
     final docRef = _db.collection(_collection).doc();
@@ -158,6 +159,7 @@ class NotificationService {
       type: type,
       message: message,
       senderName: senderName,
+      senderProfilePicture: senderProfilePicture,
       createdAt: DateTime.now(),
       orderId: orderId,
       subOrderId: subOrderId,
@@ -174,6 +176,7 @@ class NotificationService {
       String orderId,
       String partyName,
       String partyRole,
+      String? profilePicture,
       ) async {
     await _sendNotification(
       userId: customerId,
@@ -181,6 +184,7 @@ class NotificationService {
       type: NotificationDbType.orderCompleted,
       message: 'Your order #$orderId has been delivered by $partyName.',
       senderName: partyName,
+      senderProfilePicture: profilePicture,
       orderId: orderId,
     );
   }
@@ -193,6 +197,7 @@ class NotificationService {
       String orderId,
       String partyName,
       String partyRole,
+      String? profilePicture,
       ) async {
     await _sendNotification(
       userId: customerId,
@@ -200,6 +205,7 @@ class NotificationService {
       type: NotificationDbType.orderConfirmed,
       message: 'Your order #$orderId has been confirmed by $partyName.',
       senderName: partyName,
+      senderProfilePicture: profilePicture,
       orderId: orderId,
     );
   }
