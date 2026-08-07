@@ -563,7 +563,8 @@ class _InventoryScreenState extends State<InventoryScreen>
         final images = v.image.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
         final videos = v.video.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
         
-        // isAsset should be true if ANY path is a project asset
+        // We don't really need a global isAsset flag if we check per-path.
+        // But to keep your model same, we set it if ANY path is a local asset.
         final isAsset = [...images, ...videos].any((path) => path.startsWith('assets/'));
         
         return ProductColorVariant(
@@ -721,7 +722,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                               borderRadius: BorderRadius.circular(20),
                               child: VideoPreviewPlayer(
                                 videoPath: path,
-                                isAsset: selectedVariant.isAsset,
+                                isAsset: path.startsWith('assets/'), // Pass per-path asset status
                                 height: 250,
                                 width: MediaQuery.of(context).size.width * 0.7,
                               ),
@@ -1255,6 +1256,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     String ironLevel = item?.ironLevel ?? "Medium";
     // Feedback state for form
     String? formError;
+    bool isSaving = false;
 
     await showModalBottomSheet(
       context: context,
@@ -1263,6 +1265,31 @@ class _InventoryScreenState extends State<InventoryScreen>
       backgroundColor: Colors.transparent,
       builder: (_) => StatefulBuilder(
         builder: (c, setM) {
+          if (isSaving) {
+            return Container(
+              height: 300,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+              ),
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: Colors.green),
+                    SizedBox(height: 16),
+                    Text(
+                      "Saving Product...",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
           return DraggableScrollableSheet(
             expand: false,
             initialChildSize: 0.92,
@@ -1774,8 +1801,9 @@ class _InventoryScreenState extends State<InventoryScreen>
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(15),
                           ),
+                          disabledBackgroundColor: Colors.grey,
                         ),
-                        onPressed: () async {
+                        onPressed: isSaving ? null : () async {
                           if (_retailerId == null) return;
                           
                           // Form Validation
@@ -1827,7 +1855,10 @@ class _InventoryScreenState extends State<InventoryScreen>
                           }
 
                           // Clear previous error if any
-                          setM(() => formError = null);
+                          setM(() {
+                            formError = null;
+                            isSaving = true;
+                          });
 
                           // 🔄 Show a loading overlay or state if needed
                           // For simplicity, we'll just disable the button or use a local isSaving if we had one.
@@ -1883,8 +1914,10 @@ class _InventoryScreenState extends State<InventoryScreen>
                             if (context.mounted) Navigator.of(context).pop();
                           } catch (e) {
                             debugPrint("Error saving product: $e");
-                            _showFeedback("Error saving product: $e", isError: true);
-                            if (context.mounted) Navigator.of(context).pop();
+                            setM(() {
+                              isSaving = false;
+                              formError = "Error saving product: $e";
+                            });
                           }
                         },
                         child: Text(
