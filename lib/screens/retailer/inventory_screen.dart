@@ -716,18 +716,23 @@ class _InventoryScreenState extends State<InventoryScreen>
                               ),
                             );
                           }),
-                          ...selectedVariant.videoPaths.map((path) => Padding(
-                            padding: const EdgeInsets.only(right: 12),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(20),
-                              child: VideoPreviewPlayer(
-                                videoPath: path,
-                                isAsset: path.startsWith('assets/'), // Pass per-path asset status
-                                height: 250,
-                                width: MediaQuery.of(context).size.width * 0.7,
+                          ...selectedVariant.videoPaths.map((path) {
+                            final cleanPath = path.trim().replaceAll("'", "").replaceAll('"', "");
+                            if (cleanPath.isEmpty) return const SizedBox.shrink();
+                            
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 12),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: VideoPreviewPlayer(
+                                  videoPath: cleanPath,
+                                  isAsset: cleanPath.toLowerCase().startsWith('assets/'),
+                                  height: 250,
+                                  width: MediaQuery.of(context).size.width * 0.7,
+                                ),
                               ),
-                            ),
-                          )),
+                            );
+                          }),
                         ],
                       ),
                     ),
@@ -1265,61 +1270,38 @@ class _InventoryScreenState extends State<InventoryScreen>
       backgroundColor: Colors.transparent,
       builder: (_) => StatefulBuilder(
         builder: (c, setM) {
-          if (isSaving) {
-            return Container(
-              height: 300,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-              ),
-              child: const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(color: Colors.green),
-                    SizedBox(height: 16),
-                    Text(
-                      "Saving Product...",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
           return DraggableScrollableSheet(
             expand: false,
             initialChildSize: 0.92,
             minChildSize: 0.25,
             maxChildSize: 0.95,
-            builder: (context, scrollController) => Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-              ),
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              ),
-              child: SingleChildScrollView(
-                controller: scrollController,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
+            builder: (context, scrollController) => Stack(
+              children: [
+                Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                  ),
+                  padding: EdgeInsets.only(
+                    left: 20,
+                    right: 20,
+                    top: 20,
+                    bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                  ),
+                  child: SingleChildScrollView(
+                    controller: scrollController,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 20),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
                     Text(
                       item == null ? "Add New Item" : "Edit Item",
                       style: const TextStyle(
@@ -1905,13 +1887,17 @@ class _InventoryScreenState extends State<InventoryScreen>
 
                             if (item == null) {
                               await _inventoryService.createProduct(product.toJson());
-                              _showFeedback("Product added successfully!");
                             } else {
                               await _inventoryService.updateProduct(item.id, product.toJson());
-                              _showFeedback("Product updated successfully!");
                             }
 
                             if (context.mounted) Navigator.of(context).pop();
+
+                            if (item == null) {
+                              _showFeedback("Product added successfully!");
+                            } else {
+                              _showFeedback("Product updated successfully!");
+                            }
                           } catch (e) {
                             debugPrint("Error saving product: $e");
                             setM(() {
@@ -1933,11 +1919,42 @@ class _InventoryScreenState extends State<InventoryScreen>
                 ),
               ),
             ),
-          );
-        },
+          if (isSaving)
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.8),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+              ),
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: Colors.green),
+                    SizedBox(height: 20),
+                    Text(
+                      "Saving Product...",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      "Please wait, uploading media",
+                      style: TextStyle(color: Colors.black54),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
-  }
+  },
+),
+);
+}
 
 
   Widget _buildCareSwitch(String label, bool value, Function(bool) onChanged, {String? info}) {
