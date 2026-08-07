@@ -2,761 +2,142 @@ import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/user_role.dart';
+import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
+import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
-import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
 
-ColorOption _createColorOption(
-  int id,
-  String color,
-  String? image,
-  double price,
-  int stock, {
-  String? video,
-}) {
+// Helper to create ColorOption more concisely in hardcoded data
+ColorOption _co(int id, String color, String image, {double price = 0, int stock = 100}) {
   return ColorOption(
     optionId: id,
     color: color,
-    image: image,
-    video: video,
+    images: [image],
+    videos: [],
     price: price,
     stock: stock,
   );
 }
 
-final List<Product> _sampleElementProducts = [
-  Product(
-    id: 'e1',
-    retailerId: 'r1',
-    productName: 'Premium Metal Zipper',
-    category: 'Fasteners',
-    materialType: 'Metal',
-    colorOptions: [
-      ColorOption(
-        optionId: 1,
-        color: 'Silver',
-        image: 'assets/images/zipper.jpg',
-        price: 120,
-        stock: 100,
-      ),
-      ColorOption(
-        optionId: 2,
-        color: 'Gold',
-        image: 'assets/images/zipper_gold.jpg',
-        price: 150,
-        stock: 50,
-      ),
-      ColorOption(
-        optionId: 3,
-        color: 'Black',
-        image: 'assets/images/zipper.jpg',
-        price: 130,
-        stock: 75,
-      ),
-    ],
-    description: 'High-quality metal zippers with smooth operation.',
-    careSymbol: ['Do not iron directly', 'Clean with damp cloth'],
-  ),
-  Product(
-    id: 'e2',
-    retailerId: 'r1',
-    productName: 'Decorative Buttons Set',
-    category: 'Buttons',
-    materialType: 'Plastic',
-    colorOptions: [
-      ColorOption(
-        optionId: 1,
-        color: 'White',
-        image: 'assets/images/buttons.jpg',
-        price: 80,
-        stock: 200,
-      ),
-      ColorOption(
-        optionId: 2,
-        color: 'Black',
-        image: 'assets/images/buttons.jpg',
-        price: 80,
-        stock: 150,
-      ),
-      ColorOption(
-        optionId: 3,
-        color: 'Gold',
-        image: 'assets/images/buttons.jpg',
-        price: 100,
-        stock: 100,
-      ),
-    ],
-    description: 'Elegant button sets in various sizes and finishes.',
-    careSymbol: ['Hand wash', 'Do not bleach'],
-  ),
-  Product(
-    id: 'e3',
-    retailerId: 'r2',
-    productName: 'Sewing Thread Collection',
-    category: 'Threads',
-    materialType: 'Cotton',
-    colorOptions: [
-      ColorOption(
-        optionId: 1,
-        color: 'White',
-        image: 'assets/images/thread.jpg',
-        price: 45,
-        stock: 300,
-      ),
-      ColorOption(
-        optionId: 2,
-        color: 'Black',
-        image: 'assets/images/thread.jpg',
-        price: 45,
-        stock: 250,
-      ),
-      ColorOption(
-        optionId: 3,
-        color: 'Beige',
-        image: 'assets/images/thread.jpg',
-        price: 45,
-        stock: 200,
-      ),
-    ],
-    description: 'Premium quality sewing thread in essential colors.',
-    careSymbol: ['Store in cool dry place'],
-  ),
-  Product(
-    id: 'e4',
-    retailerId: 'r2',
-    productName: 'Pearl Embellishments',
-    category: 'Embellishments',
-    materialType: 'Glass',
-    colorOptions: [
-      ColorOption(
-        optionId: 1,
-        color: 'White',
-        image: 'assets/images/pearls.jpg',
-        price: 200,
-        stock: 80,
-      ),
-      ColorOption(
-        optionId: 2,
-        color: 'Pink',
-        image: 'assets/images/pearls.jpg',
-        price: 220,
-        stock: 60,
-      ),
-    ],
-    description: 'Beautiful pearl embellishments for bridal and formal wear.',
-    careSymbol: ['Dry clean only', 'Handle with care'],
-  ),
-  Product(
-    id: 'e5',
-    retailerId: 'r3',
-    productName: 'Lace Trim',
-    category: 'Trims',
-    materialType: 'Lace',
-    colorOptions: [
-      ColorOption(
-        optionId: 1,
-        color: 'White',
-        image: 'assets/images/lace_trim.jpg',
-        price: 180,
-        stock: 40,
-      ),
-      ColorOption(
-        optionId: 2,
-        color: 'Black',
-        image: 'assets/images/lace_trim.jpg',
-        price: 180,
-        stock: 35,
-      ),
-    ],
-    description: 'Fine lace trim with delicate patterns.',
-    careSymbol: ['Hand wash', 'Do not bleach'],
-  ),
-  Product(
-    id: 'e6',
-    retailerId: 'r3',
-    productName: 'Ribbon Collection',
-    category: 'Ribbons',
-    materialType: 'Satin',
-    colorOptions: [
-      ColorOption(
-        optionId: 1,
-        color: 'White',
-        image: 'assets/images/ribbon.jpg',
-        price: 60,
-        stock: 150,
-      ),
-      ColorOption(
-        optionId: 2,
-        color: 'Gold',
-        image: 'assets/images/ribbon.jpg',
-        price: 70,
-        stock: 120,
-      ),
-      ColorOption(
-        optionId: 3,
-        color: 'Blue',
-        image: 'assets/images/ribbon.jpg',
-        price: 65,
-        stock: 100,
-      ),
-    ],
-    description: 'Versatile satin ribbons in various colors and widths.',
-    careSymbol: ['Iron on low heat', 'Do not bleach'],
-  ),
-  Product(
-    id: 'e7',
-    retailerId: 'r4',
-    productName: 'Cotton Thread Set',
-    category: 'Threads',
-    materialType: 'Cotton',
-    colorOptions: [
-      ColorOption(
-        optionId: 1,
-        color: 'White',
-        image: 'assets/images/thread.jpg',
-        price: 35,
-        stock: 200,
-      ),
-      ColorOption(
-        optionId: 2,
-        color: 'Black',
-        image: 'assets/images/thread.jpg',
-        price: 35,
-        stock: 180,
-      ),
-      ColorOption(
-        optionId: 3,
-        color: 'Blue',
-        image: 'assets/images/thread.jpg',
-        price: 40,
-        stock: 150,
-      ),
-    ],
-    description: 'Premium cotton thread for all your stitching needs.',
-    careSymbol: ['Store in cool dry place'],
-  ),
-  Product(
-    id: 'e8',
-    retailerId: 'r5',
-    productName: 'Embellishment Set',
-    category: 'Embellishments',
-    materialType: 'Glass',
-    colorOptions: [
-      ColorOption(
-        optionId: 1,
-        color: 'Gold',
-        image: 'assets/images/embroidery.jpg',
-        price: 250,
-        stock: 50,
-      ),
-      ColorOption(
-        optionId: 2,
-        color: 'Silver',
-        image: 'assets/images/embroidery.jpg',
-        price: 250,
-        stock: 45,
-      ),
-    ],
-    description: 'Beautiful embellishments for traditional and formal wear.',
-    careSymbol: ['Dry clean only'],
-  ),
-  Product(
-    id: 'e9',
-    retailerId: 'r5',
-    productName: 'Satin Ribbon Set',
-    category: 'Ribbons',
-    materialType: 'Satin',
-    colorOptions: [
-      ColorOption(
-        optionId: 1,
-        color: 'Red',
-        image: 'assets/images/ribbon.jpg',
-        price: 55,
-        stock: 120,
-      ),
-      ColorOption(
-        optionId: 2,
-        color: 'Gold',
-        image: 'assets/images/ribbon.jpg',
-        price: 60,
-        stock: 100,
-      ),
-      ColorOption(
-        optionId: 3,
-        color: 'Green',
-        image: 'assets/images/ribbon.jpg',
-        price: 55,
-        stock: 90,
-      ),
-    ],
-    description: 'Luxurious satin ribbons for all your decoration needs.',
-    careSymbol: ['Iron on low heat'],
-  ),
-];
-
-final List<Product> _sampleFabricProducts = [
-  Product(
-    id: 'p1',
-    retailerId: 'r1',
-    productName: 'Premium Cotton Fabric',
-    category: 'Cotton',
-    materialType: 'Cotton',
-    colorOptions: [
-      _createColorOption(
-        1,
-        'Red',
-        'assets/images/fab.jpg',
-        1200,
-        10,
-        video: 'assets/images/Videos/vid1.mp4',
-      ),
-      _createColorOption(
-        2,
-        'Blue',
-        'assets/images/textile.jpg',
-        1300,
-        8,
-        video: 'assets/images/Videos/vid2.mp4',
-      ),
-      _createColorOption(
-        3,
-        'Green',
-        'assets/images/silk.jpg',
-        1100,
-        15,
-        video: 'assets/images/Videos/vid3.mp4',
-      ),
-    ],
-    description: 'High quality premium cotton fabric perfect for summer wear.',
-    careSymbol: ['Machine Wash', 'Do Not Bleach'],
-  ),
-  Product(
-    id: 'p2',
-    retailerId: 'r1',
-    productName: 'Silk Blend Saree',
-    category: 'Silk',
-    materialType: 'Silk',
-    colorOptions: [
-      _createColorOption(
-        1,
-        'Gold',
-        'assets/images/silk.jpg',
-        2500,
-        5,
-        video: 'assets/images/Videos/vid2.mp4',
-      ),
-      _createColorOption(
-        2,
-        'Red',
-        'assets/images/fab2.jpg',
-        2800,
-        3,
-        video: 'assets/images/Videos/vid1.mp4',
-      ),
-    ],
-    description: 'Beautiful silk blend saree with intricate embroidery.',
-    careSymbol: ['Dry Clean Only'],
-  ),
-  Product(
-    id: 'p3',
-    retailerId: 'r1',
-    productName: 'Linen Shirt Fabric',
-    category: 'Linen',
-    materialType: 'Linen',
-    colorOptions: [
-      _createColorOption(
-        1,
-        'White',
-        'assets/images/fab.jpg',
-        800,
-        20,
-        video: 'assets/images/Videos/vid3.mp4',
-      ),
-      _createColorOption(
-        2,
-        'Beige',
-        'assets/images/textile.jpg',
-        850,
-        18,
-        video: 'assets/images/Videos/vid2.mp4',
-      ),
-    ],
-    description: 'Premium linen fabric perfect for formal shirts.',
-    careSymbol: ['Machine Wash', 'Iron Medium'],
-  ),
-  Product(
-    id: 'p4',
-    retailerId: 'r1',
-    productName: 'Printed Cotton Dress',
-    category: 'Cotton',
-    materialType: 'Cotton',
-    colorOptions: [
-      _createColorOption(
-        1,
-        'Pink',
-        'assets/images/fab2.jpg',
-        950,
-        12,
-        video: 'assets/images/Videos/vid1.mp4',
-      ),
-      _createColorOption(
-        2,
-        'Purple',
-        'assets/images/fab.jpg',
-        1000,
-        10,
-        video: 'assets/images/Videos/vid3.mp4',
-      ),
-    ],
-    description: 'Beautiful printed cotton fabric for dresses and tops.',
-    careSymbol: ['Machine Wash', 'Do Not Bleach'],
-  ),
-  Product(
-    id: 'p5',
-    retailerId: 'r2',
-    productName: 'Traditional Jamdani',
-    category: 'Cotton',
-    materialType: 'Cotton',
-    colorOptions: [
-      _createColorOption(
-        1,
-        'White',
-        'assets/images/textile.jpg',
-        1500,
-        7,
-        video: 'assets/images/Videos/vid1.mp4',
-      ),
-      _createColorOption(
-        2,
-        'Cream',
-        'assets/images/fab2.jpg',
-        1600,
-        5,
-        video: 'assets/images/Videos/vid2.mp4',
-      ),
-    ],
-    description: 'Authentic Jamdani fabric with traditional patterns.',
-    careSymbol: ['Hand Wash', 'Do Not Bleach'],
-  ),
-  Product(
-    id: 'p6',
-    retailerId: 'r2',
-    productName: 'Georgette Chiffon',
-    category: 'Polyester',
-    materialType: 'Polyester',
-    colorOptions: [
-      _createColorOption(
-        1,
-        'Pink',
-        'assets/images/fab2.jpg',
-        950,
-        12,
-        video: 'assets/images/Videos/vid3.mp4',
-      ),
-      _createColorOption(
-        2,
-        'Purple',
-        'assets/images/silk.jpg',
-        1000,
-        8,
-        video: 'assets/images/Videos/vid1.mp4',
-      ),
-    ],
-    description: 'Light weight georgette chiffon for elegant drapes.',
-    careSymbol: ['Dry Clean Only'],
-  ),
-  Product(
-    id: 'p7',
-    retailerId: 'r3',
-    productName: 'Raw Silk',
-    category: 'Silk',
-    materialType: 'Silk',
-    colorOptions: [
-      _createColorOption(
-        1,
-        'Gold',
-        'assets/images/silk.jpg',
-        3200,
-        4,
-        video: 'assets/images/Videos/vid2.mp4',
-      ),
-      _createColorOption(
-        2,
-        'Silver',
-        'assets/images/lace.jpg',
-        3500,
-        3,
-        video: 'assets/images/Videos/vid1.mp4',
-      ),
-    ],
-    description: 'Luxurious raw silk with a natural sheen.',
-    careSymbol: ['Dry Clean Only'],
-  ),
-  Product(
-    id: 'p8',
-    retailerId: 'r3',
-    productName: 'Lace Trim Fabric',
-    category: 'Lace',
-    materialType: 'Lace',
-    colorOptions: [
-      _createColorOption(
-        1,
-        'White',
-        'assets/images/lace.jpg',
-        1800,
-        6,
-        video: 'assets/images/Videos/vid3.mp4',
-      ),
-      _createColorOption(
-        2,
-        'Cream',
-        'assets/images/silk.jpg',
-        1900,
-        5,
-        video: 'assets/images/Videos/vid2.mp4',
-      ),
-    ],
-    description: 'Beautiful lace fabric with intricate floral patterns.',
-    careSymbol: ['Hand Wash', 'Do Not Wring'],
-  ),
-  Product(
-    id: 'p9',
-    retailerId: 'r3',
-    productName: 'Velvet Evening Fabric',
-    category: 'Velvet',
-    materialType: 'Velvet',
-    colorOptions: [
-      _createColorOption(
-        1,
-        'Red',
-        'assets/images/fab.jpg',
-        2200,
-        7,
-        video: 'assets/images/Videos/vid1.mp4',
-      ),
-      _createColorOption(
-        2,
-        'Blue',
-        'assets/images/textile.jpg',
-        2300,
-        5,
-        video: 'assets/images/Videos/vid2.mp4',
-      ),
-      _createColorOption(
-        3,
-        'Green',
-        'assets/images/silk.jpg',
-        2400,
-        4,
-        video: 'assets/images/Videos/vid3.mp4',
-      ),
-    ],
-    description: 'Luxurious velvet fabric for evening wear.',
-    careSymbol: ['Dry Clean Only'],
-  ),
-  Product(
-    id: 'p10',
-    retailerId: 'r4',
-    productName: 'Cotton Khadi',
-    category: 'Cotton',
-    materialType: 'Cotton',
-    colorOptions: [
-      _createColorOption(
-        1,
-        'Natural',
-        'assets/images/fab2.jpg',
-        700,
-        25,
-        video: 'assets/images/Videos/vid1.mp4',
-      ),
-      _createColorOption(
-        2,
-        'Brown',
-        'assets/images/fab.jpg',
-        750,
-        20,
-        video: 'assets/images/Videos/vid2.mp4',
-      ),
-    ],
-    description: 'Hand-spun khadi cotton fabric with a rustic feel.',
-    careSymbol: ['Machine Wash'],
-  ),
-  Product(
-    id: 'p11',
-    retailerId: 'r4',
-    productName: 'Denim Fabric',
-    category: 'Denim',
-    materialType: 'Denim',
-    colorOptions: [
-      _createColorOption(
-        1,
-        'Blue',
-        'assets/images/textile.jpg',
-        850,
-        15,
-        video: 'assets/images/Videos/vid3.mp4',
-      ),
-      _createColorOption(
-        2,
-        'Black',
-        'assets/images/fab2.jpg',
-        900,
-        12,
-        video: 'assets/images/Videos/vid1.mp4',
-      ),
-    ],
-    description: 'Premium denim fabric for jeans and jackets.',
-    careSymbol: ['Machine Wash', 'Do Not Bleach'],
-  ),
-  Product(
-    id: 'p12',
-    retailerId: 'r5',
-    productName: 'Embroidery Fabric',
-    category: 'Embroidery',
-    materialType: 'Embroidery',
-    colorOptions: [
-      _createColorOption(
-        1,
-        'Green',
-        'assets/images/lace.jpg',
-        2100,
-        8,
-        video: 'assets/images/Videos/vid2.mp4',
-      ),
-      _createColorOption(
-        2,
-        'Gold',
-        'assets/images/silk.jpg',
-        2300,
-        6,
-        video: 'assets/images/Videos/vid3.mp4',
-      ),
-    ],
-    description: 'Hand-embroidered fabric with traditional motifs.',
-    careSymbol: ['Dry Clean Only'],
-  ),
-  Product(
-    id: 'p13',
-    retailerId: 'r5',
-    productName: 'Tussar Silk',
-    category: 'Silk',
-    materialType: 'Silk',
-    colorOptions: [
-      _createColorOption(
-        1,
-        'Copper',
-        'assets/images/textile.jpg',
-        2800,
-        4,
-        video: 'assets/images/Videos/vid1.mp4',
-      ),
-      _createColorOption(
-        2,
-        'Gold',
-        'assets/images/silk.jpg',
-        3000,
-        3,
-        video: 'assets/images/Videos/vid2.mp4',
-      ),
-    ],
-    description: 'Beautiful tussar silk with a textured finish.',
-    careSymbol: ['Dry Clean Only'],
-  ),
-  Product(
-    id: 'p14',
-    retailerId: 'r5',
-    productName: 'Satin Bridal Fabric',
-    category: 'Satin',
-    materialType: 'Satin',
-    colorOptions: [
-      _createColorOption(
-        1,
-        'Pink',
-        'assets/images/fab.jpg',
-        1200,
-        10,
-        video: 'assets/images/Videos/vid3.mp4',
-      ),
-      _createColorOption(
-        2,
-        'White',
-        'assets/images/lace.jpg',
-        1300,
-        8,
-        video: 'assets/images/Videos/vid1.mp4',
-      ),
-    ],
-    description: 'Smooth satin fabric for bridal and formal wear.',
-    careSymbol: ['Dry Clean Only'],
-  ),
-];
-
-List<Product> _getProductsForRetailer(String retailerId) {
-  final fabrics = _sampleFabricProducts
-      .where((p) => p.retailerId == retailerId)
-      .toList();
-  final elements = _sampleElementProducts
-      .where((p) => p.retailerId == retailerId)
-      .toList();
-  return [...fabrics, ...elements];
-}
+// ─── Hardcoded Retailers ─────────────────────────────────────────────
 
 final List<Retailer> kHardcodedRetailers = [
   Retailer(
     id: 'r1',
     shopName: 'Dhaka Fabric House',
-    email: 'contact@dhakafabric.com',
-    phone: '01711000001',
-    address: '12 New Market Road, Dhanmondi, Dhaka',
+    email: 'dhaka@fabrics.com',
+    address: 'Elephant Road, Dhaka',
+    phone: '01711223344',
     rating: 4.8,
     profilePicture: 'assets/images/fab.jpg',
-    products: _getProductsForRetailer('r1'),
+    about: 'Leading retailer of premium cotton and traditional fabrics in Dhaka.',
+    products: [
+      Product(
+        id: 'p1',
+        retailerId: 'r1',
+        productName: 'Egyptian Cotton',
+        category: 'Cotton',
+        productCode: 'COT-DHK-01',
+        materialType: [MaterialBlend(type: 'Cotton', blend: 100)],
+        colorOptions: [
+          _co(1, 'White', 'assets/images/fab.jpg', price: 650),
+          _co(2, 'Beige', 'assets/images/fab2.jpg', price: 650),
+        ],
+        description: 'Premium cotton',
+        careSymbol: [],
+      ),
+      Product(
+        id: 'p2',
+        retailerId: 'r1',
+        productName: 'Mulberry Silk',
+        category: 'Silk',
+        productCode: 'SLK-DHK-01',
+        materialType: [MaterialBlend(type: 'Silk', blend: 100)],
+        colorOptions: [
+          _co(1, 'Gold', 'assets/images/silk.jpg', price: 1800),
+        ],
+        description: 'Pure silk',
+        careSymbol: [],
+      ),
+    ],
   ),
   Retailer(
     id: 'r2',
     shopName: 'Chowdhury Textiles',
-    email: 'info@chowdhurytextiles.com',
-    phone: '01711000002',
-    address: '45 Islampur Road, Islampur, Dhaka',
+    email: 'chowdhury@textiles.com',
+    address: 'Banani, Dhaka',
+    phone: '01822334455',
     rating: 4.6,
     profilePicture: 'assets/images/textile.jpg',
-    products: _getProductsForRetailer('r2'),
+    about: 'Specialized in high-quality wool blends and winter collections.',
+    products: [
+      Product(
+        id: 'p3',
+        retailerId: 'r2',
+        productName: 'Merino Wool',
+        category: 'Wool',
+        productCode: 'WOL-CHW-01',
+        materialType: [MaterialBlend(type: 'Wool', blend: 100)],
+        colorOptions: [
+          _co(1, 'Brown', 'assets/images/drawing_fabric.jpg', price: 950),
+        ],
+        description: 'Wool blend',
+        careSymbol: [],
+      ),
+    ],
   ),
   Retailer(
     id: 'r3',
     shopName: 'Silk & Lace Emporium',
-    email: 'hello@silklace.com',
-    phone: '01711000003',
-    address: '7 Gausia Market, Elephant Road, Dhaka',
+    email: 'silk@lace.com',
+    address: 'Dhanmondi, Dhaka',
+    phone: '01933445566',
     rating: 4.9,
-    profilePicture: 'assets/images/silk.jpg',
-    products: _getProductsForRetailer('r3'),
+    profilePicture: 'assets/images/lace.jpg',
+    about: 'Exclusive collection of fine silk, lace and intricate embroidery.',
+    products: [
+      Product(
+        id: 'p5',
+        retailerId: 'r3',
+        productName: 'French Lace',
+        category: 'Lace',
+        productCode: 'LAC-SLE-01',
+        materialType: [MaterialBlend(type: 'Polyester', blend: 100)],
+        colorOptions: [
+          _co(1, 'White', 'assets/images/lace.jpg', price: 1200),
+        ],
+        description: 'Lace fabric',
+        careSymbol: [],
+      ),
+    ],
   ),
   Retailer(
     id: 'r4',
     shopName: 'Bengal Cotton Co.',
-    email: 'sales@bengalcotton.com',
-    phone: '01711000004',
-    address: '89 Karwan Bazar, Tejgaon, Dhaka',
-    rating: 4.3,
+    email: 'bengal@cotton.com',
+    address: 'Uttara, Dhaka',
+    phone: '01644556677',
+    rating: 4.5,
     profilePicture: 'assets/images/fab2.jpg',
-    products: _getProductsForRetailer('r4'),
+    about: 'Quality handloom and powerloom cotton at affordable prices.',
+    products: [],
   ),
   Retailer(
     id: 'r5',
     shopName: 'Heritage Weaves',
-    email: 'support@heritageweaves.com',
-    phone: '01711000005',
-    address: '3 Mirpur Road, Mohammadpur, Dhaka',
+    email: 'heritage@weaves.com',
+    address: 'Gulshan, Dhaka',
+    phone: '01555667788',
     rating: 4.7,
-    profilePicture: 'assets/images/lace.jpg',
-    products: _getProductsForRetailer('r5'),
+    profilePicture: 'assets/images/gorgeous.jpg',
+    about: 'Preserving tradition with handwoven Jamdani and Khadi fabrics.',
+    products: [],
   ),
 ];
 
 class RetailersPageBody extends StatefulWidget {
   final ValueNotifier<String> searchQuery;
-  final RetailersFilterData filterData;
+  final ProductFilterData filterData;
   final UserRole userRole;
 
   const RetailersPageBody({
@@ -783,24 +164,26 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
     return ValueListenableBuilder<String>(
       valueListenable: widget.searchQuery,
       builder: (context, searchQuery, _) {
-        final filteredRetailers = _retailers.where((r) {
-          final matchesSearch = r.shopName.toLowerCase().contains(
-            searchQuery.toLowerCase(),
-          );
-          final matchesRating = r.rating >= widget.filterData.minRating;
-          final matchesLocation =
-              widget.filterData.location == 'All' ||
-              r.address.toLowerCase().contains(
-                widget.filterData.location.toLowerCase(),
-              );
-
-          return matchesSearch && matchesRating && matchesLocation;
+        final filteredRetailers = _retailers.where((retailer) {
+          final matchesSearch = retailer.shopName
+              .toLowerCase()
+              .contains(searchQuery.toLowerCase());
+          
+          final matchesRating = retailer.rating >= widget.filterData.minRating;
+          
+          return matchesSearch && matchesRating;
         }).toList();
+
+        if (widget.filterData.sortBy == 'rating') {
+          filteredRetailers.sort((a, b) => b.rating.compareTo(a.rating));
+        }
 
         return Column(
           children: [
             _buildHeroSection(),
-            Expanded(child: _buildRetailersGrid(filteredRetailers)),
+            Expanded(
+              child: _buildRetailerGrid(filteredRetailers),
+            ),
           ],
         );
       },
@@ -808,15 +191,9 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
   }
 
   Widget _buildHeroSection() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenWidth < 400;
-
     return Container(
-      margin: EdgeInsets.symmetric(
-        horizontal: isSmallScreen ? 12 : 16,
-        vertical: 8,
-      ),
-      padding: EdgeInsets.all(isSmallScreen ? 14 : 16),
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [kSageDark, kSage],
@@ -828,8 +205,8 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Trusted Retailers',
+          const Text(
+            'Discover Retailers',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w800,
@@ -839,105 +216,51 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
           ),
           const SizedBox(height: 4),
           Text(
-            'Verified retailers with quality fabrics',
+            'Connect with the best fabric shops in town',
             style: TextStyle(
               fontSize: 13,
               color: Colors.white.withValues(alpha: 0.9),
             ),
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _buildHeroChip(Icons.verified, 'Authentic', isSmallScreen),
-              const SizedBox(width: 8),
-              _buildHeroChip(Icons.price_check, 'Best Prices', isSmallScreen),
-            ],
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildHeroChip(IconData icon, String label, bool isSmall) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: isSmall ? 10 : 12,
-        vertical: isSmall ? 4 : 5,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white, size: isSmall ? 12 : 14),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRetailersGrid(List<Retailer> retailers) {
+  Widget _buildRetailerGrid(List<Retailer> retailers) {
     if (retailers.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off_rounded, size: 64, color: Colors.grey[400]),
+            Icon(Icons.storefront_outlined, size: 64, color: Colors.grey[300]),
             const SizedBox(height: 16),
-            Text(
+            const Text(
               'No retailers found',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Try adjusting your filters or search terms',
-              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+              style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
           ],
         ),
       );
     }
 
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    final isSmallScreen = screenWidth < 400;
-    final spacing = isSmallScreen ? 10.0 : 12.0;
-    final cardAspectRatio = screenHeight < 700 ? 0.72 : 0.78;
-
     return GridView.builder(
-      padding: EdgeInsets.all(spacing),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: cardAspectRatio,
-        crossAxisSpacing: spacing,
-        mainAxisSpacing: spacing,
+        childAspectRatio: 0.75,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
       ),
       itemCount: retailers.length,
-      itemBuilder: (context, index) =>
-          _buildRetailerCard(retailers[index], isSmallScreen),
+      itemBuilder: (context, index) {
+        final retailer = retailers[index];
+        return _buildRetailerCard(retailer);
+      },
     );
   }
 
-  Widget _buildRetailerCard(Retailer retailer, bool isSmall) {
-    final bool isTopRated = retailer.rating >= 4.8;
-    String imageUrl = retailer.profilePicture ?? 'assets/images/fab.jpg';
-
+  Widget _buildRetailerCard(Retailer retailer) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -965,197 +288,64 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Flexible(
-              flex: 5,
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(14),
-                    ),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: double.infinity,
-                      child: Image.asset(
-                        imageUrl,
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+              child: Container(
+                height: 120,
+                width: double.infinity,
+                color: Colors.grey[100],
+                child: retailer.profilePicture != null
+                    ? Image.asset(
+                        retailer.profilePicture!,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          color: kSage.withValues(alpha: 0.12),
-                          child: Icon(
-                            Icons.store,
-                            size: isSmall ? 36 : 40,
-                            color: kSageDark,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (isTopRated)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isSmall ? 8 : 10,
-                          vertical: isSmall ? 4 : 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: kSage,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            width: 0.3,
-                          ),
-                        ),
-                        child: Text(
-                          '⭐ Top Rated',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  Positioned(
-                    bottom: 8,
-                    right: 8,
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isSmall ? 6 : 8,
-                        vertical: isSmall ? 3 : 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.7),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.star,
-                            color: Colors.amber,
-                            size: isSmall ? 10 : 12,
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            retailer.rating.toStringAsFixed(1),
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(Icons.store, size: 40, color: Colors.grey),
+                      )
+                    : const Icon(Icons.store, size: 40, color: Colors.grey),
               ),
             ),
-            Flexible(
-              flex: 4,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  isSmall ? 10 : 12,
-                  isSmall ? 8 : 10,
-                  isSmall ? 10 : 12,
-                  isSmall ? 10 : 12,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      retailer.shopName,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        height: 1.2,
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    retailer.shopName,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      RatingStars(rating: retailer.rating, size: 10),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${retailer.rating}',
+                        style: const TextStyle(fontSize: 10, color: Colors.grey),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    SizedBox(height: isSmall ? 4 : 6),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on,
-                          size: isSmall ? 12 : 14,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            retailer.generalArea,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[600],
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on,
-                          size: isSmall ? 12 : 14,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            retailer.generalArea,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[600],
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 1,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '2.5 km',
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: Colors.green.shade800,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (retailer.products != null &&
-                        retailer.products!.isNotEmpty)
-                      Padding(
-                        padding: EdgeInsets.only(top: isSmall ? 2 : 4),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on, size: 10, color: Colors.grey),
+                      const SizedBox(width: 2),
+                      Expanded(
                         child: Text(
-                          '${retailer.products!.length} products',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: kSage,
-                            fontWeight: FontWeight.w500,
-                          ),
+                          retailer.address,
+                          style: const TextStyle(fontSize: 10, color: Colors.grey),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],
