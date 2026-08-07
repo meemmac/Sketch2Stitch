@@ -2,8 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sketch2stitch/models/product.dart';
-import 'package:sketch2stitch/services/auth_service.dart';
 import 'package:sketch2stitch/services/inventory_service.dart';
+import 'package:sketch2stitch/services/user_session.dart';
 import '../../widgets/video_preview_player.dart';
 
 class ProductColorVariant {
@@ -22,6 +22,189 @@ class ProductColorVariant {
     this.price = 0,
     this.stock = 0,
   });
+
+  Map<String, dynamic> toMap() => {
+    'colorName': colorName,
+    'imagePaths': imagePaths,
+    'videoPaths': videoPaths,
+    'isAsset': isAsset,
+    'price': price,
+    'stock': stock,
+  };
+
+  factory ProductColorVariant.fromMap(Map<String, dynamic> map) {
+    List<String> images = [];
+    if (map['imagePaths'] is List) {
+      images = List<String>.from(map['imagePaths'] as List);
+    } else if (map['imagePath'] is String && (map['imagePath'] as String).isNotEmpty) {
+      images = [map['imagePath'] as String];
+    }
+
+    List<String> videos = [];
+    if (map['videoPaths'] is List) {
+      videos = List<String>.from(map['videoPaths'] as List);
+    } else if (map['videoPath'] is String && (map['videoPath'] as String).isNotEmpty) {
+      videos = [map['videoPath'] as String];
+    }
+
+    return ProductColorVariant(
+      colorName: map['colorName'] as String? ?? '',
+      imagePaths: images,
+      videoPaths: videos,
+      isAsset: map['isAsset'] as bool? ?? false,
+      price: (map['price'] as num?)?.toDouble() ?? 0,
+      stock: (map['stock'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class FabricMaterialBlend {
+  String material;
+  String blend;
+
+  FabricMaterialBlend({required this.material, this.blend = ""});
+
+  String get displayText {
+    final cleanBlend = blend.trim();
+    final cleanMaterial = material.trim();
+    if (cleanBlend.isEmpty) {
+      return cleanMaterial;
+    }
+
+    return "$cleanBlend $cleanMaterial";
+  }
+
+  Map<String, dynamic> toMap() => {'material': material, 'blend': blend};
+
+  factory FabricMaterialBlend.fromMap(Map<String, dynamic> map) {
+    return FabricMaterialBlend(
+      material: map['material'] as String? ?? '',
+      blend: map['blend'] as String? ?? '',
+    );
+  }
+}
+
+class InventoryItem {
+  String id;
+  String name;
+  String category; // "Fabric" or "Element"
+  String materialType; // Cotton, Silk etc.
+  String sku;
+  String description;
+  List<ProductColorVariant> variants;
+  List<FabricMaterialBlend> materialBlends;
+
+  // Detailed Care Options
+  bool canWash;
+  bool canBleach;
+  bool canDryClean;
+  bool canTumbleDry;
+  String ironLevel; // Low, Medium, High
+
+  InventoryItem({
+    required this.id,
+    required this.name,
+    required this.category,
+    required this.materialType,
+    required this.sku,
+    required this.description,
+    required this.variants,
+    List<FabricMaterialBlend>? materialBlends,
+    this.canWash = true,
+    this.canBleach = false,
+    this.canDryClean = true,
+    this.canTumbleDry = true,
+    this.ironLevel = "Medium",
+  }) : materialBlends = materialBlends ?? <FabricMaterialBlend>[];
+
+  // Helpers
+  String get mainImagePath =>
+      variants.isNotEmpty && variants.first.imagePaths.isNotEmpty
+          ? variants.first.imagePaths.first
+          : "";
+  bool get mainIsAsset => variants.isNotEmpty ? variants.first.isAsset : false;
+  List<String> get colorNames => variants.map((v) => v.colorName).toList();
+
+  String get materialDisplay {
+    final cleanBlends = materialBlends
+        .where((blend) => blend.material.trim().isNotEmpty)
+        .map((blend) => blend.displayText)
+        .where((text) => text.trim().isNotEmpty)
+        .toList();
+
+    if (cleanBlends.isNotEmpty) {
+      return cleanBlends.join(", ");
+    }
+
+    return materialType.trim().isNotEmpty ? materialType : "N/A";
+  }
+
+  double get minPrice {
+    if (variants.isEmpty) return 0;
+    return variants.map((v) => v.price).reduce((a, b) => a < b ? a : b);
+  }
+
+  int get totalStock {
+    if (variants.isEmpty) return 0;
+    return variants.fold(0, (sum, v) => sum + v.stock);
+  }
+
+  Map<String, dynamic> toMap() => {
+  'id': id,
+  'name': name,
+  'category': category,
+  'materialType': materialType,
+  'sku': sku,
+  'description': description,
+  'variants': variants.map((v) => v.toMap()).toList(),
+  'materialBlends': materialBlends.map((b) => b.toMap()).toList(),
+  'canWash': canWash,
+  'canBleach': canBleach,
+  'canDryClean': canDryClean,
+  'canTumbleDry': canTumbleDry,
+  'ironLevel': ironLevel,
+};
+
+  factory InventoryItem.fromMap(Map<String, dynamic> map) {
+    final rawVariants = map['variants'];
+    final variants = rawVariants is List
+        ? rawVariants
+              .whereType<Map>()
+              .map(
+                (variant) => ProductColorVariant.fromMap(
+                  Map<String, dynamic>.from(variant),
+                ),
+              )
+              .toList()
+        : <ProductColorVariant>[];
+    final rawMaterialBlends = map['materialBlends'];
+    final materialBlends = rawMaterialBlends is List
+        ? rawMaterialBlends
+              .whereType<Map>()
+              .map(
+                (blend) => FabricMaterialBlend.fromMap(
+                  Map<String, dynamic>.from(blend),
+                ),
+              )
+              .toList()
+        : <FabricMaterialBlend>[];
+
+    return InventoryItem(
+      id: map['id'] as String? ?? '',
+      name: map['name'] as String? ?? '',
+      category: map['category'] as String? ?? 'Element',
+      materialType: map['materialType'] as String? ?? 'N/A',
+      sku: map['sku'] as String? ?? '',
+      description: map['description'] as String? ?? '',
+      variants: variants,
+      materialBlends: materialBlends,
+      canWash: map['canWash'] as bool? ?? true,
+      canBleach: map['canBleach'] as bool? ?? false,
+      canDryClean: map['canDryClean'] as bool? ?? true,
+      canTumbleDry: map['canTumbleDry'] as bool? ?? true,
+      ironLevel: map['ironLevel'] as String? ?? 'Medium',
+    );
+  }
 }
 
 class InventoryScreen extends StatefulWidget {
@@ -37,45 +220,402 @@ class _InventoryScreenState extends State<InventoryScreen>
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   String _searchQuery = "";
+  int _gridAnimationSeed = 0;
   final Map<String, int> _selectedVariantIndexes = <String, int>{};
   
   final InventoryService _inventoryService = InventoryService();
-  final AuthService _authService = AuthService();
   String? _retailerId;
 
   static const List<String> _commonMaterials = <String>[
-    "Cotton", "Linen", "Silk", "Wool", "Cashmere", "Viscose",
-    "Polyester", "Nylon", "Spandex (Lycra/Elastane)", "Khadi",
-    "Muslin", "Jamdani",
+    "Cotton",
+    "Linen",
+    "Silk",
+    "Wool",
+    "Cashmere",
+    "Viscose",
+    "Polyester",
+    "Nylon",
+    "Spandex (Lycra/Elastane)",
+    "Khadi",
+    "Muslin",
+    "Jamdani",
   ];
+
+  final List<InventoryItem> items = <InventoryItem>[];
+
+  /*
+  List<InventoryItem> _seedItems() {
+    return <InventoryItem>[
+      InventoryItem(
+        id: "seed-1",
+        name: "Premium Egyptian Cotton",
+        category: "Fabric",
+        materialType: "Cotton",
+        sku: "COT-001",
+        description: "Soft, breathable Egyptian cotton perfect for shirts.",
+        materialBlends: [
+          FabricMaterialBlend(material: "Cotton", blend: "100%"),
+        ],
+        variants: [
+          ProductColorVariant(
+            colorName: "White",
+            imagePaths: ['assets/images/fab.jpg'],
+            videoPaths: ['assets/images/Videos/vid1.mp4'],
+            isAsset: true,
+            price: 650,
+            stock: 45,
+          ),
+          ProductColorVariant(
+            colorName: "Beige",
+            imagePaths: ['assets/images/fab2.jpg'],
+            videoPaths: ['assets/images/Videos/vid2.mp4'],
+            isAsset: true,
+            price: 680,
+            stock: 30,
+          ),
+          ProductColorVariant(
+            colorName: "Ivory",
+            imagePaths: ['assets/images/fab.jpg'],
+            videoPaths: ['assets/images/Videos/vid3.mp4'],
+            isAsset: true,
+            price: 720,
+            stock: 6,
+          ),
+        ],
+        canWash: true,
+        canBleach: false,
+        canDryClean: true,
+        canTumbleDry: true,
+        ironLevel: "High",
+      ),
+      InventoryItem(
+        id: "seed-2",
+        name: "Denim Shirt",
+        category: "Fabric",
+        materialType: "Denim",
+        sku: "DEN-006",
+        description: "Classic navy blue denim fabric, heavy-duty and stylish.",
+        materialBlends: [
+          FabricMaterialBlend(material: "Cotton", blend: "100%"),
+        ],
+        variants: [
+          ProductColorVariant(
+            colorName: "Navy Blue",
+            imagePaths: ['assets/images/denim.jpg'],
+            videoPaths: [],
+            isAsset: true,
+            price: 1200,
+            stock: 25,
+          ),
+        ],
+        canWash: true,
+        canBleach: false,
+        canDryClean: false,
+        canTumbleDry: true,
+        ironLevel: "Medium",
+      ),
+      InventoryItem(
+        id: "seed-3",
+        name: "Golden Silk Blend",
+        category: "Fabric",
+        materialType: "Silk",
+        sku: "SLK-002",
+        description: "Luxurious silk blend with a natural sheen.",
+        materialBlends: [
+          FabricMaterialBlend(material: "Silk", blend: "70%"),
+          FabricMaterialBlend(material: "Viscose", blend: "30%"),
+        ],
+        variants: [
+          ProductColorVariant(
+            colorName: "Gold",
+            imagePaths: ['assets/images/silk.jpg'],
+            videoPaths: ['assets/images/Videos/vid2.mp4'],
+            isAsset: true,
+            price: 1800,
+            stock: 12,
+          ),
+          ProductColorVariant(
+            colorName: "Pink",
+            imagePaths: ['assets/images/saree.jpg'],
+            videoPaths: ['assets/images/Videos/vid3.mp4'],
+            isAsset: true,
+            price: 1750,
+            stock: 8,
+          ),
+          ProductColorVariant(
+            colorName: "Emerald",
+            imagePaths: ['assets/images/gorgeous.jpg'],
+            videoPaths: ['assets/images/Videos/vid1.mp4'],
+            isAsset: true,
+            price: 1950,
+            stock: 5,
+          ),
+        ],
+        canWash: false,
+        canBleach: false,
+        canDryClean: true,
+        canTumbleDry: false,
+        ironLevel: "Low",
+      ),
+      InventoryItem(
+        id: "seed-4",
+        name: "Tassel",
+        category: "Element",
+        materialType: "N/A",
+        sku: "ACC-003",
+        description: "Decorative element to enhance the outfit.",
+        materialBlends: [
+          FabricMaterialBlend(material: "Cotton", blend: "98%"),
+          FabricMaterialBlend(
+            material: "Spandex (Lycra/Elastane)",
+            blend: "2%",
+          ),
+        ],
+        variants: [
+          ProductColorVariant(
+            colorName: "Multi",
+            imagePaths: ['assets/images/tassel.jpg'],
+            videoPaths: [],
+            isAsset: true,
+            price: 220,
+            stock: 28,
+          ),
+          ProductColorVariant(
+            colorName: "Blue",
+            imagePaths: ['assets/images/Tassel2.jpg'],
+            videoPaths: [],
+            isAsset: true,
+            price: 180,
+            stock: 7,
+          ),
+        ],
+      ),
+      InventoryItem(
+        id: "seed-5",
+        name: "Linen Summer Fabric",
+        category: "Fabric",
+        materialType: "Linen",
+        sku: "LIN-004",
+        description: "Lightweight linen fabric for summer wear.",
+        materialBlends: [
+          FabricMaterialBlend(material: "Linen", blend: "85%"),
+          FabricMaterialBlend(material: "Cotton", blend: "15%"),
+        ],
+        variants: [
+          ProductColorVariant(
+            colorName: "Natural",
+            imagePaths: ['assets/images/fab2.jpg'],
+            videoPaths: ['assets/images/Videos/vid1.mp4'],
+            isAsset: true,
+            price: 1120,
+            stock: 18,
+          ),
+          ProductColorVariant(
+            colorName: "Sage",
+            imagePaths: ['assets/images/fabrics_rolled.jpg'],
+            videoPaths: ['assets/images/Videos/vid2.mp4'],
+            isAsset: true,
+            price: 1180,
+            stock: 9,
+          ),
+        ],
+        canWash: true,
+        canBleach: false,
+        canDryClean: true,
+        canTumbleDry: false,
+        ironLevel: "Medium",
+      ),
+      InventoryItem(
+        id: "seed-6",
+        name: "Printed Scarf",
+        category: "Element",
+        materialType: "N/A",
+        sku: "SCF-005",
+        description: "Light scarf with vibrant seasonal prints.",
+        materialBlends: [
+          FabricMaterialBlend(material: "Polyester", blend: "95%"),
+          FabricMaterialBlend(
+            material: "Spandex (Lycra/Elastane)",
+            blend: "5%",
+          ),
+        ],
+        variants: [
+          ProductColorVariant(
+            colorName: "Multi",
+            imagePaths: ['assets/images/saree.jpg'],
+            videoPaths: [],
+            isAsset: true,
+            price: 380,
+            stock: 64,
+          ),
+          ProductColorVariant(
+            colorName: "Black",
+            imagePaths: ['assets/images/lace.jpg'],
+            videoPaths: [],
+            isAsset: true,
+            price: 420,
+            stock: 4,
+          ),
+        ],
+      ),
+    ];
+  }
+  */
+
+  String _itemKey(InventoryItem item) {
+    return item.id;
+  }
+
+  ProductColorVariant? _selectedVariantFor(InventoryItem item) {
+    if (item.variants.isEmpty) {
+      return null;
+    }
+
+    final index = _selectedVariantIndexes[_itemKey(item)] ?? 0;
+    if (index < 0 || index >= item.variants.length) {
+      return item.variants.first;
+    }
+
+    return item.variants[index];
+  }
+
+  String _lowStockTextFor(InventoryItem item) {
+    final lowStockVariants = item.variants
+        .where((variant) => variant.stock < 5)
+        .toList();
+
+    final colorStocks = lowStockVariants
+        .map((variant) => "${variant.stock} ${variant.colorName}")
+        .join(", ");
+    return "Low stock: $colorStocks";
+  }
+
+  bool _hasLowStockColor(InventoryItem item) {
+    return item.variants.any((variant) => variant.stock < 5);
+  }
+
+  String _materialTextFrom(List<FabricMaterialBlend> blends) {
+    return blends
+        .where((blend) => blend.material.trim().isNotEmpty)
+        .map((blend) => blend.displayText)
+        .where((text) => text.trim().isNotEmpty)
+        .join(", ");
+  }
+
+  List<FabricMaterialBlend> _initialMaterialBlendsFor(InventoryItem? item) {
+    if (item == null) {
+      return <FabricMaterialBlend>[FabricMaterialBlend(material: "")];
+    }
+
+    if (item.materialBlends.isNotEmpty) {
+      return item.materialBlends
+          .map(
+            (blend) => FabricMaterialBlend(
+              material: blend.material,
+              blend: blend.blend,
+            ),
+          )
+          .toList();
+    }
+
+    if (item.materialType.trim().isNotEmpty && item.materialType != "N/A") {
+      return <FabricMaterialBlend>[
+        FabricMaterialBlend(material: item.materialType),
+      ];
+    }
+
+    return <FabricMaterialBlend>[FabricMaterialBlend(material: "")];
+  }
+
+  String _materialLabelFor(InventoryItem item) {
+    final material = item.materialDisplay.trim();
+    if (material.isNotEmpty && material != "N/A") {
+      return material;
+    }
+
+    return item.category == "Fabric" ? "Fabric" : "Element";
+  }
+
+  List<InventoryItem> get _filteredItems {
+    final query = _searchQuery.toLowerCase();
+    return items.where((item) {
+      return item.name.toLowerCase().contains(query) ||
+          item.sku.toLowerCase().contains(query);
+    }).toList();
+  }
 
   @override
   void initState() {
     super.initState();
-    _retailerId = _authService.currentUser?.uid;
+    _retailerId = UserSession.instance.uid;
+    _loadInventory();
   }
 
-  String _itemKey(Product item) => item.id;
+  InventoryItem _mapProductToItem(Product p) {
+    return InventoryItem(
+      id: p.id,
+      name: p.productName,
+      category: p.category,
+      materialType: p.materialType.isNotEmpty ? p.materialType.first.type : 'N/A',
+      sku: p.productCode,
+      description: p.description,
+      variants: p.colorOptions.map((v) {
+        final images = v.image.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+        final videos = v.video.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+        
+        // isAsset should be true if ANY path is a project asset
+        final isAsset = [...images, ...videos].any((path) => path.startsWith('assets/'));
+        
+        return ProductColorVariant(
+          colorName: v.color,
+          imagePaths: images,
+          videoPaths: videos,
+          isAsset: isAsset,
+          price: v.price,
+          stock: v.stock,
+        );
+      }).toList(),
+      materialBlends: p.materialType.map((m) => FabricMaterialBlend(
+        material: m.type,
+        blend: "${m.blend.toInt()}%",
+      )).toList(),
+      canWash: p.careSymbol.contains('Washable'),
+      canBleach: p.careSymbol.contains('Bleach Allowed'),
+      canDryClean: p.careSymbol.contains('Dry Clean Only'),
+      canTumbleDry: p.careSymbol.contains('Tumble Dry'),
+      ironLevel: p.careSymbol.firstWhere((s) => s.startsWith('Iron: '), orElse: () => 'Iron: Medium').replaceFirst('Iron: ', ''),
+    );
+  }
 
-  ColorOption? _selectedVariantFor(Product item) {
-    if (item.colorOptions.isEmpty) return null;
-    final index = _selectedVariantIndexes[_itemKey(item)] ?? 0;
-    if (index < 0 || index >= item.colorOptions.length) {
-      return item.colorOptions.first;
+  Future<void> _loadInventory() async {
+    if (_retailerId == null) return;
+
+    _inventoryService.streamRetailerProducts(_retailerId!).listen((products) {
+      if (!mounted) return;
+      setState(() {
+        items.clear();
+        items.addAll(products.map((p) => _mapProductToItem(p)));
+        _gridAnimationSeed++;
+      });
+    });
+  }
+
+  Future<void> _saveInventory() async {
+    // This was previously for local storage. 
+    // Now logic is handled in showItemForm for individual items.
+    debugPrint("Save Inventory called - no-op as we use direct Firestore updates now.");
+  }
+
+  void _animateToNewestItem() {
+    if (!_scrollController.hasClients) {
+      return;
     }
-    return item.colorOptions[index];
-  }
 
-  bool _hasLowStockColor(Product item) {
-    return item.colorOptions.any((variant) => variant.stock < 5);
-  }
-
-  String _lowStockTextFor(Product item) {
-    final lowStockVariants = item.colorOptions
-        .where((variant) => variant.stock < 5)
-        .toList();
-
-    return "Low stock: ${lowStockVariants.map((v) => "${v.stock} ${v.color}").join(", ")}";
+    _scrollController.animateTo(
+      _scrollController.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 700),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
@@ -85,47 +625,633 @@ class _InventoryScreenState extends State<InventoryScreen>
     super.dispose();
   }
 
-  // ─── UI MAPPING HELPERS ───────────────────────────────────────────────────
-
-  List<MaterialBlend> _initialMaterialBlendsFor(Product? item) {
-    if (item == null || item.materialType.isEmpty) {
-      return [MaterialBlend(type: "", blend: 0)];
+  Future<void> _showProductPreview(InventoryItem item) async {
+    if (item.variants.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("This item has no color variants yet")),
+      );
+      return;
     }
-    return item.materialType.map((m) => MaterialBlend(type: m.type, blend: m.blend)).toList();
+
+    ProductColorVariant selectedVariant =
+        _selectedVariantFor(item) ?? item.variants.first;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      enableDrag: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setP) {
+          return DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: item.category == "Fabric" ? 0.92 : 0.78,
+            minChildSize: 0.25,
+            maxChildSize: 0.95,
+            builder: (context, scrollController) => Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+              ),
+              padding: const EdgeInsets.all(24),
+              child: SingleChildScrollView(
+                controller: scrollController,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          ...selectedVariant.imagePaths.map((path) {
+                            final cleanPath = path.trim();
+                            if (cleanPath.isEmpty) return const SizedBox.shrink();
+                            
+                            final uri = Uri.tryParse(cleanPath);
+                            final bool isNetwork = uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
+                            final bool isAssetPath = cleanPath.toLowerCase().startsWith('assets/') || selectedVariant.isAsset;
+                            
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 12),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: isNetwork
+                                    ? Image.network(
+                                        cleanPath,
+                                        height: 250,
+                                        width: MediaQuery.of(context).size.width * 0.7,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => _imageError(cleanPath),
+                                      )
+                                    : isAssetPath
+                                        ? Image.asset(
+                                            cleanPath,
+                                            height: 250,
+                                            width: MediaQuery.of(context).size.width * 0.7,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => _imageError(cleanPath),
+                                          )
+                                        : Image.file(
+                                            File(cleanPath),
+                                            height: 250,
+                                            width: MediaQuery.of(context).size.width * 0.7,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => _imageError(cleanPath),
+                                          ),
+                              ),
+                            );
+                          }),
+                          ...selectedVariant.videoPaths.map((path) => Padding(
+                            padding: const EdgeInsets.only(right: 12),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: VideoPreviewPlayer(
+                                videoPath: path,
+                                isAsset: selectedVariant.isAsset,
+                                height: 250,
+                                width: MediaQuery.of(context).size.width * 0.7,
+                              ),
+                            ),
+                          )),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Title
+                    Text(
+                      item.name,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Price and Delivery
+                    Row(
+                      children: [
+                        Text(
+                          "Tk ${selectedVariant.price.toInt()}",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green.shade800,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.directions_bike,
+                                size: 18, color: Colors.grey[600]),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Tk 50 delivery',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _infoBadge(
+                          item.category,
+                          Colors.blue.shade50,
+                          Colors.blue.shade800,
+                        ),
+                        if (item.category == "Fabric" ||
+                            item.materialDisplay != "N/A")
+                          _infoBadge(
+                            _materialLabelFor(item),
+                            Colors.green.shade50,
+                            Colors.green.shade800,
+                          ),
+                        _infoBadge(
+                          "SKU: ${item.sku}",
+                          Colors.grey.shade100,
+                          Colors.grey.shade800,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // 🎨 Color Selection (Interactive)
+                    const Text(
+                      "Select Color",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 45,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: item.variants.length,
+                        itemBuilder: (context, index) {
+                          final variant = item.variants[index];
+                          final isSelected = selectedVariant == variant;
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedVariantIndexes[_itemKey(item)] = index;
+                              });
+                              setP(() => selectedVariant = variant);
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 10),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 15,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Colors.green.shade800
+                                    : Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? Colors.green.shade800
+                                      : Colors.transparent,
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  variant.colorName,
+                                  style: TextStyle(
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.black87,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+                    const Text(
+                      "Description",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      item.description,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black54,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            "Stock for ${selectedVariant.colorName}: ${selectedVariant.stock}",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        _infoBadge(
+                          selectedVariant.stock < 10 ? "Low Stock" : "In Stock",
+                          selectedVariant.stock < 10
+                              ? Colors.red.shade50
+                              : Colors.green.shade50,
+                          selectedVariant.stock < 10
+                              ? Colors.red
+                              : Colors.green,
+                        ),
+                      ],
+                    ),
+                    if (item.category == "Fabric") ...[
+                      const SizedBox(height: 25),
+                      const Text(
+                        "Care Instructions",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      _careInfoRow(
+                        Icons.wash,
+                        "Machine Washable",
+                        item.canWash,
+                        info: "Indicates whether the garment can be safely washed in a washing machine and the recommended washing conditions. Following these instructions helps maintain the fabric's quality, color, and shape.",
+                      ),
+                      _careInfoRow(
+                        Icons.biotech,
+                        "Bleach Allowed",
+                        item.canBleach,
+                        info: "Indicates whether bleach can be safely used on the fabric. Some materials may fade, weaken, or become damaged when exposed to bleach.",
+                      ),
+                      _careInfoRow(
+                        Icons.dry_cleaning,
+                        "Dry Clean Only",
+                        item.canDryClean,
+                        info: "Indicates whether the garment should be professionally cleaned using special solvents instead of water. This method is recommended for delicate fabrics or garments with special finishes.",
+                      ),
+                      _careInfoRow(
+                        Icons.settings_input_component,
+                        "Tumble Dry",
+                        item.canTumbleDry,
+                        info: "Tumble drying is the process of drying clothes in a clothes dryer (dryer machine) instead of hanging them to air dry. It indicates whether the garment is suitable for tumble drying and the recommended heat setting. Using the wrong drying method may cause shrinking or fabric damage.",
+                      ),
+                      _careInfoRow(
+                        Icons.iron,
+                        "Iron Level",
+                        true,
+                        trailing: item.ironLevel,
+                        info: "Indicates the maximum ironing temperature that is safe for the fabric. Using excessive heat may damage, shrink, or burn the material.",
+                      ),
+                    ],
+                    const SizedBox(height: 30),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
-  List<ProductColorVariant> _initialVariantsFor(Product? item) {
-    if (item == null || item.colorOptions.isEmpty) {
-      return [ProductColorVariant(colorName: "", imagePaths: [], videoPaths: [], price: 0, stock: 0)];
-    }
-    return item.colorOptions.map((v) => ProductColorVariant(
-      colorName: v.color,
-      imagePaths: v.images,
-      videoPaths: v.videos,
-      isAsset: v.images.any((p) => p.startsWith('assets/')),
-      price: v.price,
-      stock: v.stock,
-    )).toList();
+  Widget _infoBadge(String label, Color bg, Color text) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width - 48,
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: text,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
   }
 
-  // ─── FORM ────────────────────────────────────────────────────────────────
+  Widget _careInfoRow(
+    IconData icon,
+    String label,
+    bool isOk, {
+    String? trailing,
+    String? info,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: isOk ? Colors.green : Colors.grey),
+          const SizedBox(width: 8),
+          if (info != null)
+            GestureDetector(
+              onTap: () => _showInfoDialog(label, info),
+              child: Icon(Icons.info_outline, size: 16, color: Colors.blue.shade300),
+            ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: isOk ? Colors.black87 : Colors.grey),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              trailing ?? (isOk ? "Yes" : "No"),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isOk ? Colors.green.shade800 : Colors.grey,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-  Future<void> showItemForm({Product? item}) async {
-    final name = TextEditingController(text: item?.productName ?? "");
-    final sku = TextEditingController(text: item?.productCode ?? "");
+  void _showInfoDialog(String title, String content) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: Text(content),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Got it"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMediaThumbnail(String path, bool isImage, bool isAsset, VoidCallback onRemove) {
+    final cleanPath = path.trim();
+    final uri = Uri.tryParse(cleanPath);
+    final bool isNetwork = uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
+    final bool isAssetPath = cleanPath.toLowerCase().startsWith('assets/') || isAsset;
+
+    return Stack(
+      children: [
+        Container(
+          margin: const EdgeInsets.only(right: 8),
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.green.shade100),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(7),
+            child: isImage
+                ? (isNetwork
+                    ? Image.network(cleanPath, fit: BoxFit.cover, errorBuilder: (c, e, s) => _imageError(cleanPath))
+                    : (isAssetPath 
+                        ? Image.asset(cleanPath, fit: BoxFit.cover, errorBuilder: (c, e, s) => _imageError(cleanPath)) 
+                        : Image.file(File(cleanPath), fit: BoxFit.cover, errorBuilder: (c, e, s) => _imageError(cleanPath))))
+                : Container(
+                    color: Colors.black87,
+                    child: const Icon(Icons.videocam, color: Colors.white, size: 20),
+                  ),
+          ),
+        ),
+        Positioned(
+          top: 0,
+          right: 8,
+          child: GestureDetector(
+            onTap: onRemove,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+              child: const Icon(Icons.close, size: 10, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildColorPicker(ProductColorVariant variant, StateSetter setM) {
+    final List<Map<String, dynamic>> basicColors = [
+      {'name': 'Red', 'color': Colors.red},
+      {'name': 'Pink', 'color': Colors.pink},
+      {'name': 'Purple', 'color': Colors.purple},
+      {'name': 'Deep Purple', 'color': Colors.deepPurple},
+      {'name': 'Indigo', 'color': Colors.indigo},
+      {'name': 'Blue', 'color': Colors.blue},
+      {'name': 'Light Blue', 'color': Colors.lightBlue},
+      {'name': 'Cyan', 'color': Colors.cyan},
+      {'name': 'Teal', 'color': Colors.teal},
+      {'name': 'Green', 'color': Colors.green},
+      {'name': 'Light Green', 'color': Colors.lightGreen},
+      {'name': 'Lime', 'color': Colors.lime},
+      {'name': 'Yellow', 'color': Colors.yellow},
+      {'name': 'Amber', 'color': Colors.amber},
+      {'name': 'Orange', 'color': Colors.orange},
+      {'name': 'Deep Orange', 'color': Colors.deepOrange},
+      {'name': 'Brown', 'color': Colors.brown},
+      {'name': 'Grey', 'color': Colors.grey},
+      {'name': 'Blue Grey', 'color': Colors.blueGrey},
+      {'name': 'Black', 'color': Colors.black},
+      {'name': 'White', 'color': Colors.white},
+    ];
+
+    return IconButton(
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(),
+      icon: Icon(Icons.palette_outlined, color: Colors.green.shade800),
+      onPressed: () {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Select Color"),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: GridView.builder(
+                shrinkWrap: true,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 5,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                ),
+                itemCount: basicColors.length,
+                itemBuilder: (context, index) {
+                  final colorData = basicColors[index];
+                  return GestureDetector(
+                    onTap: () {
+                      setM(() {
+                        variant.colorName = colorData['name'];
+                      });
+                      Navigator.pop(context);
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: colorData['color'],
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMaterialBlendRow(
+    FabricMaterialBlend blend,
+    int index,
+    List<FabricMaterialBlend> workingMaterialBlends,
+    StateSetter setM,
+  ) {
+    final materialText = blend.material;
+    final blendText = blend.blend;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: TextField(
+              controller: TextEditingController(text: materialText)
+                ..selection = TextSelection.fromPosition(
+                  TextPosition(offset: materialText.length),
+                ),
+              onChanged: (value) => blend.material = value,
+              decoration: InputDecoration(
+                labelText: "Material Type",
+                hintText: "Cotton, Polyester, Jamdani",
+                suffixIcon: PopupMenuButton<String>(
+                  icon: const Icon(Icons.arrow_drop_down),
+                  onSelected: (value) => setM(() => blend.material = value),
+                  itemBuilder: (context) => _commonMaterials
+                      .map(
+                        (material) => PopupMenuItem<String>(
+                          value: material,
+                          child: Text(material),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            flex: 2,
+            child: TextField(
+              controller: TextEditingController(text: blendText)
+                ..selection = TextSelection.fromPosition(
+                  TextPosition(offset: blendText.length),
+                ),
+              onChanged: (value) => blend.blend = value,
+              decoration: const InputDecoration(
+                labelText: "Blend",
+                hintText: "95%",
+              ),
+            ),
+          ),
+          if (workingMaterialBlends.length > 1)
+            IconButton(
+              icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+              onPressed: () =>
+                  setM(() => workingMaterialBlends.removeAt(index)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> showItemForm({InventoryItem? item}) async {
+    final name = TextEditingController(text: item?.name ?? "");
+    final sku = TextEditingController(text: item?.sku ?? "");
     final desc = TextEditingController(text: item?.description ?? "");
 
     String category = item?.category ?? "Fabric";
-    List<ProductColorVariant> workingVariants = _initialVariantsFor(item);
-    List<MaterialBlend> workingBlends = _initialMaterialBlendsFor(item);
+    List<ProductColorVariant> workingVariants = item != null
+        ? List.from(item.variants)
+        : [
+            ProductColorVariant(
+              colorName: "",
+              imagePaths: [],
+              videoPaths: [],
+              isAsset: false,
+              price: 0,
+              stock: 0,
+            ),
+          ];
+    List<FabricMaterialBlend> workingMaterialBlends = _initialMaterialBlendsFor(
+      item,
+    );
 
-    bool canWash = item?.careSymbol.contains("Washable") ?? true;
-    bool canBleach = item?.careSymbol.contains("Bleach Allowed") ?? false;
-    bool canDryClean = item?.careSymbol.contains("Dry Clean Only") ?? true;
-    bool canTumbleDry = item?.careSymbol.contains("Tumble Dry") ?? true;
-    String ironLevel = item?.careSymbol.firstWhere((s) => s.startsWith("Iron:"), orElse: () => "Iron: Medium").replaceFirst("Iron: ", "") ?? "Medium";
-
-    bool isSaving = false;
+    // Care states
+    bool canWash = item?.canWash ?? true;
+    bool canBleach = item?.canBleach ?? false;
+    bool canDryClean = item?.canDryClean ?? true;
+    bool canTumbleDry = item?.canTumbleDry ?? true;
+    String ironLevel = item?.ironLevel ?? "Medium";
 
     await showModalBottomSheet(
       context: context,
@@ -134,17 +1260,6 @@ class _InventoryScreenState extends State<InventoryScreen>
       backgroundColor: Colors.transparent,
       builder: (_) => StatefulBuilder(
         builder: (c, setM) {
-          if (isSaving) {
-            return Container(
-              height: 300,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-              ),
-              child: const Center(child: CircularProgressIndicator()),
-            );
-          }
-
           return DraggableScrollableSheet(
             expand: false,
             initialChildSize: 0.92,
@@ -156,7 +1271,9 @@ class _InventoryScreenState extends State<InventoryScreen>
                 borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
               ),
               padding: EdgeInsets.only(
-                left: 20, right: 20, top: 20,
+                left: 20,
+                right: 20,
+                top: 20,
                 bottom: MediaQuery.of(context).viewInsets.bottom + 20,
               ),
               child: SingleChildScrollView(
@@ -165,44 +1282,143 @@ class _InventoryScreenState extends State<InventoryScreen>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      width: 40, height: 4, margin: const EdgeInsets.only(bottom: 20),
-                      decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
-                    ),
-                    Text(item == null ? "Add New Item" : "Edit Item", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 25),
-
-                    DropdownButtonFormField<String>(
-                      initialValue: category,
-                      decoration: InputDecoration(
-                        labelText: "Category",
-                        prefixIcon: const Icon(Icons.category_outlined),
-                        filled: true, fillColor: Colors.green.shade50,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                      items: ["Fabric", "Element"].map((cat) => DropdownMenuItem(value: cat, child: Text(cat))).toList(),
-                      onChanged: (v) => setM(() => category = v!),
+                    ),
+                    Text(
+                      item == null ? "Add New Item" : "Edit Item",
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 25),
 
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text("Color Variants", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade900)),
-                        TextButton.icon(
-                          onPressed: () => setM(() => workingVariants.add(ProductColorVariant(colorName: "", imagePaths: [], videoPaths: []))),
-                          icon: const Icon(Icons.add, size: 18),
-                          label: const Text("Add Color"),
+                    // 🏷 Category Selection
+                    if (item == null)
+                      Align(
+                        alignment: Alignment.center,
+                        child: SizedBox(
+                          width: 250,
+                          child: DropdownButtonFormField<String>(
+                            value: category,
+                            style: TextStyle(
+                              color: Colors.green.shade900,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                            iconEnabledColor: Colors.green.shade800,
+                            decoration: InputDecoration(
+                              labelText: "Category",
+                              labelStyle: TextStyle(color: Colors.green.shade800),
+                              prefixIcon: Icon(
+                                Icons.category_outlined,
+                                color: Colors.green.shade700,
+                              ),
+                              filled: true,
+                              fillColor: Colors.green.shade50,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                borderSide: BorderSide(color: Colors.green.shade300),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                borderSide: BorderSide(color: Colors.green.shade100),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                borderSide: BorderSide(
+                                  color: Colors.green.shade800,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                            items: ["Fabric", "Element"]
+                                .map(
+                                  (cat) => DropdownMenuItem(
+                                    value: cat,
+                                    child: Text(cat),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) => setM(() => category = v!),
+                          ),
                         ),
-                      ],
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: Colors.green.shade100),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.category, color: Colors.green.shade700, size: 20),
+                            const SizedBox(width: 10),
+                            Text(
+                              "Category: $category",
+                              style: TextStyle(
+                                color: Colors.green.shade900,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 25),
+
+                    // 🌈 Multi-Color Variants Section
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Color Variants",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green.shade900,
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: () => setM(
+                              () => workingVariants.add(
+                                ProductColorVariant(
+                                  colorName: "",
+                                  imagePaths: [],
+                                  videoPaths: [],
+                                ),
+                              ),
+                            ),
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text("Add Color"),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 10),
 
+                    // Variants List
                     ...workingVariants.map((variant) {
                       int idx = workingVariants.indexOf(variant);
+
                       return Container(
                         margin: const EdgeInsets.only(bottom: 15),
                         padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.grey.shade200)),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
                         child: Column(
                           children: [
                             Row(
@@ -215,7 +1431,9 @@ class _InventoryScreenState extends State<InventoryScreen>
                                         variant.isAsset = false;
                                         for (var file in medias) {
                                           final path = file.path.toLowerCase();
-                                          if (path.endsWith('.mp4') || path.endsWith('.mov') || path.endsWith('.avi')) {
+                                          if (path.endsWith('.mp4') ||
+                                              path.endsWith('.mov') ||
+                                              path.endsWith('.avi')) {
                                             variant.videoPaths.add(file.path);
                                           } else {
                                             variant.imagePaths.add(file.path);
@@ -225,51 +1443,154 @@ class _InventoryScreenState extends State<InventoryScreen>
                                     }
                                   },
                                   child: Container(
-                                    width: 60, height: 60,
-                                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.green.shade100)),
-                                    child: const Icon(Icons.collections, size: 30, color: Colors.green),
+                                    width: 60,
+                                    height: 60,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: Colors.green.shade100,
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.collections,
+                                      size: 30,
+                                      color: Colors.green,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
+                                  flex: 2,
                                   child: SingleChildScrollView(
                                     scrollDirection: Axis.horizontal,
                                     child: Row(
                                       children: [
-                                        ...variant.imagePaths.map((path) => _buildMediaThumbnail(path, true, variant.isAsset, () => setM(() => variant.imagePaths.remove(path)))),
-                                        ...variant.videoPaths.map((path) => _buildMediaThumbnail(path, false, variant.isAsset, () => setM(() => variant.videoPaths.remove(path)))),
+                                        ...variant.imagePaths.map(
+                                          (path) => _buildMediaThumbnail(
+                                            path,
+                                            true,
+                                            variant.isAsset,
+                                            () => setM(() => variant.imagePaths.remove(path)),
+                                          ),
+                                        ),
+                                        ...variant.videoPaths.map(
+                                          (path) => _buildMediaThumbnail(
+                                            path,
+                                            false,
+                                            variant.isAsset,
+                                            () => setM(() => variant.videoPaths.remove(path)),
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
-                                  child: TextField(
-                                    onChanged: (v) => variant.colorName = v,
-                                    controller: TextEditingController(text: variant.colorName)..selection = TextSelection.fromPosition(TextPosition(offset: variant.colorName.length)),
-                                    decoration: const InputDecoration(hintText: "Color", border: InputBorder.none, isDense: true),
+                                  flex: 3,
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextField(
+                                          onChanged: (v) =>
+                                              variant.colorName = v,
+                                          controller:
+                                              TextEditingController(
+                                                  text: variant.colorName,
+                                                )
+                                                ..selection =
+                                                    TextSelection.fromPosition(
+                                                      TextPosition(
+                                                        offset: variant
+                                                            .colorName
+                                                            .length,
+                                                      ),
+                                                    ),
+                                          decoration: const InputDecoration(
+                                            hintText: "Color",
+                                            border: InputBorder.none,
+                                            isDense: true,
+                                            contentPadding: EdgeInsets.symmetric(vertical: 8),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      _buildColorPicker(variant, setM),
+                                    ],
                                   ),
                                 ),
                                 if (workingVariants.length > 1)
-                                  IconButton(icon: const Icon(Icons.remove_circle_outline, color: Colors.red), onPressed: () => setM(() => workingVariants.removeAt(idx))),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline,
+                                      color: Colors.red,
+                                    ),
+                                    onPressed: () => setM(
+                                      () => workingVariants.removeAt(idx),
+                                    ),
+                                  ),
                               ],
                             ),
                             const SizedBox(height: 8),
                             Row(
                               children: [
-                                Expanded(child: TextField(
-                                  onChanged: (v) => variant.price = double.tryParse(v) ?? 0,
-                                  keyboardType: TextInputType.number,
-                                  decoration: const InputDecoration(labelText: "Price (Tk)", prefixText: "Tk "),
-                                  controller: TextEditingController(text: variant.price > 0 ? variant.price.toString() : "")..selection = TextSelection.fromPosition(TextPosition(offset: (variant.price > 0 ? variant.price.toString() : "").length)),
-                                )),
+                                Expanded(
+                                  child: TextField(
+                                    onChanged: (v) =>
+                                        variant.price = double.tryParse(v) ?? 0,
+                                    controller:
+                                        TextEditingController(
+                                            text: variant.price > 0
+                                                ? variant.price.toString()
+                                                : "",
+                                          )
+                                          ..selection =
+                                              TextSelection.fromPosition(
+                                                TextPosition(
+                                                  offset:
+                                                      (variant.price > 0
+                                                              ? variant.price
+                                                                    .toString()
+                                                              : "")
+                                                          .length,
+                                                ),
+                                              ),
+                                    keyboardType: TextInputType.number,
+                                    decoration: const InputDecoration(
+                                      labelText: "Price (Tk)",
+                                      prefixText: "Tk ",
+                                    ),
+                                  ),
+                                ),
                                 const SizedBox(width: 15),
-                                Expanded(child: TextField(
-                                  onChanged: (v) => variant.stock = int.tryParse(v) ?? 0,
-                                  keyboardType: TextInputType.number,
-                                  decoration: const InputDecoration(labelText: "Stock"),
-                                  controller: TextEditingController(text: variant.stock > 0 ? variant.stock.toString() : "")..selection = TextSelection.fromPosition(TextPosition(offset: (variant.stock > 0 ? variant.stock.toString() : "").length)),
-                                )),
+                                Expanded(
+                                  child: TextField(
+                                    onChanged: (v) =>
+                                        variant.stock = int.tryParse(v) ?? 0,
+                                    controller:
+                                        TextEditingController(
+                                            text: variant.stock > 0
+                                                ? variant.stock.toString()
+                                                : "",
+                                          )
+                                          ..selection =
+                                              TextSelection.fromPosition(
+                                                TextPosition(
+                                                  offset:
+                                                      (variant.stock > 0
+                                                              ? variant.stock
+                                                                    .toString()
+                                                              : "")
+                                                          .length,
+                                                ),
+                                              ),
+                                    keyboardType: TextInputType.number,
+                                    decoration: const InputDecoration(
+                                      labelText: "Stock",
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
                           ],
@@ -277,58 +1598,189 @@ class _InventoryScreenState extends State<InventoryScreen>
                       );
                     }),
 
-                    TextField(controller: name, decoration: const InputDecoration(labelText: "Product Name")),
                     const SizedBox(height: 10),
-                    TextField(controller: desc, maxLines: 2, decoration: const InputDecoration(labelText: "Description")),
+                    TextField(
+                      controller: name,
+                      decoration: const InputDecoration(
+                        labelText: "Product Name (e.g. Pure Silk Saree)",
+                      ),
+                    ),
                     const SizedBox(height: 10),
-                    TextField(controller: sku, decoration: const InputDecoration(labelText: "Product Code (SKU)")),
+                    TextField(
+                      controller: desc,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: "Description",
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: sku,
+                      enabled: item == null,
+                      decoration: InputDecoration(
+                        labelText: "Product Code (SKU)",
+                        helperText: item == null
+                            ? null
+                            : "SKU cannot be changed after creation",
+                      ),
+                    ),
 
                     if (category == "Fabric") ...[
                       const SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text("Material Composition", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade900)),
-                          TextButton.icon(
-                            onPressed: () => setM(() => workingBlends.add(MaterialBlend(type: "", blend: 0))),
-                            icon: const Icon(Icons.add, size: 18), label: const Text("Add Material"),
-                          ),
-                        ],
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "Material Composition",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade900,
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: () => setM(
+                                () => workingMaterialBlends.add(
+                                  FabricMaterialBlend(material: ""),
+                                ),
+                              ),
+                              icon: const Icon(Icons.add, size: 18),
+                              label: const Text("Add Material"),
+                            ),
+                          ],
+                        ),
                       ),
-                      ...workingBlends.asMap().entries.map((e) => _buildMaterialBlendRow(e.value, e.key, workingBlends, setM)),
+                      const SizedBox(height: 10),
+                      ...workingMaterialBlends.asMap().entries.map((entry) {
+                        return _buildMaterialBlendRow(
+                          entry.value,
+                          entry.key,
+                          workingMaterialBlends,
+                          setM,
+                        );
+                      }),
+                    ],
+
+                    if (category == "Fabric") ...[
                       const SizedBox(height: 25),
-                      Text("Care Instructions", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade900)),
-                      _buildCareSwitch("Machine Washable", canWash, (v) => setM(() => canWash = v)),
-                      _buildCareSwitch("Bleach Allowed", canBleach, (v) => setM(() => canBleach = v)),
-                      _buildCareSwitch("Dry Clean Only", canDryClean, (v) => setM(() => canDryClean = v)),
-                      _buildCareSwitch("Tumble Dry", canTumbleDry, (v) => setM(() => canTumbleDry = v)),
-                      DropdownButtonFormField(
-                        value: ironLevel,
-                        items: ["None", "Low", "Medium", "High"].map((e) => DropdownMenuItem(value: e, child: Text("Iron Level: $e"))).toList(),
-                        onChanged: (v) => setM(() => ironLevel = v.toString()),
-                        decoration: const InputDecoration(labelText: "Ironing"),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          "Care Instructions",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green.shade900,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _buildCareSwitch(
+                        "Machine Washable",
+                        canWash,
+                        (v) => setM(() => canWash = v),
+                        info: "Indicates whether the garment can be safely washed in a washing machine and the recommended washing conditions. Following these instructions helps maintain the fabric's quality, color, and shape.",
+                      ),
+                      _buildCareSwitch(
+                        "Bleach Allowed",
+                        canBleach,
+                        (v) => setM(() => canBleach = v),
+                        info: "Indicates whether bleach can be safely used on the fabric. Some materials may fade, weaken, or become damaged when exposed to bleach.",
+                      ),
+                      _buildCareSwitch(
+                        "Dry Clean Only",
+                        canDryClean,
+                        (v) => setM(() => canDryClean = v),
+                        info: "Indicates whether the garment should be professionally cleaned using special solvents instead of water. This method is recommended for delicate fabrics or garments with special finishes.",
+                      ),
+                      _buildCareSwitch(
+                        "Tumble Dry",
+                        canTumbleDry,
+                        (v) => setM(() => canTumbleDry = v),
+                        info: "Tumble drying is the process of drying clothes in a clothes dryer (dryer machine) instead of hanging them to air dry. It indicates whether the garment is suitable for tumble drying and the recommended heat setting. Using the wrong drying method may cause shrinking or fabric damage.",
+                      ),
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: SizedBox(
+                          width: 260,
+                          child: Row(
+                            children: [
+                              GestureDetector(
+                                onTap: () => _showInfoDialog("Iron Level", "Indicates the maximum ironing temperature that is safe for the fabric. Using excessive heat may damage, shrink, or burn the material."),
+                                child: Icon(Icons.info_outline, size: 20, color: Colors.blue.shade300),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: DropdownButtonFormField(
+                                  initialValue: ironLevel,
+                                  items: ["None", "Low", "Medium", "High"]
+                                      .map(
+                                        (e) => DropdownMenuItem(
+                                          value: e,
+                                          child: Text("Iron Level: $e"),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (v) => setM(() => ironLevel = v.toString()),
+                                  decoration: const InputDecoration(labelText: "Ironing"),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
 
                     const SizedBox(height: 40),
                     SizedBox(
-                      width: double.infinity, height: 55,
+                      width: double.infinity,
+                      height: 55,
                       child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade800, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade800,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
                         onPressed: () async {
                           if (_retailerId == null) return;
-                          setM(() => isSaving = true);
+                          
+                          if (workingVariants.any(
+                            (v) =>
+                                (v.imagePaths.isEmpty && v.videoPaths.isEmpty) ||
+                                v.colorName.isEmpty ||
+                                v.price <= 0 ||
+                                v.stock <= 0,
+                          )) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  "Please provide color, media, price and stock for all variants",
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
+                          // 🔄 Show a loading overlay or state if needed
+                          // For simplicity, we'll just disable the button or use a local isSaving if we had one.
+                          // But to keep UI same, we just proceed.
+
                           try {
                             List<ColorOption> finalColorOptions = [];
                             for (int i = 0; i < workingVariants.length; i++) {
                               final v = workingVariants[i];
+                              // Upload new media to Cloudinary
                               final imageUrls = await _inventoryService.uploadMedia(v.imagePaths, folder: 'products/images');
                               final videoUrls = await _inventoryService.uploadMedia(v.videoPaths, folder: 'products/videos');
+                              
                               finalColorOptions.add(ColorOption(
                                 optionId: i + 1,
                                 color: v.colorName,
-                                images: imageUrls,
-                                videos: videoUrls,
+                                image: imageUrls,
+                                video: videoUrls,
                                 price: v.price,
                                 stock: v.stock,
                               ));
@@ -347,7 +1799,9 @@ class _InventoryScreenState extends State<InventoryScreen>
                               productName: name.text,
                               category: category,
                               productCode: sku.text,
-                              materialType: category == "Fabric" ? workingBlends.where((b) => b.type.isNotEmpty).toList() : [],
+                              materialType: category == "Fabric" 
+                                ? workingMaterialBlends.where((b) => b.material.isNotEmpty).map((b) => MaterialBlend(type: b.material, blend: double.tryParse(b.blend.replaceAll('%', '')) ?? 0)).toList()
+                                : [],
                               colorOptions: finalColorOptions,
                               description: desc.text,
                               careSymbol: careSymbols,
@@ -358,14 +1812,24 @@ class _InventoryScreenState extends State<InventoryScreen>
                             } else {
                               await _inventoryService.updateProduct(item.id, product.toJson());
                             }
-                            if (context.mounted) Navigator.pop(context);
+
+                            if (context.mounted) Navigator.of(context).pop();
                           } catch (e) {
                             debugPrint("Error saving product: $e");
-                            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-                            setM(() => isSaving = false);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text("Error saving: $e")),
+                              );
+                            }
                           }
                         },
-                        child: Text(item == null ? "Add Item" : "Save Changes", style: const TextStyle(color: Colors.white, fontSize: 16)),
+                        child: Text(
+                          item == null ? "Add Item" : "Save Changes",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -378,125 +1842,183 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  // ─── WIDGETS ─────────────────────────────────────────────────────────────
-
-  Widget _buildMediaThumbnail(String path, bool isImage, bool isAsset, VoidCallback onRemove) {
-    return Stack(
-      children: [
-        Container(
-          margin: const EdgeInsets.only(right: 8), width: 50, height: 50,
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.green.shade100)),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(7),
-            child: path.startsWith('http') 
-              ? Image.network(path, fit: BoxFit.cover)
-              : isImage 
-                ? (isAsset ? Image.asset(path, fit: BoxFit.cover) : Image.file(File(path), fit: BoxFit.cover))
-                : Container(color: Colors.black87, child: const Icon(Icons.videocam, color: Colors.white, size: 20)),
+  Widget _buildTypeToggle(String label, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.green.shade800 : Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+            color: isSelected ? Colors.green.shade800 : Colors.grey.shade300,
           ),
         ),
-        Positioned(top: 0, right: 8, child: GestureDetector(onTap: onRemove, child: Container(padding: const EdgeInsets.all(2), decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle), child: const Icon(Icons.close, size: 10, color: Colors.white)))),
-      ],
-    );
-  }
-
-  Widget _buildMaterialBlendRow(MaterialBlend blend, int index, List<MaterialBlend> blends, StateSetter setM) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.grey.shade200)),
-      child: Row(
-        children: [
-          Expanded(flex: 3, child: TextField(
-            controller: TextEditingController(text: blend.type)..selection = TextSelection.fromPosition(TextPosition(offset: blend.type.length)),
-            onChanged: (v) => setM(() => blends[index] = MaterialBlend(type: v, blend: blend.blend)),
-            decoration: InputDecoration(
-              labelText: "Material",
-              suffixIcon: PopupMenuButton<String>(
-                icon: const Icon(Icons.arrow_drop_down),
-                onSelected: (v) => setM(() {
-                  // Actually update the object in the list
-                  blends[index] = MaterialBlend(type: v, blend: blend.blend);
-                }),
-                itemBuilder: (c) => _commonMaterials.map((m) => PopupMenuItem(value: m, child: Text(m))).toList(),
-              ),
-            ),
-          )),
-          const SizedBox(width: 10),
-          Expanded(flex: 2, child: TextField(
-            keyboardType: TextInputType.number,
-            onChanged: (v) => blends[index] = MaterialBlend(type: blend.type, blend: double.tryParse(v) ?? 0),
-            decoration: const InputDecoration(labelText: "Blend %"),
-          )),
-          if (blends.length > 1) IconButton(icon: const Icon(Icons.remove_circle_outline, color: Colors.red), onPressed: () => setM(() => blends.removeAt(index))),
-        ],
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.black87,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildCareSwitch(String label, bool value, Function(bool) onChanged) {
+  Widget _buildCareSwitch(String label, bool value, Function(bool) onChanged, {String? info}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 14, color: Colors.black54)),
-        Switch(value: value, activeThumbColor: Colors.green.shade700, onChanged: onChanged),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (info != null)
+              GestureDetector(
+                onTap: () => _showInfoDialog(label, info),
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: Icon(Icons.info_outline, size: 20, color: Colors.blue.shade300),
+                ),
+              ),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 14, color: Colors.black54),
+            ),
+          ],
+        ),
+        Switch(
+          value: value,
+          activeThumbColor: Colors.green.shade700,
+          onChanged: onChanged,
+        ),
       ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_retailerId == null) return const Scaffold(body: Center(child: Text("Please login to see inventory")));
-
+    final filteredItems = _filteredItems;
     return Scaffold(
       backgroundColor: const Color(0xFFF9FBF9),
-      appBar: AppBar(title: const Text("Retailer Inventory", style: TextStyle(fontWeight: FontWeight.bold)), centerTitle: true, backgroundColor: Colors.white, elevation: 0, foregroundColor: Colors.black),
-      floatingActionButton: FloatingActionButton.extended(onPressed: () => showItemForm(), backgroundColor: Colors.green.shade800, icon: const Icon(Icons.add, color: Colors.white), label: const Text("Add Product", style: TextStyle(color: Colors.white))),
-      body: StreamBuilder<List<Product>>(
-        stream: _inventoryService.streamRetailerProducts(_retailerId!),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-          if (snapshot.hasError) return Center(child: Text("Error: ${snapshot.error}"));
-          final items = snapshot.data ?? [];
-          final filteredItems = items.where((i) => i.productName.toLowerCase().contains(_searchQuery.toLowerCase()) || i.productCode.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-
-          return Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                _inventorySummary(items.length),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: _searchController,
-                  onChanged: (v) => setState(() => _searchQuery = v),
-                  decoration: InputDecoration(hintText: "Search your products...", prefixIcon: const Icon(Icons.search), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
-                ),
-                const SizedBox(height: 20),
-                Expanded(
-                  child: filteredItems.isEmpty
-                    ? const Center(child: Text("No products found"))
-                    : GridView.builder(
-                        controller: _scrollController,
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.55, mainAxisSpacing: 15, crossAxisSpacing: 15),
-                        itemCount: filteredItems.length,
-                        itemBuilder: (c, i) => _buildProductCard(filteredItems[i]),
-                      ),
-                ),
-              ],
+      appBar: AppBar(
+        title: const Text(
+          "Retailer Inventory",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: Colors.black,
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => showItemForm(),
+        backgroundColor: Colors.green.shade800,
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text("Add Product", style: TextStyle(color: Colors.white)),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: _inventorySummary(items.length),
             ),
-          );
-        }
+            const SizedBox(height: 14),
+            TextField(
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+              decoration: InputDecoration(
+                hintText: "Search your products...",
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(15),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: filteredItems.isEmpty
+                  ? Center(
+                      child: Text(
+                        _searchQuery.isEmpty
+                            ? "No items in inventory yet"
+                            : "No products match your search",
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    )
+                  : GridView.builder(
+                      controller: _scrollController,
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            childAspectRatio: 0.55,
+                            mainAxisSpacing: 15,
+                            crossAxisSpacing: 15,
+                          ),
+                      itemCount: filteredItems.length,
+                      itemBuilder: (c, i) {
+                        return _buildAnimatedGridCard(filteredItems[i], i);
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildProductCard(Product item) {
+  Widget _buildAnimatedGridCard(InventoryItem item, int index) {
+    return TweenAnimationBuilder<double>(
+      key: ValueKey('${item.sku}-$_gridAnimationSeed'),
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: Duration(milliseconds: 320 + (index * 40)),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 18 * (1 - value)),
+            child: Transform.scale(scale: 0.96 + (0.04 * value), child: child),
+          ),
+        );
+      },
+      child: _buildProductCard(item),
+    );
+  }
+
+  Widget _buildProductCard(InventoryItem item) {
     final selectedVariant = _selectedVariantFor(item);
-    final hasLowStock = _hasLowStockColor(item);
+    final variantIndex = selectedVariant == null
+        ? -1
+        : item.variants.indexOf(selectedVariant);
+    final hasLowStockColor = _hasLowStockColor(item);
 
     return GestureDetector(
       onTap: () => _showProductPreview(item),
       child: Container(
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5))]),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -506,15 +2028,85 @@ class _InventoryScreenState extends State<InventoryScreen>
                 fit: StackFit.expand,
                 children: [
                   _buildVariantImage(selectedVariant),
-                  Positioned(top: 8, right: 8, child: Row(children: [
-                    _actionBtn(Icons.edit, Colors.blue, () => showItemForm(item: item)),
-                    const SizedBox(width: 5),
-                    _actionBtn(Icons.delete, Colors.red, () async {
-                      final confirm = await showDialog<bool>(context: context, builder: (c) => AlertDialog(title: const Text("Delete Product?"), actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text("Cancel")), TextButton(onPressed: () => Navigator.pop(c, true), child: const Text("Delete"))]));
-                      if (confirm == true) await _inventoryService.deleteProduct(item.id);
-                    }),
-                  ])),
-                  Positioned(bottom: 10, left: 10, child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(8)), child: Text("${selectedVariant?.color ?? 'N/A'}: ${selectedVariant?.stock ?? 0}", style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)))),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    left: 8,
+                    child: Align(
+                      alignment: Alignment.topRight,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.topRight,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _actionBtn(
+                              Icons.edit,
+                              Colors.blue,
+                              () => showItemForm(item: item),
+                            ),
+                            const SizedBox(width: 5),
+                            _actionBtn(Icons.delete, Colors.red, () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: const Text("Delete Product"),
+                                  content: Text("Are you sure you want to delete ${item.name}?"),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx, false),
+                                      child: const Text("Cancel"),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx, true),
+                                      child: const Text("Delete", style: TextStyle(color: Colors.red)),
+                                    ),
+                                  ],
+                                ),
+                              );
+
+                              if (confirm == true) {
+                                try {
+                                  await _inventoryService.deleteProduct(item.id);
+                                  // The stream listener will automatically remove it from the UI
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text("Error deleting product: $e")),
+                                    );
+                                  }
+                                }
+                              }
+                            }),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 10,
+                    left: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black87,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        selectedVariant == null
+                            ? "No stock"
+                            : "${selectedVariant.colorName}: ${selectedVariant.stock}",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -523,34 +2115,189 @@ class _InventoryScreenState extends State<InventoryScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item.productName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  const SizedBox(height: 4),
-                  Row(children: [
-                    Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(5)), child: Text(item.category, style: TextStyle(color: Colors.green.shade800, fontSize: 10, fontWeight: FontWeight.bold))),
-                    const SizedBox(width: 5),
-                    Expanded(child: Text(item.productCode, style: const TextStyle(color: Colors.grey, fontSize: 10), overflow: TextOverflow.ellipsis)),
-                  ]),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 30,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: item.colorOptions.length,
-                      separatorBuilder: (_, ___) => const SizedBox(width: 6),
-                      itemBuilder: (c, idx) {
-                        final v = item.colorOptions[idx];
-                        final isSelected = selectedVariant == v;
-                        return GestureDetector(
-                          onTap: () => setState(() => _selectedVariantIndexes[item.id] = idx),
-                          child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), decoration: BoxDecoration(color: isSelected ? Colors.green.shade800 : Colors.green.shade50, borderRadius: BorderRadius.circular(8)), child: Text(v.color, style: TextStyle(color: isSelected ? Colors.white : Colors.green.shade900, fontSize: 10, fontWeight: FontWeight.bold))),
-                        );
-                      },
+                  Text(
+                    item.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
                     ),
                   ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          child: Text(
+                            _materialLabelFor(item),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.green.shade800,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          item.sku,
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 10,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 8),
-                  if (hasLowStock) Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(7)), child: Text(_lowStockTextFor(item), style: TextStyle(color: Colors.red.shade700, fontSize: 10, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                  Text(
+                    item.description,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.black54, fontSize: 11),
+                  ),
+                  const SizedBox(height: 5),
+                  SizedBox(
+                    height: 30,
+                    child: item.variants.isEmpty
+                        ? const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              "No colors",
+                              style: TextStyle(
+                                color: Colors.black45,
+                                fontSize: 10,
+                              ),
+                            ),
+                          )
+                        : ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: item.variants.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: 6),
+                            itemBuilder: (context, index) {
+                              final variant = item.variants[index];
+                              final isSelected = index == variantIndex;
+                              return GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedVariantIndexes[_itemKey(item)] =
+                                        index;
+                                  });
+                                },
+                                child: Container(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 82,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? Colors.green.shade800
+                                        : Colors.green.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? Colors.green.shade800
+                                          : Colors.green.shade100,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    variant.colorName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? Colors.white
+                                          : Colors.green.shade900,
+                                      fontSize: 10,
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
                   const SizedBox(height: 8),
-                  Text("Tk ${selectedVariant?.price.toInt() ?? 0}", style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.w900, fontSize: 15)),
+                  if (hasLowStockColor) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      child: Text(
+                        _lowStockTextFor(item),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        selectedVariant == null
+                            ? "Tk 0"
+                            : "Tk ${selectedVariant.price.toInt()}",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.green.shade900,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                        ),
+                      ),
+                      Text(
+                        "Total: ${item.totalStock}",
+                        style: const TextStyle(
+                          color: Colors.black45,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (item.category == "Fabric")
+                        GestureDetector(
+                          onTap: () => _showProductPreview(item),
+                          child: Icon(
+                            Icons.info_outline,
+                            size: 16,
+                            color: Colors.green.shade300,
+                          ),
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -560,82 +2307,191 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  Widget _buildVariantImage(ColorOption? variant) {
-    if (variant == null || variant.images.isEmpty) return Container(color: Colors.green.shade50, child: Icon(Icons.image_not_supported_outlined, color: Colors.green.shade200));
-    final path = variant.images.first;
-    if (path.startsWith('http')) return Image.network(path, fit: BoxFit.cover);
-    if (path.startsWith('assets/')) return Image.asset(path, fit: BoxFit.cover);
-    return Image.file(File(path), fit: BoxFit.cover);
-  }
+  Widget _buildVariantImage(ProductColorVariant? variant) {
+    if (variant == null) return _imagePlaceholder();
+    
+    if (variant.imagePaths.isEmpty) {
+      if (variant.videoPaths.isNotEmpty) {
+        return Container(
+          color: Colors.blue.shade50,
+          child: const Icon(Icons.videocam, color: Colors.blue, size: 40),
+        );
+      }
+      return _imagePlaceholder();
+    }
 
-  Widget _actionBtn(IconData icon, Color color, VoidCallback onTap) {
-    return GestureDetector(onTap: onTap, child: Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.9), shape: BoxShape.circle), child: Icon(icon, size: 14, color: color)));
-  }
+    final path = variant.imagePaths.first.trim();
+    if (path.isEmpty) return _imagePlaceholder();
 
-  Widget _inventorySummary(int count) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(14)),
-      child: Row(children: [
-        Icon(Icons.inventory_2_outlined, size: 18, color: Colors.green.shade800),
-        const SizedBox(width: 8),
-        Text("$count", style: TextStyle(color: Colors.green.shade900, fontSize: 14, fontWeight: FontWeight.w900)),
-        const SizedBox(width: 4),
-        const Expanded(child: Text("products available in inventory", style: TextStyle(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.w700))),
-      ]),
+    // Use Uri to reliably check for network scheme
+    final uri = Uri.tryParse(path);
+    final bool isNetwork = uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
+
+    if (isNetwork) {
+      return Image.network(
+        path, 
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _imageError(path),
+      );
+    }
+    
+    if (variant.isAsset || path.toLowerCase().startsWith('assets/')) {
+      return Image.asset(
+        path, 
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _imageError(path),
+      );
+    }
+
+    return Image.file(
+      File(path), 
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => _imageError(path),
     );
   }
 
-  Future<void> _showProductPreview(Product item) async {
-    ColorOption selectedVariant = _selectedVariantFor(item) ?? item.colorOptions.first;
+  Widget _imagePlaceholder() {
+    return Container(
+      color: Colors.green.shade50,
+      child: Icon(
+        Icons.image_not_supported_outlined,
+        color: Colors.green.shade200,
+      ),
+    );
+  }
 
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => StatefulBuilder(builder: (context, setP) {
-        return DraggableScrollableSheet(
-          expand: false, initialChildSize: 0.9,
-          builder: (context, scroll) => Container(
-            decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
-            padding: const EdgeInsets.all(24),
-            child: SingleChildScrollView(
-              controller: scroll,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 20),
-                  SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
-                    ...selectedVariant.images.map((p) => Padding(padding: const EdgeInsets.only(right: 12), child: ClipRRect(borderRadius: BorderRadius.circular(20), child: _buildVariantImage(selectedVariant.copyWith(images: [p]))))),
-                    ...selectedVariant.videos.map((p) => Padding(padding: const EdgeInsets.only(right: 12), child: ClipRRect(borderRadius: BorderRadius.circular(20), child: VideoPreviewPlayer(videoPath: p, isAsset: p.startsWith('assets/'), height: 250, width: 200)))),
-                  ])),
-                  const SizedBox(height: 20),
-                  Text(item.productName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                  Text("Tk ${selectedVariant.price.toInt()}", style: TextStyle(fontSize: 20, color: Colors.green.shade800, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 20),
-                  const Text("Description", style: TextStyle(fontWeight: FontWeight.bold)),
-                  Text(item.description, style: const TextStyle(color: Colors.black54)),
-                  const SizedBox(height: 20),
-                  const Text("Colors", style: TextStyle(fontWeight: FontWeight.bold)),
-                  Wrap(spacing: 10, children: item.colorOptions.map((v) {
-                    final isSel = v == selectedVariant;
-                    return ChoiceChip(label: Text(v.color), selected: isSel, onSelected: (s) => setP(() => selectedVariant = v));
-                  }).toList()),
-                  const SizedBox(height: 20),
-                  if (item.category == "Fabric") ...[
-                    const Text("Composition", style: TextStyle(fontWeight: FontWeight.bold)),
-                    ...item.materialType.map((m) => Text("${m.blend}% ${m.type}")),
-                    const SizedBox(height: 20),
-                    const Text("Care", style: TextStyle(fontWeight: FontWeight.bold)),
-                    ...item.careSymbol.map((s) => Text("• $s")),
-                  ],
-                  const SizedBox(height: 40),
-                ],
+  Widget _imageError(String path) {
+    debugPrint("Error loading image at path: $path");
+    return Container(
+      color: Colors.red.shade50,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, color: Colors.red.shade300),
+          const SizedBox(height: 4),
+          const Text("Error", style: TextStyle(fontSize: 8, color: Colors.red)),
+        ],
+      ),
+    );
+  }
+
+  Widget _actionBtn(IconData icon, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.95),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, size: 14, color: color),
+      ),
+    );
+  }
+
+  Widget _inventorySummary(int itemCount) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.inventory_2_outlined,
+            size: 18,
+            color: Colors.green.shade800,
+          ),
+          const SizedBox(width: 8),
+          CountUpText(
+            begin: 0,
+            end: itemCount.toDouble(),
+            style: TextStyle(
+              color: Colors.green.shade900,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(width: 4),
+          const Expanded(
+            child: Text(
+              "products currently available in inventory",
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.black87,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
-        );
-      }),
+        ],
+      ),
+    );
+  }
+}
+
+class CountUpText extends StatefulWidget {
+  final double begin;
+  final double end;
+  final Duration duration;
+  final TextStyle style;
+
+  const CountUpText({
+    super.key,
+    required this.begin,
+    required this.end,
+    this.duration = const Duration(seconds: 1),
+    required this.style,
+  });
+
+  @override
+  State<CountUpText> createState() => _CountUpTextState();
+}
+
+class _CountUpTextState extends State<CountUpText>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: widget.duration);
+    _animation = Tween<double>(
+      begin: widget.begin,
+      end: widget.end,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    _controller.forward();
+  }
+
+  @override
+  void didUpdateWidget(CountUpText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.end != widget.end) {
+      _animation = Tween<double>(
+        begin: oldWidget.end,
+        end: widget.end,
+      ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+      _controller.reset();
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Text(_animation.value.toInt().toString(), style: widget.style);
+      },
     );
   }
 }
