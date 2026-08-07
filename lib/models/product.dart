@@ -5,16 +5,16 @@ import 'order_item.dart';
 class ColorOption {
   final int optionId;
   final String color;
-  final List<String> images; // Changed from String? image to List<String>
-  final List<String> videos; // Changed from String? video to List<String>
+  final List<String> image; // Matches "image" array in Firestore schema
+  final List<String> video; // Matches "video" array in Firestore schema
   final double price;
   final int stock;
 
   ColorOption({
     required this.optionId,
     required this.color,
-    required this.images,
-    required this.videos,
+    required this.image,
+    required this.video,
     required this.price,
     this.stock = 0,
   });
@@ -22,16 +22,16 @@ class ColorOption {
   ColorOption copyWith({
     int? optionId,
     String? color,
-    List<String>? images,
-    List<String>? videos,
+    List<String>? image,
+    List<String>? video,
     double? price,
     int? stock,
   }) {
     return ColorOption(
       optionId: optionId ?? this.optionId,
       color: color ?? this.color,
-      images: images ?? this.images,
-      videos: videos ?? this.videos,
+      image: image ?? this.image,
+      video: video ?? this.video,
       price: price ?? this.price,
       stock: stock ?? this.stock,
     );
@@ -40,33 +40,41 @@ class ColorOption {
   Map<String, dynamic> toJson() => {
     'optionId': optionId,
     'color': color,
-    'images': images,
-    'videos': videos,
+    'image': image, // Schema field: image
+    'video': video, // Schema field: video
     'price': price,
     'stock': stock,
   };
 
   factory ColorOption.fromJson(Map<String, dynamic> json) {
-    // Handle migration from single image/video if necessary, or just use lists
+    // Schema field names are singular: 'image' and 'video'
     List<String> imageList = [];
-    if (json['images'] is List) {
+    if (json['image'] is List) {
+      imageList = List<String>.from(json['image']);
+    } else if (json['images'] is List) {
+      // Compatibility with previous plural format
       imageList = List<String>.from(json['images']);
     } else if (json['image'] != null) {
+      // Handle legacy single string if any
       imageList = [json['image'].toString()];
     }
 
     List<String> videoList = [];
-    if (json['videos'] is List) {
+    if (json['video'] is List) {
+      videoList = List<String>.from(json['video']);
+    } else if (json['videos'] is List) {
+      // Compatibility with previous plural format
       videoList = List<String>.from(json['videos']);
     } else if (json['video'] != null) {
+      // Handle legacy single string if any
       videoList = [json['video'].toString()];
     }
 
     return ColorOption(
       optionId: json['optionId'] ?? 0,
       color: json['color'] ?? '',
-      images: imageList,
-      videos: videoList,
+      image: imageList,
+      video: videoList,
       price: (json['price'] ?? 0).toDouble(),
       stock: json['stock'] ?? 0,
     );
@@ -191,8 +199,8 @@ class Product {
         return ColorOption(
           optionId: 0,
           color: item.toString(),
-          images: [],
-          videos: [],
+          image: [],
+          video: [],
           price: 0.0,
           stock: 0,
         );

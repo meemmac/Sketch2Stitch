@@ -6,6 +6,7 @@ abstract class ProductFilterData {
   final List<String> colors; // Changed from String to List<String>
   final List<String> materialTypes;
   final String sortBy;
+  final double minRating; // Added back as common field
 
   ProductFilterData({
     required this.minPrice,
@@ -13,6 +14,7 @@ abstract class ProductFilterData {
     required this.colors,
     required this.materialTypes,
     this.sortBy = 'default',
+    this.minRating = 0.0,
   });
 
   bool get hasFilters {
@@ -20,7 +22,8 @@ abstract class ProductFilterData {
         maxPrice < 5000 ||
         (colors.isNotEmpty && !colors.contains('All')) ||
         (materialTypes.isNotEmpty && !materialTypes.contains('All')) ||
-        sortBy != 'default';
+        sortBy != 'default' ||
+        minRating > 0;
   }
 
   /// Check if a product matches any of the selected colors
@@ -80,6 +83,7 @@ class FabricsFilterData extends ProductFilterData {
     required super.colors,
     required super.materialTypes,
     super.sortBy = 'default',
+    super.minRating = 0.0,
   });
 }
 
@@ -90,6 +94,7 @@ class ElementsFilterData extends ProductFilterData {
     required super.colors,
     required super.materialTypes,
     super.sortBy = 'default',
+    super.minRating = 0.0,
   });
 }
 
@@ -141,6 +146,10 @@ class MaterialFilterOptions {
     'Muslin',
     'Jamdani',
     'Embroidery',
+    'Plastic',
+    'Glass',
+    'Satin',
+    'Lace',
   ];
 
   static List<String> extractFromBlends(List<String> blends) {
