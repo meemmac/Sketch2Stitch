@@ -1253,6 +1253,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     bool canDryClean = item?.canDryClean ?? true;
     bool canTumbleDry = item?.canTumbleDry ?? true;
     String ironLevel = item?.ironLevel ?? "Medium";
+    // Feedback state for form
+    String? formError;
 
     await showModalBottomSheet(
       context: context,
@@ -1298,6 +1300,34 @@ class _InventoryScreenState extends State<InventoryScreen>
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+                    
+                    if (formError != null)
+                      Container(
+                        margin: const EdgeInsets.only(top: 15),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                formError!,
+                                style: TextStyle(
+                                  color: Colors.red.shade900,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    
                     const SizedBox(height: 25),
 
                     // 🏷 Category Selection
@@ -1748,22 +1778,56 @@ class _InventoryScreenState extends State<InventoryScreen>
                         onPressed: () async {
                           if (_retailerId == null) return;
                           
-                          if (workingVariants.any(
-                            (v) =>
-                                (v.imagePaths.isEmpty && v.videoPaths.isEmpty) ||
-                                v.colorName.isEmpty ||
-                                v.price <= 0 ||
-                                v.stock <= 0,
-                          )) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  "Please provide color, media, price and stock for all variants",
-                                ),
-                              ),
+                          // Form Validation
+                          String? error;
+                          if (name.text.trim().isEmpty) {
+                            error = "Product Name is required";
+                          } else if (desc.text.trim().isEmpty) {
+                            error = "Description is required";
+                          } else if (item == null && sku.text.trim().isEmpty) {
+                            error = "Product Code (SKU) is required";
+                          } else if (workingVariants.isEmpty) {
+                            error = "At least one color variant is required";
+                          } else {
+                            for (var v in workingVariants) {
+                              if (v.colorName.trim().isEmpty) {
+                                error = "Color name is required for all variants";
+                                break;
+                              }
+                              if (v.imagePaths.isEmpty && v.videoPaths.isEmpty) {
+                                error = "Media is required for all variants";
+                                break;
+                              }
+                              if (v.price <= 0) {
+                                error = "Price must be greater than 0";
+                                break;
+                              }
+                              if (v.stock < 0) {
+                                error = "Stock cannot be negative";
+                                break;
+                              }
+                            }
+                          }
+
+                          if (category == "Fabric" && error == null) {
+                            if (workingMaterialBlends.isEmpty || workingMaterialBlends.every((b) => b.material.trim().isEmpty)) {
+                              error = "Material composition is required for fabrics";
+                            }
+                          }
+
+                          if (error != null) {
+                            setM(() => formError = error);
+                            // Scroll to top to see error
+                            scrollController.animateTo(
+                              0, 
+                              duration: const Duration(milliseconds: 300), 
+                              curve: Curves.easeOut,
                             );
                             return;
                           }
+
+                          // Clear previous error if any
+                          setM(() => formError = null);
 
                           // 🔄 Show a loading overlay or state if needed
                           // For simplicity, we'll just disable the button or use a local isSaving if we had one.
