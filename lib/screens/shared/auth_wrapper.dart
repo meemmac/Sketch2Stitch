@@ -4,6 +4,7 @@ import 'package:sketch2stitch/screens/customer/home_screen.dart';
 import 'package:sketch2stitch/screens/shared/welcome_screen.dart';
 import 'package:sketch2stitch/services/auth_service.dart';
 import 'package:sketch2stitch/services/user_session.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
 
 /// Gatekeeper widget that decides whether to show the Welcome screen
@@ -68,21 +69,39 @@ class AuthWrapper extends StatelessWidget {
       final profile = await authService.getUserProfile(uid, role);
       if (profile == null) return null;
 
-      // Map model to DrawerProfileData
+      // Robust mapping from Models to DrawerProfileData
+      String name = '';
+      String shopName = '';
+      double rating = 0.0;
+      String? profilePicture = profile.profilePicture;
+      String? about = profile.about ?? '';
+      GeoPoint? location = profile.location;
+
+      if (role == UserRole.customer) {
+        name = profile.name ?? '';
+      } else if (role == UserRole.tailor) {
+        name = profile.name ?? '';
+        rating = profile.rating ?? 0.0;
+      } else if (role == UserRole.retailer) {
+        shopName = profile.shopName ?? '';
+        name = shopName; // Default name to shopName for retailers
+        rating = profile.rating ?? 0.0;
+      }
+
       final drawerData = DrawerProfileData(
-        name: profile.name ?? '',
-        shopName: role == UserRole.retailer ? (profile.shopName ?? '') : '',
+        name: name,
+        shopName: shopName,
         email: profile.email ?? '',
         phone: profile.phone ?? '',
         address: profile.address ?? '',
-        rating: profile.rating ?? 0.0,
-        location: profile.location,
-        profilePicture: profile.profilePicture,
-        about: profile.about ?? '',
+        rating: rating,
+        location: location,
+        profilePicture: profilePicture,
+        about: about,
       );
 
       // Save to global session
-      UserSession.instance.setSession(drawerData, role);
+      UserSession.instance.setSession(drawerData, role, uid: uid);
       
       return role;
     } catch (e) {
