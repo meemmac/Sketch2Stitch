@@ -183,14 +183,20 @@ class InventoryService {
   Future<List<String>> uploadMedia(List<String> filePaths, {String? folder}) async {
     final List<String> urls = [];
     for (final path in filePaths) {
+      final cleanPath = path.trim();
+      if (cleanPath.isEmpty) continue;
+
       // Check if it's already a URL
-      if (path.startsWith('http')) {
-        urls.add(path);
+      if (cleanPath.startsWith('http')) {
+        urls.add(cleanPath);
         continue;
       }
       
-      final file = File(path);
-      if (!await file.exists()) continue;
+      final file = File(cleanPath);
+      if (!await file.exists()) {
+        debugPrint('File not found for upload: $cleanPath');
+        continue;
+      }
 
       final url = await _cloudinary.uploadImage(file, folder: folder);
       if (url != null) {
