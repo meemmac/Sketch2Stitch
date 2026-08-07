@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sketch2stitch/models/product.dart';
@@ -222,6 +224,11 @@ class _InventoryScreenState extends State<InventoryScreen>
   String _searchQuery = "";
   int _gridAnimationSeed = 0;
   final Map<String, int> _selectedVariantIndexes = <String, int>{};
+  
+  // Feedback state
+  String? _feedbackMessage;
+  bool _isFeedbackError = false;
+  Timer? _feedbackTimer;
   
   final InventoryService _inventoryService = InventoryService();
   String? _retailerId;
@@ -494,13 +501,6 @@ class _InventoryScreenState extends State<InventoryScreen>
     return item.variants.any((variant) => variant.stock < 5);
   }
 
-  String _materialTextFrom(List<FabricMaterialBlend> blends) {
-    return blends
-        .where((blend) => blend.material.trim().isNotEmpty)
-        .map((blend) => blend.displayText)
-        .where((text) => text.trim().isNotEmpty)
-        .join(", ");
-  }
 
   List<FabricMaterialBlend> _initialMaterialBlendsFor(InventoryItem? item) {
     if (item == null) {
@@ -600,26 +600,27 @@ class _InventoryScreenState extends State<InventoryScreen>
     });
   }
 
-  Future<void> _saveInventory() async {
-    // This was previously for local storage. 
-    // Now logic is handled in showItemForm for individual items.
-    debugPrint("Save Inventory called - no-op as we use direct Firestore updates now.");
-  }
 
-  void _animateToNewestItem() {
-    if (!_scrollController.hasClients) {
-      return;
-    }
 
-    _scrollController.animateTo(
-      _scrollController.position.maxScrollExtent,
-      duration: const Duration(milliseconds: 700),
-      curve: Curves.easeOutCubic,
-    );
+  void _showFeedback(String message, {bool isError = false}) {
+    _feedbackTimer?.cancel();
+    setState(() {
+      _feedbackMessage = message;
+      _isFeedbackError = isError;
+    });
+
+    _feedbackTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() {
+          _feedbackMessage = null;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
+    _feedbackTimer?.cancel();
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -1306,7 +1307,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                         child: SizedBox(
                           width: 250,
                           child: DropdownButtonFormField<String>(
-                            value: category,
+                            initialValue: category,
                             style: TextStyle(
                               color: Colors.green.shade900,
                               fontWeight: FontWeight.bold,
@@ -1809,18 +1810,17 @@ class _InventoryScreenState extends State<InventoryScreen>
 
                             if (item == null) {
                               await _inventoryService.createProduct(product.toJson());
+                              _showFeedback("Product added successfully!");
                             } else {
                               await _inventoryService.updateProduct(item.id, product.toJson());
+                              _showFeedback("Product updated successfully!");
                             }
 
                             if (context.mounted) Navigator.of(context).pop();
                           } catch (e) {
                             debugPrint("Error saving product: $e");
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text("Error saving: $e")),
-                              );
-                            }
+                            _showFeedback("Error saving product: $e", isError: true);
+                            if (context.mounted) Navigator.of(context).pop();
                           }
                         },
                         child: Text(
@@ -1842,29 +1842,6 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  Widget _buildTypeToggle(String label, bool isSelected, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.green.shade800 : Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(
-            color: isSelected ? Colors.green.shade800 : Colors.grey.shade300,
-          ),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.black87,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildCareSwitch(String label, bool value, Function(bool) onChanged, {String? info}) {
     return Row(
@@ -1917,64 +1894,166 @@ class _InventoryScreenState extends State<InventoryScreen>
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text("Add Product", style: TextStyle(color: Colors.white)),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            SizedBox(
-              width: double.infinity,
-              child: _inventorySummary(items.length),
+      body: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: _inventorySummary(items.length),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _searchController,
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                  decoration: InputDecoration(
+                    hintText: "Search your products...",
+                    prefixIcon: const Icon(Icons.search),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(15),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Expanded(
+                  child: filteredItems.isEmpty
+                      ? Center(
+                          child: Text(
+                            _searchQuery.isEmpty
+                                ? "No items in inventory yet"
+                                : "No products match your search",
+                            style: const TextStyle(
+                              color: Colors.black54,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        )
+                      : GridView.builder(
+                          controller: _scrollController,
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 0.55,
+                                mainAxisSpacing: 15,
+                                crossAxisSpacing: 15,
+                              ),
+                          itemCount: filteredItems.length,
+                          itemBuilder: (c, i) {
+                            return _buildAnimatedGridCard(filteredItems[i], i);
+                          },
+                        ),
+                ),
+              ],
             ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _searchController,
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
-              },
-              decoration: InputDecoration(
-                hintText: "Search your products...",
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(15),
-                  borderSide: BorderSide.none,
+          ),
+
+          // Top Feedback Banner
+          if (_feedbackMessage != null)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: SafeArea(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: _isFeedbackError
+                              ? const Color(0xFFFFEBEE).withValues(alpha: 0.92)
+                              : const Color(0xFFC8E6C9).withValues(alpha: 0.92),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: _isFeedbackError
+                                ? const Color(0xFFFFCDD2)
+                                : const Color(0xFF9CCC9F),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _isFeedbackError
+                                  ? const Color(0xFFD32F2F).withValues(alpha: 0.10)
+                                  : const Color(0xFF2E7D32).withValues(alpha: 0.10),
+                              blurRadius: 20,
+                              spreadRadius: 1,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: _isFeedbackError
+                                    ? const Color(0xFFE53935)
+                                    : const Color(0xFF4CAF50),
+                                border: Border.all(
+                                  color: _isFeedbackError
+                                      ? const Color(0xFFEF9A9A)
+                                      : const Color(0xFFA5D6A7),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Icon(
+                                _isFeedbackError ? Icons.close_rounded : Icons.check_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                _feedbackMessage!,
+                                style: const TextStyle(
+                                  color: Color(0xFF222222),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () => setState(() => _feedbackMessage = null),
+                              child: Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withValues(alpha: 0.35),
+                                ),
+                                child: Icon(
+                                  Icons.close_rounded,
+                                  color: Colors.black.withValues(alpha: 0.45),
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: filteredItems.isEmpty
-                  ? Center(
-                      child: Text(
-                        _searchQuery.isEmpty
-                            ? "No items in inventory yet"
-                            : "No products match your search",
-                        style: const TextStyle(
-                          color: Colors.black54,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    )
-                  : GridView.builder(
-                      controller: _scrollController,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 0.55,
-                            mainAxisSpacing: 15,
-                            crossAxisSpacing: 15,
-                          ),
-                      itemCount: filteredItems.length,
-                      itemBuilder: (c, i) {
-                        return _buildAnimatedGridCard(filteredItems[i], i);
-                      },
-                    ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -2068,13 +2147,10 @@ class _InventoryScreenState extends State<InventoryScreen>
                               if (confirm == true) {
                                 try {
                                   await _inventoryService.deleteProduct(item.id);
-                                  // The stream listener will automatically remove it from the UI
+                                  _showFeedback("Product deleted successfully!");
                                 } catch (e) {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text("Error deleting product: $e")),
-                                    );
-                                  }
+                                  debugPrint("Error deleting product: $e");
+                                  _showFeedback("Error deleting product: $e", isError: true);
                                 }
                               }
                             }),
@@ -2187,7 +2263,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                         : ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: item.variants.length,
-                            separatorBuilder: (_, __) =>
+                            separatorBuilder: (context, index) =>
                                 const SizedBox(width: 6),
                             itemBuilder: (context, index) {
                               final variant = item.variants[index];
