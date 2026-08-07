@@ -46,7 +46,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
       return widget.materialBlends!.join(", ");
     }
 
-    final material = widget.product.materialType.trim();
+    final material = widget.product.materialType.isNotEmpty ? widget.product.materialType.first.type : "";
     if (material.isEmpty || material == "N/A") {
       return "N/A";
     }
@@ -569,47 +569,52 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
   }
 
   Widget _buildProductImage() {
-    final imageUrl = _selectedOption?.image;
-    final videoUrl = _selectedOption?.video;
+    final imageUrl = _selectedOption != null && _selectedOption!.image.isNotEmpty ? _selectedOption!.image.first : null;
+    final videoUrl = _selectedOption != null && _selectedOption!.video.isNotEmpty ? _selectedOption!.video.first : null;
     final screenWidth = MediaQuery.of(context).size.width;
     final imageWidth = screenWidth * 0.75;
     final imageHeight = 250.0;
 
-    if (imageUrl != null && imageUrl.isNotEmpty && videoUrl != null && videoUrl.isNotEmpty) {
+    if (_selectedOption != null && _selectedOption!.image.isNotEmpty && _selectedOption!.video.isNotEmpty) {
       return SizedBox(
         height: imageHeight,
         child: ListView(
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                height: imageHeight,
-                width: imageWidth,
-                color: Colors.grey[200],
-                child: imageUrl.startsWith('http')
-                    ? Image.network(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => _imageFallback(),
-                      )
-                    : Image.asset(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => _imageFallback(),
-                      ),
+            ..._selectedOption!.image.map((img) => Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  height: imageHeight,
+                  width: imageWidth,
+                  color: Colors.grey[200],
+                  child: img.startsWith('http')
+                      ? Image.network(
+                          img,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => _imageFallback(),
+                        )
+                      : Image.asset(
+                          img,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => _imageFallback(),
+                        ),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: VideoPreviewPlayer(
-                videoPath: videoUrl,
-                height: imageHeight,
-                width: imageWidth,
+            )),
+            ..._selectedOption!.video.map((vid) => Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: VideoPreviewPlayer(
+                  videoPath: vid,
+                  height: imageHeight,
+                  width: imageWidth,
+                ),
               ),
-            ),
+            )),
           ],
         ),
       );
@@ -679,44 +684,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
       ],
     );
   }
-
-  // Widget _careInfoRow(
-  //   IconData icon,
-  //   String label,
-  //   bool isOk, {
-  //   String? trailing,
-  // }) {
-  //   return Padding(
-  //     padding: const EdgeInsets.only(bottom: 10),
-  //     child: Row(
-  //       children: [
-  //         Icon(icon, size: 20, color: isOk ? Colors.green : Colors.grey),
-  //         const SizedBox(width: 12),
-  //         Expanded(
-  //           child: Text(
-  //             label,
-  //             maxLines: 1,
-  //             overflow: TextOverflow.ellipsis,
-  //             style: TextStyle(color: isOk ? Colors.black87 : Colors.grey),
-  //           ),
-  //         ),
-  //         const SizedBox(width: 12),
-  //         Flexible(
-  //           child: Text(
-  //             trailing ?? (isOk ? "Yes" : "No"),
-  //             maxLines: 1,
-  //             overflow: TextOverflow.ellipsis,
-  //             textAlign: TextAlign.right,
-  //             style: TextStyle(
-  //               fontWeight: FontWeight.bold,
-  //               color: isOk ? Colors.green.shade800 : Colors.grey,
-  //             ),
-  //           ),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
 
   bool _canMachineWash() {
     final careSymbols = widget.product.careSymbol.map((s) => s.toLowerCase()).toList();
