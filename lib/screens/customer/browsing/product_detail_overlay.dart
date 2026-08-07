@@ -604,17 +604,23 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                 ),
               ),
             )),
-            ..._selectedOption!.video.map((vid) => Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: VideoPreviewPlayer(
-                  videoPath: vid,
-                  height: imageHeight,
-                  width: imageWidth,
+            ..._selectedOption!.video.map((vid) {
+              final cleanPath = vid.trim().replaceAll("'", "").replaceAll('"', "");
+              if (cleanPath.isEmpty) return const SizedBox.shrink();
+              
+              return Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: VideoPreviewPlayer(
+                    videoPath: cleanPath,
+                    isAsset: cleanPath.toLowerCase().startsWith('assets/'),
+                    height: imageHeight,
+                    width: imageWidth,
+                  ),
                 ),
-              ),
-            )),
+              );
+            }),
           ],
         ),
       );
@@ -642,11 +648,13 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
       );
     }
     
-    if (videoUrl != null && videoUrl.isNotEmpty) {
+    if (videoUrl != null && videoUrl.trim().isNotEmpty) {
+      final cleanVideoUrl = videoUrl.trim().replaceAll("'", "").replaceAll('"', "");
       return ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: VideoPreviewPlayer(
-          videoPath: videoUrl,
+          videoPath: cleanVideoUrl,
+          isAsset: cleanVideoUrl.toLowerCase().startsWith('assets/'),
           height: imageHeight,
           width: double.infinity,
         ),

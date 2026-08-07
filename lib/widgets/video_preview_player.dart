@@ -41,7 +41,10 @@ class _VideoPreviewPlayerState extends State<VideoPreviewPlayer> {
     try {
       if (cleanPath.startsWith('http')) {
         _controller = VideoPlayerController.networkUrl(Uri.parse(cleanPath));
-      } else if (cleanPath.startsWith('assets/') || widget.isAsset) {
+      } else if (cleanPath.startsWith('assets/')) {
+        _controller = VideoPlayerController.asset(cleanPath);
+      } else if (widget.isAsset) {
+        // Fallback for cases where 'assets/' prefix is missing but flag is true
         _controller = VideoPlayerController.asset(cleanPath);
       } else {
         _controller = VideoPlayerController.file(File(cleanPath));
