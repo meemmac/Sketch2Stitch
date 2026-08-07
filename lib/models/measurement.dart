@@ -1,4 +1,3 @@
-
 class Measurement {
   final String id;
   final String customerId;
@@ -17,25 +16,54 @@ class Measurement {
   final double waistToAnkle;
   final double shoulderToAnkle;
 
-  
   Measurement({
-  required this.id,
-  required this.customerId,
-  this.upperBustCircumference = 0,
-  this.roundShoulderCircumference = 0,
-  this.hipsCircumference = 0,
-  this.underBustCircumference = 0,
-  this.bustCircumference = 0,
-  this.waist = 0,
-  this.shoulderToKnee = 0,
-  this.shoulderToUnderBust = 0,
-  this.shoulderToBust = 0,
-  this.thigh = 0,
-  this.knee = 0,
-  this.ankle = 0,
-  this.waistToAnkle = 0,
-  this.shoulderToAnkle = 0,
-});
+    required this.id,
+    required this.customerId,
+    this.upperBustCircumference = 0,
+    this.roundShoulderCircumference = 0,
+    this.hipsCircumference = 0,
+    this.underBustCircumference = 0,
+    this.bustCircumference = 0,
+    this.waist = 0,
+    this.shoulderToKnee = 0,
+    this.shoulderToUnderBust = 0,
+    this.shoulderToBust = 0,
+    this.thigh = 0,
+    this.knee = 0,
+    this.ankle = 0,
+    this.waistToAnkle = 0,
+    this.shoulderToAnkle = 0,
+  });
+
+  /// A brand-new, all-zero record for [customerId], not yet saved to
+  /// Firestore (hence `id: ''`). Use this the moment a customer registers
+  /// or first opens the measurement screen. Once [MeasurementService]
+  /// persists it, the returned [Measurement] will have a real [id].
+  factory Measurement.empty(String customerId) => Measurement(
+        id: '',
+        customerId: customerId,
+      );
+
+  /// Whether this record has been saved to Firestore yet.
+  bool get isNew => id.isEmpty;
+
+  /// Convenience: whether the customer has entered any real data yet.
+  /// Useful for showing a "complete your measurements" prompt.
+  bool get isComplete =>
+      ankle > 0 &&
+      hipsCircumference > 0 &&
+      roundShoulderCircumference > 0 &&
+      shoulderToBust > 0 &&
+      shoulderToKnee > 0 &&
+      shoulderToUnderBust > 0 &&
+      thigh > 0 &&
+      underBustCircumference > 0 &&
+      upperBustCircumference > 0 &&
+      knee > 0 &&
+      bustCircumference > 0 &&
+      waist > 0 &&
+      shoulderToAnkle > 0 &&
+      waistToAnkle > 0;
 
   Measurement copyWith({
     String? id,
