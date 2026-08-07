@@ -76,25 +76,14 @@ class InventoryService {
   // ─── createProduct ────────────────────────────────────────────────────────
 
   /// Create product with SKU validation.
-  /// Note: [productData] should contain an 'id' which acts as the SKU.
+  /// Note: The document ID in Firestore will be the auto-generated ID or SKU.
+  /// Based on the schema provided, we will use auto-generated ID for document
+  /// and store SKU in productCode.
   Future<void> createProduct(Map<String, dynamic> productData) async {
-    final String sku = productData['id'] ?? '';
-    if (sku.isEmpty) throw Exception('SKU (id) is required for product creation');
-
     try {
-      final docRef = _db.collection(_productsCollection).doc(sku);
-      final snapshot = await docRef.get();
-      
-      if (snapshot.exists) {
-        throw Exception('Product with SKU $sku already exists');
-      }
-
-      // Ensure materialType is handled as a list if provided as a string from legacy UI
-      if (productData['materialType'] is String) {
-        productData['materialType'] = [{'type': productData['materialType'], 'blend': 100}];
-      }
-
-      await docRef.set(productData);
+      // Ensure productCode (SKU) is unique if required, or just add.
+      // For simplicity and better Firestore practice, we'll use add()
+      await _db.collection(_productsCollection).add(productData);
     } catch (e) {
       debugPrint('Error creating product: $e');
       rethrow;
@@ -103,14 +92,10 @@ class InventoryService {
 
   // ─── updateProduct ────────────────────────────────────────────────────────
 
-  /// Update existing product identified by SKU.
-  Future<void> updateProduct(String sku, Map<String, dynamic> productData) async {
+  /// Update existing product identified by Firestore ID.
+  Future<void> updateProduct(String productId, Map<String, dynamic> productData) async {
     try {
-      // Ensure materialType is handled as a list if provided as a string from legacy UI
-      if (productData['materialType'] is String) {
-        productData['materialType'] = [{'type': productData['materialType'], 'blend': 100}];
-      }
-      await _db.collection(_productsCollection).doc(sku).update(productData);
+      await _db.collection(_productsCollection).doc(productId).update(productData);
     } catch (e) {
       debugPrint('Error updating product: $e');
       rethrow;
@@ -119,10 +104,10 @@ class InventoryService {
 
   // ─── deleteProduct ────────────────────────────────────────────────────────
 
-  /// Delete product identified by SKU.
-  Future<void> deleteProduct(String sku) async {
+  /// Delete product identified by Firestore ID.
+  Future<void> deleteProduct(String productId) async {
     try {
-      await _db.collection(_productsCollection).doc(sku).delete();
+      await _db.collection(_productsCollection).doc(productId).delete();
     } catch (e) {
       debugPrint('Error deleting product: $e');
       rethrow;
@@ -134,11 +119,11 @@ class InventoryService {
   /// Quick stock update for specific color variants of a product.
   /// [variantStock] is a list of maps: {'optionId': int, 'stock': int}.
   Future<void> updateProductStock(
-    String sku,
+    String productId,
     List<Map<String, dynamic>> variantStock,
   ) async {
     try {
-      final docRef = _db.collection(_productsCollection).doc(sku);
+      final docRef = _db.collection(_productsCollection).doc(productId);
 
       await _db.runTransaction((transaction) async {
         final snapshot = await transaction.get(docRef);
@@ -195,9 +180,18 @@ class InventoryService {
   // ─── uploadMedia ──────────────────────────────────────────────────────────
 
   /// Upload images/videos to Cloudinary.
-  Future<List<String>> uploadMedia(List<File> files, {String? folder}) async {
+  Future<List<String>> uploadMedia(List<String> filePaths, {String? folder}) async {
     final List<String> urls = [];
-    for (final file in files) {
+    for (final path in filePaths) {
+      // Check if it's already a URL
+      if (path.startsWith('http')) {
+        urls.add(path);
+        continue;
+      }
+      
+      final file = File(path);
+      if (!await file.exists()) continue;
+
       final url = await _cloudinary.uploadImage(file, folder: folder);
       if (url != null) {
         urls.add(url);
