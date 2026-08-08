@@ -747,7 +747,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // Price and Delivery
+                    // Price
                     Row(
                       children: [
                         Text(
@@ -758,6 +758,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                             color: Colors.green.shade800,
                           ),
                         ),
+                        /*
                         const SizedBox(width: 12),
                         Row(
                           mainAxisSize: MainAxisSize.min,
@@ -775,6 +776,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                             ),
                           ],
                         ),
+                        */
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -2027,7 +2029,8 @@ class _InventoryScreenState extends State<InventoryScreen>
                     });
                   },
                   decoration: InputDecoration(
-                    hintText: "Search your products...",
+                    hintText: "Search your products by name or code",
+                    hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
                     prefixIcon: const Icon(Icons.search),
                     filled: true,
                     fillColor: Colors.white,
