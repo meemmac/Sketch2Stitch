@@ -178,7 +178,7 @@ class _LoginScreenState extends State<LoginScreen>
           );
 
           // Save to global session
-          UserSession.instance.setSession(drawerData, role);
+          UserSession.instance.setSession(drawerData, role, uid: authCredential.user!.uid);
 
           // Navigate to home with selected role
           Navigator.pushReplacement(

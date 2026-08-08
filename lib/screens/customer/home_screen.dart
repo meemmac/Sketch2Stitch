@@ -1104,8 +1104,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   }
 
   Widget _buildFabricCard(Product product) {
-    final coverImage = product.colorOptions.isNotEmpty
-        ? product.colorOptions.first.image
+    final coverImage = product.colorOptions.isNotEmpty && product.colorOptions.first.image.isNotEmpty
+        ? product.colorOptions.first.image.first
         : null;
     final bool outOfStock = product.colorOptions.every((c) => c.stock <= 0);
 
@@ -1345,7 +1345,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         return fabricData.materialDisplay;
       }
     }
-    final material = product.materialType.trim();
+    final material = product.materialType.isNotEmpty ? product.materialType.first.type : "";
     if (material.isEmpty || material == "N/A") {
       return "N/A";
     }

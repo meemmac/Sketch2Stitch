@@ -1,13 +1,12 @@
-import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sketch2stitch/models/product.dart';
+import 'package:sketch2stitch/services/inventory_service.dart';
+import 'package:sketch2stitch/services/user_session.dart';
 import '../../widgets/video_preview_player.dart';
-
-void main() => runApp(
-  const MaterialApp(debugShowCheckedModeBanner: false, home: InventoryScreen()),
-);
 
 class ProductColorVariant {
   String colorName;
@@ -88,6 +87,7 @@ class FabricMaterialBlend {
 }
 
 class InventoryItem {
+  String id;
   String name;
   String category; // "Fabric" or "Element"
   String materialType; // Cotton, Silk etc.
@@ -104,6 +104,7 @@ class InventoryItem {
   String ironLevel; // Low, Medium, High
 
   InventoryItem({
+    required this.id,
     required this.name,
     required this.category,
     required this.materialType,
@@ -151,6 +152,7 @@ class InventoryItem {
   }
 
   Map<String, dynamic> toMap() => {
+  'id': id,
   'name': name,
   'category': category,
   'materialType': materialType,
@@ -190,6 +192,7 @@ class InventoryItem {
         : <FabricMaterialBlend>[];
 
     return InventoryItem(
+      id: map['id'] as String? ?? '',
       name: map['name'] as String? ?? '',
       category: map['category'] as String? ?? 'Element',
       materialType: map['materialType'] as String? ?? 'N/A',
@@ -219,9 +222,17 @@ class _InventoryScreenState extends State<InventoryScreen>
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   String _searchQuery = "";
-  static const String _cacheKey = 'retailer_inventory_cache_v2';
   int _gridAnimationSeed = 0;
   final Map<String, int> _selectedVariantIndexes = <String, int>{};
+  
+  // Feedback state
+  String? _feedbackMessage;
+  bool _isFeedbackError = false;
+  Timer? _feedbackTimer;
+  
+  final InventoryService _inventoryService = InventoryService();
+  String? _retailerId;
+
   static const List<String> _commonMaterials = <String>[
     "Cotton",
     "Linen",
@@ -239,9 +250,11 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   final List<InventoryItem> items = <InventoryItem>[];
 
+  /*
   List<InventoryItem> _seedItems() {
     return <InventoryItem>[
       InventoryItem(
+        id: "seed-1",
         name: "Premium Egyptian Cotton",
         category: "Fabric",
         materialType: "Cotton",
@@ -283,6 +296,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         ironLevel: "High",
       ),
       InventoryItem(
+        id: "seed-2",
         name: "Denim Shirt",
         category: "Fabric",
         materialType: "Denim",
@@ -308,6 +322,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         ironLevel: "Medium",
       ),
       InventoryItem(
+        id: "seed-3",
         name: "Golden Silk Blend",
         category: "Fabric",
         materialType: "Silk",
@@ -350,6 +365,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         ironLevel: "Low",
       ),
       InventoryItem(
+        id: "seed-4",
         name: "Tassel",
         category: "Element",
         materialType: "N/A",
@@ -382,6 +398,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         ],
       ),
       InventoryItem(
+        id: "seed-5",
         name: "Linen Summer Fabric",
         category: "Fabric",
         materialType: "Linen",
@@ -416,6 +433,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         ironLevel: "Medium",
       ),
       InventoryItem(
+        id: "seed-6",
         name: "Printed Scarf",
         category: "Element",
         materialType: "N/A",
@@ -449,9 +467,10 @@ class _InventoryScreenState extends State<InventoryScreen>
       ),
     ];
   }
+  */
 
   String _itemKey(InventoryItem item) {
-    return item.sku.isNotEmpty ? item.sku : item.name;
+    return item.id;
   }
 
   ProductColorVariant? _selectedVariantFor(InventoryItem item) {
@@ -482,13 +501,6 @@ class _InventoryScreenState extends State<InventoryScreen>
     return item.variants.any((variant) => variant.stock < 5);
   }
 
-  String _materialTextFrom(List<FabricMaterialBlend> blends) {
-    return blends
-        .where((blend) => blend.material.trim().isNotEmpty)
-        .map((blend) => blend.displayText)
-        .where((text) => text.trim().isNotEmpty)
-        .join(", ");
-  }
 
   List<FabricMaterialBlend> _initialMaterialBlendsFor(InventoryItem? item) {
     if (item == null) {
@@ -535,90 +547,81 @@ class _InventoryScreenState extends State<InventoryScreen>
   @override
   void initState() {
     super.initState();
+    _retailerId = UserSession.instance.uid;
     _loadInventory();
   }
 
-  List<InventoryItem> _withHardcodedDemoValues(List<InventoryItem> loaded) {
-    final seedItems = _seedItems();
-    final seedsBySku = <String, InventoryItem>{
-      for (final item in seedItems) item.sku: item,
-    };
-
-    final merged = loaded.isEmpty
-        ? <InventoryItem>[...seedItems]
-        : loaded.map((item) => seedsBySku[item.sku] ?? item).toList();
-    final existingSkus = merged.map((item) => item.sku).toSet();
-
-    for (final seed in seedItems) {
-      if (!existingSkus.contains(seed.sku)) {
-        merged.add(seed);
-      }
-    }
-
-    return merged;
+  InventoryItem _mapProductToItem(Product p) {
+    return InventoryItem(
+      id: p.id,
+      name: p.productName,
+      category: p.category,
+      materialType: p.materialType.isNotEmpty ? p.materialType.first.type : 'N/A',
+      sku: p.productCode,
+      description: p.description,
+      variants: p.colorOptions.map((v) {
+        final images = v.image.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+        final videos = v.video.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+        
+        // We don't really need a global isAsset flag if we check per-path.
+        // But to keep your model same, we set it if ANY path is a local asset.
+        final isAsset = [...images, ...videos].any((path) => path.startsWith('assets/'));
+        
+        return ProductColorVariant(
+          colorName: v.color,
+          imagePaths: images,
+          videoPaths: videos,
+          isAsset: isAsset,
+          price: v.price,
+          stock: v.stock,
+        );
+      }).toList(),
+      materialBlends: p.materialType.map((m) => FabricMaterialBlend(
+        material: m.type,
+        blend: "${m.blend.toInt()}%",
+      )).toList(),
+      canWash: p.careSymbol.contains('Washable'),
+      canBleach: p.careSymbol.contains('Bleach Allowed'),
+      canDryClean: p.careSymbol.contains('Dry Clean Only'),
+      canTumbleDry: p.careSymbol.contains('Tumble Dry'),
+      ironLevel: p.careSymbol.firstWhere((s) => s.startsWith('Iron: '), orElse: () => 'Iron: Medium').replaceFirst('Iron: ', ''),
+    );
   }
 
   Future<void> _loadInventory() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_cacheKey);
-    if (raw == null || raw.isEmpty) {
-      if (!mounted) {
-        return;
-      }
+    if (_retailerId == null) return;
+
+    _inventoryService.streamRetailerProducts(_retailerId!).listen((products) {
+      if (!mounted) return;
       setState(() {
-        items
-          ..clear()
-          ..addAll(_seedItems());
+        items.clear();
+        items.addAll(products.map((p) => _mapProductToItem(p)));
+        _gridAnimationSeed++;
       });
-      await _saveInventory();
-      return;
-    }
-
-    final decoded = jsonDecode(raw);
-    final loaded = decoded is List
-        ? decoded
-              .whereType<Map>()
-              .map(
-                (entry) =>
-                    InventoryItem.fromMap(Map<String, dynamic>.from(entry)),
-              )
-              .toList()
-        : _seedItems();
-    final inventory = _withHardcodedDemoValues(loaded);
-
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      items
-        ..clear()
-        ..addAll(inventory);
     });
-    await _saveInventory();
   }
 
-  Future<void> _saveInventory() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _cacheKey,
-      jsonEncode(items.map((item) => item.toMap()).toList()),
-    );
-  }
 
-  void _animateToNewestItem() {
-    if (!_scrollController.hasClients) {
-      return;
-    }
 
-    _scrollController.animateTo(
-      _scrollController.position.maxScrollExtent,
-      duration: const Duration(milliseconds: 700),
-      curve: Curves.easeOutCubic,
-    );
+  void _showFeedback(String message, {bool isError = false}) {
+    _feedbackTimer?.cancel();
+    setState(() {
+      _feedbackMessage = message;
+      _isFeedbackError = isError;
+    });
+
+    _feedbackTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() {
+          _feedbackMessage = null;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
+    _feedbackTimer?.cancel();
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -675,37 +678,61 @@ class _InventoryScreenState extends State<InventoryScreen>
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          ...selectedVariant.imagePaths.map((path) => Padding(
-                            padding: const EdgeInsets.only(right: 12),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(20),
-                              child: selectedVariant.isAsset
-                                  ? Image.asset(
-                                      path,
-                                      height: 250,
-                                      width: MediaQuery.of(context).size.width * 0.7,
-                                      fit: BoxFit.cover,
-                                    )
-                                  : Image.file(
-                                      File(path),
-                                      height: 250,
-                                      width: MediaQuery.of(context).size.width * 0.7,
-                                      fit: BoxFit.cover,
-                                    ),
-                            ),
-                          )),
-                          ...selectedVariant.videoPaths.map((path) => Padding(
-                            padding: const EdgeInsets.only(right: 12),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(20),
-                              child: VideoPreviewPlayer(
-                                videoPath: path,
-                                isAsset: selectedVariant.isAsset,
-                                height: 250,
-                                width: MediaQuery.of(context).size.width * 0.7,
+                          ...selectedVariant.imagePaths.map((path) {
+                            final cleanPath = path.trim();
+                            if (cleanPath.isEmpty) return const SizedBox.shrink();
+                            
+                            final uri = Uri.tryParse(cleanPath);
+                            final bool isNetwork = uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
+                            final bool isAssetPath = cleanPath.toLowerCase().startsWith('assets/') || selectedVariant.isAsset;
+                            
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 12),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: isNetwork
+                                    ? Image.network(
+                                        cleanPath,
+                                        height: 250,
+                                        width: MediaQuery.of(context).size.width * 0.7,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => _imageError(cleanPath),
+                                      )
+                                    : isAssetPath
+                                        ? Image.asset(
+                                            cleanPath,
+                                            height: 250,
+                                            width: MediaQuery.of(context).size.width * 0.7,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => _imageError(cleanPath),
+                                          )
+                                        : Image.file(
+                                            File(cleanPath),
+                                            height: 250,
+                                            width: MediaQuery.of(context).size.width * 0.7,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => _imageError(cleanPath),
+                                          ),
                               ),
-                            ),
-                          )),
+                            );
+                          }),
+                          ...selectedVariant.videoPaths.map((path) {
+                            final cleanPath = path.trim().replaceAll("'", "").replaceAll('"', "");
+                            if (cleanPath.isEmpty) return const SizedBox.shrink();
+                            
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 12),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: VideoPreviewPlayer(
+                                  videoPath: cleanPath,
+                                  isAsset: cleanPath.toLowerCase().startsWith('assets/'),
+                                  height: 250,
+                                  width: MediaQuery.of(context).size.width * 0.7,
+                                ),
+                              ),
+                            );
+                          }),
                         ],
                       ),
                     ),
@@ -720,7 +747,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // Price and Delivery
+                    // Price
                     Row(
                       children: [
                         Text(
@@ -731,6 +758,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                             color: Colors.green.shade800,
                           ),
                         ),
+                        /*
                         const SizedBox(width: 12),
                         Row(
                           mainAxisSize: MainAxisSize.min,
@@ -748,6 +776,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                             ),
                           ],
                         ),
+                        */
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -1017,6 +1046,11 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   Widget _buildMediaThumbnail(String path, bool isImage, bool isAsset, VoidCallback onRemove) {
+    final cleanPath = path.trim();
+    final uri = Uri.tryParse(cleanPath);
+    final bool isNetwork = uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
+    final bool isAssetPath = cleanPath.toLowerCase().startsWith('assets/') || isAsset;
+
     return Stack(
       children: [
         Container(
@@ -1031,7 +1065,11 @@ class _InventoryScreenState extends State<InventoryScreen>
           child: ClipRRect(
             borderRadius: BorderRadius.circular(7),
             child: isImage
-                ? (isAsset ? Image.asset(path, fit: BoxFit.cover) : Image.file(File(path), fit: BoxFit.cover))
+                ? (isNetwork
+                    ? Image.network(cleanPath, fit: BoxFit.cover, errorBuilder: (c, e, s) => _imageError(cleanPath))
+                    : (isAssetPath 
+                        ? Image.asset(cleanPath, fit: BoxFit.cover, errorBuilder: (c, e, s) => _imageError(cleanPath)) 
+                        : Image.file(File(cleanPath), fit: BoxFit.cover, errorBuilder: (c, e, s) => _imageError(cleanPath))))
                 : Container(
                     color: Colors.black87,
                     child: const Icon(Icons.videocam, color: Colors.white, size: 20),
@@ -1080,6 +1118,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     ];
 
     return IconButton(
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(),
       icon: Icon(Icons.palette_outlined, color: Colors.green.shade800),
       onPressed: () {
         showDialog(
@@ -1221,6 +1261,9 @@ class _InventoryScreenState extends State<InventoryScreen>
     bool canDryClean = item?.canDryClean ?? true;
     bool canTumbleDry = item?.canTumbleDry ?? true;
     String ironLevel = item?.ironLevel ?? "Medium";
+    // Feedback state for form
+    String? formError;
+    bool isSaving = false;
 
     await showModalBottomSheet(
       context: context,
@@ -1234,31 +1277,33 @@ class _InventoryScreenState extends State<InventoryScreen>
             initialChildSize: 0.92,
             minChildSize: 0.25,
             maxChildSize: 0.95,
-            builder: (context, scrollController) => Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-              ),
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              ),
-              child: SingleChildScrollView(
-                controller: scrollController,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
+            builder: (context, scrollController) => Stack(
+              children: [
+                Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                  ),
+                  padding: EdgeInsets.only(
+                    left: 20,
+                    right: 20,
+                    top: 20,
+                    bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                  ),
+                  child: SingleChildScrollView(
+                    controller: scrollController,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 20),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
                     Text(
                       item == null ? "Add New Item" : "Edit Item",
                       style: const TextStyle(
@@ -1266,6 +1311,34 @@ class _InventoryScreenState extends State<InventoryScreen>
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+                    
+                    if (formError != null)
+                      Container(
+                        margin: const EdgeInsets.only(top: 15),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                formError!,
+                                style: TextStyle(
+                                  color: Colors.red.shade900,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    
                     const SizedBox(height: 25),
 
                     // 🏷 Category Selection
@@ -1275,7 +1348,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                         child: SizedBox(
                           width: 250,
                           child: DropdownButtonFormField<String>(
-                            value: category,
+                            initialValue: category,
                             style: TextStyle(
                               color: Colors.green.shade900,
                               fontWeight: FontWeight.bold,
@@ -1430,6 +1503,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
+                                  flex: 2,
                                   child: SingleChildScrollView(
                                     scrollDirection: Axis.horizontal,
                                     child: Row(
@@ -1454,8 +1528,9 @@ class _InventoryScreenState extends State<InventoryScreen>
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 15),
+                                const SizedBox(width: 10),
                                 Expanded(
+                                  flex: 3,
                                   child: Row(
                                     children: [
                                       Expanded(
@@ -1475,11 +1550,14 @@ class _InventoryScreenState extends State<InventoryScreen>
                                                       ),
                                                     ),
                                           decoration: const InputDecoration(
-                                            hintText: "Color Name (e.g. Red)",
+                                            hintText: "Color",
                                             border: InputBorder.none,
+                                            isDense: true,
+                                            contentPadding: EdgeInsets.symmetric(vertical: 8),
                                           ),
                                         ),
                                       ),
+                                      const SizedBox(width: 4),
                                       _buildColorPicker(variant, setM),
                                     ],
                                   ),
@@ -1707,87 +1785,128 @@ class _InventoryScreenState extends State<InventoryScreen>
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(15),
                           ),
+                          disabledBackgroundColor: Colors.grey,
                         ),
-                        onPressed: () async {
-                          if (workingVariants.any(
-                            (v) =>
-                                (v.imagePaths.isEmpty && v.videoPaths.isEmpty) ||
-                                v.colorName.isEmpty ||
-                                v.price <= 0 ||
-                                v.stock <= 0,
-                          )) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  "Please provide color, media, price and stock for all variants",
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-                          final cleanMaterialBlends = workingMaterialBlends
-                              .where(
-                                (blend) => blend.material.trim().isNotEmpty,
-                              )
-                              .map(
-                                (blend) => FabricMaterialBlend(
-                                  material: blend.material.trim(),
-                                  blend: blend.blend.trim(),
-                                ),
-                              )
-                              .toList();
-                          final materialDisplay = _materialTextFrom(
-                            cleanMaterialBlends,
-                          );
-                          final savedItem = InventoryItem(
-                            name: name.text,
-                            category: category,
-                            materialType:
-                                category == "Fabric" &&
-                                    materialDisplay.isNotEmpty
-                                ? materialDisplay
-                                : "N/A",
-                            sku: sku.text,
-                            description: desc.text,
-                            variants: workingVariants,
-                            materialBlends: category == "Fabric"
-                                ? cleanMaterialBlends
-                                : <FabricMaterialBlend>[],
-                            canWash: canWash,
-                            canBleach: canBleach,
-                            canDryClean: canDryClean,
-                            canTumbleDry: canTumbleDry,
-                            ironLevel: ironLevel,
-                          );
-                          setState(() {
-                            if (item == null) {
-                              items.add(savedItem);
-                            } else {
-                              item.name = savedItem.name;
-                              item.category = savedItem.category;
-                              item.materialType = savedItem.materialType;
-                              item.materialBlends = savedItem.materialBlends;
-                              item.sku = savedItem.sku;
-                              item.description = savedItem.description;
-                              item.variants = savedItem.variants;
-                              item.canWash = savedItem.canWash;
-                              item.canBleach = savedItem.canBleach;
-                              item.canDryClean = savedItem.canDryClean;
-                              item.canTumbleDry = savedItem.canTumbleDry;
-                              item.ironLevel = savedItem.ironLevel;
+                        onPressed: isSaving ? null : () async {
+                          if (_retailerId == null) return;
+                          
+                          // Form Validation
+                          String? error;
+                          if (name.text.trim().isEmpty) {
+                            error = "Product Name is required";
+                          } else if (desc.text.trim().isEmpty) {
+                            error = "Description is required";
+                          } else if (item == null && sku.text.trim().isEmpty) {
+                            error = "Product Code (SKU) is required";
+                          } else if (workingVariants.isEmpty) {
+                            error = "At least one color variant is required";
+                          } else {
+                            for (var v in workingVariants) {
+                              if (v.colorName.trim().isEmpty) {
+                                error = "Color name is required for all variants";
+                                break;
+                              }
+                              if (v.imagePaths.isEmpty && v.videoPaths.isEmpty) {
+                                error = "Media is required for all variants";
+                                break;
+                              }
+                              if (v.price <= 0) {
+                                error = "Price must be greater than 0";
+                                break;
+                              }
+                              if (v.stock < 0) {
+                                error = "Stock cannot be negative";
+                                break;
+                              }
                             }
-                            _gridAnimationSeed++;
-                          });
-                          await _saveInventory();
-                          if (item == null) {
-                            WidgetsBinding.instance.addPostFrameCallback(
-                              (_) => _animateToNewestItem(),
-                            );
                           }
-                          if (!mounted) {
+
+                          if (category == "Fabric" && error == null) {
+                            if (workingMaterialBlends.isEmpty || workingMaterialBlends.every((b) => b.material.trim().isEmpty)) {
+                              error = "Material composition is required for fabrics";
+                            }
+                          }
+
+                          if (error != null) {
+                            setM(() => formError = error);
+                            // Scroll to top to see error
+                            scrollController.animateTo(
+                              0, 
+                              duration: const Duration(milliseconds: 300), 
+                              curve: Curves.easeOut,
+                            );
                             return;
                           }
-                          Navigator.of(context).pop();
+
+                          // Clear previous error if any
+                          setM(() {
+                            formError = null;
+                            isSaving = true;
+                          });
+
+                          // 🔄 Show a loading overlay or state if needed
+                          // For simplicity, we'll just disable the button or use a local isSaving if we had one.
+                          // But to keep UI same, we just proceed.
+
+                          try {
+                            List<ColorOption> finalColorOptions = [];
+                            for (int i = 0; i < workingVariants.length; i++) {
+                              final v = workingVariants[i];
+                              // Upload new media to Cloudinary
+                              final imageUrls = await _inventoryService.uploadMedia(v.imagePaths, folder: 'products/images');
+                              final videoUrls = await _inventoryService.uploadMedia(v.videoPaths, folder: 'products/videos');
+                              
+                              finalColorOptions.add(ColorOption(
+                                optionId: i + 1,
+                                color: v.colorName,
+                                image: imageUrls,
+                                video: videoUrls,
+                                price: v.price,
+                                stock: v.stock,
+                              ));
+                            }
+
+                            List<String> careSymbols = [];
+                            if (canWash) careSymbols.add("Washable");
+                            if (canBleach) careSymbols.add("Bleach Allowed");
+                            if (canDryClean) careSymbols.add("Dry Clean Only");
+                            if (canTumbleDry) careSymbols.add("Tumble Dry");
+                            careSymbols.add("Iron: $ironLevel");
+
+                            final product = Product(
+                              id: item?.id ?? "",
+                              retailerId: _retailerId!,
+                              productName: name.text,
+                              category: category,
+                              productCode: sku.text,
+                              materialType: category == "Fabric" 
+                                ? workingMaterialBlends.where((b) => b.material.isNotEmpty).map((b) => MaterialBlend(type: b.material, blend: double.tryParse(b.blend.replaceAll('%', '')) ?? 0)).toList()
+                                : [],
+                              colorOptions: finalColorOptions,
+                              description: desc.text,
+                              careSymbol: careSymbols,
+                            );
+
+                            if (item == null) {
+                              await _inventoryService.createProduct(product.toJson());
+                            } else {
+                              await _inventoryService.updateProduct(item.id, product.toJson());
+                            }
+
+                            if (context.mounted) Navigator.of(context).pop();
+
+                            if (item == null) {
+                              _showFeedback("Product added successfully!");
+                            } else {
+                              _showFeedback("Product updated successfully!");
+                            }
+                          } catch (e) {
+                            debugPrint("Error saving product: $e");
+                            setM(() {
+                              isSaving = false;
+                              formError = "Error saving product: $e";
+                            });
+                          }
                         },
                         child: Text(
                           item == null ? "Add Item" : "Save Changes",
@@ -1802,35 +1921,43 @@ class _InventoryScreenState extends State<InventoryScreen>
                 ),
               ),
             ),
-          );
-        },
+          if (isSaving)
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.8),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+              ),
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: Colors.green),
+                    SizedBox(height: 20),
+                    Text(
+                      "Saving Product...",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      "Please wait, uploading media",
+                      style: TextStyle(color: Colors.black54),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
-  }
+  },
+),
+);
+}
 
-  Widget _buildTypeToggle(String label, bool isSelected, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.green.shade800 : Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(
-            color: isSelected ? Colors.green.shade800 : Colors.grey.shade300,
-          ),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.black87,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildCareSwitch(String label, bool value, Function(bool) onChanged, {String? info}) {
     return Row(
@@ -1883,64 +2010,167 @@ class _InventoryScreenState extends State<InventoryScreen>
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text("Add Product", style: TextStyle(color: Colors.white)),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            SizedBox(
-              width: double.infinity,
-              child: _inventorySummary(items.length),
+      body: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: _inventorySummary(items.length),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _searchController,
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                  decoration: InputDecoration(
+                    hintText: "Search your products by name or code",
+                    hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
+                    prefixIcon: const Icon(Icons.search),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(15),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Expanded(
+                  child: filteredItems.isEmpty
+                      ? Center(
+                          child: Text(
+                            _searchQuery.isEmpty
+                                ? "No items in inventory yet"
+                                : "No products match your search",
+                            style: const TextStyle(
+                              color: Colors.black54,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        )
+                      : GridView.builder(
+                          controller: _scrollController,
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 0.55,
+                                mainAxisSpacing: 15,
+                                crossAxisSpacing: 15,
+                              ),
+                          itemCount: filteredItems.length,
+                          itemBuilder: (c, i) {
+                            return _buildAnimatedGridCard(filteredItems[i], i);
+                          },
+                        ),
+                ),
+              ],
             ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _searchController,
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
-              },
-              decoration: InputDecoration(
-                hintText: "Search your products...",
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(15),
-                  borderSide: BorderSide.none,
+          ),
+
+          // Top Feedback Banner
+          if (_feedbackMessage != null)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: SafeArea(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: _isFeedbackError
+                              ? const Color(0xFFFFEBEE).withValues(alpha: 0.92)
+                              : const Color(0xFFC8E6C9).withValues(alpha: 0.92),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: _isFeedbackError
+                                ? const Color(0xFFFFCDD2)
+                                : const Color(0xFF9CCC9F),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _isFeedbackError
+                                  ? const Color(0xFFD32F2F).withValues(alpha: 0.10)
+                                  : const Color(0xFF2E7D32).withValues(alpha: 0.10),
+                              blurRadius: 20,
+                              spreadRadius: 1,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: _isFeedbackError
+                                    ? const Color(0xFFE53935)
+                                    : const Color(0xFF4CAF50),
+                                border: Border.all(
+                                  color: _isFeedbackError
+                                      ? const Color(0xFFEF9A9A)
+                                      : const Color(0xFFA5D6A7),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Icon(
+                                _isFeedbackError ? Icons.close_rounded : Icons.check_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                _feedbackMessage!,
+                                style: const TextStyle(
+                                  color: Color(0xFF222222),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () => setState(() => _feedbackMessage = null),
+                              child: Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withValues(alpha: 0.35),
+                                ),
+                                child: Icon(
+                                  Icons.close_rounded,
+                                  color: Colors.black.withValues(alpha: 0.45),
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: filteredItems.isEmpty
-                  ? Center(
-                      child: Text(
-                        _searchQuery.isEmpty
-                            ? "No items in inventory yet"
-                            : "No products match your search",
-                        style: const TextStyle(
-                          color: Colors.black54,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    )
-                  : GridView.builder(
-                      controller: _scrollController,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 0.55,
-                            mainAxisSpacing: 15,
-                            crossAxisSpacing: 15,
-                          ),
-                      itemCount: filteredItems.length,
-                      itemBuilder: (c, i) {
-                        return _buildAnimatedGridCard(filteredItems[i], i);
-                      },
-                    ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -2013,11 +2243,33 @@ class _InventoryScreenState extends State<InventoryScreen>
                             ),
                             const SizedBox(width: 5),
                             _actionBtn(Icons.delete, Colors.red, () async {
-                              setState(() {
-                                items.remove(item);
-                                _gridAnimationSeed++;
-                              });
-                              await _saveInventory();
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: const Text("Delete Product"),
+                                  content: Text("Are you sure you want to delete ${item.name}?"),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx, false),
+                                      child: const Text("Cancel"),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx, true),
+                                      child: const Text("Delete", style: TextStyle(color: Colors.red)),
+                                    ),
+                                  ],
+                                ),
+                              );
+
+                              if (confirm == true) {
+                                try {
+                                  await _inventoryService.deleteProduct(item.id);
+                                  _showFeedback("Product deleted successfully!");
+                                } catch (e) {
+                                  debugPrint("Error deleting product: $e");
+                                  _showFeedback("Error deleting product: $e", isError: true);
+                                }
+                              }
                             }),
                           ],
                         ),
@@ -2128,7 +2380,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                         : ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: item.variants.length,
-                            separatorBuilder: (_, __) =>
+                            separatorBuilder: (context, index) =>
                                 const SizedBox(width: 6),
                             itemBuilder: (context, index) {
                               final variant = item.variants[index];
@@ -2249,27 +2501,71 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   Widget _buildVariantImage(ProductColorVariant? variant) {
-    if (variant == null || (variant.imagePaths.isEmpty && variant.videoPaths.isEmpty)) {
-      return Container(
-        color: Colors.green.shade50,
-        child: Icon(
-          Icons.image_not_supported_outlined,
-          color: Colors.green.shade200,
-        ),
+    if (variant == null) return _imagePlaceholder();
+    
+    if (variant.imagePaths.isEmpty) {
+      if (variant.videoPaths.isNotEmpty) {
+        return Container(
+          color: Colors.blue.shade50,
+          child: const Icon(Icons.videocam, color: Colors.blue, size: 40),
+        );
+      }
+      return _imagePlaceholder();
+    }
+
+    final path = variant.imagePaths.first.trim();
+    if (path.isEmpty) return _imagePlaceholder();
+
+    // Use Uri to reliably check for network scheme
+    final uri = Uri.tryParse(path);
+    final bool isNetwork = uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
+
+    if (isNetwork) {
+      return Image.network(
+        path, 
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _imageError(path),
+      );
+    }
+    
+    if (variant.isAsset || path.toLowerCase().startsWith('assets/')) {
+      return Image.asset(
+        path, 
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _imageError(path),
       );
     }
 
-    if (variant.imagePaths.isNotEmpty) {
-      final path = variant.imagePaths.first;
-      return variant.isAsset
-          ? Image.asset(path, fit: BoxFit.cover)
-          : Image.file(File(path), fit: BoxFit.cover);
-    } else {
-      return Container(
-        color: Colors.blue.shade50,
-        child: const Icon(Icons.videocam, color: Colors.blue, size: 40),
-      );
-    }
+    return Image.file(
+      File(path), 
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => _imageError(path),
+    );
+  }
+
+  Widget _imagePlaceholder() {
+    return Container(
+      color: Colors.green.shade50,
+      child: Icon(
+        Icons.image_not_supported_outlined,
+        color: Colors.green.shade200,
+      ),
+    );
+  }
+
+  Widget _imageError(String path) {
+    debugPrint("Error loading image at path: $path");
+    return Container(
+      color: Colors.red.shade50,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, color: Colors.red.shade300),
+          const SizedBox(height: 4),
+          const Text("Error", style: TextStyle(fontSize: 8, color: Colors.red)),
+        ],
+      ),
+    );
   }
 
   Widget _actionBtn(IconData icon, Color color, VoidCallback onTap) {

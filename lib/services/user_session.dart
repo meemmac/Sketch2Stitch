@@ -23,9 +23,9 @@ class UserSession {
   String? get uid => _uid ?? AuthService().currentUser?.uid;
 
   /// Sets the active session.
-  void setSession(DrawerProfileData profile, UserRole role) {
+  void setSession(DrawerProfileData profile, UserRole role, {String? uid}) {
     _role = role;
-    _uid = AuthService().currentUser?.uid;
+    _uid = uid ?? AuthService().currentUser?.uid;
     currentProfile.value = profile;
     debugPrint('[UserSession] Session started for ${profile.email} as $role (uid: $_uid)');
   }

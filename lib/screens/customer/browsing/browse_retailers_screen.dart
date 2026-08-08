@@ -17,8 +17,8 @@ ColorOption _createColorOption(
   return ColorOption(
     optionId: id,
     color: color,
-    image: image,
-    video: video,
+    image: image != null ? [image] : [],
+    video: video != null ? [video] : [],
     price: price,
     stock: stock,
   );
@@ -30,26 +30,30 @@ final List<Product> _sampleElementProducts = [
     retailerId: 'r1',
     productName: 'Premium Metal Zipper',
     category: 'Fasteners',
-    materialType: 'Metal',
+    productCode: 'ZIP-E-01',
+    materialType: [MaterialBlend(type: 'Metal', blend: 100)],
     colorOptions: [
       ColorOption(
         optionId: 1,
         color: 'Silver',
-        image: 'assets/images/zipper.jpg',
+        image: ['assets/images/zipper.jpg'],
+        video: [],
         price: 120,
         stock: 100,
       ),
       ColorOption(
         optionId: 2,
         color: 'Gold',
-        image: 'assets/images/zipper_gold.jpg',
+        image: ['assets/images/zipper_gold.jpg'],
+        video: [],
         price: 150,
         stock: 50,
       ),
       ColorOption(
         optionId: 3,
         color: 'Black',
-        image: 'assets/images/zipper.jpg',
+        image: ['assets/images/zipper.jpg'],
+        video: [],
         price: 130,
         stock: 75,
       ),
@@ -62,26 +66,30 @@ final List<Product> _sampleElementProducts = [
     retailerId: 'r1',
     productName: 'Decorative Buttons Set',
     category: 'Buttons',
-    materialType: 'Plastic',
+    productCode: 'BTN-E-01',
+    materialType: [MaterialBlend(type: 'Plastic', blend: 100)],
     colorOptions: [
       ColorOption(
         optionId: 1,
         color: 'White',
-        image: 'assets/images/buttons.jpg',
+        image: ['assets/images/buttons.jpg'],
+        video: [],
         price: 80,
         stock: 200,
       ),
       ColorOption(
         optionId: 2,
         color: 'Black',
-        image: 'assets/images/buttons.jpg',
+        image: ['assets/images/buttons.jpg'],
+        video: [],
         price: 80,
         stock: 150,
       ),
       ColorOption(
         optionId: 3,
         color: 'Gold',
-        image: 'assets/images/buttons.jpg',
+        image: ['assets/images/buttons.jpg'],
+        video: [],
         price: 100,
         stock: 100,
       ),
@@ -94,26 +102,30 @@ final List<Product> _sampleElementProducts = [
     retailerId: 'r2',
     productName: 'Sewing Thread Collection',
     category: 'Threads',
-    materialType: 'Cotton',
+    productCode: 'THR-E-01',
+    materialType: [MaterialBlend(type: 'Cotton', blend: 100)],
     colorOptions: [
       ColorOption(
         optionId: 1,
         color: 'White',
-        image: 'assets/images/thread.jpg',
+        image: ['assets/images/thread.jpg'],
+        video: [],
         price: 45,
         stock: 300,
       ),
       ColorOption(
         optionId: 2,
         color: 'Black',
-        image: 'assets/images/thread.jpg',
+        image: ['assets/images/thread.jpg'],
+        video: [],
         price: 45,
         stock: 250,
       ),
       ColorOption(
         optionId: 3,
         color: 'Beige',
-        image: 'assets/images/thread.jpg',
+        image: ['assets/images/thread.jpg'],
+        video: [],
         price: 45,
         stock: 200,
       ),
@@ -126,19 +138,22 @@ final List<Product> _sampleElementProducts = [
     retailerId: 'r2',
     productName: 'Pearl Embellishments',
     category: 'Embellishments',
-    materialType: 'Glass',
+    productCode: 'PRL-E-01',
+    materialType: [MaterialBlend(type: 'Glass', blend: 100)],
     colorOptions: [
       ColorOption(
         optionId: 1,
         color: 'White',
-        image: 'assets/images/pearls.jpg',
+        image: ['assets/images/pearls.jpg'],
+        video: [],
         price: 200,
         stock: 80,
       ),
       ColorOption(
         optionId: 2,
         color: 'Pink',
-        image: 'assets/images/pearls.jpg',
+        image: ['assets/images/pearls.jpg'],
+        video: [],
         price: 220,
         stock: 60,
       ),
@@ -151,19 +166,22 @@ final List<Product> _sampleElementProducts = [
     retailerId: 'r3',
     productName: 'Lace Trim',
     category: 'Trims',
-    materialType: 'Lace',
+    productCode: 'TRM-E-01',
+    materialType: [MaterialBlend(type: 'Lace', blend: 100)],
     colorOptions: [
       ColorOption(
         optionId: 1,
         color: 'White',
-        image: 'assets/images/lace_trim.jpg',
+        image: ['assets/images/lace_trim.jpg'],
+        video: [],
         price: 180,
         stock: 40,
       ),
       ColorOption(
         optionId: 2,
         color: 'Black',
-        image: 'assets/images/lace_trim.jpg',
+        image: ['assets/images/lace_trim.jpg'],
+        video: [],
         price: 180,
         stock: 35,
       ),
@@ -176,26 +194,30 @@ final List<Product> _sampleElementProducts = [
     retailerId: 'r3',
     productName: 'Ribbon Collection',
     category: 'Ribbons',
-    materialType: 'Satin',
+    productCode: 'RIB-E-01',
+    materialType: [MaterialBlend(type: 'Satin', blend: 100)],
     colorOptions: [
       ColorOption(
         optionId: 1,
         color: 'White',
-        image: 'assets/images/ribbon.jpg',
+        image: ['assets/images/ribbon.jpg'],
+        video: [],
         price: 60,
         stock: 150,
       ),
       ColorOption(
         optionId: 2,
         color: 'Gold',
-        image: 'assets/images/ribbon.jpg',
+        image: ['assets/images/ribbon.jpg'],
+        video: [],
         price: 70,
         stock: 120,
       ),
       ColorOption(
         optionId: 3,
         color: 'Blue',
-        image: 'assets/images/ribbon.jpg',
+        image: ['assets/images/ribbon.jpg'],
+        video: [],
         price: 65,
         stock: 100,
       ),
@@ -208,26 +230,30 @@ final List<Product> _sampleElementProducts = [
     retailerId: 'r4',
     productName: 'Cotton Thread Set',
     category: 'Threads',
-    materialType: 'Cotton',
+    productCode: 'THR-E-02',
+    materialType: [MaterialBlend(type: 'Cotton', blend: 100)],
     colorOptions: [
       ColorOption(
         optionId: 1,
         color: 'White',
-        image: 'assets/images/thread.jpg',
+        image: ['assets/images/thread.jpg'],
+        video: [],
         price: 35,
         stock: 200,
       ),
       ColorOption(
         optionId: 2,
         color: 'Black',
-        image: 'assets/images/thread.jpg',
+        image: ['assets/images/thread.jpg'],
+        video: [],
         price: 35,
         stock: 180,
       ),
       ColorOption(
         optionId: 3,
         color: 'Blue',
-        image: 'assets/images/thread.jpg',
+        image: ['assets/images/thread.jpg'],
+        video: [],
         price: 40,
         stock: 150,
       ),
@@ -240,19 +266,22 @@ final List<Product> _sampleElementProducts = [
     retailerId: 'r5',
     productName: 'Embellishment Set',
     category: 'Embellishments',
-    materialType: 'Glass',
+    productCode: 'PRL-E-02',
+    materialType: [MaterialBlend(type: 'Glass', blend: 100)],
     colorOptions: [
       ColorOption(
         optionId: 1,
         color: 'Gold',
-        image: 'assets/images/embroidery.jpg',
+        image: ['assets/images/embroidery.jpg'],
+        video: [],
         price: 250,
         stock: 50,
       ),
       ColorOption(
         optionId: 2,
         color: 'Silver',
-        image: 'assets/images/embroidery.jpg',
+        image: ['assets/images/embroidery.jpg'],
+        video: [],
         price: 250,
         stock: 45,
       ),
@@ -265,26 +294,30 @@ final List<Product> _sampleElementProducts = [
     retailerId: 'r5',
     productName: 'Satin Ribbon Set',
     category: 'Ribbons',
-    materialType: 'Satin',
+    productCode: 'RIB-E-02',
+    materialType: [MaterialBlend(type: 'Satin', blend: 100)],
     colorOptions: [
       ColorOption(
         optionId: 1,
         color: 'Red',
-        image: 'assets/images/ribbon.jpg',
+        image: ['assets/images/ribbon.jpg'],
+        video: [],
         price: 55,
         stock: 120,
       ),
       ColorOption(
         optionId: 2,
         color: 'Gold',
-        image: 'assets/images/ribbon.jpg',
+        image: ['assets/images/ribbon.jpg'],
+        video: [],
         price: 60,
         stock: 100,
       ),
       ColorOption(
         optionId: 3,
         color: 'Green',
-        image: 'assets/images/ribbon.jpg',
+        image: ['assets/images/ribbon.jpg'],
+        video: [],
         price: 55,
         stock: 90,
       ),
@@ -300,7 +333,8 @@ final List<Product> _sampleFabricProducts = [
     retailerId: 'r1',
     productName: 'Premium Cotton Fabric',
     category: 'Cotton',
-    materialType: 'Cotton',
+    productCode: 'COT-P-03',
+    materialType: [MaterialBlend(type: 'Cotton', blend: 100)],
     colorOptions: [
       _createColorOption(
         1,
@@ -335,7 +369,8 @@ final List<Product> _sampleFabricProducts = [
     retailerId: 'r1',
     productName: 'Silk Blend Saree',
     category: 'Silk',
-    materialType: 'Silk',
+    productCode: 'SLK-P-03',
+    materialType: [MaterialBlend(type: 'Silk', blend: 100)],
     colorOptions: [
       _createColorOption(
         1,
@@ -362,7 +397,8 @@ final List<Product> _sampleFabricProducts = [
     retailerId: 'r1',
     productName: 'Linen Shirt Fabric',
     category: 'Linen',
-    materialType: 'Linen',
+    productCode: 'LIN-P-03',
+    materialType: [MaterialBlend(type: 'Linen', blend: 100)],
     colorOptions: [
       _createColorOption(
         1,
@@ -389,7 +425,8 @@ final List<Product> _sampleFabricProducts = [
     retailerId: 'r1',
     productName: 'Printed Cotton Dress',
     category: 'Cotton',
-    materialType: 'Cotton',
+    productCode: 'COT-P-04',
+    materialType: [MaterialBlend(type: 'Cotton', blend: 100)],
     colorOptions: [
       _createColorOption(
         1,
@@ -416,7 +453,8 @@ final List<Product> _sampleFabricProducts = [
     retailerId: 'r2',
     productName: 'Traditional Jamdani',
     category: 'Cotton',
-    materialType: 'Cotton',
+    productCode: 'COT-P-05',
+    materialType: [MaterialBlend(type: 'Cotton', blend: 100)],
     colorOptions: [
       _createColorOption(
         1,
@@ -443,7 +481,8 @@ final List<Product> _sampleFabricProducts = [
     retailerId: 'r2',
     productName: 'Georgette Chiffon',
     category: 'Polyester',
-    materialType: 'Polyester',
+    productCode: 'PLY-P-03',
+    materialType: [MaterialBlend(type: 'Polyester', blend: 100)],
     colorOptions: [
       _createColorOption(
         1,
@@ -470,7 +509,8 @@ final List<Product> _sampleFabricProducts = [
     retailerId: 'r3',
     productName: 'Raw Silk',
     category: 'Silk',
-    materialType: 'Silk',
+    productCode: 'SLK-P-04',
+    materialType: [MaterialBlend(type: 'Silk', blend: 100)],
     colorOptions: [
       _createColorOption(
         1,
@@ -497,7 +537,8 @@ final List<Product> _sampleFabricProducts = [
     retailerId: 'r3',
     productName: 'Lace Trim Fabric',
     category: 'Lace',
-    materialType: 'Lace',
+    productCode: 'LAC-P-03',
+    materialType: [MaterialBlend(type: 'Lace', blend: 100)],
     colorOptions: [
       _createColorOption(
         1,
@@ -524,7 +565,8 @@ final List<Product> _sampleFabricProducts = [
     retailerId: 'r3',
     productName: 'Velvet Evening Fabric',
     category: 'Velvet',
-    materialType: 'Velvet',
+    productCode: 'VLV-P-03',
+    materialType: [MaterialBlend(type: 'Velvet', blend: 100)],
     colorOptions: [
       _createColorOption(
         1,
@@ -559,7 +601,8 @@ final List<Product> _sampleFabricProducts = [
     retailerId: 'r4',
     productName: 'Cotton Khadi',
     category: 'Cotton',
-    materialType: 'Cotton',
+    productCode: 'COT-P-06',
+    materialType: [MaterialBlend(type: 'Cotton', blend: 100)],
     colorOptions: [
       _createColorOption(
         1,
@@ -586,7 +629,8 @@ final List<Product> _sampleFabricProducts = [
     retailerId: 'r4',
     productName: 'Denim Fabric',
     category: 'Denim',
-    materialType: 'Denim',
+    productCode: 'DNM-P-03',
+    materialType: [MaterialBlend(type: 'Denim', blend: 100)],
     colorOptions: [
       _createColorOption(
         1,
@@ -613,7 +657,8 @@ final List<Product> _sampleFabricProducts = [
     retailerId: 'r5',
     productName: 'Embroidery Fabric',
     category: 'Embroidery',
-    materialType: 'Embroidery',
+    productCode: 'EMB-P-03',
+    materialType: [MaterialBlend(type: 'Embroidery', blend: 100)],
     colorOptions: [
       _createColorOption(
         1,
@@ -640,7 +685,8 @@ final List<Product> _sampleFabricProducts = [
     retailerId: 'r5',
     productName: 'Tussar Silk',
     category: 'Silk',
-    materialType: 'Silk',
+    productCode: 'SLK-P-05',
+    materialType: [MaterialBlend(type: 'Silk', blend: 100)],
     colorOptions: [
       _createColorOption(
         1,
@@ -667,7 +713,8 @@ final List<Product> _sampleFabricProducts = [
     retailerId: 'r5',
     productName: 'Satin Bridal Fabric',
     category: 'Satin',
-    materialType: 'Satin',
+    productCode: 'STN-P-03',
+    materialType: [MaterialBlend(type: 'Satin', blend: 100)],
     colorOptions: [
       _createColorOption(
         1,

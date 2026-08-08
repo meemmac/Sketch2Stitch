@@ -21,8 +21,9 @@ class VideoPreviewPlayer extends StatefulWidget {
 }
 
 class _VideoPreviewPlayerState extends State<VideoPreviewPlayer> {
-  late VideoPlayerController _controller;
+  VideoPlayerController? _controller;
   bool _isInitialized = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -31,50 +32,72 @@ class _VideoPreviewPlayerState extends State<VideoPreviewPlayer> {
   }
 
   void _initializeController() {
-    if (widget.isAsset) {
-      _controller = VideoPlayerController.asset(widget.videoPath);
-    } else {
-      _controller = VideoPlayerController.file(File(widget.videoPath));
+    final cleanPath = widget.videoPath.trim();
+    if (cleanPath.isEmpty) {
+      setState(() => _errorMessage = "Video path is empty");
+      return;
     }
 
-    _controller.initialize().then((_) {
-      if (mounted) {
-        setState(() {
-          _isInitialized = true;
-        });
-        _controller.setLooping(true);
-        _controller.setVolume(0); // Mute by default for preview
-        _controller.play();
+    try {
+      if (cleanPath.startsWith('http')) {
+        _controller = VideoPlayerController.networkUrl(Uri.parse(cleanPath));
+      } else if (cleanPath.startsWith('assets/')) {
+        _controller = VideoPlayerController.asset(cleanPath);
+      } else if (widget.isAsset) {
+        // Fallback for cases where 'assets/' prefix is missing but flag is true
+        _controller = VideoPlayerController.asset(cleanPath);
+      } else {
+        _controller = VideoPlayerController.file(File(cleanPath));
       }
-    }).catchError((error) {
-      debugPrint("Video initialization failed: $error");
-      if (mounted) {
-        setState(() {
-          _isInitialized = false;
-        });
-      }
-    });
+
+      _controller!.initialize().then((_) {
+        if (mounted) {
+          setState(() {
+            _isInitialized = true;
+            _errorMessage = null;
+          });
+          _controller!.setLooping(true);
+          _controller!.setVolume(0);
+          _controller!.play();
+        }
+      }).catchError((error) {
+        debugPrint("Video initialization failed: $error");
+        if (mounted) {
+          setState(() {
+            _isInitialized = false;
+            _errorMessage = error.toString();
+          });
+        }
+      });
+    } catch (e) {
+      debugPrint("Error creating VideoPlayerController: $e");
+      setState(() {
+        _errorMessage = e.toString();
+      });
+    }
   }
 
   @override
   void didUpdateWidget(VideoPreviewPlayer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.videoPath != widget.videoPath) {
-      _controller.dispose();
+      _controller?.dispose();
+      _controller = null;
       _isInitialized = false;
+      _errorMessage = null;
       _initializeController();
     }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_controller.value.hasError) {
+    if (widget.videoPath.trim().isEmpty || _errorMessage != null) {
       return Container(
         height: widget.height,
         width: widget.width,
@@ -85,18 +108,28 @@ class _VideoPreviewPlayerState extends State<VideoPreviewPlayer> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, color: Colors.red[300], size: 40),
+            Icon(
+              _errorMessage != null ? Icons.error_outline : Icons.videocam_off_outlined,
+              color: Colors.red[300],
+              size: 40,
+            ),
             const SizedBox(height: 8),
-            Text(
-              "Error loading video",
-              style: TextStyle(color: Colors.red[300], fontSize: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                _errorMessage ?? "Video path is empty",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.red[300], fontSize: 10),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
       );
     }
 
-    if (!_isInitialized) {
+    if (_controller == null || !_isInitialized) {
       return Container(
         height: widget.height,
         width: widget.width,
@@ -125,20 +158,20 @@ class _VideoPreviewPlayerState extends State<VideoPreviewPlayer> {
         alignment: Alignment.center,
         children: [
           AspectRatio(
-            aspectRatio: _controller.value.aspectRatio,
-            child: VideoPlayer(_controller),
+            aspectRatio: _controller!.value.aspectRatio,
+            child: VideoPlayer(_controller!),
           ),
           GestureDetector(
             onTap: () {
               setState(() {
-                _controller.value.isPlaying ? _controller.pause() : _controller.play();
+                _controller!.value.isPlaying ? _controller!.pause() : _controller!.play();
               });
             },
             child: Container(
               color: Colors.transparent,
               child: Center(
                 child: Icon(
-                  _controller.value.isPlaying ? null : Icons.play_arrow,
+                  _controller!.value.isPlaying ? null : Icons.play_arrow,
                   size: 50,
                   color: Colors.white70,
                 ),

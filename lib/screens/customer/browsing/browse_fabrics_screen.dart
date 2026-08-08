@@ -53,7 +53,7 @@ class FabricProductData {
     if (cleanBlends.isNotEmpty) {
       return cleanBlends.join(", ");
     }
-    return product.materialType.trim().isNotEmpty ? product.materialType : "N/A";
+    return product.materialType.isNotEmpty ? product.materialType.first.type : "N/A";
   }
 
   List<String> get materialBlendList {
@@ -73,12 +73,13 @@ final List<FabricProductData> kHardcodedFabricData = [
       retailerId: 'r1',
       productName: 'Premium Egyptian Cotton',
       category: 'Cotton',
-      materialType: 'Cotton',
+      productCode: 'COT-P-01',
+      materialType: [MaterialBlend(type: 'Cotton', blend: 100)],
       colorOptions: [
-        ColorOption(optionId: 1, color: 'White', image: 'assets/images/fab.jpg', video: 'assets/images/Videos/vid1.mp4', price: 650, stock: 40),
-        ColorOption(optionId: 2, color: 'Beige', image: 'assets/images/fab2.jpg', video: 'assets/images/Videos/vid2.mp4', price: 650, stock: 25),
-        ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/fabric_waves.jpg', video: 'assets/images/Videos/vid3.mp4', price: 700, stock: 15),
-        ColorOption(optionId: 4, color: 'Black', image: 'assets/images/textile.jpg', price: 700, stock: 0),
+        ColorOption(optionId: 1, color: 'White', image: ['assets/images/fab.jpg'], video: ['assets/images/Videos/vid1.mp4'], price: 650, stock: 40),
+        ColorOption(optionId: 2, color: 'Beige', image: ['assets/images/fab2.jpg'], video: ['assets/images/Videos/vid2.mp4'], price: 650, stock: 25),
+        ColorOption(optionId: 3, color: 'Blue', image: ['assets/images/fabric_waves.jpg'], video: ['assets/images/Videos/vid3.mp4'], price: 700, stock: 15),
+        ColorOption(optionId: 4, color: 'Black', image: ['assets/images/textile.jpg'], video: [], price: 700, stock: 0),
       ],
       description: 'Soft, breathable Egyptian cotton perfect for shirts and casual wear.',
       careSymbol: ['Machine wash cold', 'Do not bleach', 'Tumble dry low'],
@@ -93,12 +94,13 @@ final List<FabricProductData> kHardcodedFabricData = [
       retailerId: 'r1',
       productName: 'Pure Mulberry Silk',
       category: 'Silk',
-      materialType: 'Silk',
+      productCode: 'SLK-P-01',
+      materialType: [MaterialBlend(type: 'Silk', blend: 70), MaterialBlend(type: 'Viscose', blend: 30)],
       colorOptions: [
-        ColorOption(optionId: 1, color: 'Gold', image: 'assets/images/silk.jpg', video: 'assets/images/Videos/vid2.mp4', price: 1800, stock: 10),
-        ColorOption(optionId: 2, color: 'Pink', image: 'assets/images/saree.jpg', video: 'assets/images/Videos/vid3.mp4', price: 1750, stock: 8),
-        ColorOption(optionId: 3, color: 'Green', image: 'assets/images/gorgeous.jpg', video: 'assets/images/Videos/vid1.mp4', price: 1750, stock: 5),
-        ColorOption(optionId: 4, color: 'White', image: 'assets/images/gorgette.jpg', price: 1700, stock: 12),
+        ColorOption(optionId: 1, color: 'Gold', image: ['assets/images/silk.jpg'], video: ['assets/images/Videos/vid2.mp4'], price: 1800, stock: 10),
+        ColorOption(optionId: 2, color: 'Pink', image: ['assets/images/saree.jpg'], video: ['assets/images/Videos/vid3.mp4'], price: 1750, stock: 8),
+        ColorOption(optionId: 3, color: 'Green', image: ['assets/images/gorgeous.jpg'], video: ['assets/images/Videos/vid1.mp4'], price: 1750, stock: 5),
+        ColorOption(optionId: 4, color: 'White', image: ['assets/images/gorgette.jpg'], video: [], price: 1700, stock: 12),
       ],
       description: 'Luxurious mulberry silk with a natural sheen.',
       careSymbol: ['Dry clean only', 'Iron on low heat'],
@@ -114,11 +116,12 @@ final List<FabricProductData> kHardcodedFabricData = [
       retailerId: 'r2',
       productName: 'Merino Wool Blend',
       category: 'Wool',
-      materialType: 'Wool',
+      productCode: 'WOL-P-01',
+      materialType: [MaterialBlend(type: 'Wool', blend: 85), MaterialBlend(type: 'Nylon', blend: 15)],
       colorOptions: [
-        ColorOption(optionId: 1, color: 'Brown', image: 'assets/images/drawing_fabric.jpg', video: 'assets/images/Videos/vid3.mp4', price: 950, stock: 18),
-        ColorOption(optionId: 2, color: 'Black', image: 'assets/images/textile.jpg', video: 'assets/images/Videos/vid2.mp4', price: 950, stock: 20),
-        ColorOption(optionId: 3, color: 'Beige', image: 'assets/images/fabric_waves.jpg', price: 900, stock: 0),
+        ColorOption(optionId: 1, color: 'Brown', image: ['assets/images/drawing_fabric.jpg'], video: ['assets/images/Videos/vid3.mp4'], price: 950, stock: 18),
+        ColorOption(optionId: 2, color: 'Black', image: ['assets/images/textile.jpg'], video: ['assets/images/Videos/vid2.mp4'], price: 950, stock: 20),
+        ColorOption(optionId: 3, color: 'Beige', image: ['assets/images/fabric_waves.jpg'], video: [], price: 900, stock: 0),
       ],
       description: 'Warm merino wool blend suited for winter jackets and blazers.',
       careSymbol: ['Hand wash cold', 'Dry flat'],
@@ -134,11 +137,12 @@ final List<FabricProductData> kHardcodedFabricData = [
       retailerId: 'r2',
       productName: 'Irish Linen Weave',
       category: 'Linen',
-      materialType: 'Linen',
+      productCode: 'LIN-P-01',
+      materialType: [MaterialBlend(type: 'Linen', blend: 100)],
       colorOptions: [
-        ColorOption(optionId: 1, color: 'White', image: 'assets/images/fabrics_rolled.jpg', video: 'assets/images/Videos/vid1.mp4', price: 780, stock: 30),
-        ColorOption(optionId: 2, color: 'Beige', image: 'assets/images/fab.jpg', video: 'assets/images/Videos/vid2.mp4', price: 780, stock: 22),
-        ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/fabric_waves.jpg', price: 820, stock: 14),
+        ColorOption(optionId: 1, color: 'White', image: ['assets/images/fabrics_rolled.jpg'], video: ['assets/images/Videos/vid1.mp4'], price: 780, stock: 30),
+        ColorOption(optionId: 2, color: 'Beige', image: ['assets/images/fab.jpg'], video: ['assets/images/Videos/vid2.mp4'], price: 780, stock: 22),
+        ColorOption(optionId: 3, color: 'Blue', image: ['assets/images/fabric_waves.jpg'], video: [], price: 820, stock: 14),
       ],
       description: 'Classic Irish linen with a crisp hand-feel.',
       careSymbol: ['Machine wash cold', 'Iron while damp'],
@@ -153,11 +157,12 @@ final List<FabricProductData> kHardcodedFabricData = [
       retailerId: 'r3',
       productName: 'French Chantilly Lace',
       category: 'Lace',
-      materialType: 'Lace',
+      productCode: 'LAC-P-01',
+      materialType: [MaterialBlend(type: 'Polyester', blend: 100)],
       colorOptions: [
-        ColorOption(optionId: 1, color: 'White', image: 'assets/images/lace.jpg', price: 1200, stock: 6),
-        ColorOption(optionId: 2, color: 'Black', image: 'assets/images/lace2.jpg', price: 1200, stock: 4),
-        ColorOption(optionId: 3, color: 'Pink', image: 'assets/images/embroidery.jpg', price: 1250, stock: 0),
+        ColorOption(optionId: 1, color: 'White', image: ['assets/images/lace.jpg'], video: [], price: 1200, stock: 6),
+        ColorOption(optionId: 2, color: 'Black', image: ['assets/images/lace2.jpg'], video: [], price: 1200, stock: 4),
+        ColorOption(optionId: 3, color: 'Pink', image: ['assets/images/embroidery.jpg'], video: [], price: 1250, stock: 0),
       ],
       description: 'Delicate floral Chantilly lace, hand-finished scalloped edges.',
       careSymbol: ['Dry clean only', 'Do not bleach'],
@@ -172,11 +177,12 @@ final List<FabricProductData> kHardcodedFabricData = [
       retailerId: 'r3',
       productName: 'Zardozi Embroidered Panel',
       category: 'Embroidery',
-      materialType: 'Embroidery',
+      productCode: 'EMB-P-01',
+      materialType: [MaterialBlend(type: 'Silk', blend: 60), MaterialBlend(type: 'Cotton', blend: 40)],
       colorOptions: [
-        ColorOption(optionId: 1, color: 'Gold', image: 'assets/images/embroidery.jpg', price: 3200, stock: 3),
-        ColorOption(optionId: 2, color: 'Green', image: 'assets/images/design.jpg', price: 3200, stock: 2),
-        ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/crochet.jpg', price: 3400, stock: 0),
+        ColorOption(optionId: 1, color: 'Gold', image: ['assets/images/embroidery.jpg'], video: [], price: 3200, stock: 3),
+        ColorOption(optionId: 2, color: 'Green', image: ['assets/images/design.jpg'], video: [], price: 3200, stock: 2),
+        ColorOption(optionId: 3, color: 'Blue', image: ['assets/images/crochet.jpg'], video: [], price: 3400, stock: 0),
       ],
       description: 'Hand-embroidered zardozi work with metallic thread and sequins.',
       careSymbol: ['Dry clean only'],
@@ -192,10 +198,11 @@ final List<FabricProductData> kHardcodedFabricData = [
       retailerId: 'r1',
       productName: 'Premium Tassel Fabric',
       category: 'Cotton',
-      materialType: 'Cotton',
+      productCode: 'TAS-P-01',
+      materialType: [MaterialBlend(type: 'Cotton', blend: 100)],
       colorOptions: [
-        ColorOption(optionId: 1, color: 'White', image: 'assets/images/tassel.jpg', price: 550, stock: 35),
-        ColorOption(optionId: 2, color: 'Blue', image: 'assets/images/drawing_fabric.jpg', price: 600, stock: 20),
+        ColorOption(optionId: 1, color: 'White', image: ['assets/images/tassel.jpg'], video: [], price: 550, stock: 35),
+        ColorOption(optionId: 2, color: 'Blue', image: ['assets/images/drawing_fabric.jpg'], video: [], price: 600, stock: 20),
       ],
       description: 'Beautiful tassel fabric with intricate detailing.',
       careSymbol: ['Dry clean only', 'Do not iron directly'],
@@ -210,10 +217,11 @@ final List<FabricProductData> kHardcodedFabricData = [
       retailerId: 'r2',
       productName: 'Handwoven Textile',
       category: 'Cotton',
-      materialType: 'Cotton',
+      productCode: 'TEX-P-01',
+      materialType: [MaterialBlend(type: 'Cotton', blend: 100)],
       colorOptions: [
-        ColorOption(optionId: 1, color: 'White', image: 'assets/images/textile.jpg', price: 850, stock: 15),
-        ColorOption(optionId: 2, color: 'Beige', image: 'assets/images/fabric_waves.jpg', price: 850, stock: 10),
+        ColorOption(optionId: 1, color: 'White', image: ['assets/images/textile.jpg'], video: [], price: 850, stock: 15),
+        ColorOption(optionId: 2, color: 'Beige', image: ['assets/images/fabric_waves.jpg'], video: [], price: 850, stock: 10),
       ],
       description: 'Handwoven textile with traditional patterns.',
       careSymbol: ['Hand wash', 'Do not bleach', 'Air dry'],
@@ -228,10 +236,11 @@ final List<FabricProductData> kHardcodedFabricData = [
       retailerId: 'r3',
       productName: 'Designer Silk Blend',
       category: 'Silk',
-      materialType: 'Silk',
+      productCode: 'SLK-P-02',
+      materialType: [MaterialBlend(type: 'Silk', blend: 80), MaterialBlend(type: 'Cotton', blend: 20)],
       colorOptions: [
-        ColorOption(optionId: 1, color: 'Gold', image: 'assets/images/gorgeous.jpg', price: 2500, stock: 5),
-        ColorOption(optionId: 2, color: 'Blue', image: 'assets/images/design.jpg', price: 2800, stock: 3),
+        ColorOption(optionId: 1, color: 'Gold', image: ['assets/images/gorgeous.jpg'], video: [], price: 2500, stock: 5),
+        ColorOption(optionId: 2, color: 'Blue', image: ['assets/images/design.jpg'], video: [], price: 2800, stock: 3),
       ],
       description: 'Luxurious designer silk blend with a unique texture.',
       careSymbol: ['Dry clean only', 'Store in a cool place'],
@@ -247,11 +256,12 @@ final List<FabricProductData> kHardcodedFabricData = [
       retailerId: 'r1',
       productName: 'Classic Cotton Weave',
       category: 'Cotton',
-      materialType: 'Cotton',
+      productCode: 'COT-P-02',
+      materialType: [MaterialBlend(type: 'Cotton', blend: 100)],
       colorOptions: [
-        ColorOption(optionId: 1, color: 'White', image: 'assets/images/fab.jpg', price: 450, stock: 50),
-        ColorOption(optionId: 2, color: 'Blue', image: 'assets/images/fab2.jpg', price: 500, stock: 30),
-        ColorOption(optionId: 3, color: 'Green', image: 'assets/images/fabric_waves.jpg', price: 550, stock: 20),
+        ColorOption(optionId: 1, color: 'White', image: ['assets/images/fab.jpg'], video: [], price: 450, stock: 50),
+        ColorOption(optionId: 2, color: 'Blue', image: ['assets/images/fab2.jpg'], video: [], price: 500, stock: 30),
+        ColorOption(optionId: 3, color: 'Green', image: ['assets/images/fabric_waves.jpg'], video: [], price: 550, stock: 20),
       ],
       description: 'Classic cotton weave fabric with a soft, comfortable feel.',
       careSymbol: ['Machine wash warm', 'Tumble dry', 'Iron medium'],
@@ -269,11 +279,12 @@ final List<Product> kHardcodedElements = [
     retailerId: 'r1',
     productName: 'Decorative Buttons Set',
     category: 'Buttons',
-    materialType: 'Plastic',
+    productCode: 'BTN-E-01',
+    materialType: [MaterialBlend(type: 'Plastic', blend: 100)],
     colorOptions: [
-      ColorOption(optionId: 1, color: 'White', image: 'assets/images/buttons.jpg', price: 80, stock: 200),
-      ColorOption(optionId: 2, color: 'Black', image: 'assets/images/buttons.jpg', price: 80, stock: 150),
-      ColorOption(optionId: 3, color: 'Gold', image: 'assets/images/buttons.jpg', price: 100, stock: 100),
+      ColorOption(optionId: 1, color: 'White', image: ['assets/images/buttons.jpg'], video: [], price: 80, stock: 200),
+      ColorOption(optionId: 2, color: 'Black', image: ['assets/images/buttons.jpg'], video: [], price: 80, stock: 150),
+      ColorOption(optionId: 3, color: 'Gold', image: ['assets/images/buttons.jpg'], video: [], price: 100, stock: 100),
     ],
     description: 'Elegant button sets in various sizes and finishes.',
     careSymbol: ['Hand wash', 'Do not bleach'],
@@ -283,11 +294,12 @@ final List<Product> kHardcodedElements = [
     retailerId: 'r2',
     productName: 'Sewing Thread Collection',
     category: 'Threads',
-    materialType: 'Cotton',
+    productCode: 'THR-E-01',
+    materialType: [MaterialBlend(type: 'Cotton', blend: 100)],
     colorOptions: [
-      ColorOption(optionId: 1, color: 'White', image: 'assets/images/thread.jpg', price: 45, stock: 300),
-      ColorOption(optionId: 2, color: 'Black', image: 'assets/images/thread.jpg', price: 45, stock: 250),
-      ColorOption(optionId: 3, color: 'Beige', image: 'assets/images/thread.jpg', price: 45, stock: 200),
+      ColorOption(optionId: 1, color: 'White', image: ['assets/images/thread.jpg'], video: [], price: 45, stock: 300),
+      ColorOption(optionId: 2, color: 'Black', image: ['assets/images/thread.jpg'], video: [], price: 45, stock: 250),
+      ColorOption(optionId: 3, color: 'Beige', image: ['assets/images/thread.jpg'], video: [], price: 45, stock: 200),
     ],
     description: 'Premium quality sewing thread in essential colors.',
     careSymbol: ['Store in cool dry place'],
@@ -297,10 +309,11 @@ final List<Product> kHardcodedElements = [
     retailerId: 'r2',
     productName: 'Pearl Embellishments',
     category: 'Embellishments',
-    materialType: 'Glass',
+    productCode: 'PRL-E-01',
+    materialType: [MaterialBlend(type: 'Glass', blend: 100)],
     colorOptions: [
-      ColorOption(optionId: 1, color: 'White', image: 'assets/images/pearls.jpg', price: 200, stock: 80),
-      ColorOption(optionId: 2, color: 'Pink', image: 'assets/images/pearls.jpg', price: 220, stock: 60),
+      ColorOption(optionId: 1, color: 'White', image: ['assets/images/pearls.jpg'], video: [], price: 200, stock: 80),
+      ColorOption(optionId: 2, color: 'Pink', image: ['assets/images/pearls.jpg'], video: [], price: 220, stock: 60),
     ],
     description: 'Beautiful pearl embellishments for bridal and formal wear.',
     careSymbol: ['Dry clean only', 'Handle with care'],
@@ -310,10 +323,11 @@ final List<Product> kHardcodedElements = [
     retailerId: 'r3',
     productName: 'Lace Trim',
     category: 'Trims',
-    materialType: 'Lace',
+    productCode: 'TRM-E-01',
+    materialType: [MaterialBlend(type: 'Lace', blend: 100)],
     colorOptions: [
-      ColorOption(optionId: 1, color: 'White', image: 'assets/images/lace_trim.jpg', price: 180, stock: 40),
-      ColorOption(optionId: 2, color: 'Black', image: 'assets/images/lace_trim.jpg', price: 180, stock: 35),
+      ColorOption(optionId: 1, color: 'White', image: ['assets/images/lace_trim.jpg'], video: [], price: 180, stock: 40),
+      ColorOption(optionId: 2, color: 'Black', image: ['assets/images/lace_trim.jpg'], video: [], price: 180, stock: 35),
     ],
     description: 'Fine lace trim with delicate patterns.',
     careSymbol: ['Hand wash', 'Do not bleach'],
@@ -323,11 +337,12 @@ final List<Product> kHardcodedElements = [
     retailerId: 'r3',
     productName: 'Ribbon Collection',
     category: 'Ribbons',
-    materialType: 'Satin',
+    productCode: 'RIB-E-01',
+    materialType: [MaterialBlend(type: 'Satin', blend: 100)],
     colorOptions: [
-      ColorOption(optionId: 1, color: 'White', image: 'assets/images/ribbon.jpg', price: 60, stock: 150),
-      ColorOption(optionId: 2, color: 'Gold', image: 'assets/images/ribbon.jpg', price: 70, stock: 120),
-      ColorOption(optionId: 3, color: 'Blue', image: 'assets/images/ribbon.jpg', price: 65, stock: 100),
+      ColorOption(optionId: 1, color: 'White', image: ['assets/images/ribbon.jpg'], video: [], price: 60, stock: 150),
+      ColorOption(optionId: 2, color: 'Gold', image: ['assets/images/ribbon.jpg'], video: [], price: 70, stock: 120),
+      ColorOption(optionId: 3, color: 'Blue', image: ['assets/images/ribbon.jpg'], video: [], price: 65, stock: 100),
     ],
     description: 'Versatile satin ribbons in various colors and widths.',
     careSymbol: ['Iron on low heat', 'Do not bleach'],
@@ -392,7 +407,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
             final matchesColor = widget.filterData.matchesColor(productColors);
             
             final matchesMaterial = widget.filterData.matchesMaterial(
-              product.materialType,
+              product.materialType.isNotEmpty ? product.materialType.first.type : "",
               fabricData.materialBlendList,
             );
             
@@ -429,7 +444,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
             final matchesMaterial = widget.filterData.materialTypes.isEmpty ||
                 widget.filterData.materialTypes.contains('All') ||
                 widget.filterData.materialTypes.any((type) =>
-                    product.materialType.toLowerCase().contains(type.toLowerCase()));
+                    product.materialType.isNotEmpty && product.materialType.first.type.toLowerCase().contains(type.toLowerCase()));
             
             return matchesSearch && matchesPrice && 
                    matchesColor && matchesMaterial;
@@ -580,8 +595,8 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       itemBuilder: (context, index) {
         final fabricData = fabrics[index];
         final product = fabricData.product;
-        final coverImage = product.colorOptions.isNotEmpty
-            ? product.colorOptions.first.image
+        final coverImage = product.colorOptions.isNotEmpty && product.colorOptions.first.image.isNotEmpty
+            ? product.colorOptions.first.image.first
             : null;
         final bool outOfStock =
             product.colorOptions.every((c) => c.stock <= 0);
@@ -618,26 +633,18 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                           width: double.infinity,
                           height: double.infinity,
                           child: coverImage != null
-                              ? Image.asset(
-                                  coverImage,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => Container(
-                                    color: kSage.withValues(alpha: 0.12),
-                                    child: Icon(
-                                      Icons.texture,
-                                      size: isSmallScreen ? 36 : 40,
-                                      color: kSageDark,
-                                    ),
-                                  ),
-                                )
-                              : Container(
-                                  color: kSage.withValues(alpha: 0.12),
-                                  child: Icon(
-                                    Icons.texture,
-                                    size: isSmallScreen ? 36 : 40,
-                                    color: kSageDark,
-                                  ),
-                                ),
+                              ? (coverImage.startsWith('http')
+                                  ? Image.network(
+                                      coverImage,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => _imageFallback(isSmallScreen),
+                                    )
+                                  : Image.asset(
+                                      coverImage,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => _imageFallback(isSmallScreen),
+                                    ))
+                              : _imageFallback(isSmallScreen),
                         ),
                       ),
                       if (materialDisplay != "N/A")
@@ -845,8 +852,8 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       itemCount: elements.length,
       itemBuilder: (context, index) {
         final product = elements[index];
-        final coverImage = product.colorOptions.isNotEmpty
-            ? product.colorOptions.first.image
+        final coverImage = product.colorOptions.isNotEmpty && product.colorOptions.first.image.isNotEmpty
+            ? product.colorOptions.first.image.first
             : null;
         final bool outOfStock =
             product.colorOptions.every((c) => c.stock <= 0);
@@ -882,26 +889,18 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                           width: double.infinity,
                           height: double.infinity,
                           child: coverImage != null
-                              ? Image.asset(
-                                  coverImage,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => Container(
-                                    color: kSage.withValues(alpha: 0.12),
-                                    child: Icon(
-                                      Icons.category,
-                                      size: isSmallScreen ? 36 : 40,
-                                      color: kSageDark,
-                                    ),
-                                  ),
-                                )
-                              : Container(
-                                  color: kSage.withValues(alpha: 0.12),
-                                  child: Icon(
-                                    Icons.category,
-                                    size: isSmallScreen ? 36 : 40,
-                                    color: kSageDark,
-                                  ),
-                                ),
+                              ? (coverImage.startsWith('http')
+                                  ? Image.network(
+                                      coverImage,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => _elementFallback(isSmallScreen),
+                                    )
+                                  : Image.asset(
+                                      coverImage,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => _elementFallback(isSmallScreen),
+                                    ))
+                              : _elementFallback(isSmallScreen),
                         ),
                       ),
                       if (outOfStock)
@@ -1099,5 +1098,27 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
 
   String _getRetailerName(String retailerId) {
     return retailerNameMap[retailerId] ?? 'Unknown Retailer';
+  }
+
+  Widget _imageFallback(bool isSmall) {
+    return Container(
+      color: kSage.withValues(alpha: 0.12),
+      child: Icon(
+        Icons.texture,
+        size: isSmall ? 36 : 40,
+        color: kSageDark,
+      ),
+    );
+  }
+
+  Widget _elementFallback(bool isSmall) {
+    return Container(
+      color: kSage.withValues(alpha: 0.12),
+      child: Icon(
+        Icons.category,
+        size: isSmall ? 36 : 40,
+        color: kSageDark,
+      ),
+    );
   }
 }
