@@ -405,7 +405,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         ),
         const SizedBox(width: 10),
         _navPill(
-          'Favorites',
+          'Wishlist',
           Icons.favorite_border_rounded,
           () => _scrollToSection(_favoritesKey),
         ),
@@ -813,7 +813,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader('Favorites'),
+        _buildSectionHeader('Wishlist'),
         const SizedBox(height: 12),
         _buildFavoritesTabBar(),
         const SizedBox(height: 14),
@@ -830,7 +830,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           children: [
             _buildRetailerRow(items),
             _buildSeeAllButton(
-              () => _openSeeAllRetailers('Favorite Retailers', items),
+              () => _openSeeAllRetailers('Wish-listed Retailers', items),
             ),
           ],
         );
@@ -840,7 +840,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           children: [
             _buildTailorRow(items),
             _buildSeeAllButton(
-              () => _openSeeAllTailors('Favorite Tailors', items),
+              () => _openSeeAllTailors('Wish-listed Tailors', items),
             ),
           ],
         );
@@ -850,7 +850,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           children: [
             _buildFabricRow(items),
             _buildSeeAllButton(
-              () => _openSeeAllProducts('Favorite Fabrics & Elements', items),
+              () => _openSeeAllProducts('Wish-listed Fabrics & Elements', items),
             ),
           ],
         );
