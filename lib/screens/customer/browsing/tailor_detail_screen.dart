@@ -246,26 +246,51 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 380;
     final isMediumScreen = screenWidth >= 380 && screenWidth < 600;
+    final bool isUnavailable = widget.tailor.maxOrder == 0;
 
     return Scaffold(
       bottomNavigationBar: (_isCustomer && widget.onTailorSelected != null)
           ? _buildBookButton()
           : null,
-      body: CustomScrollView(
-        slivers: [
-          _buildAppBar(isSmallScreen),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildAboutSection(isSmallScreen),
-                  const SizedBox(height: 24),
-                  _buildPortfolioSection(isSmallScreen, isMediumScreen),
-                  const SizedBox(height: 80),
-                ],
+      body: Column(
+        children: [
+          if (isUnavailable)
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 10,
+                bottom: 10,
               ),
+              color: Colors.red.shade800,
+              child: const Text(
+                "Sorry, currently unavailable",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          Expanded(
+            child: CustomScrollView(
+              slivers: [
+                _buildAppBar(isSmallScreen),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildAboutSection(isSmallScreen),
+                        const SizedBox(height: 24),
+                        _buildPortfolioSection(isSmallScreen, isMediumScreen),
+                        const SizedBox(height: 80),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -556,18 +581,20 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton(
-          onPressed: () => widget.onTailorSelected!(widget.tailor.id),
+          onPressed: widget.tailor.maxOrder == 0 
+              ? null 
+              : () => widget.onTailorSelected!(widget.tailor.id),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green.shade800,
+            backgroundColor: widget.tailor.maxOrder == 0 ? Colors.grey : Colors.green.shade800,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(15),
             ),
           ),
-          child: const Text(
-            "Book This Tailor",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          child: Text(
+            widget.tailor.maxOrder == 0 ? "Currently Unavailable" : "Book This Tailor",
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
           ),
         ),
       ),

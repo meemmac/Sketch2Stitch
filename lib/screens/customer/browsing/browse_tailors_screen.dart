@@ -312,7 +312,20 @@ final List<Tailor> kHardcodedTailors = [
     rating: 4.5,
     profilePicture: 'assets/images/silk.jpg',
     about: 'Expert in traditional embroidery and boutique designs.',
-    portfolio: [],
+    portfolio: [
+      Portfolio(
+        id: 'pf15',
+        tailorId: 't6',
+        image: 'assets/images/silk.jpg',
+        description: 'Traditional zardosi work on silk saree',
+      ),
+      Portfolio(
+        id: 'pf16',
+        tailorId: 't6',
+        image: 'assets/images/embroidery.jpg',
+        description: 'Hand-crafted embroidery on bridal wear',
+      ),
+    ],
     maxOrder: 0, // Simulating unavailable
   ),
   Tailor(
@@ -324,7 +337,20 @@ final List<Tailor> kHardcodedTailors = [
     rating: 4.2,
     profilePicture: 'assets/images/fab.jpg',
     about: 'Men\'s formal wear and uniform specialist.',
-    portfolio: [],
+    portfolio: [
+      Portfolio(
+        id: 'pf17',
+        tailorId: 't7',
+        image: 'assets/images/fab.jpg',
+        description: 'Three-piece formal suit',
+      ),
+      Portfolio(
+        id: 'pf18',
+        tailorId: 't7',
+        image: 'assets/images/textile.jpg',
+        description: 'Custom corporate uniform design',
+      ),
+    ],
     maxOrder: 0, // Simulating unavailable
   ),
 ];
@@ -501,6 +527,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
 
     final isSmallScreen = screenWidth < 400;
     final spacing = isSmallScreen ? 10.0 : 12.0;
+    // final cardAspectRatio = screenHeight < 700 ? 0.65 : 0.68; // Taller cards for portfolio
     final cardAspectRatio = screenHeight < 700 ? 0.72 : 0.78;
 
     return GridView.builder(
@@ -727,7 +754,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
     String imageUrl = tailor.profilePicture ?? 'assets/images/fab.jpg';
 
     return GestureDetector(
-      onTap: isFull ? null : () async {
+      onTap: () async {
         final result = await Navigator.push<String>(
           context,
           MaterialPageRoute(
@@ -827,34 +854,59 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                         Positioned(
                           bottom: 8,
                           right: 8,
-                          child: Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: isSmall ? 6 : 8,
-                              vertical: isSmall ? 3 : 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.7),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.star,
-                                  color: Colors.amber,
-                                  size: isSmall ? 10 : 12,
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  tailor.rating.toStringAsFixed(1),
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isFull)
+                                Container(
+                                  margin: const EdgeInsets.only(right: 6),
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: isSmall ? 6 : 8,
+                                    vertical: isSmall ? 3 : 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.8),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    "Fully Booked",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: isSmall ? 9 : 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
-                              ],
-                            ),
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isSmall ? 6 : 8,
+                                  vertical: isSmall ? 3 : 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.7),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.star,
+                                      color: Colors.amber,
+                                      size: isSmall ? 10 : 12,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      tailor.rating.toStringAsFixed(1),
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -932,35 +984,51 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                       ),
                     ),
                   ),
-                ],
-              ),
-              if (isFull)
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          "Fully Booked",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
+                  /*
+                  if (tailor.portfolio != null && tailor.portfolio!.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        isSmall ? 10 : 12,
+                        0,
+                        isSmall ? 10 : 12,
+                        isSmall ? 10 : 12,
+                      ),
+                      child: SizedBox(
+                        height: isSmall ? 34 : 40,
+                        child: Row(
+                          children: tailor.portfolio!
+                              .take(3)
+                              .map(
+                                (pf) => Expanded(
+                                  child: Container(
+                                    margin: const EdgeInsets.only(right: 4),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: Colors.black.withValues(alpha: 0.05),
+                                        width: 0.5,
+                                      ),
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(5),
+                                      child: Image.asset(
+                                        pf.image ?? 'assets/images/fab.jpg',
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (c, e, s) => Container(
+                                          color: Colors.grey[100],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
                         ),
                       ),
                     ),
-                  ),
-                ),
+                  */
+                ],
+              ),
             ],
           ),
         ),
