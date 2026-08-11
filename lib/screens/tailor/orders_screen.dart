@@ -109,9 +109,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
   void initState() {
     super.initState();
     if (widget.tailor != null) {
-      _tailor = widget.tailor!.maxOrder == null 
-          ? widget.tailor!.copyWith(maxOrder: 20) 
-          : widget.tailor!;
+      _tailor = widget.tailor!;
     } else {
       _tailor = Tailor(
         id: "T-123",
@@ -120,7 +118,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
         phone: "",
         address: "",
         rating: 5.0,
-        maxOrder: 20, // 🆕 Default to 20
+        maxOrder: null, // Defaults to Not Set (unlimited)
       );
       _fetchTailorProfile();
     }
@@ -132,7 +130,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
       final t = await _tailorService.getTailorProfile(uid);
       if (t != null && mounted) {
         setState(() {
-          _tailor = t.maxOrder == null ? t.copyWith(maxOrder: 20) : t;
+          _tailor = t;
         });
       }
     }
@@ -1137,7 +1135,8 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
             onPressed: canAccept ? () {
               setState(() => order.status = TailorOrderStatus.confirmed);
               Navigator.pop(modalContext);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Job Accepted Successfully!")));
+              // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Job Accepted Successfully!")));
+              _showBanner("Job Accepted Successfully!", isError: false);
             } : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryGreen,
@@ -1430,7 +1429,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
               children: [
                 "Unable to work with selected material",
                 "Order requirements are unclear",
-                "Delivery location issue",
+                "Delivery location issue"
               ].map((reason) => GestureDetector(
                 onTap: () {
                   controller.text = reason;
@@ -1484,13 +1483,15 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 child: ElevatedButton(
                   onPressed: () {
                     if (controller.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please provide a reason")));
+                      // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please provide a reason")));
+                      _showBanner("Please provide a reason", isError: true);
                       return;
                     }
                     setState(() {
                       order.status = TailorOrderStatus.cancelled;
                     });
                     Navigator.pop(context);
+                    _showBanner("Request declined successfully.", isError: false);
                     if (onDone != null) onDone();
                   },
                   style: ElevatedButton.styleFrom(
@@ -1820,6 +1821,12 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
               final val = controller.text.trim();
               final newMaxOrder = val.isEmpty ? null : int.tryParse(val);
               
+              // Only proceed if the value has actually changed
+              if (newMaxOrder == _tailor.maxOrder) {
+                Navigator.pop(context);
+                return;
+              }
+
               // Dismiss dialog immediately
               Navigator.pop(context);
 
