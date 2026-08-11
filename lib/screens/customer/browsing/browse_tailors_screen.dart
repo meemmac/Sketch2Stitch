@@ -6,6 +6,156 @@ import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dar
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
 
+/*
+/// ORIGINAL Hardcoded sample tailors
+final List<Tailor> kHardcodedTailors = [
+  Tailor(
+    id: 't1',
+    name: 'Abdul Karim',
+    email: 'karim.tailor@example.com',
+    phone: '01811000001',
+    address: '5 Banani Road, Banani, Dhaka',
+    rating: 4.9,
+    profilePicture: 'assets/images/fab.jpg',
+    about: 'Formal and informal wear specialist with 12 years experience.',
+    portfolio: [
+      Portfolio(
+        id: 'pf1',
+        tailorId: 't1',
+        image: 'assets/images/fab.jpg',
+        description: 'Premium formal suit with perfect fit',
+      ),
+      Portfolio(
+        id: 'pf2',
+        tailorId: 't1',
+        image: 'assets/images/silk.jpg',
+        description: 'Elegant wedding sherwani',
+      ),
+      Portfolio(
+        id: 'pf3',
+        tailorId: 't1',
+        image: 'assets/images/textile.jpg',
+        description: 'Casual blazer with modern cut',
+      ),
+    ],
+  ),
+  Tailor(
+    id: 't2',
+    name: 'Rehana Begum',
+    email: 'rehana.stitch@example.com',
+    phone: '01811000002',
+    address: '22 Gulshan Avenue, Gulshan, Dhaka',
+    rating: 4.7,
+    profilePicture: 'assets/images/silk.jpg',
+    about: 'Traditional and ethnic wear specialist with 15 years experience.',
+    portfolio: [
+      Portfolio(
+        id: 'pf4',
+        tailorId: 't2',
+        image: 'assets/images/silk.jpg',
+        description: 'Designer silk saree with zari work',
+      ),
+      Portfolio(
+        id: 'pf5',
+        tailorId: 't2',
+        image: 'assets/images/saree.jpg',
+        description: 'Traditional lehenga for weddings',
+      ),
+      Portfolio(
+        id: 'pf6',
+        tailorId: 't2',
+        image: 'assets/images/gorgeous.jpg',
+        description: 'Hand-embroidered blouse design',
+      ),
+    ],
+  ),
+  Tailor(
+    id: 't3',
+    name: 'Mohammed Rafiq',
+    email: 'rafiq.tailors@example.com',
+    phone: '01811000003',
+    address: 'Kotwali, Chittagong',
+    rating: 4.4,
+    profilePicture: 'assets/images/textile.jpg',
+    about: 'Casual and daily wear specialist with quick turnaround.',
+    portfolio: [
+      Portfolio(
+        id: 'pf7',
+        tailorId: 't3',
+        image: 'assets/images/textile.jpg',
+        description: 'Daily wear cotton kurta',
+      ),
+      Portfolio(
+        id: 'pf8',
+        tailorId: 't3',
+        image: 'assets/images/fabric_waves.jpg',
+        description: 'Casual shirt with modern fit',
+      ),
+    ],
+  ),
+  Tailor(
+    id: 't4',
+    name: 'Fatima Noor',
+    email: 'fatima.designs@example.com',
+    phone: '01811000004',
+    address: '3 Dhanmondi 27, Dhanmondi, Dhaka',
+    rating: 4.8,
+    profilePicture: 'assets/images/lace.jpg',
+    about: 'Bridal and formal wear specialist with custom embroidery.',
+    portfolio: [
+      Portfolio(
+        id: 'pf9',
+        tailorId: 't4',
+        image: 'assets/images/lace.jpg',
+        description: 'Bridal gown with lace detailing',
+      ),
+      Portfolio(
+        id: 'pf10',
+        tailorId: 't4',
+        image: 'assets/images/embroidery.jpg',
+        description: 'Custom embroidered bridal blouse',
+      ),
+      Portfolio(
+        id: 'pf11',
+        tailorId: 't4',
+        image: 'assets/images/gorgeous.jpg',
+        description: 'Formal evening gown with embellishments',
+      ),
+    ],
+  ),
+  Tailor(
+    id: 't5',
+    name: 'Kamal Hossain',
+    email: 'kamal.tailor@example.com',
+    phone: '01811000005',
+    address: '15 Mirpur Road, Mirpur, Dhaka',
+    rating: 4.6,
+    profilePicture: 'assets/images/fab2.jpg',
+    about: 'Quick stitching and alterations for all types of garments.',
+    portfolio: [
+      Portfolio(
+        id: 'pf12',
+        tailorId: 't5',
+        image: 'assets/images/fab2.jpg',
+        description: 'School uniform stitching',
+      ),
+      Portfolio(
+        id: 'pf13',
+        tailorId: 't5',
+        image: 'assets/images/fab.jpg',
+        description: 'Office wear shirt and pant set',
+      ),
+      Portfolio(
+        id: 'pf14',
+        tailorId: 't5',
+        image: 'assets/images/textile.jpg',
+        description: 'Children\'s wear stitching',
+      ),
+    ],
+  ),
+];
+*/
+
 /// Hardcoded sample tailors
 final List<Tailor> kHardcodedTailors = [
   Tailor(
@@ -151,6 +301,31 @@ final List<Tailor> kHardcodedTailors = [
         description: 'Children\'s wear stitching',
       ),
     ],
+    maxOrder: 10,
+  ),
+  Tailor(
+    id: 't6',
+    name: 'Sultana Razia',
+    email: 'sultana.razia@example.com',
+    phone: '01811000006',
+    address: 'Sector 7, Uttara, Dhaka',
+    rating: 4.5,
+    profilePicture: 'assets/images/silk.jpg',
+    about: 'Expert in traditional embroidery and boutique designs.',
+    portfolio: [],
+    maxOrder: 0, // Simulating unavailable
+  ),
+  Tailor(
+    id: 't7',
+    name: 'Jashim Uddin',
+    email: 'jashim.tailor@example.com',
+    phone: '01811000007',
+    address: 'Halishahar, Chittagong',
+    rating: 4.2,
+    profilePicture: 'assets/images/fab.jpg',
+    about: 'Men\'s formal wear and uniform specialist.',
+    portfolio: [],
+    maxOrder: 0, // Simulating unavailable
   ),
 ];
 
@@ -342,6 +517,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
     );
   }
 
+  /*
   Widget _buildTailorCard(Tailor tailor, bool isSmall) {
     final bool isTopRated = tailor.rating >= 4.8;
     String imageUrl = tailor.profilePicture ?? 'assets/images/fab.jpg';
@@ -516,39 +692,20 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                     Row(
                       children: [
                         Icon(
-                          Icons.location_on,
+                          Icons.directions_bike_outlined,
                           size: isSmall ? 12 : 14,
                           color: Colors.grey[600],
                         ),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            tailor.generalArea,
+                            "1.8 km",
                             style: TextStyle(
                               fontSize: 11,
                               color: Colors.grey[600],
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 1,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '1.8 km',
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: Colors.green.shade800,
-                              fontWeight: FontWeight.bold,
-                            ),
                           ),
                         ),
                       ],
@@ -558,6 +715,254 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+  */
+
+  Widget _buildTailorCard(Tailor tailor, bool isSmall) {
+    final bool isTopRated = tailor.rating >= 4.8;
+    final bool isFull = tailor.maxOrder == 0; // Backend logic placeholder
+    String imageUrl = tailor.profilePicture ?? 'assets/images/fab.jpg';
+
+    return GestureDetector(
+      onTap: isFull ? null : () async {
+        final result = await Navigator.push<String>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TailorDetailScreen(
+              tailor: tailor,
+              onTailorSelected: widget.onTailorSelected,
+              userRole: widget.userRole,
+            ),
+          ),
+        );
+        if (result != null && widget.onTailorSelected != null) {
+          widget.onTailorSelected!(result);
+        }
+      },
+      child: Opacity(
+        opacity: isFull ? 0.65 : 1.0,
+        child: Container(
+          decoration: BoxDecoration(
+            color: kCardBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isFull ? Colors.grey.shade300 : kBorder, 
+              width: 0.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isFull ? 0.02 : 0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    flex: 5,
+                    child: Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(14),
+                          ),
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: double.infinity,
+                            child: ColorFiltered(
+                              colorFilter: ColorFilter.mode(
+                                isFull ? Colors.black.withValues(alpha: 0.2) : Colors.transparent,
+                                BlendMode.darken,
+                              ),
+                              child: Image.asset(
+                                imageUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => Container(
+                                  color: kSage.withValues(alpha: 0.12),
+                                  child: Icon(
+                                    Icons.person,
+                                    size: isSmall ? 36 : 40,
+                                    color: kSageDark,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (isTopRated && !isFull)
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isSmall ? 8 : 10,
+                                vertical: isSmall ? 4 : 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: kSage,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  width: 0.3,
+                                ),
+                              ),
+                              child: Text(
+                                '⭐ Top Rated',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        Positioned(
+                          bottom: 8,
+                          right: 8,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isSmall ? 6 : 8,
+                              vertical: isSmall ? 3 : 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.star,
+                                  color: Colors.amber,
+                                  size: isSmall ? 10 : 12,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  tailor.rating.toStringAsFixed(1),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Flexible(
+                    flex: 4,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        isSmall ? 10 : 12,
+                        isSmall ? 8 : 10,
+                        isSmall ? 10 : 12,
+                        isSmall ? 10 : 12,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            tailor.name,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              height: 1.2,
+                              color: isFull ? Colors.grey.shade700 : Colors.black,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          SizedBox(height: isSmall ? 4 : 6),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                size: isSmall ? 12 : 14,
+                                color: isFull ? Colors.grey.shade400 : Colors.grey[600],
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  tailor.generalArea,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isFull ? Colors.grey.shade400 : Colors.grey[600],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.directions_bike_outlined,
+                                size: isSmall ? 12 : 14,
+                                color: isFull ? Colors.grey.shade400 : Colors.grey[600],
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  "1.8 km",
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isFull ? Colors.grey.shade400 : Colors.grey[600],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (isFull)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          "Fully Booked",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
