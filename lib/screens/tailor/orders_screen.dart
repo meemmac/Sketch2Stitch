@@ -1491,6 +1491,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                       order.status = TailorOrderStatus.cancelled;
                     });
                     Navigator.pop(context);
+                    // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Request declined successfully.")));
                     _showBanner("Request declined successfully.", isError: false);
                     if (onDone != null) onDone();
                   },
@@ -1573,9 +1574,10 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
               child: IconButton(
                 icon: const Icon(Icons.download, color: Colors.white, size: 30),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Reference image download started...")),
-                  );
+                  // ScaffoldMessenger.of(context).showSnackBar(
+                  //   const SnackBar(content: Text("Reference image download started...")),
+                  // );
+                  _showBanner("Reference image download started...", isError: false);
                 },
               ),
             ),
@@ -1720,7 +1722,8 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     return "${date.day} ${months[date.month - 1]} ${date.year}";
   }
 
-  // Added Max Order Info and Update Button
+  /*
+  // ORIGINAL Max Order section
   Widget _buildMaxOrderButton() {
     final int? maxOrder = _tailor.maxOrder;
     final String label = maxOrder == null ? "Maximum Orders: Not Set" : "Maximum Orders: $maxOrder";
@@ -1772,6 +1775,75 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           ),
         ),
       ],
+    );
+  }
+  */
+
+  // Added Max Order Info and Update Button
+  Widget _buildMaxOrderButton() {
+    final int? maxOrder = _tailor.maxOrder;
+    final String value = maxOrder == null ? "Not Set" : "$maxOrder";
+    
+    return InkWell(
+      onTap: _showMaxOrderDialog,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.green.shade100, width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: primaryGreen.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.bolt_rounded, size: 20, color: primaryGreen),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              "Maximum Order Capacity:",
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: Colors.black54,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              value,
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+                color: primaryGreen,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              maxOrder == null ? "Set" : "Update",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: primaryGreen,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right_rounded, size: 16, color: primaryGreen),
+          ],
+        ),
+      ),
     );
   }
 
