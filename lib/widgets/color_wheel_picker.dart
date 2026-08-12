@@ -1,14 +1,22 @@
+import 'dart:async';
 import 'dart:math';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
-/// A circular color picker.
+/// A circular color picker, rendered once as a bitmap (not recomputed every
+/// frame), so dragging is smooth even on lower-end devices.
 ///
-/// • Full mode (`paletteColors == null`): a standard hue/saturation wheel
-///   with a brightness slider underneath — use this for Hair Color.
-/// • Palette mode (`paletteColors != null`): the ring is built ONLY from the
-///   colors you pass in (interpolated around the circle), so the picker
-///   can never leave that gamut. Use this for Skin Tone, passing your
-///   existing fair→deep swatch list.
+/// • Full mode (`paletteColors == null`): standard hue wheel, radius =
+///   saturation, plus a brightness slider. Use for Hair Color.
+/// • Palette mode (`paletteColors != null`): the ring only ever produces
+///   shades derived from the colors you pass in — angle blends between your
+///   swatches (undertone), radius sweeps the FULL light→dark range within
+///   that undertone (center = lightest, edge = deepest). Use for Skin Tone.
+///
+/// [onColorSelected] fires once per tap and once when a drag ends — never
+/// continuously during a drag — so it's safe to call `setState` on a large
+/// parent widget from the callback without causing jank.
 class ColorWheelPicker extends StatefulWidget {
   final Color initialColor;
   final List<Color>? paletteColors;
@@ -26,141 +34,257 @@ class ColorWheelPicker extends StatefulWidget {
 }
 
 class _ColorWheelPickerState extends State<ColorWheelPicker> {
-  static const double _size = 240;
-  late HSVColor _hsv;
+  static const double _wheelSize = 260;
+  static const int _res = 200; // bitmap resolution — computed once, not per frame
+
+  double _angleDeg = 0;
+  double _distFrac = 0;
+  double _brightness = 1.0; // full-hue mode only
+  Color _current = Colors.black;
+  ui.Image? _wheelImage;
+
+  bool get _isPalette => widget.paletteColors != null;
 
   @override
   void initState() {
     super.initState();
-    _hsv = HSVColor.fromColor(widget.initialColor);
+    _current = widget.initialColor;
+    final hsv = HSVColor.fromColor(widget.initialColor);
+    if (_isPalette) {
+      final hsl = HSLColor.fromColor(widget.initialColor);
+      // invert our center-light→edge-dark mapping to seed the thumb position
+      _distFrac = ((0.88 - hsl.lightness) / 0.74).clamp(0.0, 1.0);
+      _angleDeg = _closestPaletteAngle(widget.initialColor);
+    } else {
+      _angleDeg = hsv.hue;
+      _distFrac = hsv.saturation;
+      _brightness = hsv.value;
+    }
+    _generateWheelBitmap();
   }
 
-  bool get _isPalette => widget.paletteColors != null;
+  @override
+  void dispose() {
+    _wheelImage?.dispose();
+    super.dispose();
+  }
 
-  Color get _currentColor =>
-      _isPalette ? _paletteColorAt(_hsv.hue, _hsv.saturation) : _hsv.toColor();
-
-  /// Maps the ring angle (0–360°) to a position in the palette list, and
-  /// uses distance-from-center as a lighten/darken nudge within that color —
-  /// so you only ever land on shades that stay close to your source palette.
-  Color _paletteColorAt(double hueDeg, double sat) {
+  double _closestPaletteAngle(Color target) {
     final colors = widget.paletteColors!;
-    if (colors.length < 2) return colors.first;
-    final t = (hueDeg % 360) / 360;
-    final scaled = t * (colors.length - 1);
-    final i = scaled.floor().clamp(0, colors.length - 2);
-    final localT = scaled - i;
-    final base = Color.lerp(colors[i], colors[i + 1], localT)!;
+    double bestAngle = 0;
+    double bestDist = double.infinity;
+    for (int a = 0; a < 360; a += 4) {
+      final c = _paletteColorFor(a.toDouble(), 0.4);
+      final d = (c.red - target.red).abs() +
+          (c.green - target.green).abs() +
+          (c.blue - target.blue).abs();
+      if (d < bestDist) {
+        bestDist = d.toDouble();
+        bestAngle = a.toDouble();
+      }
+    }
+    return bestAngle;
+  }
+
+  Color _paletteColorFor(double angleDeg, double distFrac) {
+    final colors = widget.paletteColors!;
+    final t = (angleDeg % 360) / 360;
+    final scaled = t * colors.length;
+    final i = scaled.floor() % colors.length;
+    final j = (i + 1) % colors.length;
+    final localT = scaled - scaled.floor();
+    final base = Color.lerp(colors[i], colors[j], localT)!;
     final hsl = HSLColor.fromColor(base);
-    final lightness = (hsl.lightness + (sat - 0.5) * 0.3).clamp(0.05, 0.95);
+    // Center = lightest (≈0.88), edge = deepest (≈0.14) — full realistic range.
+    final lightness = (0.88 - distFrac.clamp(0.0, 1.0) * 0.74).clamp(0.05, 0.95);
     return hsl.withLightness(lightness).toColor();
   }
 
-  void _handlePan(Offset localPos) {
-    const radius = _size / 2;
-    final center = const Offset(radius, radius);
+  Color _colorForPolar(double angleDeg, double distFrac) {
+    if (_isPalette) return _paletteColorFor(angleDeg, distFrac);
+    return HSVColor.fromAHSV(1, angleDeg, distFrac.clamp(0.0, 1.0), 1).toColor();
+  }
+
+  Future<void> _generateWheelBitmap() async {
+    final pixels = Uint8List(_res * _res * 4);
+    final center = (_res - 1) / 2;
+    for (int y = 0; y < _res; y++) {
+      for (int x = 0; x < _res; x++) {
+        final dx = x - center;
+        final dy = y - center;
+        final dist = sqrt(dx * dx + dy * dy) / center;
+        final idx = (y * _res + x) * 4;
+        if (dist > 1.0) continue; // leave transparent outside the circle
+        var angle = atan2(dy, dx) * 180 / pi;
+        if (angle < 0) angle += 360;
+        final c = _colorForPolar(angle, dist);
+        pixels[idx] = c.red;
+        pixels[idx + 1] = c.green;
+        pixels[idx + 2] = c.blue;
+        pixels[idx + 3] = 255;
+      }
+    }
+    final completer = Completer<ui.Image>();
+    ui.decodeImageFromPixels(
+      pixels,
+      _res,
+      _res,
+      ui.PixelFormat.rgba8888,
+      completer.complete,
+    );
+    final img = await completer.future;
+    if (mounted) setState(() => _wheelImage = img);
+  }
+
+  Color _currentColor() {
+    final base = _colorForPolar(_angleDeg, _distFrac);
+    if (_isPalette) return base;
+    return HSVColor.fromColor(base).withValue(_brightness).toColor();
+  }
+
+  void _updateFromLocalPosition(Offset localPos, {required bool commit}) {
+    const radius = _wheelSize / 2;
+    const center = Offset(radius, radius);
     final d = localPos - center;
-    final dist = d.distance.clamp(0, radius);
+    final dist = (d.distance / radius).clamp(0.0, 1.0);
     var angle = atan2(d.dy, d.dx) * 180 / pi;
     if (angle < 0) angle += 360;
-    setState(() => _hsv = _hsv.withHue(angle).withSaturation(dist / radius));
-    widget.onColorSelected(_currentColor);
+    setState(() {
+      _angleDeg = angle;
+      _distFrac = dist;
+      _current = _currentColor();
+    });
+    if (commit) widget.onColorSelected(_current);
   }
 
   @override
   Widget build(BuildContext context) {
+    final hex =
+        '#${_current.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        GestureDetector(
-          onPanUpdate: (d) => _handlePan(d.localPosition),
-          onTapDown: (d) => _handlePan(d.localPosition),
-          child: SizedBox(
-            width: _size,
-            height: _size,
-            child: CustomPaint(
-              painter: _WheelPainter(
-                hsv: _hsv,
-                paletteColors: widget.paletteColors,
+        // Big, obvious live preview — not a tiny dot.
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: _current,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.black12, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: _current.withOpacity(0.35),
+                    blurRadius: 10,
+                    spreadRadius: 1,
+                  ),
+                ],
               ),
             ),
+            const SizedBox(width: 10),
+            Text(
+              hex,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        GestureDetector(
+          onTapDown: (d) => _updateFromLocalPosition(d.localPosition, commit: true),
+          onPanUpdate: (d) => _updateFromLocalPosition(d.localPosition, commit: false),
+          onPanEnd: (_) => widget.onColorSelected(_current),
+          child: SizedBox(
+            width: _wheelSize,
+            height: _wheelSize,
+            child: _wheelImage == null
+                ? const Center(child: CircularProgressIndicator())
+                : CustomPaint(
+                    painter: _WheelPainter(
+                      image: _wheelImage!,
+                      angleDeg: _angleDeg,
+                      distFrac: _distFrac,
+                    ),
+                  ),
           ),
         ),
-        const SizedBox(height: 14),
-        if (!_isPalette)
+        if (_isPalette) ...[
+          const SizedBox(height: 10),
+          const Text(
+            'Rotate for undertone · drag out from center for a deeper shade',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11, color: Colors.black45),
+          ),
+        ],
+        if (!_isPalette) ...[
+          const SizedBox(height: 14),
           Row(
             children: [
-              const Icon(Icons.brightness_6_outlined,
-                  size: 16, color: Colors.black45),
+              const Icon(Icons.brightness_6_outlined, size: 16, color: Colors.black45),
               const SizedBox(width: 8),
               Expanded(
                 child: Slider(
-                  value: _hsv.value,
+                  value: _brightness,
                   onChanged: (v) {
-                    setState(() => _hsv = _hsv.withValue(v));
-                    widget.onColorSelected(_currentColor);
+                    setState(() {
+                      _brightness = v;
+                      _current = _currentColor();
+                    });
                   },
+                  onChangeEnd: (_) => widget.onColorSelected(_current),
                 ),
               ),
             ],
           ),
-        const SizedBox(height: 4),
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: _currentColor,
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.black12),
-          ),
-        ),
+        ],
       ],
     );
   }
 }
 
 class _WheelPainter extends CustomPainter {
-  final HSVColor hsv;
-  final List<Color>? paletteColors;
-  _WheelPainter({required this.hsv, this.paletteColors});
+  final ui.Image image;
+  final double angleDeg;
+  final double distFrac;
+  _WheelPainter({required this.image, required this.angleDeg, required this.distFrac});
 
   @override
   void paint(Canvas canvas, Size size) {
+    final paint = Paint()..filterQuality = FilterQuality.high;
+    canvas.drawImageRect(
+      image,
+      Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      paint,
+    );
+
     final radius = size.width / 2;
     final center = Offset(radius, radius);
+    final angleRad = angleDeg * pi / 180;
+    final pos = center + Offset(cos(angleRad), sin(angleRad)) * (distFrac * radius);
 
-    final ringPaint = Paint()
-      ..shader = SweepGradient(
-        colors: paletteColors != null
-            ? [...paletteColors!, paletteColors!.first]
-            : List.generate(
-                13, (i) => HSVColor.fromAHSV(1, i * 30.0, 1, 1).toColor()),
-      ).createShader(Rect.fromCircle(center: center, radius: radius));
-    canvas.drawCircle(center, radius, ringPaint);
-
-    // White-out toward the center so saturation/lightness reads visually.
-    final fadePaint = Paint()
-      ..shader = RadialGradient(
-        colors: [Colors.white, Colors.white.withOpacity(0)],
-      ).createShader(Rect.fromCircle(center: center, radius: radius));
-    canvas.drawCircle(center, radius, fadePaint);
-
-    // Thumb
-    final angle = hsv.hue * pi / 180;
-    final dist = hsv.saturation * radius;
-    final pos = center + Offset(cos(angle), sin(angle)) * dist;
+    canvas.drawCircle(pos, 11, Paint()..color = Colors.black26);
+    canvas.drawCircle(pos, 9, Paint()..color = Colors.white);
     canvas.drawCircle(
-        pos, 9, Paint()..color = Colors.white..style = PaintingStyle.fill);
-    canvas.drawCircle(
-        pos,
-        9,
-        Paint()
-          ..color = Colors.black26
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5);
+      pos,
+      9,
+      Paint()
+        ..color = Colors.black26
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
   }
 
   @override
   bool shouldRepaint(covariant _WheelPainter oldDelegate) =>
-      oldDelegate.hsv != hsv || oldDelegate.paletteColors != paletteColors;
+      oldDelegate.image != image ||
+      oldDelegate.angleDeg != angleDeg ||
+      oldDelegate.distFrac != distFrac;
 }

@@ -123,7 +123,10 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
 
   final Set<String> _selectedStyles = {};
   final _customInstructionsController = TextEditingController();
-Color? _customHairColorValue;   // set when user picks from the hair wheel
+Color _hairBaseColor = _hairSwatches.first.$1;
+  double _hairAdjustDelta = 0;
+  Color _skinBaseColor = _skinSwatches[2].$1; // matches AppearanceProfile's default (medium)
+  double _skinAdjustDelta = 0;
   Color? _customSkinColorValue;   // set when user picks from the skin wheel
   final _customAccessoriesController = TextEditingController();
 
@@ -815,91 +818,31 @@ accessories: Set.from(_profile.accessories),
          // Skin Tone
           _profileRow(
             label: 'Skin Tone',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    _swatchRow(
-                      items: _skinSwatches
-                          .map(
-                            (s) => (
-                              s.$1,
-                              _customSkinColorValue == null && s.$2 == _profile.skinTone,
-                              () => setState(() {
-                                _profile.skinTone = s.$2;
-                                _customSkinColorValue = null;
-                                _profileConfigured = true;
-                              }),
-                            ),
-                          )
-                          .toList(),
-                      tooltip: (i) => _skinSwatches[i].$2.label,
-                      bordered: (i) => _skinSwatches[i].$2 == SkinTone.fair,
-                      onLongPress: (i) => _showLightenDarkenSheet(
-                        base: _skinSwatches[i].$1,
-                       onChanged: (c) => setState(() {
-                          _customSkinColorValue = c;
-                          _profile.skinTone = _skinSwatches[i].$2;
-                          _profile.customSkinColorValue = c;
-                          _profile.customSkinColor = AppearanceProfile.colorToHex(c);
-                          _profileConfigured = true;
-                        }),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => _openColorWheel(
-                        initial: _customSkinColorValue ??
-                            _skinSwatches
-                                .firstWhere((s) => s.$2 == _profile.skinTone)
-                                .$1,
-                        palette: _skinSwatches.map((s) => s.$1).toList(),
-onSelected: (c) => setState(() {
-                          _customSkinColorValue = c;
-                          _profile.customSkinColorValue = c;
-                          _profile.customSkinColor = AppearanceProfile.colorToHex(c);
-                          _profileConfigured = true;
-                        }),
-                      ),
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: _customSkinColorValue != null ? _sage : _border,
-                            width: _customSkinColorValue != null ? 2 : 1,
-                          ),
-                          gradient: SweepGradient(
-                            colors: _skinSwatches.map((s) => s.$1).toList(),
-                          ),
-                        ),
-                        child: _customSkinColorValue != null
-                            ? const Icon(Icons.check, size: 12, color: Colors.white)
-                            : null,
-                      ),
-                    ),
-                  ],
-                ),
-                if (_customSkinColorValue != null) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: _customSkinColorValue,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      const Text('Custom shade selected',
-                          style: TextStyle(fontSize: 11, color: Colors.black45)),
-                    ],
-                  ),
-                ],
-              ],
+            child: ColorPickerRow(
+              swatches: _skinSwatches.map((s) => s.$1).toList(),
+              baseColor: _skinBaseColor,
+              adjustDelta: _skinAdjustDelta,
+              wheelPalette: _skinSwatches.map((s) => s.$1).toList(),
+              wheelDialogTitle: 'Pick a Skin Tone',
+              accent: _sage,
+              pale: Colors.white,
+              border: _border,
+              onBaseChanged: (c) => setState(() {
+                _skinBaseColor = c;
+                final nearest = _skinSwatches.reduce(
+                  (a, b) => (a.$1.value - c.value).abs() < (b.$1.value - c.value).abs() ? a : b,
+                );
+                _profile.skinTone = nearest.$2;
+                _profileConfigured = true;
+              }),
+              onAdjustChanged: (d) => setState(() {
+                _skinAdjustDelta = d;
+                final hsl = HSLColor.fromColor(_skinBaseColor);
+                final adjusted = hsl.withLightness((hsl.lightness + d).clamp(0.0, 1.0)).toColor();
+                _profile.customSkinColorValue = adjusted;
+                _profile.customSkinColor = AppearanceProfile.colorToHex(adjusted);
+                _profileConfigured = true;
+              }),
             ),
           ),
           // Hair Length
@@ -937,94 +880,34 @@ onSelected: (c) => setState(() {
               ),
             ),
           ),
-// Hair Color (swatches + wheel, both long-press to lighten/darken)
+
+
+// Hair Color
           _profileRow(
             label: 'Hair Color',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    _swatchRow(
-                      items: _hairSwatches
-                          .take(3)
-                          .map(
-                            (s) => (
-                              s.$1,
-                              _customHairColorValue == null && _profile.hairColor == s.$2,
-                              () => setState(() {
-                                _profile.hairColor = s.$2;
-                                _customHairColorValue = null;
-                                _profileConfigured = true;
-                              }),
-                            ),
-                          )
-                          .toList(),
-                      tooltip: (i) => _hairSwatches[i].$2.label,
-                      bordered: (i) => false,
-                      onLongPress: (i) => _showLightenDarkenSheet(
-                        base: _hairSwatches[i].$1,
-onChanged: (c) => setState(() {
-                          _customHairColorValue = c;
-                          _profile.hairColor = _hairSwatches[i].$2;
-                          _profile.customHairColorValue = c;
-                          _profile.customHairColor = AppearanceProfile.colorToHex(c);
-                          _profileConfigured = true;
-                        }),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => _openColorWheel(
-                        initial: _customHairColorValue ?? _hairSwatches.first.$1,
-                        onSelected: (c) => setState(() {
-                          _customHairColorValue = c;
-                          _profile.hairColor = HairColor.colorful;
-                          _profile.customHairColorValue = c;
-                          _profile.customHairColor = AppearanceProfile.colorToHex(c);
-                          _profileConfigured = true;
-                        }),
-                      ),
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: _customHairColorValue != null ? _sage : _border,
-                            width: _customHairColorValue != null ? 2 : 1,
-                          ),
-                          gradient: const SweepGradient(
-                            colors: [Colors.red, Colors.yellow, Colors.blue, Colors.red],
-                          ),
-                        ),
-                        child: _customHairColorValue != null
-                            ? const Icon(Icons.check, size: 12, color: Colors.white)
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Other Custom Color',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black54),
-                    ),
-                  ],
-                ),
-                if (_customHairColorValue != null) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(color: _customHairColorValue, shape: BoxShape.circle),
-                      ),
-                      const SizedBox(width: 6),
-                      const Text('Custom color selected',
-                          style: TextStyle(fontSize: 11, color: Colors.black45)),
-                    ],
-                  ),
-                ],
-              ],
+            child: ColorPickerRow(
+              swatches: _hairSwatches.map((s) => s.$1).toList(),
+              baseColor: _hairBaseColor,
+              adjustDelta: _hairAdjustDelta,
+              wheelPalette: null, // full hue wheel for hair
+              wheelDialogTitle: 'Pick a Hair Color',
+              accent: _sage,
+              pale: Colors.white,
+              border: _border,
+              onBaseChanged: (c) => setState(() {
+                _hairBaseColor = c;
+                final match = _hairSwatches.where((s) => s.$1.value == c.value);
+                _profile.hairColor = match.isNotEmpty ? match.first.$2 : HairColor.colorful;
+                _profileConfigured = true;
+              }),
+              onAdjustChanged: (d) => setState(() {
+                _hairAdjustDelta = d;
+                final hsl = HSLColor.fromColor(_hairBaseColor);
+                final adjusted = hsl.withLightness((hsl.lightness + d).clamp(0.0, 1.0)).toColor();
+                _profile.customHairColorValue = adjusted;
+                _profile.customHairColor = AppearanceProfile.colorToHex(adjusted);
+                _profileConfigured = true;
+              }),
             ),
           ),
 
@@ -1832,58 +1715,7 @@ onChanged: (c) => setState(() {
     );
   }
 
-Widget _swatchRow({
-    required List<(Color, bool, VoidCallback)> items,
-    required String Function(int) tooltip,
-    bool Function(int)? bordered,
-    void Function(int)? onLongPress, // NEW: lighten/darken trigger
-  }) {
-    return Row(
-      children: items.asMap().entries.map((e) {
-        final i = e.key;
-        final (color, selected, onTap) = e.value;
-        return Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: Tooltip(
-            message: tooltip(i),
-            child: GestureDetector(
-              onTap: onTap,
-              onLongPress: onLongPress == null ? null : () => onLongPress(i),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: selected
-                        ? _sage
-                        : (bordered?.call(i) ?? false)
-                        ? Colors.grey.shade300
-                        : Colors.transparent,
-                    width: selected ? 3 : 1.5,
-                  ),
-                  boxShadow: selected
-                      ? [
-                          BoxShadow(
-                            color: _sage.withAlpha(100),
-                            blurRadius: 8,
-                            spreadRadius: 1,
-                          ),
-                        ]
-                      : null,
-                ),
-                child: selected
-                    ? const Icon(Icons.check, size: 15, color: Colors.white)
-                    : null,
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
+
 
   Widget _smallButton({
     required IconData icon,
@@ -1915,90 +1747,6 @@ Widget _swatchRow({
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Color _adjustLightness(Color base, double delta) {
-    final hsl = HSLColor.fromColor(base);
-    return hsl.withLightness((hsl.lightness + delta).clamp(0.0, 1.0)).toColor();
-  }
-
-  void _showLightenDarkenSheet({
-    required Color base,
-    required ValueChanged<Color> onChanged,
-  }) {
-    double delta = 0;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            final adjusted = _adjustLightness(base, delta);
-            return Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: adjusted,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.black12),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text('Lighten / Darken',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                  Slider(
-                    value: delta,
-                    min: -0.35,
-                    max: 0.35,
-                    activeColor: _sage,
-                    onChanged: (v) {
-                      setSheetState(() => delta = v);
-                      onChanged(_adjustLightness(base, delta));
-                    },
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: const [
-                      Text('Darker', style: TextStyle(fontSize: 11, color: Colors.black45)),
-                      Text('Lighter', style: TextStyle(fontSize: 11, color: Colors.black45)),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _openColorWheel({
-    required Color initial,
-    List<Color>? palette,
-    required ValueChanged<Color> onSelected,
-  }) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(palette != null ? 'Pick a Skin Tone' : 'Pick a Hair Color'),
-        content: ColorWheelPicker(
-          initialColor: initial,
-          paletteColors: palette,
-          onColorSelected: onSelected,
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Done')),
-        ],
       ),
     );
   }
