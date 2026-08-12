@@ -171,7 +171,6 @@ Color? _customHairColorValue;   // set when user picks from the hair wheel
 
   // ── Progress tracking ──────────────────────────────────────────
   /// True once the user has tapped any appearance-profile control.
-  bool _profileConfigured = false;
 
   /// True once the user has expanded the Advanced Measurements tile.
   bool _measurementsReviewed = false;
@@ -1471,7 +1470,7 @@ Color? _customHairColorValue;   // set when user picks from the hair wheel
       ('Gender', p.gender.label),
       ('Body Shape', p.bodyShape.label),
       ('Height', p.height.label),
-      ('Skin Tone', p.skinTone.label),
+      ('Skin Tone', _customSkinColorValue != null ? 'Custom shade' : p.skinTone.label),
       (
         'Hair',
         '${p.hairLength.label} ${p.hairStyle.label} ${p.hairColor.label}',
