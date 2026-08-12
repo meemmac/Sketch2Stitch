@@ -167,7 +167,6 @@ class _HueWheelPickerState extends State<_HueWheelPicker> {
 
   double _angleDeg = 0;
   double _distFrac = 0;
-  double _brightness = 1.0;
   Color _current = Colors.black;
   ui.Image? _wheelImage;
 
@@ -178,7 +177,6 @@ class _HueWheelPickerState extends State<_HueWheelPicker> {
     final hsv = HSVColor.fromColor(widget.initialColor);
     _angleDeg = hsv.hue;
     _distFrac = hsv.saturation;
-    _brightness = hsv.value;
     _generateWheelBitmap();
   }
 
@@ -219,10 +217,7 @@ class _HueWheelPickerState extends State<_HueWheelPicker> {
     if (mounted) setState(() => _wheelImage = img);
   }
 
-  Color _currentColor() {
-    final base = _colorForPolar(_angleDeg, _distFrac);
-    return HSVColor.fromColor(base).withValue(_brightness).toColor();
-  }
+  Color _currentColor() => _colorForPolar(_angleDeg, _distFrac);
 
   void _updateFromLocalPosition(Offset localPos, {required bool commit}) {
     const radius = _wheelSize / 2;
@@ -293,18 +288,6 @@ class _HueWheelPickerState extends State<_HueWheelPicker> {
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 18),
-        _BrightnessSlider(
-          value: _brightness,
-          hueColor: HSVColor.fromAHSV(1, _angleDeg, _distFrac.clamp(0.0, 1.0), 1).toColor(),
-          onChanged: (v) {
-            setState(() {
-              _brightness = v;
-              _current = _currentColor();
-            });
-          },
-          onChangeEnd: () => widget.onColorSelected(_current),
         ),
       ],
     );
@@ -403,23 +386,34 @@ class _SkinTonePickerState extends State<_SkinTonePicker> {
     super.dispose();
   }
 
-  Color _colorForXY(double xFrac, double yFrac) {
-    final colors = widget.paletteColors;
-    if (colors.length == 1) {
-      final hsl = HSLColor.fromColor(colors.first);
-      final lightness =
-          (_lightestL - yFrac.clamp(0.0, 1.0) * (_lightestL - _darkestL)).clamp(_darkestL, _lightestL);
-      return hsl.withLightness(lightness).toColor();
-    }
+// Anchors for the light/dark ends of the strip — NOT pure white/black.
+// A pale, slightly pink-warm highlight and a deep warm-brown shadow,
+// so every undertone still reads as skin at both extremes.
+static const Color _lightSkinAnchor = Color(0xFFF6E1D3);
+static const Color _darkSkinAnchor = Color(0xFF3B2415);
+
+Color _colorForXY(double xFrac, double yFrac) {
+  final colors = widget.paletteColors;
+  Color base;
+  if (colors.length == 1) {
+    base = colors.first;
+  } else {
     final scaled = xFrac.clamp(0.0, 1.0) * (colors.length - 1);
     final i = scaled.floor().clamp(0, colors.length - 2);
     final localT = scaled - i;
-    final base = Color.lerp(colors[i], colors[i + 1], localT)!;
-    final hsl = HSLColor.fromColor(base);
-    final lightness =
-        (_lightestL - yFrac.clamp(0.0, 1.0) * (_lightestL - _darkestL)).clamp(_darkestL, _lightestL);
-    return hsl.withLightness(lightness).toColor();
+    base = Color.lerp(colors[i], colors[i + 1], localT)!;
   }
+
+  final y = yFrac.clamp(0.0, 1.0);
+  // Top half: pale-skin anchor → the undertone itself.
+  // Bottom half: the undertone itself → deep-skin anchor.
+  // Straight RGB lerp (not HSL lightness) keeps the blend smooth and
+  // avoids the hue/saturation drag that made the old gradient look muddy.
+  if (y <= 0.5) {
+    return Color.lerp(_lightSkinAnchor, base, y / 0.5)!;
+  }
+  return Color.lerp(base, _darkSkinAnchor, (y - 0.5) / 0.5)!;
+}
 
   Offset _closestXY(Color target) {
     double bestX = 0.5, bestY = 0.5, bestDist = double.infinity;
@@ -631,67 +625,6 @@ class _PreviewPill extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _BrightnessSlider extends StatelessWidget {
-  final double value; // 0..1
-  final Color hueColor;
-  final ValueChanged<double> onChanged;
-  final VoidCallback onChangeEnd;
-
-  const _BrightnessSlider({
-    required this.value,
-    required this.hueColor,
-    required this.onChanged,
-    required this.onChangeEnd,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final trackWidth = constraints.maxWidth;
-        final thumbX = (value.clamp(0.0, 1.0)) * trackWidth;
-        return SizedBox(
-          height: 30,
-          child: Stack(
-            alignment: Alignment.centerLeft,
-            children: [
-              Container(
-                height: 14,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  gradient: LinearGradient(colors: [Colors.black, hueColor]),
-                ),
-              ),
-              Positioned(
-                left: (thumbX - 12).clamp(0.0, trackWidth - 24),
-                child: Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                    border: Border.all(color: Colors.black12),
-                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 1))],
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTapDown: (d) => onChanged((d.localPosition.dx / trackWidth).clamp(0.0, 1.0)),
-                  onPanUpdate: (d) => onChanged((d.localPosition.dx / trackWidth).clamp(0.0, 1.0)),
-                  onPanEnd: (_) => onChangeEnd(),
-                  onTapUp: (_) => onChangeEnd(),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

@@ -193,8 +193,8 @@ class ColorPickerRow extends StatelessWidget {
                   ),
                   child: Slider(
                     value: adjustDelta,
-                    min: -0.4,
-                    max: 0.4,
+                    min: -0.1,
+                    max: 0.1,
                     activeColor: accent,
                     inactiveColor: border,
                     onChanged: onAdjustChanged,
