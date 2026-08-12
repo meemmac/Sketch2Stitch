@@ -360,11 +360,6 @@ class _SkinTonePickerState extends State<_SkinTonePicker> {
   static const int _resX = 240;
   static const int _resY = 140;
 
-  // Realistic skin-tone lightness band — never washes out to white,
-  // never crushes to black, unlike the old wheel's 0.88 center.
-  static const double _lightestL = 0.62;
-  static const double _darkestL = 0.14;
-
   double _xFrac = 0.5; // undertone position, left → right across swatches
   double _yFrac = 0.35; // light (0, top) → dark (1, bottom)
   Color _current = Colors.black;
@@ -386,34 +381,34 @@ class _SkinTonePickerState extends State<_SkinTonePicker> {
     super.dispose();
   }
 
-// Anchors for the light/dark ends of the strip — NOT pure white/black.
-// A pale, slightly pink-warm highlight and a deep warm-brown shadow,
-// so every undertone still reads as skin at both extremes.
-static const Color _lightSkinAnchor = Color(0xFFF6E1D3);
-static const Color _darkSkinAnchor = Color(0xFF3B2415);
+  // Anchors for the light/dark ends of the strip — NOT pure white/black.
+  // A pale, slightly pink-warm highlight and a deep warm-brown shadow,
+  // so every undertone still reads as skin at both extremes.
+  static const Color _lightSkinAnchor = Color(0xFFF6E1D3);
+  static const Color _darkSkinAnchor = Color(0xFF3B2415);
 
-Color _colorForXY(double xFrac, double yFrac) {
-  final colors = widget.paletteColors;
-  Color base;
-  if (colors.length == 1) {
-    base = colors.first;
-  } else {
-    final scaled = xFrac.clamp(0.0, 1.0) * (colors.length - 1);
-    final i = scaled.floor().clamp(0, colors.length - 2);
-    final localT = scaled - i;
-    base = Color.lerp(colors[i], colors[i + 1], localT)!;
-  }
+  Color _colorForXY(double xFrac, double yFrac) {
+    final colors = widget.paletteColors;
+    Color base;
+    if (colors.length == 1) {
+      base = colors.first;
+    } else {
+      final scaled = xFrac.clamp(0.0, 1.0) * (colors.length - 1);
+      final i = scaled.floor().clamp(0, colors.length - 2);
+      final localT = scaled - i;
+      base = Color.lerp(colors[i], colors[i + 1], localT)!;
+    }
 
-  final y = yFrac.clamp(0.0, 1.0);
-  // Top half: pale-skin anchor → the undertone itself.
-  // Bottom half: the undertone itself → deep-skin anchor.
-  // Straight RGB lerp (not HSL lightness) keeps the blend smooth and
-  // avoids the hue/saturation drag that made the old gradient look muddy.
-  if (y <= 0.5) {
-    return Color.lerp(_lightSkinAnchor, base, y / 0.5)!;
+    final y = yFrac.clamp(0.0, 1.0);
+    // Top half: pale-skin anchor → the undertone itself.
+    // Bottom half: the undertone itself → deep-skin anchor.
+    // Straight RGB lerp (not HSL lightness) keeps the blend smooth and
+    // avoids the hue/saturation drag that made the old gradient look muddy.
+    if (y <= 0.5) {
+      return Color.lerp(_lightSkinAnchor, base, y / 0.5)!;
+    }
+    return Color.lerp(base, _darkSkinAnchor, (y - 0.5) / 0.5)!;
   }
-  return Color.lerp(base, _darkSkinAnchor, (y - 0.5) / 0.5)!;
-}
 
   Offset _closestXY(Color target) {
     double bestX = 0.5, bestY = 0.5, bestDist = double.infinity;
@@ -476,40 +471,55 @@ Color _colorForXY(double xFrac, double yFrac) {
       children: [
         _PreviewPill(color: _current, hex: _hex),
         const SizedBox(height: 18),
-        GestureDetector(
-          onTapDown: (d) => _updateFromLocalPosition(d.localPosition, commit: true),
-          onPanUpdate: (d) => _updateFromLocalPosition(d.localPosition, commit: false),
-          onPanEnd: (_) => widget.onColorSelected(_current),
+        Container(
+          width: _boxWidth + 16,
+          height: _boxHeight + 16,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18 + 8),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.10),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
           child: Container(
-            width: _boxWidth,
-            height: _boxHeight,
+            width: _boxWidth + 8,
+            height: _boxHeight + 8,
+            padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.10),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+              borderRadius: BorderRadius.circular(18 + 4),
+              color: Colors.white,
+              border: Border.all(color: Colors.black.withOpacity(0.08), width: 1),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(18),
-              child: _gradientImage == null
-                  ? const Center(
-                      child: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2.4, color: _sage),
-                      ),
-                    )
-                  : CustomPaint(
-                      painter: _RectPainter(
-                        image: _gradientImage!,
-                        xFrac: _xFrac,
-                        yFrac: _yFrac,
-                      ),
-                    ),
+            child: GestureDetector(
+              onTapDown: (d) => _updateFromLocalPosition(d.localPosition, commit: true),
+              onPanUpdate: (d) => _updateFromLocalPosition(d.localPosition, commit: false),
+              onPanEnd: (_) => widget.onColorSelected(_current),
+              child: SizedBox(
+                width: _boxWidth,
+                height: _boxHeight,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: _gradientImage == null
+                      ? const Center(
+                          child: SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2.4, color: _sage),
+                          ),
+                        )
+                      : CustomPaint(
+                          painter: _RectPainter(
+                            image: _gradientImage!,
+                            xFrac: _xFrac,
+                            yFrac: _yFrac,
+                          ),
+                        ),
+                ),
+              ),
             ),
           ),
         ),
@@ -628,3 +638,6 @@ class _PreviewPill extends StatelessWidget {
     );
   }
 }
+
+/// Vertical brightness rail — top = full brightness, bottom = black —
+/// sized to sit flush beside the wheel in the same row.
