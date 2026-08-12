@@ -809,27 +809,92 @@ Color? _customHairColorValue;   // set when user picks from the hair wheel
             ),
           ),
 
-          // Skin Tone
+         // Skin Tone
           _profileRow(
             label: 'Skin Tone',
-            child: _swatchRow(
-              items: _skinSwatches
-                  .map(
-                    (s) => (
-                      s.$1,
-                      s.$2 == _profile.skinTone,
-                      () => setState(() {
-                        _profile.skinTone = s.$2;
-                        _profileConfigured = true;
-                      }),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    _swatchRow(
+                      items: _skinSwatches
+                          .map(
+                            (s) => (
+                              s.$1,
+                              _customSkinColorValue == null && s.$2 == _profile.skinTone,
+                              () => setState(() {
+                                _profile.skinTone = s.$2;
+                                _customSkinColorValue = null;
+                                _profileConfigured = true;
+                              }),
+                            ),
+                          )
+                          .toList(),
+                      tooltip: (i) => _skinSwatches[i].$2.label,
+                      bordered: (i) => _skinSwatches[i].$2 == SkinTone.fair,
+                      onLongPress: (i) => _showLightenDarkenSheet(
+                        base: _skinSwatches[i].$1,
+                        onChanged: (c) => setState(() {
+                          _customSkinColorValue = c;
+                          _profile.skinTone = _skinSwatches[i].$2;
+                          _profileConfigured = true;
+                        }),
+                      ),
                     ),
-                  )
-                  .toList(),
-              tooltip: (i) => _skinSwatches[i].$2.label,
-              bordered: (i) => _skinSwatches[i].$2 == SkinTone.fair,
+                    GestureDetector(
+                      onTap: () => _openColorWheel(
+                        initial: _customSkinColorValue ??
+                            _skinSwatches
+                                .firstWhere((s) => s.$2 == _profile.skinTone)
+                                .$1,
+                        palette: _skinSwatches.map((s) => s.$1).toList(),
+                        onSelected: (c) => setState(() {
+                          _customSkinColorValue = c;
+                          _profileConfigured = true;
+                        }),
+                      ),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: _customSkinColorValue != null ? _sage : _border,
+                            width: _customSkinColorValue != null ? 2 : 1,
+                          ),
+                          gradient: SweepGradient(
+                            colors: _skinSwatches.map((s) => s.$1).toList(),
+                          ),
+                        ),
+                        child: _customSkinColorValue != null
+                            ? const Icon(Icons.check, size: 12, color: Colors.white)
+                            : null,
+                      ),
+                    ),
+                  ],
+                ),
+                if (_customSkinColorValue != null) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: _customSkinColorValue,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text('Custom shade selected',
+                          style: TextStyle(fontSize: 11, color: Colors.black45)),
+                    ],
+                  ),
+                ],
+              ],
             ),
           ),
-
           // Hair Length
           _profileRow(
             label: 'Hair Length',
