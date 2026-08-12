@@ -1868,4 +1868,88 @@ Widget _swatchRow({
       ),
     );
   }
+
+  Color _adjustLightness(Color base, double delta) {
+    final hsl = HSLColor.fromColor(base);
+    return hsl.withLightness((hsl.lightness + delta).clamp(0.0, 1.0)).toColor();
+  }
+
+  void _showLightenDarkenSheet({
+    required Color base,
+    required ValueChanged<Color> onChanged,
+  }) {
+    double delta = 0;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            final adjusted = _adjustLightness(base, delta);
+            return Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: adjusted,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.black12),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Lighten / Darken',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                  Slider(
+                    value: delta,
+                    min: -0.35,
+                    max: 0.35,
+                    activeColor: _sage,
+                    onChanged: (v) {
+                      setSheetState(() => delta = v);
+                      onChanged(_adjustLightness(base, delta));
+                    },
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: const [
+                      Text('Darker', style: TextStyle(fontSize: 11, color: Colors.black45)),
+                      Text('Lighter', style: TextStyle(fontSize: 11, color: Colors.black45)),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _openColorWheel({
+    required Color initial,
+    List<Color>? palette,
+    required ValueChanged<Color> onSelected,
+  }) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(palette != null ? 'Pick a Skin Tone' : 'Pick a Hair Color'),
+        content: ColorWheelPicker(
+          initialColor: initial,
+          paletteColors: palette,
+          onColorSelected: onSelected,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Done')),
+        ],
+      ),
+    );
+  }
 }
