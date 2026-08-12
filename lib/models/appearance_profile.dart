@@ -98,8 +98,8 @@ enum AgeGroup {
 }
 
 enum GenderPresentation {
-  feminine('Feminine'),
-  masculine('Masculine'),
+  feminine('Female'),
+  masculine('Male'),
   neutral('Neutral');
 
   const GenderPresentation(this.label);

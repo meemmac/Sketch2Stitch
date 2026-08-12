@@ -270,7 +270,6 @@ Color? _customHairColorValue;   // set when user picks from the hair wheel
     }
 
     const geminiKey = APIConfig.geminiApiKey;
-    const hfToken = APIConfig.hfToken;
 
     if (geminiKey.isEmpty || geminiKey == 'YOUR_GEMINI_API_KEY_HERE') {
       _showSnack('Please set your Gemini API key in lib/utils/api_config.dart');
@@ -1482,10 +1481,12 @@ onChanged: (c) => setState(() {
       ('Gender', p.gender.label),
       ('Body Shape', p.bodyShape.label),
       ('Height', p.height.label),
-      ('Skin Tone', _customSkinColorValue != null ? 'Custom shade' : p.skinTone.label),
+('Skin Tone', p.customSkinColorValue != null ? 'Custom shade' : p.skinTone.label),
       (
         'Hair',
-        '${p.hairLength.label} ${p.hairStyle.label} ${p.hairColor.label}',
+        p.customHairColorValue != null
+            ? '${p.hairLength.label} ${p.hairStyle.label} custom shade'
+            : '${p.hairLength.label} ${p.hairStyle.label} ${p.hairColor.label}',
       ),
       ('Pose', p.pose.displayName),
       ('Expression', p.expression.label),
