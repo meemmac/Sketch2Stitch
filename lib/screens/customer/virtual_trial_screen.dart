@@ -930,115 +930,87 @@ Color? _customHairColorValue;   // set when user picks from the hair wheel
               ),
             ),
           ),
-
-          // Hair Color (Only first 3 options as color swatches, otherwise text input)
+// Hair Color (swatches + wheel, both long-press to lighten/darken)
           _profileRow(
             label: 'Hair Color',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _swatchRow(
-                  items: _hairSwatches
-                      .take(3)
-                      .map(
-                        (s) => (
-                          s.$1,
-                          _profile.hairColor == s.$2,
-                          () => setState(() {
-                            _profile.hairColor = s.$2;
-                            _profileConfigured = true;
-                          }),
-                        ),
-                      )
-                      .toList(),
-                  tooltip: (i) => _hairSwatches[i].$2.label,
-                  bordered: (i) => false,
-                ),
-                const SizedBox(height: 8),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _profile.hairColor = HairColor.colorful;
-                      _profileConfigured = true;
-                    });
-                  },
-                  child: Row(
-                    children: [
-                      Container(
+                Row(
+                  children: [
+                    _swatchRow(
+                      items: _hairSwatches
+                          .take(3)
+                          .map(
+                            (s) => (
+                              s.$1,
+                              _customHairColorValue == null && _profile.hairColor == s.$2,
+                              () => setState(() {
+                                _profile.hairColor = s.$2;
+                                _customHairColorValue = null;
+                                _profileConfigured = true;
+                              }),
+                            ),
+                          )
+                          .toList(),
+                      tooltip: (i) => _hairSwatches[i].$2.label,
+                      bordered: (i) => false,
+                      onLongPress: (i) => _showLightenDarkenSheet(
+                        base: _hairSwatches[i].$1,
+                        onChanged: (c) => setState(() {
+                          _customHairColorValue = c;
+                          _profile.hairColor = _hairSwatches[i].$2;
+                          _profileConfigured = true;
+                        }),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => _openColorWheel(
+                        initial: _customHairColorValue ?? _hairSwatches.first.$1,
+                        onSelected: (c) => setState(() {
+                          _customHairColorValue = c;
+                          _profile.hairColor = HairColor.colorful;
+                          _profileConfigured = true;
+                        }),
+                      ),
+                      child: Container(
                         width: 24,
                         height: 24,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: _profile.hairColor == HairColor.colorful
-                                ? _sage
-                                : _border,
-                            width: _profile.hairColor == HairColor.colorful
-                                ? 2
-                                : 1,
+                            color: _customHairColorValue != null ? _sage : _border,
+                            width: _customHairColorValue != null ? 2 : 1,
                           ),
                           gradient: const SweepGradient(
-                            colors: [
-                              Colors.red,
-                              Colors.yellow,
-                              Colors.blue,
-                              Colors.red,
-                            ],
+                            colors: [Colors.red, Colors.yellow, Colors.blue, Colors.red],
                           ),
                         ),
-                        child: _profile.hairColor == HairColor.colorful
-                            ? const Icon(
-                                Icons.check,
-                                size: 12,
-                                color: Colors.white,
-                              )
+                        child: _customHairColorValue != null
+                            ? const Icon(Icons.check, size: 12, color: Colors.white)
                             : null,
                       ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Other Custom Color',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (_profile.hairColor == HairColor.colorful) ...[
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 40,
-                    child: TextField(
-                      controller: _customHairColorController,
-                      decoration: InputDecoration(
-                        hintText:
-                            'Enter hair color (e.g. Auburn, Silver, Pink)...',
-                        hintStyle: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.black38,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: _border),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: _sage),
-                        ),
-                      ),
-                      style: const TextStyle(fontSize: 12),
-                      onChanged: (val) {
-                        setState(() {
-                          _profileConfigured = true;
-                        });
-                      },
                     ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Other Custom Color',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black54),
+                    ),
+                  ],
+                ),
+                if (_customHairColorValue != null) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(color: _customHairColorValue, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text('Custom color selected',
+                          style: TextStyle(fontSize: 11, color: Colors.black45)),
+                    ],
                   ),
                 ],
               ],
