@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show Color;
 /// Holds all user-selected appearance attributes used to generate
 /// an AI fashion-model prompt (no personal photo required).
 class AppearanceProfile {
@@ -39,8 +40,15 @@ class AppearanceProfile {
   }) : accessories = accessories ?? {};
 
   // Custom visual values
-  String customHairColor;
+  String customHairColor;     // hex string, e.g. '#A0522D' — set from the wheel
   String customAccessories;
+  String customSkinColor;     // hex string — set from the skin wheel
+  Color? customHairColorValue; // live Color for UI (swatch preview), not sent to the prompt
+  Color? customSkinColorValue; // live Color for UI (swatch preview), not sent to the prompt
+
+  /// Converts a picked [Color] into a '#RRGGBB' string for the prompt/model summary.
+  static String colorToHex(Color c) =>
+      '#${c.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
 
   /// Builds a descriptive English prompt fragment for the AI model.
   String toPromptString() {
