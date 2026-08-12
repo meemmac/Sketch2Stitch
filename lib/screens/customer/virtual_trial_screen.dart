@@ -169,8 +169,9 @@ Color? _customHairColorValue;   // set when user picks from the hair wheel
   Map<String, String>? _fabricEstimates;
   AppearanceProfile? _usedProfile; // snapshot shown in summary card
 
-  // ── Progress tracking ──────────────────────────────────────────
+// ── Progress tracking ──────────────────────────────────────────
   /// True once the user has tapped any appearance-profile control.
+  bool _profileConfigured = false;
 
   /// True once the user has expanded the Advanced Measurements tile.
   bool _measurementsReviewed = false;
@@ -297,8 +298,12 @@ Color? _customHairColorValue;   // set when user picks from the hair wheel
       hairColor: _profile.hairColor,
       pose: _profile.pose,
       expression: _profile.expression,
-      accessories: Set.from(_profile.accessories),
+accessories: Set.from(_profile.accessories),
       customAccessories: _customAccessoriesController.text.trim(),
+      customHairColor: _profile.customHairColor,
+      customHairColorValue: _profile.customHairColorValue,
+      customSkinColor: _profile.customSkinColor,
+      customSkinColorValue: _profile.customSkinColorValue,
     );
 
     try {
@@ -407,7 +412,6 @@ Color? _customHairColorValue;   // set when user picks from the hair wheel
       c.dispose();
     }
     _customInstructionsController.dispose();
-    _customHairColorController.dispose();
     _customAccessoriesController.dispose();
     _resultAnim.dispose();
     _scrollController.dispose();
@@ -834,9 +838,11 @@ Color? _customHairColorValue;   // set when user picks from the hair wheel
                       bordered: (i) => _skinSwatches[i].$2 == SkinTone.fair,
                       onLongPress: (i) => _showLightenDarkenSheet(
                         base: _skinSwatches[i].$1,
-                        onChanged: (c) => setState(() {
+                       onChanged: (c) => setState(() {
                           _customSkinColorValue = c;
                           _profile.skinTone = _skinSwatches[i].$2;
+                          _profile.customSkinColorValue = c;
+                          _profile.customSkinColor = AppearanceProfile.colorToHex(c);
                           _profileConfigured = true;
                         }),
                       ),
@@ -848,8 +854,10 @@ Color? _customHairColorValue;   // set when user picks from the hair wheel
                                 .firstWhere((s) => s.$2 == _profile.skinTone)
                                 .$1,
                         palette: _skinSwatches.map((s) => s.$1).toList(),
-                        onSelected: (c) => setState(() {
+onSelected: (c) => setState(() {
                           _customSkinColorValue = c;
+                          _profile.customSkinColorValue = c;
+                          _profile.customSkinColor = AppearanceProfile.colorToHex(c);
                           _profileConfigured = true;
                         }),
                       ),
@@ -956,9 +964,11 @@ Color? _customHairColorValue;   // set when user picks from the hair wheel
                       bordered: (i) => false,
                       onLongPress: (i) => _showLightenDarkenSheet(
                         base: _hairSwatches[i].$1,
-                        onChanged: (c) => setState(() {
+onChanged: (c) => setState(() {
                           _customHairColorValue = c;
                           _profile.hairColor = _hairSwatches[i].$2;
+                          _profile.customHairColorValue = c;
+                          _profile.customHairColor = AppearanceProfile.colorToHex(c);
                           _profileConfigured = true;
                         }),
                       ),
@@ -969,6 +979,8 @@ Color? _customHairColorValue;   // set when user picks from the hair wheel
                         onSelected: (c) => setState(() {
                           _customHairColorValue = c;
                           _profile.hairColor = HairColor.colorful;
+                          _profile.customHairColorValue = c;
+                          _profile.customHairColor = AppearanceProfile.colorToHex(c);
                           _profileConfigured = true;
                         }),
                       ),
