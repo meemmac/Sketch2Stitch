@@ -9,7 +9,7 @@ import '../../utils/api_config.dart';
 import '../../widgets/dashboard_drawer.dart';
 import 'home_screen.dart';
 import 'package:gal/gal.dart';
-import './../widgets/color_wheel_picker.dart';
+import '../../widgets/color_wheel_picker.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Colour palette & tokens
@@ -122,7 +122,8 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
 
   final Set<String> _selectedStyles = {};
   final _customInstructionsController = TextEditingController();
-  final _customHairColorController = TextEditingController();
+Color? _customHairColorValue;   // set when user picks from the hair wheel
+  Color? _customSkinColorValue;   // set when user picks from the skin wheel
   final _customAccessoriesController = TextEditingController();
 
   // =========================================================================
@@ -298,7 +299,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       pose: _profile.pose,
       expression: _profile.expression,
       accessories: Set.from(_profile.accessories),
-      customHairColor: _customHairColorController.text.trim(),
       customAccessories: _customAccessoriesController.text.trim(),
     );
 
@@ -1782,10 +1782,11 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     );
   }
 
-  Widget _swatchRow({
+Widget _swatchRow({
     required List<(Color, bool, VoidCallback)> items,
     required String Function(int) tooltip,
     bool Function(int)? bordered,
+    void Function(int)? onLongPress, // NEW: lighten/darken trigger
   }) {
     return Row(
       children: items.asMap().entries.map((e) {
@@ -1797,6 +1798,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
             message: tooltip(i),
             child: GestureDetector(
               onTap: onTap,
+              onLongPress: onLongPress == null ? null : () => onLongPress(i),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
                 width: 32,
