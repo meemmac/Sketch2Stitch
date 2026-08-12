@@ -110,6 +110,21 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
               constraints: const BoxConstraints(),
             ),
           ),
+          if (widget.product.colorOptions.every((o) => o.stock <= 0))
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              color: Colors.red.shade800,
+              child: const Text(
+                "Sorry, currently unavailable",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),

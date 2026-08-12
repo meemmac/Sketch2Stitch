@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show Color;
 /// Holds all user-selected appearance attributes used to generate
 /// an AI fashion-model prompt (no personal photo required).
 class AppearanceProfile {
@@ -36,23 +37,37 @@ class AppearanceProfile {
     Set<ModelAccessory>? accessories,
     this.customHairColor = '',
     this.customAccessories = '',
+    this.customSkinColor = '',
+    this.customHairColorValue,
+    this.customSkinColorValue,
   }) : accessories = accessories ?? {};
 
   // Custom visual values
-  String customHairColor;
+  String customHairColor;     // hex string, e.g. '#A0522D' — set from the wheel
   String customAccessories;
+  String customSkinColor;     // hex string — set from the skin wheel
+  Color? customHairColorValue; // live Color for UI (swatch preview), not sent to the prompt
+  Color? customSkinColorValue; // live Color for UI (swatch preview), not sent to the prompt
+
+  /// Converts a picked [Color] into a '#RRGGBB' string for the prompt/model summary.
+  static String colorToHex(Color c) =>
+      '#${c.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
 
   /// Builds a descriptive English prompt fragment for the AI model.
-  String toPromptString() {
+String toPromptString() {
     String hairText = '';
     if (hairLength == HairLength.bald) {
       hairText = 'bald head';
     } else {
       final colorStr = (hairColor == HairColor.colorful && customHairColor.trim().isNotEmpty)
-          ? customHairColor.trim()
+          ? 'a custom shade close to ${customHairColor.trim()}'
           : hairColor.label;
       hairText = '${hairLength.label} ${hairStyle.label} $colorStr hair';
     }
+
+    final skinText = customSkinColor.trim().isNotEmpty
+        ? 'a custom skin tone close to ${customSkinColor.trim()}'
+        : '${skinTone.label} skin tone';
 
     final List<String> accList = [];
     accList.addAll(accessories.map((a) => a.label));
@@ -63,7 +78,7 @@ class AppearanceProfile {
 
     return 'A ${ageGroup.label} ${gender.label} fashion model '
         'with a ${bodyShape.label} body shape, ${height.label} height, '
-        '${skinTone.label} skin tone, $hairText. '
+        '$skinText, $hairText. '
         'The model is ${pose.label} with a ${expression.label} expression. '
         'The model is wearing $accText as pre-existing accessories.';
   }
@@ -83,8 +98,8 @@ enum AgeGroup {
 }
 
 enum GenderPresentation {
-  feminine('Feminine'),
-  masculine('Masculine'),
+  feminine('Female'),
+  masculine('Male'),
   neutral('Neutral');
 
   const GenderPresentation(this.label);
