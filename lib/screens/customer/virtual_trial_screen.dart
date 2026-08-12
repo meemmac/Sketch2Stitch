@@ -10,6 +10,7 @@ import '../../widgets/dashboard_drawer.dart';
 import 'home_screen.dart';
 import 'package:gal/gal.dart';
 import '../../widgets/color_wheel_picker.dart';
+import '../../widgets/color_picker_row.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Colour palette & tokens
