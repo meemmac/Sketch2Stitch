@@ -33,12 +33,6 @@ class _MeasurementPageState extends State<MeasurementPage> {
     _future = _service.getOrCreateMeasurement(widget.customerId);
   }
 
-  Future<void> _retry() {
-    final f = _service.getOrCreateMeasurement(widget.customerId);
-    setState(() => _future = f);
-    return f;
-  }
-
   Future<void> _handleSave(Measurement updated) async {
     if (updated.isNew) {
       // Shouldn't normally happen since getOrCreateMeasurement always

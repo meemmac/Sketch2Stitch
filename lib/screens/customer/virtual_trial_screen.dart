@@ -123,11 +123,12 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
 
   final Set<String> _selectedStyles = {};
   final _customInstructionsController = TextEditingController();
-Color _hairBaseColor = _hairSwatches.first.$1;
+  Color _hairBaseColor = _hairSwatches.first.$1;
   double _hairAdjustDelta = 0;
-  Color _skinBaseColor = _skinSwatches[2].$1; // matches AppearanceProfile's default (medium)
+  Color _skinBaseColor =
+      _skinSwatches[2].$1; // matches AppearanceProfile's default (medium)
   double _skinAdjustDelta = 0;
-  Color? _customSkinColorValue;   // set when user picks from the skin wheel
+  Color? _customSkinColorValue; // set when user picks from the skin wheel
   final _customAccessoriesController = TextEditingController();
 
   // =========================================================================
@@ -173,12 +174,15 @@ Color _hairBaseColor = _hairSwatches.first.$1;
   Map<String, String>? _fabricEstimates;
   AppearanceProfile? _usedProfile; // snapshot shown in summary card
 
-// ── Progress tracking ──────────────────────────────────────────
+  // ── Progress tracking ──────────────────────────────────────────
   /// True once the user has tapped any appearance-profile control.
   bool _profileConfigured = false;
 
   /// True once the user has expanded the Advanced Measurements tile.
   bool _measurementsReviewed = false;
+  // ── Appearance mode toggle ──────────────────────────────────────
+  // true = "Custom" tab (full picker shown), false = "Default" tab (collapsed)
+  bool _isCustomAppearance = false;
 
   // ── Scroll & Animations ──────────────────────────────────────────────────────
   final _scrollController = ScrollController();
@@ -301,7 +305,7 @@ Color _hairBaseColor = _hairSwatches.first.$1;
       hairColor: _profile.hairColor,
       pose: _profile.pose,
       expression: _profile.expression,
-accessories: Set.from(_profile.accessories),
+      accessories: Set.from(_profile.accessories),
       customAccessories: _customAccessoriesController.text.trim(),
       customHairColor: _profile.customHairColor,
       customHairColorValue: _profile.customHairColorValue,
@@ -759,302 +763,327 @@ accessories: Set.from(_profile.accessories),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Age Group
-          _profileRow(
-            label: 'Age Group',
-            child: _chipRow(
-              values: AgeGroup.values,
-              labels: (v) => v.label,
-              selected: (v) => _profile.ageGroup == v,
-              onTap: (v) => setState(() {
-                _profile.ageGroup = v;
-                _profileConfigured = true;
-              }),
+          _buildAppearanceTabs(),
+          if (_isCustomAppearance) ...[
+            const SizedBox(height: 16),
+            // Age Group
+            _profileRow(
+              label: 'Age Group',
+              child: _chipRow(
+                values: AgeGroup.values,
+                labels: (v) => v.label,
+                selected: (v) => _profile.ageGroup == v,
+                onTap: (v) => setState(() {
+                  _profile.ageGroup = v;
+                  _profileConfigured = true;
+                }),
+              ),
             ),
-          ),
 
-          // Gender Presentation
-          _profileRow(
-            label: 'Gender Presentation',
-            child: _chipRow(
-              values: GenderPresentation.values,
-              labels: (v) => v.label,
-              selected: (v) => _profile.gender == v,
-              onTap: (v) => setState(() {
-                _profile.gender = v;
-                _profileConfigured = true;
-              }),
+            // Gender Presentation
+            _profileRow(
+              label: 'Gender Presentation',
+              child: _chipRow(
+                values: GenderPresentation.values,
+                labels: (v) => v.label,
+                selected: (v) => _profile.gender == v,
+                onTap: (v) => setState(() {
+                  _profile.gender = v;
+                  _profileConfigured = true;
+                }),
+              ),
             ),
-          ),
 
-          // Body Shape
-          _profileRow(
-            label: 'Body Shape',
-            child: _chipRow(
-              values: BodyShape.values,
-              labels: (v) => v.label,
-              selected: (v) => _profile.bodyShape == v,
-              onTap: (v) => setState(() {
-                _profile.bodyShape = v;
-                _profileConfigured = true;
-              }),
+            // Body Shape
+            _profileRow(
+              label: 'Body Shape',
+              child: _chipRow(
+                values: BodyShape.values,
+                labels: (v) => v.label,
+                selected: (v) => _profile.bodyShape == v,
+                onTap: (v) => setState(() {
+                  _profile.bodyShape = v;
+                  _profileConfigured = true;
+                }),
+              ),
             ),
-          ),
 
-          // Height
-          _profileRow(
-            label: 'Height',
-            child: _chipRow(
-              values: ModelHeight.values,
-              labels: (v) => v.label,
-              selected: (v) => _profile.height == v,
-              onTap: (v) => setState(() {
-                _profile.height = v;
-                _profileConfigured = true;
-              }),
+            // Height
+            _profileRow(
+              label: 'Height',
+              child: _chipRow(
+                values: ModelHeight.values,
+                labels: (v) => v.label,
+                selected: (v) => _profile.height == v,
+                onTap: (v) => setState(() {
+                  _profile.height = v;
+                  _profileConfigured = true;
+                }),
+              ),
             ),
-          ),
 
-         // Skin Tone
-          _profileRow(
-            label: 'Skin Tone',
-            child: ColorPickerRow(
-              swatches: _skinSwatches.map((s) => s.$1).toList(),
-              baseColor: _skinBaseColor,
-              adjustDelta: _skinAdjustDelta,
-              wheelPalette: _skinSwatches.map((s) => s.$1).toList(),
-              wheelDialogTitle: 'Pick a Skin Tone',
-              accent: _sage,
-              pale: Colors.white,
-              border: _border,
-              onBaseChanged: (c) => setState(() {
-                _skinBaseColor = c;
-                final nearest = _skinSwatches.reduce(
-                  (a, b) => (a.$1.value - c.value).abs() < (b.$1.value - c.value).abs() ? a : b,
-                );
-                _profile.skinTone = nearest.$2;
-                _profileConfigured = true;
-              }),
-              onAdjustChanged: (d) => setState(() {
-                _skinAdjustDelta = d;
-                final hsl = HSLColor.fromColor(_skinBaseColor);
-                final adjusted = hsl.withLightness((hsl.lightness + d).clamp(0.0, 1.0)).toColor();
-                _profile.customSkinColorValue = adjusted;
-                _profile.customSkinColor = AppearanceProfile.colorToHex(adjusted);
-                _profileConfigured = true;
-              }),
+            // Skin Tone
+            _profileRow(
+              label: 'Skin Tone',
+              child: ColorPickerRow(
+                swatches: _skinSwatches.map((s) => s.$1).toList(),
+                baseColor: _skinBaseColor,
+                adjustDelta: _skinAdjustDelta,
+                wheelPalette: _skinSwatches.map((s) => s.$1).toList(),
+                wheelDialogTitle: 'Pick a Skin Tone',
+                accent: _sage,
+                pale: Colors.white,
+                border: _border,
+                onBaseChanged: (c) => setState(() {
+                  _skinBaseColor = c;
+                  final nearest = _skinSwatches.reduce(
+                    (a, b) =>
+                        (a.$1.value - c.value).abs() <
+                            (b.$1.value - c.value).abs()
+                        ? a
+                        : b,
+                  );
+                  _profile.skinTone = nearest.$2;
+                  _profileConfigured = true;
+                }),
+                onAdjustChanged: (d) => setState(() {
+                  _skinAdjustDelta = d;
+                  final hsl = HSLColor.fromColor(_skinBaseColor);
+                  final adjusted = hsl
+                      .withLightness((hsl.lightness + d).clamp(0.0, 1.0))
+                      .toColor();
+                  _profile.customSkinColorValue = adjusted;
+                  _profile.customSkinColor = AppearanceProfile.colorToHex(
+                    adjusted,
+                  );
+                  _profileConfigured = true;
+                }),
+              ),
             ),
-          ),
-          // Hair Length
-          _profileRow(
-            label: 'Hair Length',
-            child: _chipRow(
-              values: HairLength.values,
-              labels: (v) => v.label,
-              selected: (v) => _profile.hairLength == v,
-              onTap: (v) => setState(() {
-                _profile.hairLength = v;
-                _profileConfigured = true;
-              }),
+            // Hair Length
+            _profileRow(
+              label: 'Hair Length',
+              child: _chipRow(
+                values: HairLength.values,
+                labels: (v) => v.label,
+                selected: (v) => _profile.hairLength == v,
+                onTap: (v) => setState(() {
+                  _profile.hairLength = v;
+                  _profileConfigured = true;
+                }),
+              ),
             ),
-          ),
 
-          // Hair Style (Disabled if Bald is selected)
-          _profileRow(
-            label: 'Hair Style',
-            child: IgnorePointer(
-              ignoring: _profile.hairLength == HairLength.bald,
-              child: Opacity(
-                opacity: _profile.hairLength == HairLength.bald ? 0.4 : 1.0,
-                child: _chipRow(
-                  values: HairStyle.values,
-                  labels: (v) => v.label,
-                  selected: (v) =>
-                      _profile.hairLength != HairLength.bald &&
-                      _profile.hairStyle == v,
-                  onTap: (v) => setState(() {
-                    _profile.hairStyle = v;
-                    _profileConfigured = true;
-                  }),
+            // Hair Style (Disabled if Bald is selected)
+            _profileRow(
+              label: 'Hair Style',
+              child: IgnorePointer(
+                ignoring: _profile.hairLength == HairLength.bald,
+                child: Opacity(
+                  opacity: _profile.hairLength == HairLength.bald ? 0.4 : 1.0,
+                  child: _chipRow(
+                    values: HairStyle.values,
+                    labels: (v) => v.label,
+                    selected: (v) =>
+                        _profile.hairLength != HairLength.bald &&
+                        _profile.hairStyle == v,
+                    onTap: (v) => setState(() {
+                      _profile.hairStyle = v;
+                      _profileConfigured = true;
+                    }),
+                  ),
                 ),
               ),
             ),
-          ),
 
-
-// Hair Color
-          _profileRow(
-            label: 'Hair Color',
-            child: ColorPickerRow(
-              swatches: _hairSwatches.map((s) => s.$1).toList(),
-              baseColor: _hairBaseColor,
-              adjustDelta: _hairAdjustDelta,
-              wheelPalette: null, // full hue wheel for hair
-              wheelDialogTitle: 'Pick a Hair Color',
-              accent: _sage,
-              pale: Colors.white,
-              border: _border,
-              onBaseChanged: (c) => setState(() {
-                _hairBaseColor = c;
-                final match = _hairSwatches.where((s) => s.$1.value == c.value);
-                _profile.hairColor = match.isNotEmpty ? match.first.$2 : HairColor.colorful;
-                _profileConfigured = true;
-              }),
-              onAdjustChanged: (d) => setState(() {
-                _hairAdjustDelta = d;
-                final hsl = HSLColor.fromColor(_hairBaseColor);
-                final adjusted = hsl.withLightness((hsl.lightness + d).clamp(0.0, 1.0)).toColor();
-                _profile.customHairColorValue = adjusted;
-                _profile.customHairColor = AppearanceProfile.colorToHex(adjusted);
-                _profileConfigured = true;
-              }),
+            // Hair Color
+            _profileRow(
+              label: 'Hair Color',
+              child: ColorPickerRow(
+                swatches: _hairSwatches.map((s) => s.$1).toList(),
+                baseColor: _hairBaseColor,
+                adjustDelta: _hairAdjustDelta,
+                wheelPalette: null, // full hue wheel for hair
+                wheelDialogTitle: 'Pick a Hair Color',
+                accent: _sage,
+                pale: Colors.white,
+                border: _border,
+                onBaseChanged: (c) => setState(() {
+                  _hairBaseColor = c;
+                  final match = _hairSwatches.where(
+                    (s) => s.$1.value == c.value,
+                  );
+                  _profile.hairColor = match.isNotEmpty
+                      ? match.first.$2
+                      : HairColor.colorful;
+                  _profileConfigured = true;
+                }),
+                onAdjustChanged: (d) => setState(() {
+                  _hairAdjustDelta = d;
+                  final hsl = HSLColor.fromColor(_hairBaseColor);
+                  final adjusted = hsl
+                      .withLightness((hsl.lightness + d).clamp(0.0, 1.0))
+                      .toColor();
+                  _profile.customHairColorValue = adjusted;
+                  _profile.customHairColor = AppearanceProfile.colorToHex(
+                    adjusted,
+                  );
+                  _profileConfigured = true;
+                }),
+              ),
             ),
-          ),
 
-          // Pose
-          _profileRow(
-            label: 'Pose',
-            child: Row(
-              children: _poseIcons.map((pi) {
-                final selected = _profile.pose == pi.$2;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Tooltip(
-                    message: pi.$2.displayName,
-                    child: GestureDetector(
-                      onTap: () => setState(() {
-                        _profile.pose = pi.$2;
-                        _profileConfigured = true;
-                      }),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: selected ? _sage : _sagePale,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: selected ? _sage : _border),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              pi.$1,
-                              size: 20,
-                              color: selected ? Colors.white : _sage,
+            // Pose
+            _profileRow(
+              label: 'Pose',
+              child: Row(
+                children: _poseIcons.map((pi) {
+                  final selected = _profile.pose == pi.$2;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Tooltip(
+                      message: pi.$2.displayName,
+                      child: GestureDetector(
+                        onTap: () => setState(() {
+                          _profile.pose = pi.$2;
+                          _profileConfigured = true;
+                        }),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: selected ? _sage : _sagePale,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: selected ? _sage : _border,
                             ),
-                            Text(
-                              pi.$2.displayName,
-                              style: TextStyle(
-                                fontSize: 8,
-                                color: selected ? Colors.white : Colors.black54,
-                                fontWeight: FontWeight.w600,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                pi.$1,
+                                size: 20,
+                                color: selected ? Colors.white : _sage,
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-
-          // Facial Expression
-          _profileRow(
-            label: 'Expression',
-            child: _chipRow(
-              values: FacialExpression.values,
-              labels: (v) =>
-                  v == FacialExpression.neutral ? '😐 Neutral' : '😊 Smile',
-              selected: (v) => _profile.expression == v,
-              onTap: (v) => setState(() {
-                _profile.expression = v;
-                _profileConfigured = true;
-              }),
-            ),
-          ),
-
-          // Accessories (multi-select + custom accessory text input)
-          _profileRow(
-            label: 'Accessories',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: ModelAccessory.values.map((acc) {
-                    final selected = _profile.accessories.contains(acc);
-                    return GestureDetector(
-                      onTap: () => setState(() {
-                        if (selected) {
-                          _profile.accessories.remove(acc);
-                        } else {
-                          _profile.accessories.add(acc);
-                        }
-                        _profileConfigured = true;
-                      }),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: selected ? _sage : _sagePale,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: selected ? _sage : _border),
-                        ),
-                        child: Text(
-                          acc.label,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: selected ? Colors.white : Colors.black54,
+                              Text(
+                                pi.$2.displayName,
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: selected
+                                      ? Colors.white
+                                      : Colors.black54,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 40,
-                  child: TextField(
-                    controller: _customAccessoriesController,
-                    decoration: InputDecoration(
-                      hintText:
-                          'Other custom accessories (e.g. Earrings, Bracelet, Tiara)...',
-                      hintStyle: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.black38,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: _border),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: _sage),
-                      ),
                     ),
-                    style: const TextStyle(fontSize: 12),
-                    onChanged: (val) {
-                      setState(() {
-                        _profileConfigured = true;
-                      });
-                    },
-                  ),
-                ),
-              ],
+                  );
+                }).toList(),
+              ),
             ),
-          ),
+
+            // Facial Expression
+            _profileRow(
+              label: 'Expression',
+              child: _chipRow(
+                values: FacialExpression.values,
+                labels: (v) =>
+                    v == FacialExpression.neutral ? '😐 Neutral' : '😊 Smile',
+                selected: (v) => _profile.expression == v,
+                onTap: (v) => setState(() {
+                  _profile.expression = v;
+                  _profileConfigured = true;
+                }),
+              ),
+            ),
+
+            // Accessories (multi-select + custom accessory text input)
+            _profileRow(
+              label: 'Accessories',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: ModelAccessory.values.map((acc) {
+                      final selected = _profile.accessories.contains(acc);
+                      return GestureDetector(
+                        onTap: () => setState(() {
+                          if (selected) {
+                            _profile.accessories.remove(acc);
+                          } else {
+                            _profile.accessories.add(acc);
+                          }
+                          _profileConfigured = true;
+                        }),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: selected ? _sage : _sagePale,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: selected ? _sage : _border,
+                            ),
+                          ),
+                          child: Text(
+                            acc.label,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: selected ? Colors.white : Colors.black54,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 40,
+                    child: TextField(
+                      controller: _customAccessoriesController,
+                      decoration: InputDecoration(
+                        hintText:
+                            'Other custom accessories (e.g. Earrings, Bracelet, Tiara)...',
+                        hintStyle: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.black38,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: _border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: _sage),
+                        ),
+                      ),
+                      style: const TextStyle(fontSize: 12),
+                      onChanged: (val) {
+                        setState(() {
+                          _profileConfigured = true;
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1365,7 +1394,10 @@ accessories: Set.from(_profile.accessories),
       ('Gender', p.gender.label),
       ('Body Shape', p.bodyShape.label),
       ('Height', p.height.label),
-('Skin Tone', p.customSkinColorValue != null ? 'Custom shade' : p.skinTone.label),
+      (
+        'Skin Tone',
+        p.customSkinColorValue != null ? 'Custom shade' : p.skinTone.label,
+      ),
       (
         'Hair',
         p.customHairColorValue != null
@@ -1715,7 +1747,71 @@ accessories: Set.from(_profile.accessories),
     );
   }
 
+  Widget _buildAppearanceTabs() {
+    Widget tab(String label, bool selected, VoidCallback onTap) {
+      return Expanded(
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: selected ? _sage : _sagePale,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: selected ? _sage : _border),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: selected ? Colors.white : Colors.black54,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
+    return Row(
+      children: [
+        tab('Any', !_isCustomAppearance, () {
+          setState(() {
+            _isCustomAppearance = false;
+            // reset profile back to defaults when leaving Custom
+            _profile.ageGroup = AgeGroup.adult;
+            _profile.gender = GenderPresentation.feminine;
+            _profile.bodyShape = BodyShape.regular;
+            _profile.height = ModelHeight.average;
+            _profile.skinTone = SkinTone.medium;
+            _profile.hairLength = HairLength.medium;
+            _profile.hairStyle = HairStyle.straight;
+            _profile.hairColor = HairColor.black;
+            _profile.pose = ModelPose.standingFront;
+            _profile.expression = FacialExpression.neutral;
+            _profile.accessories.clear();
+            _profile.customHairColorValue = null;
+            _profile.customSkinColorValue = null;
+            _profile.customHairColor = '';
+            _profile.customSkinColor = '';
+            _skinBaseColor = _skinSwatches[2].$1;
+            _hairBaseColor = _hairSwatches.first.$1;
+            _skinAdjustDelta = 0;
+            _hairAdjustDelta = 0;
+            _customAccessoriesController.clear();
+          });
+        }),
+        const SizedBox(width: 8),
+        tab('Custom', _isCustomAppearance, () {
+          setState(() {
+            _isCustomAppearance = true;
+            _profileConfigured = true;
+          });
+        }),
+      ],
+    );
+  }
 
   Widget _smallButton({
     required IconData icon,
