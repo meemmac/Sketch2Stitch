@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'reviews_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:async';
+import '../../services/order_service.dart';
+import '../../services/auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../models/user_role.dart';
+import '../../models/retailer.dart';
 
 class OrderItem {
   final String name;
@@ -79,6 +85,12 @@ class RetailerOrdersScreen extends StatefulWidget {
 }
 
 class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
+  final OrderService _orderService = OrderService();
+  final AuthService _authService = AuthService();
+  StreamSubscription? _ordersSubscription;
+  bool _isLoading = true;
+  String _shopName = "Retailer Shop";
+
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
   OrderFilterPreset _filterPreset = OrderFilterPreset.last3Months;
@@ -91,12 +103,108 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
   final Color primaryGreen = const Color(0xFF4F7942);
 
   @override
+  void initState() {
+    super.initState();
+    _fetchRetailerProfile();
+    _listenToOrders();
+  }
+
+  void _fetchRetailerProfile() async {
+    final uid = _authService.currentUser?.uid;
+    if (uid != null) {
+      final profile = await _authService.getUserProfile(uid, UserRole.retailer);
+      if (profile != null && profile is Retailer) {
+        if (mounted) {
+          setState(() {
+            _shopName = profile.shopName;
+          });
+        }
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
+    _ordersSubscription?.cancel();
     super.dispose();
   }
 
-  late final List<RetailerOrder> _orders = <RetailerOrder>[
+  void _listenToOrders() {
+    final retailerId = _authService.currentUser?.uid;
+    if (retailerId == null) return;
+
+    _ordersSubscription = _orderService
+        .streamDetailedRetailerOrders(retailerId)
+        .listen((data) {
+      if (!mounted) return;
+      setState(() {
+        _orders = data.map((map) {
+          final subOrder = map['subOrder'];
+          final order = map['order'];
+          final customer = map['customer'];
+          final items = map['items'] as List<dynamic>;
+          final tailorName = map['tailorName'];
+
+          return RetailerOrder(
+            id: subOrder['id'],
+            customerName: customer['name'] ?? 'N/A',
+            customerPhone: customer['phone'] ?? 'N/A',
+            tailorName: tailorName,
+            amount: (subOrder['itemsSubtotal'] ?? 0).toDouble() +
+                (subOrder['deliveryCharge'] ?? 0).toDouble(),
+            orderDate: _parseDateTime(order['orderDate']),
+            deliveryDate: subOrder['deliveryDate'] != null
+                ? _parseDateTime(subOrder['deliveryDate'])
+                : null,
+            status: _capitalize(subOrder['status']),
+            isDelivered: subOrder['status'] == 'delivered',
+            recipientType: _capitalize(subOrder['deliveryDestination']),
+            deliveryAddress: customer['address'] ?? 'No address provided',
+            items: items.map((i) {
+              final careSymbols = List<String>.from(i['careSymbol'] ?? []);
+              return OrderItem(
+                name: i['name'],
+                quantity: i['quantity'],
+                imagePath: i['imagePath'],
+                color: i['color'],
+                price: (i['price'] ?? 0).toDouble(),
+                description: i['description'] ?? '',
+                canWash: careSymbols.contains('wash'),
+                canBleach: careSymbols.contains('bleach'),
+                canDryClean: careSymbols.contains('dryClean'),
+                canTumbleDry: careSymbols.contains('tumbleDry'),
+                ironLevel: careSymbols.firstWhere(
+                  (s) => s.startsWith('iron'),
+                  orElse: () => "Medium",
+                ),
+              );
+            }).toList(),
+          );
+        }).toList();
+        _isLoading = false;
+      });
+    }, onError: (error) {
+      debugPrint("Error listening to orders: $error");
+      if(mounted) setState(() => _isLoading = false);
+    });
+  }
+
+  DateTime _parseDateTime(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is String) return DateTime.parse(value);
+    return DateTime.now();
+  }
+
+  String _capitalize(String? s) {
+    if (s == null || s.isEmpty) return 'N/A';
+    return s[0].toUpperCase() + s.substring(1);
+  }
+
+  List<RetailerOrder> _orders = [];
+
+  /*
+  late final List<RetailerOrder> _dummyOrders = <RetailerOrder>[
     RetailerOrder(
       id: "ORD-1087",
       customerName: "Nazia Tasphia",
@@ -216,6 +324,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
       ],
     ),
   ];
+  */
 
   DateTime get _startDate {
     final today = DateTime.now();
@@ -272,17 +381,24 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     return _filteredOrders.where((order) => order.isDelivered).toList();
   }
 
-  void _updateOrderStatus(RetailerOrder order, String newStatus) {
-    setState(() {
-      order.status = newStatus;
-      if (newStatus == "Delivered") {
-        order.isDelivered = true;
-        order.deliveryDate = DateTime.now();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Order ${order.id} marked as Delivered")),
-        );
-      }
-    });
+  void _updateOrderStatus(RetailerOrder order, String newStatus) async {
+    try {
+      await _orderService.updateOrderStatus(order.id, newStatus);
+      setState(() {
+        order.status = newStatus;
+        if (newStatus == "Delivered") {
+          order.isDelivered = true;
+          order.deliveryDate = DateTime.now();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Order ${order.id} marked as Delivered")),
+          );
+        }
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to update status: $e")),
+      );
+    }
   }
 
   @override
@@ -363,7 +479,9 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            if (_showOngoing)
+            if (_isLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (_showOngoing)
               _ordersSection(
                 title: "Ongoing Orders",
                 icon: Icons.local_shipping_outlined,
@@ -728,8 +846,8 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const RetailerReviewsScreen(
-                        shopName: "Elegant Fabrics Ltd.",
+                      builder: (_) => RetailerReviewsScreen(
+                        shopName: _shopName,
                       ),
                     ),
                   );
@@ -818,18 +936,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(14),
-                  child: Image.asset(
-                    firstItem.imagePath,
-                    width: 52,
-                    height: 52,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      width: 52,
-                      height: 52,
-                      color: Colors.green.shade50,
-                      child: Icon(Icons.receipt_long, color: primaryGreen),
-                    ),
-                  ),
+                  child: _buildProductImage(firstItem.imagePath, 52, 52),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1331,12 +1438,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.asset(
-                  item.imagePath,
-                  width: 60,
-                  height: 60,
-                  fit: BoxFit.cover,
-                ),
+                child: _buildProductImage(item.imagePath, 60, 60),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1486,6 +1588,37 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildProductImage(String path, double width, double height) {
+    if (path.startsWith('http')) {
+      return Image.network(
+        path,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _imagePlaceholder(width, height),
+      );
+    } else if (path.isNotEmpty) {
+      return Image.asset(
+        path,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _imagePlaceholder(width, height),
+      );
+    } else {
+      return _imagePlaceholder(width, height);
+    }
+  }
+
+  Widget _imagePlaceholder(double width, double height) {
+    return Container(
+      width: width,
+      height: height,
+      color: Colors.green.shade50,
+      child: Icon(Icons.receipt_long, color: primaryGreen),
     );
   }
 

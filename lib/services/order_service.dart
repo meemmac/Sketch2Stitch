@@ -252,6 +252,97 @@ class OrderService {
             .toList());
   }
 
+  /// Streams sub-orders with full details (customer, products, items) for a retailer.
+  Stream<List<Map<String, dynamic>>> streamDetailedRetailerOrders(String retailerId) {
+    return _db
+        .collection(_subOrdersCollection)
+        .where('retailerId', isEqualTo: retailerId)
+        .snapshots()
+        .asyncMap((subOrdersSnap) async {
+      List<Map<String, dynamic>> detailedOrders = [];
+
+      for (var subOrderDoc in subOrdersSnap.docs) {
+        final subOrderData = subOrderDoc.data();
+        final String subOrderId = subOrderDoc.id;
+        final String orderId = subOrderData['orderId'];
+
+        // Fetch parent order
+        final orderDoc = await _db.collection(_ordersCollection).doc(orderId).get();
+        if (!orderDoc.exists) continue;
+        final orderData = orderDoc.data()!;
+
+        // Fetch customer
+        final String customerId = orderData['customerId'];
+        final customerDoc = await _db.collection('Customer').doc(customerId).get();
+        if (!customerDoc.exists) continue;
+        final customerData = customerDoc.data()!;
+
+        // Fetch items
+        final itemsSnap = await _db
+            .collection(_orderItemsCollection)
+            .where('subOrderId', isEqualTo: subOrderId)
+            .get();
+
+        List<Map<String, dynamic>> itemsList = [];
+        for (var itemDoc in itemsSnap.docs) {
+          final itemData = itemDoc.data();
+          final String productId = itemData['productId'];
+          final int optionId = itemData['optionId'];
+
+          // Fetch product
+          final productDoc = await _db.collection('Products').doc(productId).get();
+          if (productDoc.exists) {
+            final productData = productDoc.data()!;
+            final List<dynamic> colorOptions = productData['colorOptions'] ?? [];
+            final option = colorOptions.firstWhere(
+              (o) => o['optionId'] == optionId,
+              orElse: () => null,
+            );
+
+            final rawImages = (option?['image'] as List?)?.map((e) => e.toString()).toList() ?? [];
+            final resolvedImages = resolveImageUrls(rawImages);
+
+            itemsList.add({
+              'name': productData['productName'] ?? 'Unknown Product',
+              'quantity': itemData['quantity'] ?? 1,
+              'price': (option?['price'] ?? 0).toDouble(),
+              'imagePath': resolvedImages.isNotEmpty ? resolvedImages.first : '',
+              'color': option?['color'] ?? 'N/A',
+              'description': productData['description'] ?? '',
+              'careSymbol': productData['careSymbol'] ?? [],
+            });
+          }
+        }
+
+        // Fetch tailor if applicable
+        String? tailorName;
+        if (subOrderData['deliveryDestination'] == 'tailor') {
+          final tailorJobSnap = await _db
+              .collection(_tailorJobsCollection)
+              .where('orderId', isEqualTo: orderId)
+              .limit(1)
+              .get();
+          if (tailorJobSnap.docs.isNotEmpty) {
+            final tId = tailorJobSnap.docs.first.data()['tailorId'];
+            final tailorDoc = await _db.collection('Tailor').doc(tId).get();
+            if (tailorDoc.exists) {
+              tailorName = tailorDoc.data()?['name'];
+            }
+          }
+        }
+
+        detailedOrders.add({
+          'subOrder': {...subOrderData, 'id': subOrderId},
+          'order': {...orderData, 'id': orderId},
+          'customer': customerData,
+          'items': itemsList,
+          'tailorName': tailorName,
+        });
+      }
+      return detailedOrders;
+    });
+  }
+
   /// Updates the status of a sub-order.
   Future<void> updateOrderStatus(String subOrderId, String newStatus) async {
     try {
