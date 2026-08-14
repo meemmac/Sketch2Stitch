@@ -612,13 +612,29 @@ class OrderService {
     double? deliveryCharge,
   }) async {
     try {
-      await _db.collection(_tailorJobsCollection).doc(tailorJobId).update({
+      final jobDoc = await _db.collection(_tailorJobsCollection).doc(tailorJobId).get();
+      if (!jobDoc.exists) throw Exception('Tailor job not found');
+      final orderId = jobDoc.data()?['orderId'];
+
+      final batch = _db.batch();
+      
+      // 1. Update Tailor Job
+      batch.update(_db.collection(_tailorJobsCollection).doc(tailorJobId), {
         'status': TailorJobStatus.confirmed.toValue,
         'quoteAmount': servicePrice,
         if (deliveryCharge != null) 'deliveryCharge': deliveryCharge,
         'estimatedDeliveryDate': estimatedDate.toIso8601String(),
         'confirmedAt': FieldValue.serverTimestamp(),
       });
+
+      // 2. Update parent Order
+      if (orderId != null) {
+        batch.update(_db.collection(_ordersCollection).doc(orderId), {
+          'status': OrderStatus.processing.toValue,
+        });
+      }
+
+      await batch.commit();
     } catch (e) {
       debugPrint('Error accepting tailor job: $e');
       rethrow;
@@ -628,10 +644,26 @@ class OrderService {
   /// Declines a tailor job request.
   Future<void> declineTailorJob(String tailorJobId, String reason) async {
     try {
-      await _db.collection(_tailorJobsCollection).doc(tailorJobId).update({
+      final jobDoc = await _db.collection(_tailorJobsCollection).doc(tailorJobId).get();
+      if (!jobDoc.exists) throw Exception('Tailor job not found');
+      final orderId = jobDoc.data()?['orderId'];
+
+      final batch = _db.batch();
+
+      // 1. Update Tailor Job
+      batch.update(_db.collection(_tailorJobsCollection).doc(tailorJobId), {
         'status': TailorJobStatus.tailorDeclined.toValue,
         'rejectionReason': reason,
       });
+
+      // 2. Update parent Order
+      if (orderId != null) {
+        batch.update(_db.collection(_ordersCollection).doc(orderId), {
+          'status': OrderStatus.cancelled.toValue,
+        });
+      }
+
+      await batch.commit();
     } catch (e) {
       debugPrint('Error declining tailor job: $e');
       rethrow;
@@ -641,9 +673,35 @@ class OrderService {
   /// Updates work progress for a tailor job.
   Future<void> updateWorkProgress(String tailorJobId, String status) async {
     try {
-      await _db.collection(_tailorJobsCollection).doc(tailorJobId).update({
-        'status': status.toLowerCase(),
+      final statusLower = status.toLowerCase();
+      final jobDoc = await _db.collection(_tailorJobsCollection).doc(tailorJobId).get();
+      if (!jobDoc.exists) throw Exception('Tailor job not found');
+      final orderId = jobDoc.data()?['orderId'];
+
+      final batch = _db.batch();
+
+      // 1. Update Tailor Job
+      batch.update(_db.collection(_tailorJobsCollection).doc(tailorJobId), {
+        'status': statusLower,
       });
+
+      // 2. Update parent Order
+      if (orderId != null) {
+        String orderStatus;
+        if (statusLower == 'completed') {
+          orderStatus = OrderStatus.completed.toValue;
+        } else if (statusLower == 'in_progress' || statusLower == 'ready') {
+          orderStatus = OrderStatus.processing.toValue;
+        } else {
+          orderStatus = OrderStatus.processing.toValue; // Default to processing if confirmed/stitching
+        }
+        
+        batch.update(_db.collection(_ordersCollection).doc(orderId), {
+          'status': orderStatus,
+        });
+      }
+
+      await batch.commit();
     } catch (e) {
       debugPrint('Error updating work progress: $e');
       rethrow;
@@ -751,12 +809,47 @@ class OrderService {
   /// Updates the status of a tailor job.
   Future<void> updateTailorJobStatus(String tailorJobId, TailorJobStatus status) async {
     try {
-      await _db.collection(_tailorJobsCollection).doc(tailorJobId).update({
+      final jobDoc = await _db.collection(_tailorJobsCollection).doc(tailorJobId).get();
+      if (!jobDoc.exists) throw Exception('Tailor job not found');
+      final orderId = jobDoc.data()?['orderId'];
+
+      final batch = _db.batch();
+
+      // 1. Update Tailor Job
+      batch.update(_db.collection(_tailorJobsCollection).doc(tailorJobId), {
         'status': status.toValue,
       });
+
+      // 2. Update Parent Order
+      if (orderId != null) {
+        batch.update(_db.collection(_ordersCollection).doc(orderId), {
+          'status': _mapTailorJobToOrderStatus(status.toValue).toValue,
+        });
+      }
+
+      await batch.commit();
     } catch (e) {
       debugPrint('Error updating tailor job status: $e');
       rethrow;
+    }
+  }
+
+  OrderStatus _mapTailorJobToOrderStatus(String tailorJobStatus) {
+    switch (tailorJobStatus.toLowerCase()) {
+      case 'confirmed':
+      case 'in_progress':
+      case 'ready':
+      case 'quoted':
+        return OrderStatus.processing;
+      case 'completed':
+        return OrderStatus.completed;
+      case 'cancelled':
+      case 'rejected':
+      case 'tailor_declined':
+        return OrderStatus.cancelled;
+      case 'pending':
+      default:
+        return OrderStatus.tailorPending;
     }
   }
 
@@ -778,15 +871,31 @@ class OrderService {
   /// Records a customer's response to a tailor's quote.
   Future<void> respondToQuote(String tailorJobId, QuoteStatus response) async {
     try {
+      final jobDoc = await _db.collection(_tailorJobsCollection).doc(tailorJobId).get();
+      if (!jobDoc.exists) throw Exception('Tailor job not found');
+      final orderId = jobDoc.data()?['orderId'];
+
       final status = response == QuoteStatus.accepted 
           ? TailorJobStatus.confirmed 
           : TailorJobStatus.rejected;
           
-      await _db.collection(_tailorJobsCollection).doc(tailorJobId).update({
+      final batch = _db.batch();
+
+      // 1. Update Tailor Job
+      batch.update(_db.collection(_tailorJobsCollection).doc(tailorJobId), {
         'quoteStatus': response.toValue,
         'status': status.toValue,
         if (response == QuoteStatus.accepted) 'confirmedAt': FieldValue.serverTimestamp(),
       });
+
+      // 2. Update Parent Order
+      if (orderId != null) {
+        batch.update(_db.collection(_ordersCollection).doc(orderId), {
+          'status': _mapTailorJobToOrderStatus(status.toValue).toValue,
+        });
+      }
+
+      await batch.commit();
     } catch (e) {
       debugPrint('Error responding to quote: $e');
       rethrow;
