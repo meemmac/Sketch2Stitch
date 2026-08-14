@@ -23,8 +23,8 @@ class TailorReview {
 }
 
 class TailorReviewsScreen extends StatefulWidget {
-  final String tailorName;
-  const TailorReviewsScreen({super.key, this.tailorName = "Master Tailor Ahmed"});
+  final String? tailorName;
+  const TailorReviewsScreen({super.key, this.tailorName});
 
   @override
   State<TailorReviewsScreen> createState() => _TailorReviewsScreenState();
@@ -50,7 +50,7 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
   @override
   void initState() {
     super.initState();
-    _currentTailorName = widget.tailorName;
+    _currentTailorName = widget.tailorName ?? "Loading...";
     _loadData();
   }
 
@@ -69,14 +69,12 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
       return;
     }
 
-    // Fetch tailor profile for the name if it's default
-    if (_currentTailorName == "Master Tailor Ahmed" || _currentTailorName == "Loading...") {
-      final profile = await _authService.getUserProfile(tailorId, UserRole.tailor);
-      if (profile != null && profile is Tailor && mounted) {
-        setState(() {
-          _currentTailorName = profile.name;
-        });
-      }
+    // Always fetch tailor profile to ensure the name is correct and dynamic
+    final profile = await _authService.getUserProfile(tailorId, UserRole.tailor);
+    if (profile != null && profile is Tailor && mounted) {
+      setState(() {
+        _currentTailorName = profile.name;
+      });
     }
 
     // Listen to stats
