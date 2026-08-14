@@ -453,21 +453,45 @@ class OrderService {
     });
   }
 
-  /// Updates the status of a sub-order.
-  Future<void> updateOrderStatus(String subOrderId, String newStatus) async {
+  /// Updates the status of a sub-order and synchronizes it with the parent order.
+  Future<void> updateOrderStatus(String subOrderId, String newStatus, {String? parentOrderId}) async {
     try {
       final statusLower = newStatus.toLowerCase();
       debugPrint("OrderService: Updating sub-order $subOrderId to status: $statusLower");
       
-      final Map<String, dynamic> updates = {
+      String? orderId = parentOrderId;
+      
+      // 1. If parentOrderId not provided, fetch the sub-order doc to find it
+      if (orderId == null) {
+        final subOrderDoc = await _db.collection(_subOrdersCollection).doc(subOrderId).get();
+        if (subOrderDoc.exists) {
+          orderId = subOrderDoc.data()?['orderId'];
+        }
+      }
+
+      // 2. Prepare updates for sub-order
+      final Map<String, dynamic> subOrderUpdates = {
         'status': statusLower,
       };
 
       if (statusLower == 'delivered') {
-        updates['deliveryDate'] = DateTime.now().toIso8601String();
+        subOrderUpdates['deliveryDate'] = DateTime.now().toIso8601String();
       }
 
-      await _db.collection(_subOrdersCollection).doc(subOrderId).update(updates);
+      final batch = _db.batch();
+      
+      // 3. Update Sub-order
+      batch.update(_db.collection(_subOrdersCollection).doc(subOrderId), subOrderUpdates);
+      
+      // 4. Update Parent Order Status to match
+      if (orderId != null) {
+        debugPrint("OrderService: Synchronizing parent order $orderId status to: $statusLower");
+        batch.update(_db.collection(_ordersCollection).doc(orderId), {
+          'status': statusLower,
+        });
+      }
+
+      await batch.commit();
       debugPrint("OrderService: Update successful for $subOrderId");
     } catch (e) {
       debugPrint('Error updating order status for $subOrderId: $e');
