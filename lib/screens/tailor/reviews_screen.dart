@@ -63,7 +63,11 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
 
   void _loadData() async {
     final tailorId = _authService.currentUser?.uid;
-    if (tailorId == null) return;
+    debugPrint("TailorReviewsScreen: Loading data for Tailor ID: $tailorId");
+    if (tailorId == null) {
+      debugPrint("TailorReviewsScreen: No logged in user found.");
+      return;
+    }
 
     // Fetch tailor profile for the name if it's default
     if (_currentTailorName == "Master Tailor Ahmed" || _currentTailorName == "Loading...") {
@@ -77,6 +81,7 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
 
     // Listen to stats
     _statsSubscription = _reviewService.streamTailorReviewStats(tailorId).listen((stats) {
+      debugPrint("TailorReviewsScreen: Received stats: $stats");
       if (!mounted) return;
       setState(() {
         _averageRating = stats['average'] ?? 0.0;
@@ -87,6 +92,7 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
 
     // Listen to reviews
     _reviewsSubscription = _reviewService.streamDetailedTailorReviews(tailorId).listen((data) {
+      debugPrint("TailorReviewsScreen: Received ${data.length} reviews from stream.");
       if (!mounted) return;
       setState(() {
         _allReviews = data.map((item) {

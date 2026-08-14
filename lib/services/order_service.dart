@@ -817,11 +817,13 @@ class OrderService {
 
   /// Streams detailed jobs for a specific tailor.
   Stream<List<Map<String, dynamic>>> streamDetailedTailorOrders(String tailorId) {
+    debugPrint("OrderService: Starting streamDetailedTailorOrders for tailor: $tailorId");
     return _db
         .collection(_tailorJobsCollection)
         .where('tailorId', isEqualTo: tailorId)
         .snapshots()
         .asyncMap((jobsSnap) async {
+      debugPrint("OrderService: Found ${jobsSnap.docs.length} jobs for tailor $tailorId");
       final Map<String, Map<String, dynamic>> orderCache = {};
       final Map<String, Map<String, dynamic>> customerCache = {};
       final Map<String, Map<String, dynamic>> productCache = {};
