@@ -189,27 +189,19 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   }
 
   Widget _buildAvatar(AppNotification n, _NotificationStyle style) {
-    // 1. Check for Real Profile Picture first (Tailor/Retailer)
-    if (n.senderProfilePicture != null && n.senderProfilePicture!.isNotEmpty) {
-      return CircleAvatar(
-        radius: 22,
-        backgroundColor: Colors.white,
-        backgroundImage: NetworkImage(n.senderProfilePicture!),
-      );
-    }
+    String? name;
 
 
-    // 2. If no picture, use Smart Name Parser for Initials (Customer)
-    String? name = n.senderName;
-    if (name == null || name.trim().isEmpty) {
-      final msg = n.message.toLowerCase();
-      if (msg.contains('from ')) {
-        final parts = n.message.split(RegExp(r'from ', caseSensitive: false));
-        if (parts.length > 1) name = parts[1].trim().split(' ')[0];
-      } else if (msg.contains('by ')) {
-        final parts = n.message.split(RegExp(r'by ', caseSensitive: false));
-        if (parts.length > 1) name = parts[1].trim().split(' ')[0];
-      }
+    // 🧠 Smart Name Parser
+    // Since we don't store senderName or ProfilePic in the notification,
+    // we extract the name from the message text to show initials.
+    final msg = n.message.toLowerCase();
+    if (msg.contains('from ')) {
+      final parts = n.message.split(RegExp(r'from ', caseSensitive: false));
+      if (parts.length > 1) name = parts[1].trim().split(' ')[0];
+    } else if (msg.contains('by ')) {
+      final parts = n.message.split(RegExp(r'by ', caseSensitive: false));
+      if (parts.length > 1) name = parts[1].trim().split(' ')[0];
     }
 
 

@@ -168,8 +168,6 @@ class NotificationService {
     required NotificationDbType type,
     required String message,
     required String orderId,
-    String? senderName,
-    String? senderProfilePicture,
     String? subOrderId,
   }) async {
     final docRef = _db.collection(_collection).doc();
@@ -179,8 +177,6 @@ class NotificationService {
       userRole: userRole,
       type: type,
       message: message,
-      senderName: senderName,
-      senderProfilePicture: senderProfilePicture,
       createdAt: DateTime.now(),
       orderId: orderId,
       subOrderId: subOrderId,
@@ -190,27 +186,20 @@ class NotificationService {
   }
 
 
-
-
   Future<void> notifyCustomerOrderDelivered(
       String customerId,
       String orderId,
       String partyName,
       String partyRole,
-      String? profilePicture,
       ) async {
     await _sendNotification(
       userId: customerId,
       userRole: UserRole.customer,
       type: NotificationDbType.orderCompleted,
       message: 'Your order #$orderId has been delivered by $partyName.',
-      senderName: partyName,
-      senderProfilePicture: profilePicture,
       orderId: orderId,
     );
   }
-
-
 
 
   Future<void> notifyCustomerOrderConfirmed(
@@ -218,15 +207,12 @@ class NotificationService {
       String orderId,
       String partyName,
       String partyRole,
-      String? profilePicture,
       ) async {
     await _sendNotification(
       userId: customerId,
       userRole: UserRole.customer,
       type: NotificationDbType.orderConfirmed,
       message: 'Your order #$orderId has been confirmed by $partyName.',
-      senderName: partyName,
-      senderProfilePicture: profilePicture,
       orderId: orderId,
     );
   }
