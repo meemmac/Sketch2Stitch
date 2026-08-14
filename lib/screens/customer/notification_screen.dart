@@ -560,9 +560,16 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
       case NotificationDbType.selectionDeadlineReminder:
         return _NotificationStyle(
           background: const Color(0xFFF7D6D6),
-          icon: Icons.warning_rounded,
+          icon: Icons.assignment_late_outlined,
           iconColor: Colors.red.shade700,
-          title: 'Action Required',
+          title: 'Job Confirmation Required',
+        );
+      case NotificationDbType.jobDeliveryDeadline:
+        return _NotificationStyle(
+          background: const Color(0xFFFBE7C0),
+          icon: Icons.timer_rounded,
+          iconColor: Colors.orange.shade800,
+          title: 'Delivery Deadline Approaching',
         );
       case NotificationDbType.jobRejected:
         return _NotificationStyle(

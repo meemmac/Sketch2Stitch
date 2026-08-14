@@ -354,7 +354,7 @@ class NotificationService {
     await _sendNotification(
       userId: tailorId,
       userRole: UserRole.tailor,
-      type: NotificationDbType.selectionDeadlineReminder,
+      type: NotificationDbType.jobDeliveryDeadline,
       message: 'Delivery deadline approaching for $customerName\'s order #$orderId.',
       orderId: orderId,
     );

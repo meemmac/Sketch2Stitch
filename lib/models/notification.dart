@@ -11,7 +11,7 @@ enum NotificationDbType {
   suborderPlaced, paymentConfirmed, deliveryReminder,
   // tailor
   jobRequested, selectionDeadlineReminder, jobConfirmed,
-  materialsArrived, paymentReleased,
+  materialsArrived, paymentReleased, jobDeliveryDeadline,
   // shared
   newMessage, reviewReceived,
 }
