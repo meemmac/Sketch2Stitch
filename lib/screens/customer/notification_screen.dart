@@ -295,6 +295,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     final tempNotification = n.copyWith(
       senderName: data['customerName'],
       orderId: data['orderId'] ?? n.orderId,
+      cancelReason: data['rejectionReason'],
     );
     
     return _buildOriginalCardByRole(tempNotification);
@@ -361,13 +362,103 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              _buildFooterRow(n),
+              if (n.type == NotificationDbType.jobRejected) _buildCustomerCancelRow(n) else _buildFooterRow(n),
               if (n.type == NotificationDbType.orderCompleted || n.type == NotificationDbType.suborderDelivered)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text('Please review on orders',
                       style: TextStyle(fontSize: 12, color: Colors.blue.shade700, fontWeight: FontWeight.w500)),
                 ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomerCancelRow(AppNotification n) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text('Order ID: ${n.orderId}', style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.55))),
+        Row(
+          children: [
+            if (n.cancelReason != null && n.cancelReason!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: OutlinedButton(
+                  onPressed: () => _showCustomerCancelReason(n),
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    side: BorderSide.none,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('View Reason',
+                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.black87)),
+                ),
+              ),
+            Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withValues(alpha: 0.45)),
+            const SizedBox(width: 4),
+            Text(timeago.format(n.createdAt), style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.55))),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _showCustomerCancelReason(AppNotification n) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        alignment: Alignment.center,
+        insetPadding: const EdgeInsets.all(20),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4))
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Cancellation Reason', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, size: 20)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(14),
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7D6D6).withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFF7D6D6).withValues(alpha: 0.5)),
+                ),
+                child: Text(n.cancelReason ?? 'No reason was provided.',
+                    style: TextStyle(fontSize: 14, height: 1.5, color: Colors.black.withValues(alpha: 0.8))),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 12)),
+                  child: const Text('Close', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                ),
+              ),
             ],
           ),
         ),

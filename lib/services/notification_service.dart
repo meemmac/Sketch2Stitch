@@ -95,23 +95,39 @@ class NotificationService {
 
       // 2. Find the Customer ID from the Order
       final orderDoc = await _db.collection('Orders').doc(orderId).get();
-      if (!orderDoc.exists) {
-        return {'orderId': orderId, 'customerName': null};
-      }
-      
-      final customerId = orderDoc.data()?['customerId'];
       String? customerName;
+      String? rejectionReason;
 
-
-      if (customerId != null) {
-        // 3. Finally, get the Customer's Name
-        final customerDoc = await _db.collection('Customer').doc(customerId).get();
-        customerName = customerDoc.data()?['name'] as String?;
+      if (orderDoc.exists) {
+        final customerId = orderDoc.data()?['customerId'];
+        if (customerId != null) {
+          final customerDoc = await _db.collection('Customer').doc(customerId).get();
+          customerName = customerDoc.data()?['name'] as String?;
+        }
       }
+
+      // 3. If it's a cancellation, try to find the rejection reason from Tailor-jobs
+      if (n.type == NotificationDbType.jobRejected) {
+        if (n.tailorJobId != null && n.tailorJobId!.isNotEmpty) {
+          final jobDoc = await _db.collection('Tailor-jobs').doc(n.tailorJobId).get();
+          rejectionReason = jobDoc.data()?['rejectionReason'];
+        } else {
+          final jobQuery = await _db
+              .collection('Tailor-jobs')
+              .where('orderId', isEqualTo: orderId)
+              .limit(1)
+              .get();
+          if (jobQuery.docs.isNotEmpty) {
+            rejectionReason = jobQuery.docs.first.data()['rejectionReason'];
+          }
+        }
+      }
+
 
       return {
         'orderId': orderId,
         'customerName': customerName,
+        'rejectionReason': rejectionReason,
       };
     } catch (e) {
       debugPrint('Error resolving notification data: $e');

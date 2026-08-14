@@ -33,6 +33,8 @@ class AppNotification {
   // They are NOT saved to the Firebase "Notifications" collection
   final String? senderName;
   final String? senderProfilePicture;
+  final String? cancelReason;
+
 
   AppNotification({
     required this.id,
@@ -47,7 +49,9 @@ class AppNotification {
     this.tailorJobId,
     this.senderName,
     this.senderProfilePicture,
+    this.cancelReason,
   });
+
 
   AppNotification copyWith({
     String? id,
@@ -62,6 +66,7 @@ class AppNotification {
     String? tailorJobId,
     String? senderName,
     String? senderProfilePicture,
+    String? cancelReason,
   }) {
     return AppNotification(
       id: id ?? this.id,
@@ -76,6 +81,7 @@ class AppNotification {
       tailorJobId: tailorJobId ?? this.tailorJobId,
       senderName: senderName ?? this.senderName,
       senderProfilePicture: senderProfilePicture ?? this.senderProfilePicture,
+      cancelReason: cancelReason ?? this.cancelReason,
     );
   }
 
