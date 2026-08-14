@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/review.dart';
+import 'Cloudinary_service.dart';
 
 class ReviewService {
   ReviewService({FirebaseFirestore? firestore})
@@ -129,38 +130,134 @@ class ReviewService {
 
   // ─── Retailer Review Functions ───────────────────────────────────────────
 
-  /// Fetches reviews for a specific retailer shop with optional filtering and sorting.
-  Future<List<Review>> fetchShopReviews(
-    String retailerId, {
-    int? starFilter,
-    String sortBy = 'createdAt',
-    bool descending = true,
-  }) async {
-    try {
-      Query query = _db
-          .collection(_reviewsCollection)
-          .where('targetId', isEqualTo: retailerId)
-          .where('targetRole', isEqualTo: ReviewTargetRole.retailer.name);
+  /// Streams reviews for a specific retailer shop.
+  Stream<List<Review>> streamShopReviews(String retailerId) {
+    return _db
+        .collection(_reviewsCollection)
+        .where('targetId', isEqualTo: retailerId)
+        .where('targetRole', isEqualTo: ReviewTargetRole.retailer.name)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
+            .toList());
+  }
 
-      if (starFilter != null) {
-        query = query.where('rating', isEqualTo: starFilter.toDouble());
+  /// Streams detailed reviews for a retailer shop (includes customer and product info).
+  Stream<List<Map<String, dynamic>>> streamDetailedShopReviews(String retailerId) {
+    debugPrint("ReviewService: Starting stream for retailer: $retailerId");
+    return _db
+        .collection(_reviewsCollection)
+        .where('targetId', isEqualTo: retailerId)
+        .where('targetRole', isEqualTo: ReviewTargetRole.retailer.name)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      debugPrint("ReviewService: Found ${snapshot.docs.length} raw reviews in Firestore.");
+      List<Map<String, dynamic>> detailedReviews = [];
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final String customerId = data['customerId'];
+        final String? orderId = data['orderId'];
+
+        debugPrint("ReviewService: Processing review ${doc.id} for order $orderId");
+
+        // Fetch customer name
+        final customerDoc = await _db.collection('Customer').doc(customerId).get();
+        final customerName = customerDoc.exists ? (customerDoc.data()?['name'] ?? 'Anonymous') : 'Anonymous';
+
+        // Fetch products from the sub-order for this retailer
+        List<Map<String, dynamic>> products = [];
+        if (orderId != null) {
+          final subOrderSnap = await _db
+              .collection('Sub-orders')
+              .where('orderId', isEqualTo: orderId)
+              .where('retailerId', isEqualTo: retailerId)
+              .limit(1)
+              .get();
+
+          debugPrint("ReviewService: Found ${subOrderSnap.docs.length} matching sub-orders for retailer $retailerId");
+
+          if (subOrderSnap.docs.isNotEmpty) {
+            final subOrderId = subOrderSnap.docs.first.id;
+            final itemsSnap = await _db
+                .collection('Order-Items')
+                .where('subOrderId', isEqualTo: subOrderId)
+                .get();
+
+            debugPrint("ReviewService: Found ${itemsSnap.docs.length} items for sub-order $subOrderId");
+
+            for (var itemDoc in itemsSnap.docs) {
+              final itemData = itemDoc.data();
+              final productId = itemData['productId'];
+              final optionId = itemData['optionId'];
+
+              final productDoc = await _db.collection('Products').doc(productId).get();
+              if (productDoc.exists) {
+                final productData = productDoc.data()!;
+                final List<dynamic> colorOptions = productData['colorOptions'] ?? [];
+                final option = colorOptions.firstWhere(
+                  (o) => o['optionId'] == optionId,
+                  orElse: () => null,
+                );
+
+                final rawImages = (option?['image'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                final resolvedImages = _resolveImageUrls(rawImages);
+
+                products.add({
+                  'name': productData['productName'] ?? 'Unknown Product',
+                  'image': resolvedImages.isNotEmpty ? resolvedImages.first : '',
+                  'price': (option?['price'] ?? 0).toDouble(),
+                });
+              }
+            }
+          }
+        }
+
+        detailedReviews.add({
+          'review': {...data, 'id': doc.id},
+          'userName': customerName,
+          'products': products,
+        });
       }
+      return detailedReviews;
+    });
+  }
 
-      // Note: top reviews sorting might involve high ratings
-      if (sortBy == 'top') {
-        query = query.orderBy('rating', descending: true);
-      } else {
-        query = query.orderBy(sortBy, descending: descending);
-      }
-
-      final snapshot = await query.get();
-      return snapshot.docs
-          .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
+  /// Streams review statistics for a retailer shop.
+  Stream<Map<String, dynamic>> streamShopReviewStats(String retailerId) {
+    return _db
+        .collection(_reviewsCollection)
+        .where('targetId', isEqualTo: retailerId)
+        .where('targetRole', isEqualTo: ReviewTargetRole.retailer.name)
+        .snapshots()
+        .map((snap) {
+      final reviews = snap.docs
+          .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
           .toList();
-    } catch (e) {
-      debugPrint('Error fetching shop reviews: $e');
-      return [];
-    }
+
+      if (reviews.isEmpty) {
+        return {
+          'total': 0,
+          'average': 0.0,
+          'distribution': {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        };
+      }
+
+      final total = reviews.length;
+      final avg = reviews.fold(0.0, (sum, r) => sum + r.rating) / total;
+      final distribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0};
+      for (var r in reviews) {
+        int star = r.rating.floor().clamp(1, 5);
+        distribution[star] = (distribution[star] ?? 0) + 1;
+      }
+
+      return {
+        'total': total,
+        'average': avg,
+        'distribution': distribution,
+      };
+    });
   }
 
   /// Gets review statistics for a retailer shop.
@@ -324,5 +421,21 @@ class ReviewService {
       debugPrint('Error fetching reviews by target: $e');
       return [];
     }
+  }
+
+  // ─── Image Helpers ──────────────────────────────────────────────────────
+
+  List<String> _resolveImageUrls(List<String> imagePaths) {
+    final svc = CloudinaryService();
+    return imagePaths.map((p) {
+      final url = p.contains('cloudinary.com') ? p : _getCDNUrl(p);
+      return svc.getOptimizedImageUrl(url);
+    }).toList();
+  }
+
+  String _getCDNUrl(String imagePath) {
+    if (imagePath.startsWith('http')) return imagePath;
+    final cleaned = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+    return 'https://res.cloudinary.com/${CloudinaryService.cloudName}/image/upload/$cleaned';
   }
 }

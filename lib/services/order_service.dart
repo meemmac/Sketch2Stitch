@@ -331,6 +331,11 @@ class OrderService {
           }
         }
 
+        if (itemsList.isEmpty) {
+          debugPrint("OrderService: Skipping sub-order $subOrderId because no items were found.");
+          continue;
+        }
+
         detailedOrders.add({
           'subOrder': {...subOrderData, 'id': subOrderId},
           'order': {...orderData, 'id': orderId},
