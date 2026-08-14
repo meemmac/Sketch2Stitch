@@ -456,11 +456,21 @@ class OrderService {
   /// Updates the status of a sub-order.
   Future<void> updateOrderStatus(String subOrderId, String newStatus) async {
     try {
-      await _db.collection(_subOrdersCollection).doc(subOrderId).update({
-        'status': newStatus.toLowerCase(),
-      });
+      final statusLower = newStatus.toLowerCase();
+      debugPrint("OrderService: Updating sub-order $subOrderId to status: $statusLower");
+      
+      final Map<String, dynamic> updates = {
+        'status': statusLower,
+      };
+
+      if (statusLower == 'delivered') {
+        updates['deliveryDate'] = DateTime.now().toIso8601String();
+      }
+
+      await _db.collection(_subOrdersCollection).doc(subOrderId).update(updates);
+      debugPrint("OrderService: Update successful for $subOrderId");
     } catch (e) {
-      debugPrint('Error updating order status: $e');
+      debugPrint('Error updating order status for $subOrderId: $e');
       rethrow;
     }
   }

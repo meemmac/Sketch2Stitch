@@ -40,7 +40,8 @@ class OrderItem {
 }
 
 class RetailerOrder {
-  final String id;
+  final String id; // This is the Sub-order document ID
+  final String orderId; // This is the parent Order document ID
   final String customerName;
   final String customerPhone;
   final String? tailorName;
@@ -57,6 +58,7 @@ class RetailerOrder {
 
   RetailerOrder({
     required this.id,
+    required this.orderId,
     required this.customerName,
     required this.customerPhone,
     this.tailorName,
@@ -148,6 +150,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
 
           return RetailerOrder(
             id: subOrder['id'],
+            orderId: subOrder['orderId'] ?? order['id'] ?? 'N/A',
             customerName: customer['name'] ?? 'N/A',
             customerPhone: customer['phone'] ?? 'N/A',
             tailorName: tailorName,
@@ -395,6 +398,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
 
   void _updateOrderStatus(RetailerOrder order, String newStatus) async {
     try {
+      debugPrint("RetailerOrdersScreen: Changing status for sub-order ${order.id} (Parent: ${order.orderId}) to $newStatus");
       await _orderService.updateOrderStatus(order.id, newStatus);
       if (!mounted) return;
       setState(() {
@@ -402,12 +406,13 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
         if (newStatus == "Delivered") {
           order.isDelivered = true;
           order.deliveryDate = DateTime.now();
-          _showBanner("Order ${order.id} marked as Delivered", isError: false);
+          _showBanner("Order ${order.orderId} marked as Delivered", isError: false);
         } else {
           _showBanner("Status updated to $newStatus", isError: false);
         }
       });
     } catch (e) {
+      debugPrint("RetailerOrdersScreen: Error updating status: $e");
       _showBanner("Failed to update status: $e");
     }
   }
@@ -959,7 +964,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        order.id.startsWith('ORD-') ? order.id : "ORD-${order.id}",
+                        order.orderId.startsWith('ORD-') ? order.orderId : "ORD-${order.orderId}",
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -1223,7 +1228,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                           ),
                         ),
                         Text(
-                          "ID: ${order.id.startsWith('ORD-') ? order.id : "ORD-${order.id}"}",
+                          "ID: ${order.orderId.startsWith('ORD-') ? order.orderId : "ORD-${order.orderId}"}",
                           style: const TextStyle(
                             color: Colors.black54,
                             fontWeight: FontWeight.w600,
