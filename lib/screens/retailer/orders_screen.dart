@@ -381,23 +381,34 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
     return _filteredOrders.where((order) => order.isDelivered).toList();
   }
 
+  void _showBanner(String message, {bool isError = true}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red.shade700 : Colors.green.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
   void _updateOrderStatus(RetailerOrder order, String newStatus) async {
     try {
       await _orderService.updateOrderStatus(order.id, newStatus);
+      if (!mounted) return;
       setState(() {
         order.status = newStatus;
         if (newStatus == "Delivered") {
           order.isDelivered = true;
           order.deliveryDate = DateTime.now();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Order ${order.id} marked as Delivered")),
-          );
+          _showBanner("Order ${order.id} marked as Delivered", isError: false);
+        } else {
+          _showBanner("Status updated to $newStatus", isError: false);
         }
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to update status: $e")),
-      );
+      _showBanner("Failed to update status: $e");
     }
   }
 
