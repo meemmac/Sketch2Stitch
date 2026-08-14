@@ -82,6 +82,8 @@ macos/Flutter/flutter_export_environment.sh
 lib/utils/db_seeder.dart
 lib/utils/db_seeder2.dart
 lib/utils/db_seeder3.dart
+lib/utils/db_seeder4.dart
+
 
 .artifacts/c3d90605-a875-4c33-ab63-e98311731e83/implementation_plan.artifact.md
 .artifacts/c3d90605-a875-4c33-ab63-e98311731e83/task.artifact.md
