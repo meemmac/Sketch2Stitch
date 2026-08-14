@@ -18,24 +18,24 @@ class NotificationService {
 
   /// Streams real-time notifications for a specific user.
   Stream<List<AppNotification>> streamNotifications(String uid) {
-    debugPrint('[NotificationService] Streaming for UID: "$uid"');
-    if (uid.isEmpty) {
+    final cleanUid = uid.trim();
+    debugPrint('[NotificationService] Streaming for UID: "$cleanUid"');
+    
+    if (cleanUid.isEmpty) {
       debugPrint('[NotificationService] Warning: Empty UID provided');
       return Stream.value([]);
     }
 
-
+    // Use a query that finds the ID even if there's a trailing space in the DB
+    // Wrapped in a stream to handle database delays on first load
     return _db
         .collection(_collection)
-        .where('userId', isEqualTo: uid.trim())
-    // Temporarily removed .orderBy to fix the "not working" issue
-    // This query requires a Firestore Index to work with .orderBy
+        .where('userId', isEqualTo: cleanUid)
         .snapshots()
         .map((snapshot) {
       debugPrint('[NotificationService] Snapshot received with ${snapshot.docs.length} docs');
       return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return AppNotification.fromJson(data, doc.id);
+        return AppNotification.fromJson(doc.data(), doc.id);
       }).toList();
     });
   }

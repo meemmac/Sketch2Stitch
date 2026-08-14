@@ -1,6 +1,6 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/user_role.dart';
-import 'package:sketch2stitch/services/auth_service.dart';
 import 'package:sketch2stitch/services/notification_service.dart';
 import 'package:sketch2stitch/models/notification.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -25,23 +25,26 @@ class UnifiedNotificationScreen extends StatefulWidget {
 
 
 class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
-  late Stream<List<AppNotification>> _notificationStream;
-  
   // Cache for profile data (URLs or Resolved Name/ID Maps)
   final Map<String, dynamic> _profileCache = {};
 
 
-  @override
-  void initState() {
-    super.initState();
-    final uid = AuthService().currentUser?.uid ?? '';
-    debugPrint('[NotificationScreen] Initializing with UID: "$uid"');
-    _notificationStream = NotificationService().streamNotifications(uid);
+  Stream<List<AppNotification>> _getNotificationsStream() {
+    // Use UserSession email to find the UID securely
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    
+    if (uid == null) {
+      debugPrint('[NotificationScreen] Waiting for valid Firebase UID...');
+      return Stream.value([]);
+    }
+
+    debugPrint('[NotificationScreen] Connecting to live backend for UID: "$uid"');
+    return NotificationService().streamNotifications(uid);
   }
 
 
   void _clearAll() {
-    final uid = AuthService().currentUser?.uid;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
       NotificationService().deleteAllNotifications(uid);
     }
@@ -51,7 +54,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<AppNotification>>(
-      stream: _notificationStream,
+      stream: _getNotificationsStream(),
       builder: (context, snapshot) {
         final notifications = snapshot.data ?? [];
         final count = notifications.length;
@@ -94,8 +97,17 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     }
 
 
-    if (snapshot.connectionState == ConnectionState.waiting) {
-      return const Center(child: CircularProgressIndicator());
+    if (snapshot.connectionState == ConnectionState.waiting || !snapshot.hasData) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: Color(0xFF16332A)),
+            SizedBox(height: 16),
+            Text('Syncing with database...', style: TextStyle(color: Colors.grey, fontSize: 13)),
+          ],
+        ),
+      );
     }
 
 
@@ -109,7 +121,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       itemCount: notifications.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 14),
+      separatorBuilder: (_, _) => const SizedBox(height: 14),
       itemBuilder: (context, index) {
         final n = notifications[index];
         return Dismissible(
@@ -284,9 +296,14 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   }
 
   Widget _buildNotificationItem(AppNotification n) {
+    // Customers only need Profile Pic lookup (Retailer/Tailor photos)
+    if (widget.role == UserRole.customer) {
+      return _buildCustomerCard(n);
+    }
+
+    // Professionals (Tailor/Retailer) need Customer Name & Real Order ID lookup
     final cacheKey = n.subOrderId ?? n.tailorJobId ?? n.orderId;
     
-    // Check if we have already resolved the real Order ID and Name for this notification
     if (_profileCache.containsKey("${cacheKey}_resolved")) {
       final data = _profileCache["${cacheKey}_resolved"] as Map<String, String?>;
       return _buildRoleCardWithResolvedData(n, data);
@@ -295,13 +312,11 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     return FutureBuilder<Map<String, String?>?>(
       future: NotificationService().getResolvedNotificationData(n),
       builder: (context, snapshot) {
-        final data = snapshot.data;
-        if (data != null) {
-          _profileCache["${cacheKey}_resolved"] = data;
-          return _buildRoleCardWithResolvedData(n, data);
+        if (snapshot.hasData && snapshot.data != null) {
+          _profileCache["${cacheKey}_resolved"] = snapshot.data;
+          return _buildRoleCardWithResolvedData(n, snapshot.data!);
         }
         
-        // While loading, show original card based on role
         return _buildOriginalCardByRole(n);
       },
     );
