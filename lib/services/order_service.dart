@@ -453,46 +453,48 @@ class OrderService {
     });
   }
 
-  /// Updates the status of a sub-order and synchronizes it with the parent order.
+  /// Updates the status of a sub-order and synchronizes it with the parent order based on business rules.
   Future<void> updateOrderStatus(String subOrderId, String newStatus, {String? parentOrderId}) async {
     try {
       final statusLower = newStatus.toLowerCase();
       debugPrint("OrderService: Updating sub-order $subOrderId to status: $statusLower");
       
-      String? orderId = parentOrderId;
+      // Fetch sub-order metadata to check destination
+      final subOrderDoc = await _db.collection(_subOrdersCollection).doc(subOrderId).get();
+      if (!subOrderDoc.exists) throw Exception("Sub-order $subOrderId not found");
       
-      // 1. If parentOrderId not provided, fetch the sub-order doc to find it
-      if (orderId == null) {
-        final subOrderDoc = await _db.collection(_subOrdersCollection).doc(subOrderId).get();
-        if (subOrderDoc.exists) {
-          orderId = subOrderDoc.data()?['orderId'];
-        }
-      }
-
-      // 2. Prepare updates for sub-order
-      final Map<String, dynamic> subOrderUpdates = {
-        'status': statusLower,
-      };
-
-      if (statusLower == 'delivered') {
-        subOrderUpdates['deliveryDate'] = DateTime.now().toIso8601String();
-      }
+      final subOrderData = subOrderDoc.data()!;
+      final String orderId = parentOrderId ?? subOrderData['orderId'];
+      final String destination = (subOrderData['deliveryDestination'] ?? 'customer').toString().toLowerCase();
 
       final batch = _db.batch();
       
-      // 3. Update Sub-order
+      // 1. Prepare updates for sub-order
+      final Map<String, dynamic> subOrderUpdates = {
+        'status': statusLower,
+      };
+      if (statusLower == 'delivered') {
+        subOrderUpdates['deliveryDate'] = DateTime.now().toIso8601String();
+      }
       batch.update(_db.collection(_subOrdersCollection).doc(subOrderId), subOrderUpdates);
       
-      // 4. Update Parent Order Status to match
-      if (orderId != null) {
-        debugPrint("OrderService: Synchronizing parent order $orderId status to: $statusLower");
+      // 2. Parent Order status logic:
+      // "order status will only change when ONLY customer is involved and retailer press delivered"
+      // Otherwise, it stays 'processing'.
+      if (destination == 'customer' && statusLower == 'delivered') {
+        debugPrint("OrderService: Direct-to-Customer delivery detected. Marking parent order $orderId as completed.");
         batch.update(_db.collection(_ordersCollection).doc(orderId), {
-          'status': statusLower,
+          'status': 'completed',
+        });
+      } else {
+        debugPrint("OrderService: Tailor-bound or partial step detected. Keeping parent order $orderId as processing.");
+        batch.update(_db.collection(_ordersCollection).doc(orderId), {
+          'status': 'processing',
         });
       }
 
       await batch.commit();
-      debugPrint("OrderService: Update successful for $subOrderId");
+      debugPrint("OrderService: Update successful for $subOrderId and parent $orderId");
     } catch (e) {
       debugPrint('Error updating order status for $subOrderId: $e');
       rethrow;
