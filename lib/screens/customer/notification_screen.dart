@@ -110,7 +110,24 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       itemCount: notifications.length,
       separatorBuilder: (_, __) => const SizedBox(height: 14),
-      itemBuilder: (context, index) => _buildNotificationItem(notifications[index]),
+      itemBuilder: (context, index) {
+        final n = notifications[index];
+        return Dismissible(
+          key: Key(n.id),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            decoration: BoxDecoration(
+              color: Colors.red.shade100,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Icon(Icons.delete_outline_rounded, color: Colors.red.shade700),
+          ),
+          onDismissed: (_) => NotificationService().deleteNotification(n.id),
+          child: _buildNotificationItem(n),
+        );
+      },
     );
   }
 

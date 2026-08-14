@@ -21,6 +21,9 @@ import 'package:sketch2stitch/screens/retailer/inventory_screen.dart';
 import 'package:sketch2stitch/screens/tailor/orders_screen.dart';
 import 'order_list_screen.dart';
 
+import 'package:sketch2stitch/services/auth_service.dart';
+import 'package:sketch2stitch/services/notification_service.dart';
+
 class UnifiedHomeScreen extends StatefulWidget {
   final UserRole initialRole;
 
@@ -46,7 +49,6 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   final GlobalKey _exploreRetailersKey = GlobalKey();
 
   String _favoritesFilter = 'Fabric and elements';
-  bool _hasUnreadNotifications = true;
 
   // ─── Get all fabric products from kHardcodedFabricData ──────────────
 
@@ -128,18 +130,12 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   }
 
   void _openNotifications() async {
-    final result = await Navigator.push<bool>(
+    Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => UnifiedNotificationScreen(role: _currentRole),
       ),
     );
-
-    if (result == true && mounted) {
-      setState(() {
-        _hasUnreadNotifications = false;
-      });
-    }
   }
 
   void _openOrderList() {
@@ -333,35 +329,43 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
             ),
           ),
           const Spacer(),
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              IconButton(
-                icon: const Icon(
-                  Icons.notifications_none_rounded,
-                  color: Colors.black87,
-                ),
-                iconSize: 28,
-                onPressed: _openNotifications,
-              ),
-              if (_hasUnreadNotifications)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    width: 9,
-                    height: 9,
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFFF4F9F1),
-                        width: 1.5,
+          StreamBuilder<int>(
+            stream: NotificationService().getUnreadNotificationCount(
+              AuthService().currentUser?.uid ?? '',
+            ),
+            builder: (context, snapshot) {
+              final unreadCount = snapshot.data ?? 0;
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.notifications_none_rounded,
+                      color: Colors.black87,
+                    ),
+                    iconSize: 28,
+                    onPressed: _openNotifications,
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        width: 9,
+                        height: 9,
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFFF4F9F1),
+                            width: 1.5,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-            ],
+                ],
+              );
+            },
           ),
           if (_currentRole == UserRole.customer)
             IconButton(
