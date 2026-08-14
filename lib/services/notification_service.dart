@@ -40,6 +40,73 @@ class NotificationService {
     });
   }
 
+  /// Fetches the profile picture URL of the person who sent the notification.
+  /// Used for Customer notifications to show Tailor/Retailer photos.
+  Future<String?> getSenderProfilePicture(AppNotification n) async {
+    try {
+      // 1. If it's a retailer notification (based on subOrderId)
+      if (n.subOrderId != null && n.subOrderId!.isNotEmpty) {
+        final subOrderDoc = await _db.collection('Sub-orders').doc(n.subOrderId).get();
+        if (subOrderDoc.exists) {
+          final retailerId = subOrderDoc.data()?['retailerId'];
+          if (retailerId != null) {
+            final retailerDoc = await _db.collection('Retailer').doc(retailerId).get();
+            return retailerDoc.data()?['profilePicture'] as String?;
+          }
+        }
+      }
+
+      // 2. If it's a tailor notification (based on tailorJobId)
+      if (n.tailorJobId != null && n.tailorJobId!.isNotEmpty) {
+        final tailorJobDoc = await _db.collection('Tailor-jobs').doc(n.tailorJobId).get();
+        if (tailorJobDoc.exists) {
+          final tailorId = tailorJobDoc.data()?['tailorId'];
+          if (tailorId != null) {
+            final tailorDoc = await _db.collection('Tailor').doc(tailorId).get();
+            return tailorDoc.data()?['profilePicture'] as String?;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching sender profile picture: $e');
+    }
+    return null;
+  }
+
+  /// Deep lookup to find a Customer's name starting from a TailorJob or Sub-Order.
+  Future<String?> getCustomerName(AppNotification n) async {
+    try {
+      String? orderId = n.orderId;
+
+      // 1. Find the Order ID first if it's missing
+      if (orderId.isEmpty || orderId == 'N/A') {
+        if (n.subOrderId != null && n.subOrderId!.isNotEmpty) {
+          final doc = await _db.collection('Sub-orders').doc(n.subOrderId).get();
+          orderId = doc.data()?['orderId'];
+        } else if (n.tailorJobId != null && n.tailorJobId!.isNotEmpty) {
+          final doc = await _db.collection('Tailor-jobs').doc(n.tailorJobId).get();
+          orderId = doc.data()?['orderId'];
+        }
+      }
+
+      if (orderId == null || orderId.isEmpty) return null;
+
+      // 2. Find the Customer ID from the Order
+      final orderDoc = await _db.collection('Orders').doc(orderId).get();
+      if (!orderDoc.exists) return null;
+      final customerId = orderDoc.data()?['customerId'];
+
+      if (customerId != null) {
+        // 3. Finally, get the Customer's Name
+        final customerDoc = await _db.collection('Customer').doc(customerId).get();
+        return customerDoc.data()?['name'] as String?;
+      }
+    } catch (e) {
+      debugPrint('Error fetching customer name: $e');
+    }
+    return null;
+  }
+
 
   /// Marks a specific notification as read.
   Future<void> markAsRead(String notificationId) async {
@@ -232,7 +299,6 @@ class NotificationService {
       userRole: UserRole.customer,
       type: NotificationDbType.jobRejected,
       message: 'Order #$orderId was cancelled by $partyName. Reason: $cancelReason',
-      senderName: partyName,
       orderId: orderId,
     );
   }
@@ -254,7 +320,6 @@ class NotificationService {
       userRole: UserRole.tailor,
       type: NotificationDbType.jobRequested,
       message: 'New stitching request from $customerName for $itemName. Order #$orderId',
-      senderName: customerName,
       orderId: orderId,
     );
   }
@@ -273,7 +338,6 @@ class NotificationService {
       userRole: UserRole.tailor,
       type: NotificationDbType.selectionDeadlineReminder,
       message: 'Reminder: Please confirm the stitching request for $customerName ($itemName).',
-      senderName: customerName,
       orderId: orderId,
     );
   }
@@ -292,7 +356,6 @@ class NotificationService {
       userRole: UserRole.tailor,
       type: NotificationDbType.selectionDeadlineReminder,
       message: 'Delivery deadline approaching for $customerName\'s order #$orderId.',
-      senderName: customerName,
       orderId: orderId,
     );
   }
@@ -312,7 +375,6 @@ class NotificationService {
       userRole: UserRole.tailor,
       type: NotificationDbType.jobRejected,
       message: '$customerName cancelled their order for $itemName. Reason: $cancelReason',
-      senderName: customerName,
       orderId: orderId,
     );
   }
@@ -338,7 +400,6 @@ class NotificationService {
       userRole: UserRole.retailer,
       type: NotificationDbType.suborderPlaced,
       message: 'New material order from $customerName for $itemName. Order #$orderId',
-      senderName: customerName,
       orderId: orderId,
     );
   }

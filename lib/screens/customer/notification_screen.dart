@@ -26,6 +26,9 @@ class UnifiedNotificationScreen extends StatefulWidget {
 
 class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   late Stream<List<AppNotification>> _notificationStream;
+  
+  // Cache for sender profile pictures to avoid redundant DB calls
+  final Map<String, String?> _profilePicCache = {};
 
 
   @override
@@ -189,6 +192,43 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   }
 
   Widget _buildAvatar(AppNotification n, _NotificationStyle style) {
+    // Only perform profile picture lookup for Customers (to see Tailor/Retailer photos)
+    if (widget.role == UserRole.customer) {
+      final cacheKey = n.subOrderId ?? n.tailorJobId ?? n.orderId;
+      
+      // If we already know the URL, show it immediately
+      if (_profilePicCache.containsKey(cacheKey) && _profilePicCache[cacheKey] != null) {
+        return CircleAvatar(
+          radius: 22,
+          backgroundColor: Colors.white,
+          backgroundImage: NetworkImage(_profilePicCache[cacheKey]!),
+        );
+      }
+
+      // Otherwise, fetch it once and store it in cache
+      return FutureBuilder<String?>(
+        future: NotificationService().getSenderProfilePicture(n),
+        builder: (context, snapshot) {
+          if (snapshot.hasData && snapshot.data != null) {
+            _profilePicCache[cacheKey] = snapshot.data;
+            return CircleAvatar(
+              radius: 22,
+              backgroundColor: Colors.white,
+              backgroundImage: NetworkImage(snapshot.data!),
+            );
+          }
+          
+          // While loading or if no picture found, show initials
+          return _buildInitialsAvatar(n, style);
+        },
+      );
+    }
+
+    // For Tailors/Retailers receiving from Customers, always use initials
+    return _buildInitialsAvatar(n, style);
+  }
+
+  Widget _buildInitialsAvatar(AppNotification n, _NotificationStyle style) {
     String? name;
 
 
@@ -227,14 +267,35 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   }
 
   Widget _buildNotificationItem(AppNotification n) {
-    switch (widget.role) {
-      case UserRole.customer:
-        return _buildCustomerCard(n);
-      case UserRole.tailor:
-        return _buildTailorCard(n);
-      case UserRole.retailer:
-        return _buildRetailerCard(n);
+    // Only perform Name lookup for Tailors/Retailers (to see Customer names)
+    if (widget.role == UserRole.tailor || widget.role == UserRole.retailer) {
+      final cacheKey = n.subOrderId ?? n.tailorJobId ?? n.orderId;
+      
+      // Use cache to avoid redundant deep searches
+      if (_profilePicCache.containsKey(cacheKey + "_name")) {
+        return _buildRoleCardWithFixedName(n, _profilePicCache[cacheKey + "_name"]);
+      }
+
+      return FutureBuilder<String?>(
+        future: NotificationService().getCustomerName(n),
+        builder: (context, snapshot) {
+          final name = snapshot.data;
+          if (name != null) _profilePicCache[cacheKey + "_name"] = name;
+          return _buildRoleCardWithFixedName(n, name);
+        },
+      );
     }
+
+    // Default Customer view (already has photo lookup)
+    return _buildCustomerCard(n);
+  }
+
+  Widget _buildRoleCardWithFixedName(AppNotification n, String? fetchedName) {
+    // Temporarily swap senderName in memory for UI display
+    final tempNotification = n.copyWith(senderName: fetchedName);
+    return widget.role == UserRole.tailor 
+        ? _buildTailorCard(tempNotification) 
+        : _buildRetailerCard(tempNotification);
   }
 
 
@@ -522,13 +583,24 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
 
 
   Widget _buildFooterRow(AppNotification n, {bool isRetailer = false}) {
-    String idLabel = (isRetailer && n.type == NotificationDbType.deliveryReminder) ? 'Product ID' : 'Order ID';
+    String idLabel = 'Order ID';
+    String idValue = n.orderId;
+
+    if (isRetailer && n.type == NotificationDbType.deliveryReminder) {
+      idLabel = 'Product ID';
+    } else if (n.subOrderId != null && n.subOrderId!.isNotEmpty) {
+      idLabel = 'Sub-Order ID';
+      idValue = n.subOrderId!;
+    } else if (n.tailorJobId != null && n.tailorJobId!.isNotEmpty) {
+      idLabel = 'Job ID';
+      idValue = n.tailorJobId!;
+    }
 
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text('$idLabel: ${n.orderId}', style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
+        Text('$idLabel: $idValue', style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
         Row(
           children: [
             Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withOpacity(0.45)),

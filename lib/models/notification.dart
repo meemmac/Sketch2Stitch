@@ -27,7 +27,12 @@ class AppNotification {
   final DateTime createdAt;
   final String orderId;
   final String? subOrderId;
-
+  final String? tailorJobId;
+  
+  // These fields are for UI display only (In-Memory)
+  // They are NOT saved to the Firebase "Notifications" collection
+  final String? senderName;
+  final String? senderProfilePicture;
 
   AppNotification({
     required this.id,
@@ -39,8 +44,10 @@ class AppNotification {
     required this.createdAt,
     required this.orderId,
     this.subOrderId,
+    this.tailorJobId,
+    this.senderName,
+    this.senderProfilePicture,
   });
-
 
   AppNotification copyWith({
     String? id,
@@ -52,6 +59,9 @@ class AppNotification {
     DateTime? createdAt,
     String? orderId,
     String? subOrderId,
+    String? tailorJobId,
+    String? senderName,
+    String? senderProfilePicture,
   }) {
     return AppNotification(
       id: id ?? this.id,
@@ -63,10 +73,13 @@ class AppNotification {
       createdAt: createdAt ?? this.createdAt,
       orderId: orderId ?? this.orderId,
       subOrderId: subOrderId ?? this.subOrderId,
+      tailorJobId: tailorJobId ?? this.tailorJobId,
+      senderName: senderName ?? this.senderName,
+      senderProfilePicture: senderProfilePicture ?? this.senderProfilePicture,
     );
   }
 
-
+  // ⚠️ Important: toJson() only contains your original Firebase fields
   Map<String, dynamic> toJson() => {
     'userId': userId,
     'userRole': userRole.name[0].toUpperCase() + userRole.name.substring(1),
@@ -76,8 +89,8 @@ class AppNotification {
     'createdAt': Timestamp.fromDate(createdAt),
     'orderId': orderId,
     'subOrderId': subOrderId,
+    'tailorJobId': tailorJobId,
   };
-
 
   factory AppNotification.fromJson(Map<String, dynamic> json, [String? id]) {
     return AppNotification(
@@ -98,6 +111,8 @@ class AppNotification {
           : DateTime.now(),
       orderId: json['orderId'] ?? '',
       subOrderId: json['subOrderId'],
+      tailorJobId: json['tailorJobId'],
+      // Note: We don't read senderName from Firebase JSON as it's fetched separately
     );
   }
 }
