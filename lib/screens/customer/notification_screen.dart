@@ -27,8 +27,8 @@ class UnifiedNotificationScreen extends StatefulWidget {
 class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   late Stream<List<AppNotification>> _notificationStream;
   
-  // Cache for sender profile pictures to avoid redundant DB calls
-  final Map<String, String?> _profilePicCache = {};
+  // Cache for profile data (URLs or Resolved Name/ID Maps)
+  final Map<String, dynamic> _profileCache = {};
 
 
   @override
@@ -197,11 +197,11 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
       final cacheKey = n.subOrderId ?? n.tailorJobId ?? n.orderId;
       
       // If we already know the URL, show it immediately
-      if (_profilePicCache.containsKey(cacheKey) && _profilePicCache[cacheKey] != null) {
+      if (_profileCache.containsKey(cacheKey) && _profileCache[cacheKey] is String) {
         return CircleAvatar(
           radius: 22,
           backgroundColor: Colors.white,
-          backgroundImage: NetworkImage(_profilePicCache[cacheKey]!),
+          backgroundImage: NetworkImage(_profileCache[cacheKey] as String),
         );
       }
 
@@ -210,7 +210,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
         future: NotificationService().getSenderProfilePicture(n),
         builder: (context, snapshot) {
           if (snapshot.hasData && snapshot.data != null) {
-            _profilePicCache[cacheKey] = snapshot.data;
+            _profileCache[cacheKey] = snapshot.data;
             return CircleAvatar(
               radius: 22,
               backgroundColor: Colors.white,
@@ -252,7 +252,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
 
     return CircleAvatar(
       radius: 22,
-      backgroundColor: style.iconColor.withOpacity(0.12),
+      backgroundColor: style.iconColor.withValues(alpha: 0.12),
       child: initial != null
           ? Text(
               initial,
@@ -267,35 +267,48 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   }
 
   Widget _buildNotificationItem(AppNotification n) {
-    // Only perform Name lookup for Tailors/Retailers (to see Customer names)
-    if (widget.role == UserRole.tailor || widget.role == UserRole.retailer) {
-      final cacheKey = n.subOrderId ?? n.tailorJobId ?? n.orderId;
-      
-      // Use cache to avoid redundant deep searches
-      if (_profilePicCache.containsKey(cacheKey + "_name")) {
-        return _buildRoleCardWithFixedName(n, _profilePicCache[cacheKey + "_name"]);
-      }
-
-      return FutureBuilder<String?>(
-        future: NotificationService().getCustomerName(n),
-        builder: (context, snapshot) {
-          final name = snapshot.data;
-          if (name != null) _profilePicCache[cacheKey + "_name"] = name;
-          return _buildRoleCardWithFixedName(n, name);
-        },
-      );
+    final cacheKey = n.subOrderId ?? n.tailorJobId ?? n.orderId;
+    
+    // Check if we have already resolved the real Order ID and Name for this notification
+    if (_profileCache.containsKey("${cacheKey}_resolved")) {
+      final data = _profileCache["${cacheKey}_resolved"] as Map<String, String?>;
+      return _buildRoleCardWithResolvedData(n, data);
     }
 
-    // Default Customer view (already has photo lookup)
-    return _buildCustomerCard(n);
+    return FutureBuilder<Map<String, String?>?>(
+      future: NotificationService().getResolvedNotificationData(n),
+      builder: (context, snapshot) {
+        final data = snapshot.data;
+        if (data != null) {
+          _profileCache["${cacheKey}_resolved"] = data;
+          return _buildRoleCardWithResolvedData(n, data);
+        }
+        
+        // While loading, show original card based on role
+        return _buildOriginalCardByRole(n);
+      },
+    );
   }
 
-  Widget _buildRoleCardWithFixedName(AppNotification n, String? fetchedName) {
-    // Temporarily swap senderName in memory for UI display
-    final tempNotification = n.copyWith(senderName: fetchedName);
-    return widget.role == UserRole.tailor 
-        ? _buildTailorCard(tempNotification) 
-        : _buildRetailerCard(tempNotification);
+  Widget _buildRoleCardWithResolvedData(AppNotification n, Map<String, String?> data) {
+    // Temporarily swap data in memory for UI display
+    final tempNotification = n.copyWith(
+      senderName: data['customerName'],
+      orderId: data['orderId'] ?? n.orderId,
+    );
+    
+    return _buildOriginalCardByRole(tempNotification);
+  }
+
+  Widget _buildOriginalCardByRole(AppNotification n) {
+    switch (widget.role) {
+      case UserRole.customer:
+        return _buildCustomerCard(n);
+      case UserRole.tailor:
+        return _buildTailorCard(n);
+      case UserRole.retailer:
+        return _buildRetailerCard(n);
+    }
   }
 
 
@@ -340,7 +353,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                         const SizedBox(height: 6),
                         Text(
                           n.message,
-                          style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
+                          style: TextStyle(fontSize: 13, color: Colors.black.withValues(alpha: 0.75), height: 1.4),
                         ),
                       ],
                     ),
@@ -439,7 +452,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                         const SizedBox(height: 6),
                         Text(
                           n.message,
-                          style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
+                          style: TextStyle(fontSize: 13, color: Colors.black.withValues(alpha: 0.75), height: 1.4),
                         ),
                       ],
                     ),
@@ -531,7 +544,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                         const SizedBox(height: 6),
                         Text(
                           n.message,
-                          style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
+                          style: TextStyle(fontSize: 13, color: Colors.black.withValues(alpha: 0.75), height: 1.4),
                         ),
                       ],
                     ),
@@ -595,24 +608,18 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
 
     if (isRetailer && n.type == NotificationDbType.deliveryReminder) {
       idLabel = 'Product ID';
-    } else if (n.subOrderId != null && n.subOrderId!.isNotEmpty) {
-      idLabel = 'Sub-Order ID';
-      idValue = n.subOrderId!;
-    } else if (n.tailorJobId != null && n.tailorJobId!.isNotEmpty) {
-      idLabel = 'Job ID';
-      idValue = n.tailorJobId!;
     }
 
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text('$idLabel: $idValue', style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
+        Text('$idLabel: $idValue', style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.55))),
         Row(
           children: [
-            Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withOpacity(0.45)),
+            Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withValues(alpha: 0.45)),
             const SizedBox(width: 4),
-            Text(timeago.format(n.createdAt), style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
+            Text(timeago.format(n.createdAt), style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.55))),
           ],
         ),
       ],

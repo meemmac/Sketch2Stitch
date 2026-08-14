@@ -73,12 +73,12 @@ class NotificationService {
     return null;
   }
 
-  /// Deep lookup to find a Customer's name starting from a TailorJob or Sub-Order.
-  Future<String?> getCustomerName(AppNotification n) async {
+  /// Deep lookup to find a Customer's name and the actual Order ID starting from a TailorJob or Sub-Order.
+  Future<Map<String, String?>?> getResolvedNotificationData(AppNotification n) async {
     try {
       String? orderId = n.orderId;
 
-      // 1. Find the Order ID first if it's missing
+      // 1. Find the Order ID first if it's missing in the notification document
       if (orderId.isEmpty || orderId == 'N/A') {
         if (n.subOrderId != null && n.subOrderId!.isNotEmpty) {
           final doc = await _db.collection('Sub-orders').doc(n.subOrderId).get();
@@ -89,20 +89,32 @@ class NotificationService {
         }
       }
 
+
       if (orderId == null || orderId.isEmpty) return null;
+
 
       // 2. Find the Customer ID from the Order
       final orderDoc = await _db.collection('Orders').doc(orderId).get();
-      if (!orderDoc.exists) return null;
+      if (!orderDoc.exists) {
+        return {'orderId': orderId, 'customerName': null};
+      }
+      
       final customerId = orderDoc.data()?['customerId'];
+      String? customerName;
+
 
       if (customerId != null) {
         // 3. Finally, get the Customer's Name
         final customerDoc = await _db.collection('Customer').doc(customerId).get();
-        return customerDoc.data()?['name'] as String?;
+        customerName = customerDoc.data()?['name'] as String?;
       }
+
+      return {
+        'orderId': orderId,
+        'customerName': customerName,
+      };
     } catch (e) {
-      debugPrint('Error fetching customer name: $e');
+      debugPrint('Error resolving notification data: $e');
     }
     return null;
   }
