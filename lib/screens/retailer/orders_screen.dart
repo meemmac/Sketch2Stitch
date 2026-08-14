@@ -901,6 +901,10 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
   }
 
   Widget _orderCard(RetailerOrder order) {
+    if (order.items.isEmpty) {
+      return const SizedBox.shrink(); // Hide corrupted or empty orders
+    }
+
     final Color statusColor = order.isDelivered
         ? primaryGreen
         : Colors.blueAccent;
@@ -944,7 +948,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        order.id,
+                        order.id.startsWith('ORD-') ? order.id : "ORD-${order.id}",
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -1208,7 +1212,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                           ),
                         ),
                         Text(
-                          "ID: ${order.id}",
+                          "ID: ${order.id.startsWith('ORD-') ? order.id : "ORD-${order.id}"}",
                           style: const TextStyle(
                             color: Colors.black54,
                             fontWeight: FontWeight.w600,
@@ -1598,7 +1602,10 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
         width: width,
         height: height,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _imagePlaceholder(width, height),
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint("OrdersScreen: Error loading network image: $path - $error");
+          return _imagePlaceholder(width, height);
+        },
       );
     } else if (path.isNotEmpty) {
       return Image.asset(
@@ -1606,7 +1613,10 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
         width: width,
         height: height,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _imagePlaceholder(width, height),
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint("OrdersScreen: Error loading asset image: $path - $error");
+          return _imagePlaceholder(width, height);
+        },
       );
     } else {
       return _imagePlaceholder(width, height);
