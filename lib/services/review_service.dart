@@ -515,6 +515,93 @@ class ReviewService {
     }
   }
 
+  /// Streams reviews for a specific tailor.
+  Stream<List<Review>> streamTailorReviews(String tailorId) {
+    return _db
+        .collection(_reviewsCollection)
+        .where('targetId', isEqualTo: tailorId)
+        .where('targetRole', isEqualTo: ReviewTargetRole.tailor.name)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
+            .toList());
+  }
+
+  /// Streams detailed reviews for a tailor (includes customer info).
+  Stream<List<Map<String, dynamic>>> streamDetailedTailorReviews(String tailorId) {
+    return _db
+        .collection(_reviewsCollection)
+        .where('targetId', isEqualTo: tailorId)
+        .where('targetRole', isEqualTo: ReviewTargetRole.tailor.name)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      final Map<String, String> customerNameCache = {};
+
+      final List<Map<String, dynamic>?> results = await Future.wait(
+        snapshot.docs.map((doc) async {
+          try {
+            final data = doc.data();
+            final String customerId = data['customerId'];
+
+            if (!customerNameCache.containsKey(customerId)) {
+              final customerDoc = await _db.collection('Customer').doc(customerId).get();
+              customerNameCache[customerId] = customerDoc.exists ? (customerDoc.data()?['name'] ?? 'Anonymous') : 'Anonymous';
+            }
+            final customerName = customerNameCache[customerId]!;
+
+            return {
+              'review': {...data, 'id': doc.id},
+              'userName': customerName,
+            };
+          } catch (e) {
+            debugPrint("ReviewService: Error processing tailor review: $e");
+            return null;
+          }
+        }),
+      );
+
+      return results.whereType<Map<String, dynamic>>().toList();
+    });
+  }
+
+  /// Streams review statistics for a tailor.
+  Stream<Map<String, dynamic>> streamTailorReviewStats(String tailorId) {
+    return _db
+        .collection(_reviewsCollection)
+        .where('targetId', isEqualTo: tailorId)
+        .where('targetRole', isEqualTo: ReviewTargetRole.tailor.name)
+        .snapshots()
+        .map((snap) {
+      final reviews = snap.docs
+          .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
+          .toList();
+
+      if (reviews.isEmpty) {
+        return {
+          'total': 0,
+          'average': 0.0,
+          'distribution': {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        };
+      }
+
+      final total = reviews.length;
+      final avg = reviews.fold(0.0, (sum, r) => sum + r.rating) / total;
+      final distribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0};
+      for (var r in reviews) {
+        int star = r.rating.floor().clamp(1, 5);
+        distribution[star] = (distribution[star] ?? 0) + 1;
+      }
+
+      return {
+        'total': total,
+        'average': avg,
+        'distribution': distribution,
+      };
+    });
+  }
+
   // ─── Image Helpers ──────────────────────────────────────────────────────
 
   List<String> _resolveImageUrls(List<String> imagePaths) {
