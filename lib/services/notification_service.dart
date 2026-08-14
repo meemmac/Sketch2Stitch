@@ -121,6 +121,27 @@ class NotificationService {
   }
 
 
+  /// Deletes all notifications for a specific user.
+  Future<void> deleteAllNotifications(String userId) async {
+    try {
+      final batch = _db.batch();
+      final snapshots = await _db
+          .collection(_collection)
+          .where('userId', isEqualTo: userId)
+          .get();
+
+
+      for (var doc in snapshots.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+      debugPrint('[NotificationService] All notifications deleted for UID: $userId');
+    } catch (e) {
+      debugPrint('Error deleting notifications: $e');
+    }
+  }
+
+
   /// Returns the count of unread notifications for a user.
   Stream<int> getUnreadNotificationCount(String userId) {
     return _db

@@ -40,7 +40,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   void _clearAll() {
     final uid = AuthService().currentUser?.uid;
     if (uid != null) {
-      NotificationService().markAllNotificationsRead(uid);
+      NotificationService().deleteAllNotifications(uid);
     }
   }
 
