@@ -1811,7 +1811,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     switch (status) {
       case TailorOrderStatus.pending: return "New Request";
       case TailorOrderStatus.confirmed: return "Pending Customer";
-      case TailorOrderStatus.inProgress: return "Stitching";
+      case TailorOrderStatus.inProgress: return "In Progress";
       case TailorOrderStatus.ready: return "Ready";
       case TailorOrderStatus.completed: return "Finished";
       case TailorOrderStatus.cancelled: return "Declined";

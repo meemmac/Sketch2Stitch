@@ -661,7 +661,7 @@ class OrderService {
       // 2. Update parent Order
       if (orderId != null) {
         batch.update(_db.collection(_ordersCollection).doc(orderId), {
-          'status': OrderStatus.cancelled.toValue,
+          'status': OrderStatus.processing.toValue,
         });
       }
 
@@ -689,17 +689,10 @@ class OrderService {
 
       // 2. Update parent Order
       if (orderId != null) {
-        String orderStatus;
-        if (statusLower == 'completed') {
-          orderStatus = OrderStatus.completed.toValue;
-        } else if (statusLower == 'in_progress' || statusLower == 'ready') {
-          orderStatus = OrderStatus.processing.toValue;
-        } else {
-          orderStatus = OrderStatus.processing.toValue; // Default to processing if confirmed/stitching
-        }
-        
         batch.update(_db.collection(_ordersCollection).doc(orderId), {
-          'status': orderStatus,
+          'status': (statusLower == 'completed') 
+              ? OrderStatus.completed.toValue 
+              : OrderStatus.processing.toValue,
         });
       }
 
@@ -837,22 +830,10 @@ class OrderService {
   }
 
   OrderStatus _mapTailorJobToOrderStatus(String tailorJobStatus) {
-    switch (tailorJobStatus.toLowerCase()) {
-      case 'confirmed':
-      case 'in_progress':
-      case 'ready':
-      case 'quoted':
-        return OrderStatus.processing;
-      case 'completed':
-        return OrderStatus.completed;
-      case 'cancelled':
-      case 'rejected':
-      case 'tailor_declined':
-        return OrderStatus.cancelled;
-      case 'pending':
-      default:
-        return OrderStatus.tailorPending;
+    if (tailorJobStatus.toLowerCase() == 'completed') {
+      return OrderStatus.completed;
     }
+    return OrderStatus.processing;
   }
 
   /// Submits a price quote for a tailor job.
