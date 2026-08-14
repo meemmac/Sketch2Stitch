@@ -145,7 +145,8 @@ class ReviewService {
 
   /// Streams detailed reviews for a retailer shop (includes customer and product info).
   Stream<List<Map<String, dynamic>>> streamDetailedShopReviews(String retailerId) {
-    debugPrint("ReviewService: Starting stream for retailer: $retailerId");
+    /* 
+    // PREVIOUS SEQUENTIAL VERSION (Slower)
     return _db
         .collection(_reviewsCollection)
         .where('targetId', isEqualTo: retailerId)
@@ -153,14 +154,11 @@ class ReviewService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .asyncMap((snapshot) async {
-      debugPrint("ReviewService: Found ${snapshot.docs.length} raw reviews in Firestore.");
       List<Map<String, dynamic>> detailedReviews = [];
       for (var doc in snapshot.docs) {
         final data = doc.data();
         final String customerId = data['customerId'];
         final String? orderId = data['orderId'];
-
-        debugPrint("ReviewService: Processing review ${doc.id} for order $orderId");
 
         // Fetch customer name
         final customerDoc = await _db.collection('Customer').doc(customerId).get();
@@ -176,16 +174,12 @@ class ReviewService {
               .limit(1)
               .get();
 
-          debugPrint("ReviewService: Found ${subOrderSnap.docs.length} matching sub-orders for retailer $retailerId");
-
           if (subOrderSnap.docs.isNotEmpty) {
             final subOrderId = subOrderSnap.docs.first.id;
             final itemsSnap = await _db
                 .collection('Order-Items')
                 .where('subOrderId', isEqualTo: subOrderId)
                 .get();
-
-            debugPrint("ReviewService: Found ${itemsSnap.docs.length} items for sub-order $subOrderId");
 
             for (var itemDoc in itemsSnap.docs) {
               final itemData = itemDoc.data();
@@ -221,6 +215,104 @@ class ReviewService {
         });
       }
       return detailedReviews;
+    });
+    */
+
+    // OPTIMIZED PARALLEL VERSION
+    return _db
+        .collection(_reviewsCollection)
+        .where('targetId', isEqualTo: retailerId)
+        .where('targetRole', isEqualTo: ReviewTargetRole.retailer.name)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      // Local caches to avoid redundant fetches
+      final Map<String, String> customerNameCache = {};
+      final Map<String, List<Map<String, dynamic>>> subOrderProductsCache = {};
+
+      final List<Map<String, dynamic>?> results = await Future.wait(
+        snapshot.docs.map((doc) async {
+          try {
+            final data = doc.data();
+            final String customerId = data['customerId'];
+            final String? orderId = data['orderId'];
+
+            // 1. Fetch customer name (parallelized/cached)
+            if (!customerNameCache.containsKey(customerId)) {
+              final customerDoc = await _db.collection('Customer').doc(customerId).get();
+              customerNameCache[customerId] = customerDoc.exists ? (customerDoc.data()?['name'] ?? 'Anonymous') : 'Anonymous';
+            }
+            final customerName = customerNameCache[customerId]!;
+
+            // 2. Fetch products from the sub-order for this retailer
+            List<Map<String, dynamic>> products = [];
+            if (orderId != null) {
+              final cacheKey = "${orderId}_$retailerId";
+              if (!subOrderProductsCache.containsKey(cacheKey)) {
+                final subOrderSnap = await _db
+                    .collection('Sub-orders')
+                    .where('orderId', isEqualTo: orderId)
+                    .where('retailerId', isEqualTo: retailerId)
+                    .limit(1)
+                    .get();
+
+                if (subOrderSnap.docs.isNotEmpty) {
+                  final subOrderId = subOrderSnap.docs.first.id;
+                  final itemsSnap = await _db
+                      .collection('Order-Items')
+                      .where('subOrderId', isEqualTo: subOrderId)
+                      .get();
+
+                  // Fetch all product details for this sub-order in parallel
+                  final subOrderProducts = await Future.wait(
+                    itemsSnap.docs.map((itemDoc) async {
+                      final itemData = itemDoc.data();
+                      final productId = itemData['productId'];
+                      final optionId = itemData['optionId'];
+
+                      final productDoc = await _db.collection('Products').doc(productId).get();
+                      if (productDoc.exists) {
+                        final productData = productDoc.data()!;
+                        final List<dynamic> colorOptions = productData['colorOptions'] ?? [];
+                        final option = colorOptions.firstWhere(
+                          (o) => o['optionId'] == optionId,
+                          orElse: () => null,
+                        );
+
+                        final rawImages = (option?['image'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                        final resolvedImages = _resolveImageUrls(rawImages);
+
+                        return {
+                          'name': productData['productName'] ?? 'Unknown Product',
+                          'image': resolvedImages.isNotEmpty ? resolvedImages.first : '',
+                          'price': (option?['price'] ?? 0).toDouble(),
+                        };
+                      }
+                      return null;
+                    }),
+                  ).then((list) => list.whereType<Map<String, dynamic>>().toList());
+                  
+                  subOrderProductsCache[cacheKey] = subOrderProducts;
+                } else {
+                  subOrderProductsCache[cacheKey] = [];
+                }
+              }
+              products = subOrderProductsCache[cacheKey]!;
+            }
+
+            return {
+              'review': {...data, 'id': doc.id},
+              'userName': customerName,
+              'products': products,
+            };
+          } catch (e) {
+            debugPrint("ReviewService: Error processing review: $e");
+            return null;
+          }
+        }),
+      );
+
+      return results.whereType<Map<String, dynamic>>().toList();
     });
   }
 
