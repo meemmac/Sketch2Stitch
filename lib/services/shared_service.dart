@@ -460,8 +460,8 @@ class SharedService {
   /// [query]. Returns a list of human-readable address strings suitable for
   /// profile setup address selection.
   ///
-  /// Results are limited to 5 entries. An empty list is returned on network
-  /// failure so the UI degrades gracefully.
+  /// Results are limited to 15 entries and soft-biased toward Bangladesh. An
+  /// empty list is returned on network failure so the UI degrades gracefully.
   Future<List<String>> searchLocations(String query) async {
     if (query.trim().isEmpty) return [];
 
@@ -474,9 +474,9 @@ class SharedService {
           'format':         'json',
           'addressdetails': '1',
           'limit':          '15',
-          // Bias to Bangladesh — an unbiased global search lets same-named
-          // foreign places outrank local ones and crowd them out.
-          'countrycodes':   'bd',
+          // Soft bias to Bangladesh — the viewbox lifts local matches without
+          // `bounded=1`, so foreign places still appear, just lower down.
+          'viewbox':        '88.0,26.7,92.7,20.5',
         },
       );
 
