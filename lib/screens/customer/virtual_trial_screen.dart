@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import '../../models/appearance_profile.dart';
 import '../../models/user_role.dart';
@@ -283,6 +285,41 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   }
 
   // ── Generation ─────────────────────────────────────────────────────────────
+  /// Reads every reference image into bytes for the Gemini call, in the order
+  /// they're shown: the cart's chosen colour options (Cloudinary URLs, or
+  /// bundled asset paths for seeded demo products) followed by the customer's
+  /// own uploads. Any single image that fails to load is skipped rather than
+  /// failing the whole generation.
+  Future<List<Uint8List>> _loadReferenceBytes() async {
+    final bytes = <Uint8List>[];
+
+    for (final path in _prefilledAssetImages) {
+      try {
+        if (path.startsWith('http')) {
+          final response = await http
+              .get(Uri.parse(path))
+              .timeout(const Duration(seconds: 20));
+          if (response.statusCode == 200) bytes.add(response.bodyBytes);
+        } else {
+          final data = await rootBundle.load(path);
+          bytes.add(data.buffer.asUint8List());
+        }
+      } catch (e) {
+        debugPrint('[VirtualTrial] Skipped reference "$path": $e');
+      }
+    }
+
+    for (final file in _referenceImages) {
+      try {
+        bytes.add(await file.readAsBytes());
+      } catch (e) {
+        debugPrint('[VirtualTrial] Skipped upload "${file.path}": $e');
+      }
+    }
+
+    return bytes;
+  }
+
   Future<void> _generate() async {
     // ── Quota guard ────────────────────────────────────────────────────────
     // Checked against the cached value first (instant feedback), then against
