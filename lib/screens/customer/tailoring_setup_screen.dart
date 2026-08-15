@@ -14,12 +14,13 @@ import 'messaging/chat_screen.dart'; // adjust path to match your folder structu
 // Add `shared_preferences` to pubspec.yaml if it isn't already a dependency.
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/bkash_service.dart';
+import '../../services/measurement_service.dart';
 import '../../services/tailor_service.dart';
 import '../../services/user_session.dart';
 import 'bkash_payment_screen.dart';
 
 import '../../models/measurement.dart';
-import 'measurement_screen.dart';
+import 'measurement_page.dart';
 import 'browsing/browse_shell.dart';
 import 'track_order.dart';
 
@@ -182,6 +183,13 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   bool _loading = false;
   bool _resuming = true;
   Measurement? _selectedMeasurement;
+
+  /// Local copy of `widget.savedMeasurements`, so a profile saved from
+  /// within this flow is reflected here without rebuilding the screen from
+  /// its caller (Cart/Checkout or Running Orders).
+  late List<Measurement> _savedMeasurements =
+      List<Measurement>.of(widget.savedMeasurements);
+
   final List<DesignItem> _designs = [];
 
   DateTime? _tailorSelectionDeadline;
@@ -332,8 +340,8 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.savedMeasurements.isNotEmpty) {
-      _selectedMeasurement = widget.savedMeasurements.first;
+    if (_savedMeasurements.isNotEmpty) {
+      _selectedMeasurement = _savedMeasurements.first;
     }
     _initMeasurementControllers();
     _resumeFromBackend();
@@ -425,18 +433,50 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
 
   // ─── Step 2 actions ────────────────────────────────────────────────
 
-  void _goToMeasurementScreen() {
-    Navigator.push(
+  /// Opens the measurements editor through `MeasurementPage`, which owns
+  /// the fetch-or-create and the save against `MeasurementService`. Pushing
+  /// `MeasurementScreen` directly from here used to mean edits made inside
+  /// the tailoring flow were never persisted.
+  ///
+  /// On return the profile is re-read, so `measurementId` sent with the
+  /// tailor job is the real document id — including the first-time case
+  /// where the customer had no profile when this screen was opened.
+  Future<void> _goToMeasurementScreen() async {
+    final customerId = UserSession.instance.uid;
+    if (customerId == null || customerId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please sign in again to edit your measurements.'),
+        ),
+      );
+      return;
+    }
+
+    await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => MeasurementScreen(
-          measurement: widget.savedMeasurements.isNotEmpty
-              ? widget.savedMeasurements.first
-              : Measurement(id: '', customerId: ''),
-          onSave: (_) async {},
-        ),
+        builder: (_) => MeasurementPage(customerId: customerId),
       ),
     );
+
+    if (!mounted) return;
+
+    try {
+      final updated = await MeasurementService().getMeasurement(customerId);
+      if (!mounted || updated == null) return;
+      setState(() {
+        _savedMeasurements = [updated];
+        _selectedMeasurement = updated;
+        // Step 2's fields read from these controllers, so they have to be
+        // rebuilt against the saved values rather than the stale ones.
+        for (final c in _measurementControllers.values) {
+          c.dispose();
+        }
+        _initMeasurementControllers();
+      });
+    } catch (e) {
+      debugPrint('[TailoringSetup] measurement reload failed: $e');
+    }
   }
 
   // ─── Step 3 actions ────────────────────────────────────────────────
@@ -1117,7 +1157,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   // ─── Step 2 ────────────────────────────────────────────────────────
 
   Widget _buildMeasurementsStep() {
-    if (widget.savedMeasurements.isEmpty) {
+    if (_savedMeasurements.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
