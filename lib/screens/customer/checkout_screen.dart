@@ -10,8 +10,8 @@ import '../../services/bkash_service.dart';
 import 'bkash_payment_screen.dart';
 import '../../services/checkout_service.dart';
 import '../../services/user_session.dart';
-import '../../services/cart_service.dart';
 import '../../models/order.dart' show PaymentStatus;
+import '../../models/payment.dart' show PaymentMethod, PaymentTargetType;
 
 /// ─── Checkout Screen ────────────────────────────────────────────────────
 ///
@@ -51,7 +51,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _isPlacingOrder = false;
 
   final CheckoutService _checkoutService = CheckoutService();
-  final CartService _cartService = CartService();
 
   String get _customerId => UserSession.instance.uid ?? '';
 
