@@ -1,261 +1,16 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/user_role.dart';
-// ============= CUSTOMER NOTIFICATION =============
-enum NotificationType { confirmed, delivered, cancelled, paymentDue }
+import 'package:sketch2stitch/services/notification_service.dart';
+import 'package:sketch2stitch/models/notification.dart';
+import 'package:timeago/timeago.dart' as timeago;
 
-class CustomerNotificationCardData {
-  final NotificationType type;
-  final String avatarImage;
-  final String itemName;
-  final String partyLabel;
-  final String partyName;
-  final String orderId;
-  final String? subOrderId;
-  final String timeAgo;
-  final bool isNew;
-  final String? cancelReason;
-
-  const CustomerNotificationCardData({
-    required this.type,
-    required this.avatarImage,
-    required this.itemName,
-    required this.partyLabel,
-    required this.partyName,
-    required this.orderId,
-    this.subOrderId,
-    required this.timeAgo,
-    this.isNew = false,
-    this.cancelReason,
-  });
-}
-
-final List<CustomerNotificationCardData> kCustomerDummyNotifications = [
-  const CustomerNotificationCardData(
-    type: NotificationType.delivered,
-    avatarImage: 'assets/images/textile.jpg',
-    itemName: 'Premium Cotton Fabric',
-    partyLabel: 'from',
-    partyName: 'Style Fabric House',
-    orderId: 'OR03',
-    subOrderId: 'SUB03-1',
-    timeAgo: 'Today',
-    isNew: true,
-  ),
-  const CustomerNotificationCardData(
-    type: NotificationType.confirmed,
-    avatarImage: 'assets/images/fab.jpg',
-    itemName: 'Salwar Kameez',
-    partyLabel: 'confirmed by',
-    partyName: 'Rahman Readymade House',
-    orderId: 'OR01',
-    subOrderId: null,
-    timeAgo: '2 hours ago',
-    isNew: true,
-  ),
-  const CustomerNotificationCardData(
-    type: NotificationType.paymentDue,
-    avatarImage: 'assets/images/fab2.jpg',
-    itemName: 'Bridal Lehenga',
-    partyLabel: 'is due for',
-    partyName: 'Noor Fashion House',
-    orderId: 'OR02',
-    subOrderId: null,
-    timeAgo: '5 hours ago',
-    isNew: true,
-  ),
-  const CustomerNotificationCardData(
-    type: NotificationType.delivered,
-    avatarImage: 'assets/images/textile.jpg',
-    itemName: 'Premium Cotton Fabric',
-    partyLabel: 'from',
-    partyName: 'Style Fabric House',
-    orderId: 'OR03',
-    subOrderId: null,
-    timeAgo: 'Today',
-    isNew: true,
-  ),
-  const CustomerNotificationCardData(
-    type: NotificationType.cancelled,
-    avatarImage: 'assets/images/lace.jpg',
-    itemName: 'Wedding Sherwani',
-    partyLabel: 'from',
-    partyName: 'Dhaka Fabric House',
-    orderId: 'OR04',
-    subOrderId: null,
-    timeAgo: 'Yesterday',
-    cancelReason: 'The fabric you selected went out of stock before your order could be processed.',
-  ),
-  const CustomerNotificationCardData(
-    type: NotificationType.delivered,
-    avatarImage: 'assets/images/silk.jpg',
-    itemName: 'Casual Shirt',
-    partyLabel: 'from',
-    partyName: 'Modern Tailor House',
-    orderId: 'OR06',
-    subOrderId: null,
-    timeAgo: '5 days ago',
-  ),
-];
-
-// ============= RETAILER NOTIFICATION =============
-enum RetailerNotificationType { orderPlaced, stockOut, tailorAssigned }
-
-class RetailerNotification {
-  final RetailerNotificationType type;
-  final String avatarImage;
-  final String customerName; // For orderPlaced: customer name, For stockOut: product name
-  final String itemName;
-  final String orderId;
-  final String? subOrderId;
-  final String timeAgo;
-  final bool isNew;
-  final String? colorName;
-  final String? tailorName;
-  final String? deliveryDeadline;
-
-  const RetailerNotification({
-    required this.type,
-    required this.avatarImage,
-    required this.customerName,
-    required this.itemName,
-    required this.orderId,
-    this.subOrderId,
-    required this.timeAgo,
-    this.isNew = false,
-    this.colorName,
-    this.tailorName,
-    this.deliveryDeadline,
-  });
-}
-
-final List<RetailerNotification> kRetailerDummyNotifications = [
-  const RetailerNotification(
-    type: RetailerNotificationType.orderPlaced,
-    avatarImage: 'assets/images/fab.jpg',
-    customerName: 'Sarah Ahmed',
-    itemName: 'Salwar Kameez',
-    orderId: 'OR001',
-    timeAgo: '2 hours ago',
-    isNew: true,
-  ),
-  const RetailerNotification(
-    type: RetailerNotificationType.orderPlaced,
-    avatarImage: 'assets/images/fab2.jpg',
-    customerName: 'Fatima Khan',
-    itemName: 'Bridal Lehenga',
-    orderId: 'OR002',
-    timeAgo: '3 hours ago',
-    isNew: true,
-  ),
-  const RetailerNotification(
-    type: RetailerNotificationType.stockOut,
-    avatarImage: 'assets/images/textile.jpg',
-    customerName: 'Premium Cotton Fabric', // Product name
-    itemName: 'Premium Cotton Fabric',
-    orderId: 'PROD003',
-    timeAgo: '5 hours ago',
-    isNew: true,
-    colorName: 'White',
-  ),
-  const RetailerNotification(
-    type: RetailerNotificationType.stockOut,
-    avatarImage: 'assets/images/silk.jpg',
-    customerName: 'Silk Saree', // Product name
-    itemName: 'Silk Saree',
-    orderId: 'PROD004',
-    timeAgo: '1 day ago',
-    colorName: 'Red',
-
-  ),
-  // ✅ New: Tailor Assigned notification
-  const RetailerNotification(
-    type: RetailerNotificationType.tailorAssigned,
-    avatarImage: 'assets/images/fab.jpg',
-    customerName: 'Sarah Ahmed',
-    itemName: 'Salwar Kameez',
-    orderId: 'OR001',
-    timeAgo: '1 hour ago',
-    isNew: true,
-    tailorName: 'Master Karim',
-    deliveryDeadline: '25 Dec 2026',
-  ),
-  RetailerNotification(
-    type: RetailerNotificationType.tailorAssigned,
-    avatarImage: 'assets/images/fab2.jpg',
-    customerName: 'Fatima Khan',
-    itemName: 'Bridal Lehenga',
-    orderId: 'OR002',
-    timeAgo: '2 hours ago',
-    isNew: true,
-    tailorName: 'Rehana Begum',
-    deliveryDeadline: '28 Dec 2026',
-  ),
-];
-
-// ============= TAILOR NOTIFICATION =============
-enum TailorNotificationType { newOrder, orderConfirmationReminder, deliveryDeadline,orderCancelledByCustomer }
-
-class TailorNotification {
-  final TailorNotificationType type;
-  final String avatarImage;
-  final String customerName;
-  final String orderId;
-  final String? subOrderId;
-  final String timeAgo;
-  final bool isNew;
-  final String? deadlineDate;
-
-  const TailorNotification({
-    required this.type,
-    required this.avatarImage,
-    required this.customerName,
-    required this.orderId,
-    this.subOrderId,
-    required this.timeAgo,
-    this.isNew = false,
-    this.deadlineDate,
-  });
-}
-
-final List<TailorNotification> kTailorDummyNotifications = [
-  const TailorNotification(
-    type: TailorNotificationType.newOrder,
-    avatarImage: 'assets/images/fab.jpg',
-    customerName: 'Sarah Ahmed',
-    orderId: 'OR001',
-    timeAgo: '2 hours ago',
-    isNew: true,
-  ),
-  const TailorNotification(
-    type: TailorNotificationType.orderConfirmationReminder,
-    avatarImage: 'assets/images/lace.jpg',
-    customerName: 'Aisha Rahman',
-    orderId: 'OR003',
-    timeAgo: '1 day ago',
-  ),
-  const TailorNotification(
-    type: TailorNotificationType.deliveryDeadline,
-    avatarImage: 'assets/images/textile.jpg',
-    customerName: 'Zara Malik',
-    orderId: 'OR005',
-    timeAgo: '5 hours ago',
-    isNew: true,
-    deadlineDate: '2026-07-20',
-  ),
-  const TailorNotification(
-    type: TailorNotificationType.orderCancelledByCustomer,
-    avatarImage: 'assets/images/fab2.jpg',
-    customerName: 'Fatima Khan',
-    orderId: 'OR002',
-    timeAgo: '1 hour ago',
-    isNew: true,
-  ),
-];
 
 // ============= UNIFIED NOTIFICATION SCREEN =============
 class UnifiedNotificationScreen extends StatefulWidget {
   final UserRole role;
   final void Function(String orderId, String? subOrderId)? onNotificationTap;
+
 
   const UnifiedNotificationScreen({
     super.key,
@@ -263,91 +18,133 @@ class UnifiedNotificationScreen extends StatefulWidget {
     this.onNotificationTap,
   });
 
+
   @override
   State<UnifiedNotificationScreen> createState() => _UnifiedNotificationScreenState();
 }
 
-class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
-  late List<CustomerNotificationCardData> _customerNotifications;
-  late List<RetailerNotification> _retailerNotifications;
-  late List<TailorNotification> _tailorNotifications;
 
-  @override
-  void initState() {
-    super.initState();
-    _customerNotifications = List.of(kCustomerDummyNotifications);
-    _retailerNotifications = List.of(kRetailerDummyNotifications);
-    _tailorNotifications = List.of(kTailorDummyNotifications);
+class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
+  // Cache for profile data (URLs or Resolved Name/ID Maps)
+  final Map<String, dynamic> _profileCache = {};
+
+
+  Stream<List<AppNotification>> _getNotificationsStream() {
+    // Use UserSession email to find the UID securely
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    
+    if (uid == null) {
+      debugPrint('[NotificationScreen] Waiting for valid Firebase UID...');
+      return Stream.value([]);
+    }
+
+    debugPrint('[NotificationScreen] Connecting to live backend for UID: "$uid"');
+    return NotificationService().streamNotifications(uid);
   }
+
 
   void _clearAll() {
-    setState(() {
-      switch (widget.role) {
-        case UserRole.customer:
-          _customerNotifications.clear();
-          break;
-        case UserRole.tailor:
-          _tailorNotifications.clear();
-          break;
-        case UserRole.retailer:
-          _retailerNotifications.clear();
-          break;
-      }
-    });
-  }
-
-  int get _notificationCount {
-    switch (widget.role) {
-      case UserRole.customer:
-        return _customerNotifications.length;
-      case UserRole.tailor:
-        return _tailorNotifications.length;
-      case UserRole.retailer:
-        return _retailerNotifications.length;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      NotificationService().deleteAllNotifications(uid);
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: true,
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF6FAF6),
-        body: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: _notificationCount == 0
-                    ? _buildEmptyState()
-                    : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                  itemCount: _notificationCount,
-                  separatorBuilder: (_, __) => const SizedBox(height: 14),
-                  itemBuilder: (context, index) => _buildNotificationCard(index),
-                ),
+    return StreamBuilder<List<AppNotification>>(
+      stream: _getNotificationsStream(),
+      builder: (context, snapshot) {
+        final notifications = snapshot.data ?? [];
+        final count = notifications.length;
+
+
+        return PopScope(
+          canPop: true,
+          child: Scaffold(
+            backgroundColor: const Color(0xFFF6FAF6),
+            body: SafeArea(
+              child: Column(
+                children: [
+                  _buildHeader(count),
+                  Expanded(
+                    child: _buildBody(snapshot),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildHeader() {
-    String title;
-    switch (widget.role) {
-      case UserRole.customer:
-        title = 'Notifications';
-        break;
-      case UserRole.tailor:
-        title = 'Notifications';
-        break;
-      case UserRole.retailer:
-        title = 'Notifications';
-        break;
+
+  Widget _buildBody(AsyncSnapshot<List<AppNotification>> snapshot) {
+    if (snapshot.hasError) {
+      debugPrint('[NotificationScreen] Stream Error: ${snapshot.error}');
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'Error loading notifications:\n${snapshot.error}',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.red),
+          ),
+        ),
+      );
     }
 
+
+    if (snapshot.connectionState == ConnectionState.waiting || !snapshot.hasData) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: Color(0xFF16332A)),
+            SizedBox(height: 16),
+            Text('Syncing with database...', style: TextStyle(color: Colors.grey, fontSize: 13)),
+          ],
+        ),
+      );
+    }
+
+
+    final notifications = snapshot.data ?? [];
+    debugPrint('[NotificationScreen] Loaded ${notifications.length} notifications');
+    if (notifications.isEmpty) {
+      return _buildEmptyState();
+    }
+
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      itemCount: notifications.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 14),
+      itemBuilder: (context, index) {
+        final n = notifications[index];
+        return Dismissible(
+          key: Key(n.id),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            decoration: BoxDecoration(
+              color: Colors.red.shade100,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Icon(Icons.delete_outline_rounded, color: Colors.red.shade700),
+          ),
+          onDismissed: (_) => NotificationService().deleteNotification(n.id),
+          child: _buildNotificationItem(n),
+        );
+      },
+    );
+  }
+
+
+  Widget _buildHeader(int count) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
       decoration: BoxDecoration(
@@ -363,16 +160,15 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
         children: [
           Row(
             children: [
-              // ✅ Back button with arrow icon (like track order page)
               IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.black87),
                 onPressed: () => Navigator.pop(context),
               ),
               const SizedBox(width: 8),
-              Icon(Icons.notifications_none_rounded, color: Colors.black87, size: 26),
+              const Icon(Icons.notifications_none_rounded, color: Colors.black87, size: 26),
               const SizedBox(width: 10),
-              Text(
-                title,
+              const Text(
+                'Notifications',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -380,15 +176,15 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                 ),
               ),
               const Spacer(),
-              // ✅ Clear all button
               TextButton(
-                onPressed: _notificationCount == 0 ? null : _clearAll,
+                onPressed: count == 0 ? null : _clearAll,
                 style: TextButton.styleFrom(
                   backgroundColor: const Color(0xFF16332A),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                 ),
-                child: const Text('Clear all', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12.5)),
+                child: const Text('Clear all',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12.5)),
               ),
             ],
           ),
@@ -397,6 +193,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     );
   }
 
+
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -404,11 +201,13 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
         children: [
           Icon(Icons.notifications_off_outlined, size: 56, color: Colors.grey.shade400),
           const SizedBox(height: 12),
-          Text("You're all caught up", style: TextStyle(color: Colors.grey.shade600, fontSize: 14, fontWeight: FontWeight.w600)),
+          Text("You're all caught up",
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 14, fontWeight: FontWeight.w600)),
         ],
       ),
     );
   }
+
 
   Widget _buildNewBadge() {
     return Container(
@@ -421,33 +220,153 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     );
   }
 
-  Widget _buildNotificationCard(int index) {
+  Widget _buildAvatar(AppNotification n, _NotificationStyle style) {
+    // 1. Handle System Notifications (e.g. Stock Alerts for Retailers)
+    final isStockAlert = widget.role == UserRole.retailer && 
+                         n.type == NotificationDbType.deliveryReminder;
+    
+    if (isStockAlert) {
+      return CircleAvatar(
+        radius: 22,
+        backgroundColor: Colors.red.shade50,
+        child: Icon(Icons.inventory_2_outlined, color: Colors.red.shade700, size: 20),
+      );
+    }
+
+    // 2. Profile picture lookup for Customers (to see Tailor/Retailer photos)
+    if (widget.role == UserRole.customer) {
+      final cacheKey = n.subOrderId ?? n.tailorJobId ?? n.orderId;
+      
+      // If we already know the URL, show it immediately
+      if (_profileCache.containsKey(cacheKey) && _profileCache[cacheKey] is String) {
+        return CircleAvatar(
+          radius: 22,
+          backgroundColor: Colors.white,
+          backgroundImage: NetworkImage(_profileCache[cacheKey] as String),
+        );
+      }
+
+      // Otherwise, fetch it once and store it in cache
+      return FutureBuilder<String?>(
+        future: NotificationService().getSenderProfilePicture(n),
+        builder: (context, snapshot) {
+          if (snapshot.hasData && snapshot.data != null) {
+            _profileCache[cacheKey] = snapshot.data;
+            return CircleAvatar(
+              radius: 22,
+              backgroundColor: Colors.white,
+              backgroundImage: NetworkImage(snapshot.data!),
+            );
+          }
+          
+          // While loading or if no picture found, show initials
+          return _buildInitialsAvatar(n, style);
+        },
+      );
+    }
+
+    // For Tailors/Retailers receiving from Customers, always use initials
+    return _buildInitialsAvatar(n, style);
+  }
+
+  Widget _buildInitialsAvatar(AppNotification n, _NotificationStyle style) {
+    // 1. Use the name fetched from the Customer Table (senderName) if available
+    String? name = n.senderName;
+
+
+    // 2. Backup: Smart Name Parser (only if database name is missing)
+    if (name == null || name.trim().isEmpty) {
+      final msg = n.message.toLowerCase();
+      if (msg.contains('from ')) {
+        final parts = n.message.split(RegExp(r'from ', caseSensitive: false));
+        if (parts.length > 1) name = parts[1].trim().split(' ')[0];
+      } else if (msg.contains('by ')) {
+        final parts = n.message.split(RegExp(r'by ', caseSensitive: false));
+        if (parts.length > 1) name = parts[1].trim().split(' ')[0];
+      }
+    }
+
+
+    final initial = (name != null && name.trim().isNotEmpty)
+        ? name.trim()[0].toUpperCase()
+        : null;
+
+
+    return CircleAvatar(
+      radius: 22,
+      backgroundColor: style.iconColor.withValues(alpha: 0.12),
+      child: initial != null
+          ? Text(
+              initial,
+              style: TextStyle(
+                color: style.iconColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            )
+          : Icon(Icons.person, color: style.iconColor),
+    );
+  }
+
+  Widget _buildNotificationItem(AppNotification n) {
+    // The Notifications collection never stores orderId directly — every role needs the same
+    // subOrderId/tailorJobId -> orderId resolution, not just Tailor/Retailer.
+    final cacheKey = n.subOrderId ?? n.tailorJobId ?? n.orderId;
+    
+    if (_profileCache.containsKey("${cacheKey}_resolved")) {
+      final data = _profileCache["${cacheKey}_resolved"] as Map<String, String?>;
+      return _buildRoleCardWithResolvedData(n, data);
+    }
+
+    return FutureBuilder<Map<String, String?>?>(
+      future: NotificationService().getResolvedNotificationData(n),
+      builder: (context, snapshot) {
+        if (snapshot.hasData && snapshot.data != null) {
+          _profileCache["${cacheKey}_resolved"] = snapshot.data;
+          return _buildRoleCardWithResolvedData(n, snapshot.data!);
+        }
+        
+        return _buildOriginalCardByRole(n);
+      },
+    );
+  }
+
+  Widget _buildRoleCardWithResolvedData(AppNotification n, Map<String, String?> data) {
+    // Temporarily swap data in memory for UI display
+    final tempNotification = n.copyWith(
+      senderName: data['customerName'],
+      orderId: data['orderId'] ?? n.orderId,
+      cancelReason: data['rejectionReason'],
+    );
+    
+    return _buildOriginalCardByRole(tempNotification);
+  }
+
+  Widget _buildOriginalCardByRole(AppNotification n) {
     switch (widget.role) {
       case UserRole.customer:
-        return _buildCustomerCard(_customerNotifications[index]);
+        return _buildCustomerCard(n);
       case UserRole.tailor:
-        return _buildTailorCard(_tailorNotifications[index]);
+        return _buildTailorCard(n);
       case UserRole.retailer:
-        return _buildRetailerCard(_retailerNotifications[index]);
+        return _buildRetailerCard(n);
     }
   }
 
+
   // ============= CUSTOMER CARD =============
-  Widget _buildCustomerCard(CustomerNotificationCardData n) {
+  Widget _buildCustomerCard(AppNotification n) {
     final style = _customerStyleFor(n.type);
 
-    // ✅ Check if notification is from a retailer
-    bool isFromRetailer = n.partyName.contains('Fabric') ||
-        n.partyName.contains('House') ||
-        n.partyName.contains('Shop') ||
-        n.partyName.contains('Store') ||
-        n.partyLabel == 'from';
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () => widget.onNotificationTap?.call(n.orderId, n.subOrderId),
+        onTap: () {
+          NotificationService().markAsRead(n.id);
+          widget.onNotificationTap?.call(n.orderId, n.subOrderId);
+        },
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(color: style.background, borderRadius: BorderRadius.circular(20)),
@@ -457,7 +376,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(radius: 22, backgroundColor: Colors.white, backgroundImage: AssetImage(n.avatarImage)),
+                  _buildAvatar(n, style),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -467,37 +386,16 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                           children: [
                             Icon(style.icon, size: 18, color: style.iconColor),
                             const SizedBox(width: 6),
-                            Expanded(child: Text(style.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
-                            if (n.isNew) _buildNewBadge(),
+                            Expanded(
+                                child: Text(style.title,
+                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+                            if (!n.isRead) _buildNewBadge(),
                           ],
                         ),
                         const SizedBox(height: 6),
-                        RichText(
-                          text: TextSpan(
-                            style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
-                            children: [
-                              TextSpan(text: '${style.messagePrefix} '),
-                              if (isFromRetailer) ...[
-                                // ✅ Retailer: Show only retailer name
-                                TextSpan(
-                                  text: n.partyName,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-                                ),
-                              ] else ...[
-                                // ✅ Tailor: Show product name + tailor name
-                                TextSpan(
-                                  text: n.itemName,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-                                ),
-                                TextSpan(text: ' ${n.partyLabel} '),
-                                TextSpan(
-                                  text: n.partyName,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-                                ),
-                              ],
-                              if (style.messageSuffix.isNotEmpty) TextSpan(text: style.messageSuffix),
-                            ],
-                          ),
+                        Text(
+                          n.message,
+                          style: TextStyle(fontSize: 13, color: Colors.black.withValues(alpha: 0.75), height: 1.4),
                         ),
                       ],
                     ),
@@ -505,11 +403,12 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              if (n.type == NotificationType.cancelled) _buildCustomerCancelRow(n) else _buildCustomerFooterRow(n),
-              if (n.type == NotificationType.delivered)
+              if (n.type == NotificationDbType.jobRejected) _buildCustomerCancelRow(n) else _buildFooterRow(n),
+              if (n.type == NotificationDbType.orderCompleted || n.type == NotificationDbType.suborderDelivered)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: Text('Please review on orders', style: TextStyle(fontSize: 12, color: Colors.blue.shade700, fontWeight: FontWeight.w500)),
+                  child: Text('Please review on orders',
+                      style: TextStyle(fontSize: 12, color: Colors.blue.shade700, fontWeight: FontWeight.w500)),
                 ),
             ],
           ),
@@ -518,52 +417,40 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     );
   }
 
-  Widget _buildCustomerCancelRow(CustomerNotificationCardData n) {
+  Widget _buildCustomerCancelRow(AppNotification n) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text('Order ID: ${n.orderId}', style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
+        Text('Order ID: ${n.orderId}', style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.55))),
         Row(
           children: [
-            OutlinedButton(
-              onPressed: () => _showCustomerCancelReason(n),
-              style: OutlinedButton.styleFrom(
-                backgroundColor: Colors.white,
-                side: BorderSide.none,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            if (n.cancelReason != null && n.cancelReason!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: OutlinedButton(
+                  onPressed: () => _showCustomerCancelReason(n),
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    side: BorderSide.none,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('View Reason',
+                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.black87)),
+                ),
               ),
-              child: const Text('View Reason', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.black87)),
-            ),
-            const SizedBox(width: 10),
-            Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withOpacity(0.45)),
+            Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withValues(alpha: 0.45)),
             const SizedBox(width: 4),
-            Text(n.timeAgo, style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
+            Text(timeago.format(n.createdAt), style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.55))),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildCustomerFooterRow(CustomerNotificationCardData n) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text('Order ID: ${n.orderId}', style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
-        Row(
-          children: [
-            Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withOpacity(0.45)),
-            const SizedBox(width: 4),
-            Text(n.timeAgo, style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
-          ],
-        ),
-      ],
-    );
-  }
-
-  void _showCustomerCancelReason(CustomerNotificationCardData n) {
+  void _showCustomerCancelReason(AppNotification n) {
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -576,7 +463,9 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))],
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4))
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -592,19 +481,22 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(14),
+                width: double.infinity,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF7D6D6).withOpacity(0.3),
+                  color: const Color(0xFFF7D6D6).withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFF7D6D6).withOpacity(0.5)),
+                  border: Border.all(color: const Color(0xFFF7D6D6).withValues(alpha: 0.5)),
                 ),
-                child: Text(n.cancelReason ?? 'No reason was provided.', style: TextStyle(fontSize: 14, height: 1.5, color: Colors.black.withOpacity(0.8))),
+                child: Text(n.cancelReason ?? 'No reason was provided.',
+                    style: TextStyle(fontSize: 14, height: 1.5, color: Colors.black.withValues(alpha: 0.8))),
               ),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 12)),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 12)),
                   child: const Text('Close', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                 ),
               ),
@@ -615,33 +507,55 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     );
   }
 
-  _CustomerNotificationStyle _customerStyleFor(NotificationType type) {
+
+  _NotificationStyle _customerStyleFor(NotificationDbType type) {
     switch (type) {
-      case NotificationType.confirmed:
-        return _CustomerNotificationStyle(background: const Color(0xFFCDEFD3), icon: Icons.check_circle_rounded, iconColor: Colors.green.shade800, title: 'Order Confirmed', messagePrefix: 'Your order for', messageSuffix: ' has been confirmed.');
-      case NotificationType.delivered:
-        return _CustomerNotificationStyle(background: const Color(0xFFD3E9F7), icon: Icons.local_shipping_rounded, iconColor: Colors.blue.shade700, title: 'Order Delivered', messagePrefix: 'Your order for', messageSuffix: ' has been delivered.');
-      case NotificationType.cancelled:
-        return _CustomerNotificationStyle(background: const Color(0xFFF7D6D6), icon: Icons.cancel_rounded, iconColor: Colors.red.shade700, title: 'Order Cancelled', messagePrefix: 'Your order for', messageSuffix: ' was cancelled.');
-      case NotificationType.paymentDue:
-        return _CustomerNotificationStyle(background: const Color(0xFFFBE7C0), icon: Icons.payments_rounded, iconColor: Colors.orange.shade800, title: 'Payment Deadline Approaching', messagePrefix: 'Payment for', messageSuffix: '.');
+      case NotificationDbType.orderConfirmed:
+        return _NotificationStyle(
+          background: const Color(0xFFCDEFD3),
+          icon: Icons.check_circle_rounded,
+          iconColor: Colors.green.shade800,
+          title: 'Order Confirmed',
+        );
+      case NotificationDbType.orderCompleted:
+      case NotificationDbType.suborderDelivered:
+        return _NotificationStyle(
+          background: const Color(0xFFD3E9F7),
+          icon: Icons.local_shipping_rounded,
+          iconColor: Colors.blue.shade700,
+          title: 'Order Delivered',
+        );
+      case NotificationDbType.jobRejected:
+        return _NotificationStyle(
+          background: const Color(0xFFF7D6D6),
+          icon: Icons.cancel_rounded,
+          iconColor: Colors.red.shade700,
+          title: 'Order Cancelled',
+        );
+      default:
+        return _NotificationStyle(
+          background: const Color(0xFFFBE7C0),
+          icon: Icons.notifications_active,
+          iconColor: Colors.orange.shade800,
+          title: 'Notification',
+        );
     }
   }
 
+
   // ============= RETAILER CARD =============
-  Widget _buildRetailerCard(RetailerNotification n) {
+  Widget _buildRetailerCard(AppNotification n) {
     final style = _retailerStyleFor(n.type);
 
-    bool isStockOut = n.type == RetailerNotificationType.stockOut;
-    bool isTailorAssigned = n.type == RetailerNotificationType.tailorAssigned;
-
-    String firstLetter = isStockOut ? '📦' : (n.customerName.isNotEmpty ? n.customerName[0].toUpperCase() : '?');
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () => widget.onNotificationTap?.call(n.orderId, n.subOrderId),
+        onTap: () {
+          NotificationService().markAsRead(n.id);
+          widget.onNotificationTap?.call(n.orderId, n.subOrderId);
+        },
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(color: style.background, borderRadius: BorderRadius.circular(20)),
@@ -651,25 +565,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Avatar - shows product emoji for stockOut, first letter for customer
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: isStockOut
-                        ? Colors.red.shade200
-                        : (isTailorAssigned ? Colors.blue.shade200 : style.iconColor.withOpacity(0.2)),
-                    child: isStockOut
-                        ? const Icon(Icons.inventory_2_outlined, color: Colors.red, size: 22)
-                        : isTailorAssigned
-                        ? Icon(Icons.design_services_rounded, color: Colors.blue.shade700, size: 22)
-                        : Text(
-                      firstLetter,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: style.iconColor,
-                      ),
-                    ),
-                  ),
+                  _buildAvatar(n, style),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -679,48 +575,16 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                           children: [
                             Icon(style.icon, size: 18, color: style.iconColor),
                             const SizedBox(width: 6),
-                            Expanded(child: Text(style.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
-                            if (n.isNew) _buildNewBadge(),
+                            Expanded(
+                                child: Text(style.title,
+                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+                            if (!n.isRead) _buildNewBadge(),
                           ],
                         ),
                         const SizedBox(height: 6),
-                        RichText(
-                          text: TextSpan(
-                            style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
-                            children: [
-                              if (isStockOut) ...[
-                                TextSpan(text: '${n.customerName} '),
-                                TextSpan(text: style.messageMiddle),
-                                if (n.colorName != null) ...[
-                                  TextSpan(text: ' (Color: '),
-                                  TextSpan(text: n.colorName!, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-                                  TextSpan(text: ')'),
-                                ],
-                                TextSpan(text: style.messageSuffix),
-                              ] else if (isTailorAssigned) ...[
-                                TextSpan(text: 'Order #${n.orderId} '),
-                                TextSpan(text: style.messageMiddle),
-                                TextSpan(
-                                  text: n.tailorName ?? 'a tailor',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-                                ),
-                                if (n.deliveryDeadline != null) ...[
-                                  TextSpan(text: ' with deadline: '),
-                                  TextSpan(
-                                    text: n.deliveryDeadline!,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
-                                  ),
-                                  TextSpan(text: '. Please start delivery as soon as possible. '),
-                                ],
-                              ] else ...[
-                                TextSpan(text: style.messagePrefix),
-                                TextSpan(text: n.customerName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-                                TextSpan(text: style.messageMiddle),
-                                TextSpan(text: n.itemName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-                                TextSpan(text: style.messageSuffix),
-                              ],
-                            ],
-                          ),
+                        Text(
+                          n.message,
+                          style: TextStyle(fontSize: 13, color: Colors.black.withValues(alpha: 0.75), height: 1.4),
                         ),
                       ],
                     ),
@@ -728,7 +592,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              _buildRetailerFooter(n),
+              _buildFooterRow(n, isRetailer: true),
             ],
           ),
         ),
@@ -736,71 +600,54 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     );
   }
 
-  Widget _buildRetailerFooter(RetailerNotification n) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text('${n.type == RetailerNotificationType.stockOut ? 'Product' : 'Order'} ID: ${n.orderId}', style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
-        Row(
-          children: [
-            Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withOpacity(0.45)),
-            const SizedBox(width: 4),
-            Text(n.timeAgo, style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
-          ],
-        ),
-      ],
-    );
-  }
 
-  _RetailerNotificationStyle _retailerStyleFor(RetailerNotificationType type) {
+  _NotificationStyle _retailerStyleFor(NotificationDbType type) {
     switch (type) {
-      case RetailerNotificationType.orderPlaced:
-        return _RetailerNotificationStyle(
+      case NotificationDbType.suborderPlaced:
+        return _NotificationStyle(
           background: const Color(0xFFCDEFD3),
           icon: Icons.shopping_cart_rounded,
           iconColor: Colors.green.shade800,
           title: 'New Order Placed',
-          messagePrefix: '',
-          messageMiddle: ' placed an order for ',
-          messageSuffix: '. ',
         );
-      case RetailerNotificationType.stockOut:
-        return _RetailerNotificationStyle(
+      case NotificationDbType.deliveryReminder:
+        return _NotificationStyle(
           background: const Color(0xFFF7D6D6),
           icon: Icons.warning_rounded,
           iconColor: Colors.red.shade700,
           title: 'Stock Alert',
-          messagePrefix: '',
-          messageMiddle: ' is out of stock',
-          messageSuffix: '.',
         );
-      case RetailerNotificationType.tailorAssigned:
-        return _RetailerNotificationStyle(
-          background: const Color(0xFFD3E9F7), // Blue background
+      case NotificationDbType.jobConfirmed:
+        return _NotificationStyle(
+          background: const Color(0xFFD3E9F7),
           icon: Icons.design_services_rounded,
           iconColor: Colors.blue.shade700,
           title: 'Tailor Assigned',
-          messagePrefix: '',
-          messageMiddle: ' assigned to ',
-          messageSuffix: ' for order ',
+        );
+      default:
+        return _NotificationStyle(
+          background: const Color(0xFFFBE7C0),
+          icon: Icons.notifications_active,
+          iconColor: Colors.orange.shade800,
+          title: 'Retailer Notification',
         );
     }
   }
 
+
   // ============= TAILOR CARD =============
-  // ============= TAILOR CARD =============
-  Widget _buildTailorCard(TailorNotification n) {
+  Widget _buildTailorCard(AppNotification n) {
     final style = _tailorStyleFor(n.type);
 
-    // Get first letter of customer name for avatar
-    String firstLetter = n.customerName.isNotEmpty ? n.customerName[0].toUpperCase() : '?';
-    bool isCancelled = n.type == TailorNotificationType.orderCancelledByCustomer;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () => widget.onNotificationTap?.call(n.orderId, n.subOrderId),
+        onTap: () {
+          NotificationService().markAsRead(n.id);
+          widget.onNotificationTap?.call(n.orderId, n.subOrderId);
+        },
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(color: style.background, borderRadius: BorderRadius.circular(20)),
@@ -810,21 +657,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ✅ Avatar with first letter of customer name (for cancellation too)
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: isCancelled
-                        ? Colors.red.shade100
-                        : style.iconColor.withOpacity(0.2),
-                    child: Text(
-                      firstLetter,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: isCancelled ? Colors.red.shade700 : style.iconColor,
-                      ),
-                    ),
-                  ),
+                  _buildAvatar(n, style),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -834,161 +667,112 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                           children: [
                             Icon(style.icon, size: 18, color: style.iconColor),
                             const SizedBox(width: 6),
-                            Expanded(child: Text(style.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
-                            if (n.isNew) _buildNewBadge(),
+                            Expanded(
+                                child: Text(style.title,
+                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+                            if (!n.isRead) _buildNewBadge(),
                           ],
                         ),
                         const SizedBox(height: 6),
-                        RichText(
-  text: TextSpan(
-    style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.75), height: 1.4),
-    children: [
-      TextSpan(text: style.messagePrefix),
-      TextSpan(
-        text: n.customerName,
-        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-      ),
-      if (style.messageSuffix.isNotEmpty) TextSpan(text: style.messageSuffix),
-      if (n.type == TailorNotificationType.deliveryDeadline && n.deadlineDate != null) ...[
-        TextSpan(
-          text: ' Deadline: ${n.deadlineDate}',
-          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
-        ),
-      ],
-      if (n.type == TailorNotificationType.newOrder) ...[
-        TextSpan(text: ' View Order from orders'),
-      ],
-      if (n.type == TailorNotificationType.orderConfirmationReminder) ...[
-        TextSpan(text: ' Confirm Now in orders'),
-      ],
-    ],
-  ),
-),
+                        Text(
+                          n.message,
+                          style: TextStyle(fontSize: 13, color: Colors.black.withValues(alpha: 0.75), height: 1.4),
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
-              _buildTailorFooter(n),
+              if (n.type == NotificationDbType.jobRejected) _buildCustomerCancelRow(n) else _buildFooterRow(n),
             ],
           ),
         ),
       ),
     );
   }
-  
-  Widget _buildTailorFooter(TailorNotification n) {
+
+
+  _NotificationStyle _tailorStyleFor(NotificationDbType type) {
+    switch (type) {
+      case NotificationDbType.jobRequested:
+        return _NotificationStyle(
+          background: const Color(0xFFCDEFD3),
+          icon: Icons.shopping_cart_rounded,
+          iconColor: Colors.green.shade800,
+          title: 'New Order Received',
+        );
+      case NotificationDbType.selectionDeadlineReminder:
+        return _NotificationStyle(
+          background: const Color(0xFFF7D6D6),
+          icon: Icons.assignment_late_outlined,
+          iconColor: Colors.red.shade700,
+          title: 'Job Confirmation Required',
+        );
+      case NotificationDbType.jobDeliveryDeadline:
+        return _NotificationStyle(
+          background: const Color(0xFFFBE7C0),
+          icon: Icons.timer_rounded,
+          iconColor: Colors.orange.shade800,
+          title: 'Delivery Deadline Approaching',
+        );
+      case NotificationDbType.jobRejected:
+        return _NotificationStyle(
+          background: const Color(0xFFF7D6D6),
+          icon: Icons.cancel_rounded,
+          iconColor: Colors.red.shade700,
+          title: 'Order Cancelled',
+        );
+      default:
+        return _NotificationStyle(
+          background: const Color(0xFFFBE7C0),
+          icon: Icons.notifications_active,
+          iconColor: Colors.orange.shade800,
+          title: 'Tailor Notification',
+        );
+    }
+  }
+
+
+  Widget _buildFooterRow(AppNotification n, {bool isRetailer = false}) {
+    String idLabel = 'Order ID';
+    String idValue = n.orderId;
+
+    if (isRetailer && n.type == NotificationDbType.deliveryReminder) {
+      idLabel = 'Product ID';
+    }
+
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text('Order ID: ${n.orderId}', style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
+        Text('$idLabel: $idValue', style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.55))),
         Row(
           children: [
-            Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withOpacity(0.45)),
+            Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withValues(alpha: 0.45)),
             const SizedBox(width: 4),
-            Text(n.timeAgo, style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.55))),
+            Text(timeago.format(n.createdAt), style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.55))),
           ],
         ),
       ],
     );
   }
+}
 
-  _TailorNotificationStyle _tailorStyleFor(TailorNotificationType type) {
-  switch (type) {
-    case TailorNotificationType.newOrder:
-      return _TailorNotificationStyle(
-        background: const Color(0xFFCDEFD3),
-        icon: Icons.shopping_cart_rounded,
-        iconColor: Colors.green.shade800,
-        title: 'New Order Received',
-        messagePrefix: '',
-        messageSuffix: ' placed a new order.',
-      );
-    case TailorNotificationType.orderConfirmationReminder:
-      return _TailorNotificationStyle(
-        background: const Color(0xFFF7D6D6),
-        icon: Icons.warning_rounded,
-        iconColor: Colors.red.shade700,
-        title: 'Confirm Order',
-        messagePrefix: '',
-        messageSuffix: '\'s order will be cancelled if not confirmed.',
-      );
-    case TailorNotificationType.deliveryDeadline:
-      return _TailorNotificationStyle(
-        background: const Color(0xFFFBE7C0),
-        icon: Icons.timer_rounded,
-        iconColor: Colors.orange.shade800,
-        title: 'Delivery Deadline Approaching',
-        messagePrefix: 'Order from ',
-        messageSuffix: ' is approaching deadline.',
-      );
-    case TailorNotificationType.orderCancelledByCustomer:
-      return _TailorNotificationStyle(
-        background: const Color(0xFFF7D6D6),
-        icon: Icons.cancel_rounded,
-        iconColor: Colors.red.shade700,
-        title: 'Order Cancelled by Customer',
-        messagePrefix: '',
-        messageSuffix: '\'s order has been cancelled.',
-      );
-  }
-}
-}
 
 // ============= STYLE CLASSES =============
-class _CustomerNotificationStyle {
+class _NotificationStyle {
   final Color background;
   final IconData icon;
   final Color iconColor;
   final String title;
-  final String messagePrefix;
-  final String messageSuffix;
 
-  const _CustomerNotificationStyle({
+
+  const _NotificationStyle({
     required this.background,
     required this.icon,
     required this.iconColor,
     required this.title,
-    required this.messagePrefix,
-    required this.messageSuffix,
   });
 }
 
-class _RetailerNotificationStyle {
-  final Color background;
-  final IconData icon;
-  final Color iconColor;
-  final String title;
-  final String messagePrefix;
-  final String messageMiddle;
-  final String messageSuffix;
-
-  const _RetailerNotificationStyle({
-    required this.background,
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    required this.messagePrefix,
-    required this.messageMiddle,
-    required this.messageSuffix,
-  });
-}
-
-class _TailorNotificationStyle {
-  final Color background;
-  final IconData icon;
-  final Color iconColor;
-  final String title;
-  final String messagePrefix;
-  final String messageSuffix;
-
-  const _TailorNotificationStyle({
-    required this.background,
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    required this.messagePrefix,
-    required this.messageSuffix,
-  });
-}
