@@ -520,16 +520,35 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   /// screen) — the customer is only accepting what's already on the job,
   /// so this is a plain confirm dialog with no input fields.
   ///
-  void _openChatWithTailor(String tailorId) {
+  Future<void> _openChatWithTailor(String tailorId) async {
+    final customerId = UserSession.instance.uid ?? '';
+
+    // The tailor's display name lives on their Tailor document — falling
+    // back to a generic label only if the lookup fails, so a slow or
+    // offline profile fetch never blocks the chat from opening.
+    String tailorName = 'Your Tailor';
+    try {
+      final tailor = await TailorService().getTailorProfile(tailorId);
+      if (tailor != null && tailor.shopName.isNotEmpty) {
+        tailorName = tailor.shopName;
+      }
+    } catch (e) {
+      debugPrint('[TailoringSetup] tailor name lookup failed: $e');
+    }
+
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ChatScreen(
-          conversationId:
-              '${widget.orderId}_$tailorId', // TODO: use real conversation id if you generate one elsewhere
-          customerId: '', // TODO: current logged-in customer's id
+          // Deterministic per (order, tailor) pair so reopening the chat
+          // lands on the same thread. NOTE: messaging itself is still
+          // running on local sample data — see MessagingService, which no
+          // screen is wired to yet.
+          conversationId: '${widget.orderId}_$tailorId',
+          customerId: customerId,
           otherUserId: tailorId,
-          otherUserName: 'Your Tailor', // TODO: look up tailor's real name
+          otherUserName: tailorName,
           otherUserRole: UserRole.tailor,
           orderId: widget.orderId,
         ),

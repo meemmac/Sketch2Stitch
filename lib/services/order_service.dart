@@ -620,19 +620,24 @@ class OrderService {
 
       final batch = _db.batch();
       
-      // 1. Update Tailor Job
+      // 1. Update Tailor Job — the tailor is QUOTING, not confirming. The
+      // job only reaches 'confirmed' once the customer accepts the quote and
+      // pays, in TailoringService.confirmTailorJob(). Writing 'confirmed'
+      // here used to skip the customer's confirm-and-pay step entirely, so
+      // the tailor was never actually paid.
       batch.update(_db.collection(_tailorJobsCollection).doc(tailorJobId), {
-        'status': TailorJobStatus.confirmed.toValue,
+        'status': TailorJobStatus.quoted.toValue,
+        'quoteStatus': QuoteStatus.sent.toValue,
         'quoteAmount': servicePrice,
         if (deliveryCharge != null) 'deliveryCharge': deliveryCharge,
         'estimatedDeliveryDate': estimatedDate.toIso8601String(),
-        'confirmedAt': FieldValue.serverTimestamp(),
       });
 
-      // 2. Update parent Order
+      // 2. Parent Order stays 'tailor_pending' — the customer still has a
+      // decision to make, so it must keep showing up as an active order.
       if (orderId != null) {
         batch.update(_db.collection(_ordersCollection).doc(orderId), {
-          'status': OrderStatus.processing.toValue,
+          'status': OrderStatus.tailorPending.toValue,
         });
       }
 

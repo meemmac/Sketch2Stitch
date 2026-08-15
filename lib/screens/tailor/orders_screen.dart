@@ -207,6 +207,10 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
   TailorOrderStatus _mapStatus(String? status) {
     switch (status?.toLowerCase()) {
       case 'pending': return TailorOrderStatus.pending;
+      // Quote sent — the tailor is done, it's the customer's move now. Groups
+      // with 'confirmed' so a quoted job doesn't fall back into the Pending
+      // bucket and look like it still needs a response.
+      case 'quoted':
       case 'confirmed': return TailorOrderStatus.confirmed;
       case 'in_progress': return TailorOrderStatus.inProgress;
       case 'ready': return TailorOrderStatus.ready;

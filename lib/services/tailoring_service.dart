@@ -280,8 +280,8 @@ class TailoringService {
 
         final status = TailorJobStatus.fromValue(data['status'] as String? ?? '');
         if (status != TailorJobStatus.quoted) {
-          throw TailoringServiceException(
-            'This quote can no longer be accepted (${TailorJob.fromJson({...data, 'status': status.toValue}).statusText}).',
+          throw const TailoringServiceException(
+            'This quote can no longer be accepted.',
           );
         }
 
