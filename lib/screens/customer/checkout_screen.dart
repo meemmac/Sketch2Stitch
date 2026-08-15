@@ -167,15 +167,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// Creates the order in Firestore, clears the cart, starts a local
   /// OrderRecord, and navigates into that order's tailoring setup.
   Future<void> _continueToTailoring() async {
+    if (_customerId.isEmpty) {
+      _showPaymentError('Please sign in again before placing your order.');
+      return;
+    }
+
     setState(() => _isPlacingOrder = true);
     try {
-      // Step 1: Create the order in Firestore.
-      final fireOrder = await _checkoutService.createOrder(
-        _customerId,
-        {'tailorSelectionDeadline': DateTime.now().add(const Duration(days: 3))},
-      );
+      // Step 1: the parent Orders document. createOrder() stamps
+      // customerId, orderDate and status (awaiting_confirmation) itself.
+      // tailorSelectionDeadline is deliberately NOT set here — the customer
+      // hasn't decided whether they even want a tailor yet; that deadline is
+      // written later by onContinueToTailoring in TailoringSetupScreen.
+      final fireOrder = await _checkoutService.createOrder(_customerId, {});
 
-      // Step 2: Create each sub-order and its items in Firestore.
+      // Step 2: one Sub-order per retailer, plus its Order-Items.
       final fireSubOrders = <SubOrder>[];
       for (final subOrder in widget.subOrders) {
         final fireSubOrder = await _checkoutService.createSubOrder(
@@ -184,12 +190,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           {
             'itemsSubtotal': subOrder.itemsSubtotal,
             'deliveryCharge': subOrder.deliveryCharge,
-            'deliveryDestination': 'customer', // Default; customizable later
-            'status': SubOrderStatus.preparing.name,
+            'deliveryDistanceKm': subOrder.deliveryDistanceKm,
+            // 'pending' until tailoring setup decides whether the fabric
+            // ships to the customer or straight to the tailor.
+            'deliveryDestination': SubOrderDeliveryDestination.pending.name,
           },
         );
 
-        // Convert CartLine → OrderItemInput for this sub-order.
         final items = widget.cartLines
             .where((l) => l.retailerId == subOrder.retailerId)
             .map((l) => OrderItemInput(
@@ -206,23 +213,33 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         fireSubOrders.add(fireSubOrder);
       }
 
-      // Step 3: Record the payment for this order.
-      await _checkoutService.recordPayment(
-        fireOrder.id,
-        {
-          'method': 'bkash',
-          'amount': widget.grandTotal,
-          'targetType': 'order',
-          'targetId': fireOrder.id,
+      // Step 3: one Payments record per retailer — this screen charges each
+      // retailer separately through bKash, and Payments.targetType only
+      // admits 'retailer' or 'tailor'.
+      for (final subOrder in widget.subOrders) {
+        await _checkoutService.recordPayment(fireOrder.id, {
+          'method': PaymentMethod.mobileBanking.toValue,
+          'amount': subOrder.itemsSubtotal + subOrder.deliveryCharge,
+          'itemsAmount': subOrder.itemsSubtotal,
+          'deliveryAmount': subOrder.deliveryCharge,
+          'targetType': PaymentTargetType.retailer.toValue,
+          'targetId': subOrder.retailerId,
+          'transactionId': _trxIds[subOrder.retailerId],
           'status': PaymentStatus.completed.toValue,
-        },
+        });
+      }
+
+      // Step 4: the cart has become an order — clear it. Delegated to the
+      // cart screen's own handler so there's one place that owns clearing.
+      widget.onOrderPlaced();
+
+      // Step 5: mirror into the local session store, reusing the Firestore
+      // order id so the tailoring flow stays attached to the real document.
+      final order = OrderStore.instance.startOrder(
+        fireSubOrders,
+        orderId: fireOrder.id,
+        orderDate: fireOrder.orderDate,
       );
-
-      // Step 4: Clear the Firestore cart.
-      await _cartService.clearCart(_customerId);
-
-      // Step 5: Create local OrderStore entry for the UI flow.
-      final order = OrderStore.instance.startOrder(fireSubOrders);
 
       if (!mounted) return;
       Navigator.pushReplacement(
