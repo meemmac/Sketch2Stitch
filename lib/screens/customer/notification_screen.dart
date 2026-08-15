@@ -252,7 +252,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     // A cached null means "already looked up, this one has no picture" — don't
     // re-issue the Firestore reads on every rebuild.
     if (_profileCache.containsKey(cacheKey)) {
-      return _buildInitialsAvatar(n, style);
+      return _buildCounterpartyInitials(n, style);
     }
 
     return FutureBuilder<String?>(
@@ -269,8 +269,39 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
           );
         }
 
-        // While loading or if no picture found, show initials
-        return _buildInitialsAvatar(n, style);
+        // While loading or if no picture found, show initials for the
+        // actual counterparty (Retailer/Tailor), not a generic person icon.
+        return _buildCounterpartyInitials(n, style);
+      },
+    );
+  }
+
+  /// For a Customer viewer the counterparty is the Retailer/Tailor, whose name
+  /// isn't part of the resolved order data — look it up so the initials avatar
+  /// shows *them* rather than a generic person icon.
+  Widget _buildCounterpartyInitials(
+    AppNotification n,
+    _NotificationStyle style,
+  ) {
+    final cacheKey = '${_cacheKeyFor(n)}_name';
+
+    if (_profileCache.containsKey(cacheKey)) {
+      return _buildInitialsAvatar(
+        n.copyWith(senderName: _profileCache[cacheKey] as String?),
+        style,
+      );
+    }
+
+    return FutureBuilder<String?>(
+      future: NotificationService().getCounterpartyName(n, widget.role),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done) {
+          _profileCache[cacheKey] = snapshot.data;
+        }
+        return _buildInitialsAvatar(
+          n.copyWith(senderName: snapshot.data),
+          style,
+        );
       },
     );
   }

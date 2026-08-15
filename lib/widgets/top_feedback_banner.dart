@@ -127,12 +127,16 @@ class TopFeedbackBanner extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
+                      // Inherits the app's text theme so the banner reads in
+                      // the same font as the rest of the app.
                       child: Text(
                         message,
-                        style: const TextStyle(
-                          color: Color(0xFF222222),
+                        style: (Theme.of(context).textTheme.bodyMedium ??
+                                const TextStyle())
+                            .copyWith(
+                          color: const Color(0xFF222222),
                           fontWeight: FontWeight.w600,
-                          fontSize: 12,
+                          fontSize: 13,
                           height: 1.35,
                           decoration: TextDecoration.none,
                         ),

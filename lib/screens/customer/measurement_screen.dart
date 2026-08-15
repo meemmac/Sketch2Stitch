@@ -462,7 +462,7 @@ class _MeasurementScreenState extends State<MeasurementScreen>
       scrolledUnderElevation: 0,
       leading: IconButton(
         icon: const Icon(
-          Icons.arrow_back_ios_new,
+          Icons.arrow_back,
           color: _MeasurementColors.labelText,
           size: 20,
         ),

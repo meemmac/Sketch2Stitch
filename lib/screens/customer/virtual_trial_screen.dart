@@ -552,7 +552,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         },
       ),
       automaticallyImplyLeading: false,
-      backgroundColor: _sagePale,
+      backgroundColor: Colors.white,
       elevation: 0,
       scrolledUnderElevation: 0,
       title: const Text(
@@ -1241,7 +1241,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           leading: Container(
             padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
@@ -1277,27 +1277,50 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                   runSpacing: 10,
                   children: List.generate(keys.length, (i) {
                     final key = keys[i];
+                    // The name sits above the field rather than as a floating
+                    // label, so long names ('Upper Bust / Over Bust') wrap
+                    // instead of being clipped by the field's border.
                     return SizedBox(
                       width: cellWidth,
-                      height: 72,
-                      child: TextField(
-                        controller: _measurements[key],
-                        decoration: InputDecoration(
-                          labelText: key,
-                          labelStyle: const TextStyle(fontSize: 10),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
+                      height: 78,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            height: 28,
+                            child: Text(
+                              key,
+                              maxLines: 2,
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                height: 1.2,
+                                color: Colors.black54,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 14,
+                          const SizedBox(height: 4),
+                          Expanded(
+                            child: TextField(
+                              controller: _measurements[key],
+                              decoration: InputDecoration(
+                                isDense: true,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 12,
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(color: _sage),
+                                ),
+                              ),
+                              style: const TextStyle(fontSize: 13),
+                            ),
                           ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: _sage),
-                          ),
-                        ),
-                        style: const TextStyle(fontSize: 13),
+                        ],
                       ),
                     );
                   }),
