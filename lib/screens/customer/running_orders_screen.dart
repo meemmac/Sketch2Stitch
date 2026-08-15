@@ -10,10 +10,11 @@ import 'tailoring_callbacks.dart';
 /// ─── Running Orders Screen ──────────────────────────────────────────────
 ///
 /// Lists every order still needing a customer decision — i.e.
-/// `OrderRecord.isActive == true` (awaiting_confirmation,
-/// awaiting_tailor_search, tailor_pending). Orders that were skipped,
-/// expired-to-direct-delivery, or fully paid are TERMINAL and intentionally
-/// do NOT appear here — see OrderRecord.isActive for why.
+/// an `Orders.status` in `OrderService.activeOrderStatuses`
+/// (awaiting_confirmation, awaiting_tailor_search, tailor_pending). Orders
+/// that were skipped or expired-to-direct-delivery ('processing') and fully
+/// paid ones ('completed') are TERMINAL and intentionally do NOT appear
+/// here — there is nothing left for the customer to decide.
 ///
 /// This screen never blocks or is blocked by CartScreen — it's a pure
 /// navigation shortcut into an existing TailoringSetupScreen instance.
@@ -37,7 +38,7 @@ class _RunningOrdersScreenState extends State<RunningOrdersScreen> {
   late final String? _customerId = UserSession.instance.uid;
   late final Stream<List<Order>> _ordersStream = _customerId == null
       ? Stream.value(const <Order>[])
-      : _orderService.streamActiveCustomerOrders(_customerId!);
+      : _orderService.streamActiveCustomerOrders(_customerId);
 
   // Fetched once per visit rather than per card — the same measurement is
   // handed to whichever order the customer continues into, and it can't
@@ -51,7 +52,7 @@ class _RunningOrdersScreenState extends State<RunningOrdersScreen> {
   Future<void> _loadMeasurement() async {
     if (_customerId == null) return;
     try {
-      _measurement = await _measurementService.getMeasurement(_customerId!);
+      _measurement = await _measurementService.getMeasurement(_customerId);
     } catch (e) {
       debugPrint('[RunningOrders] measurement fetch failed: $e');
     }
@@ -233,7 +234,7 @@ class _RunningOrdersScreenState extends State<RunningOrdersScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Order #${order.orderId}",
+                    Text("Order #${order.id}",
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                     Text(
                       "$subOrderCount ${subOrderCount == 1 ? 'retailer' : 'retailers'} · Tk ${total.toStringAsFixed(0)}",
@@ -248,15 +249,15 @@ class _RunningOrdersScreenState extends State<RunningOrdersScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: _statusColor(order.orderStatus).withValues(alpha: 0.1),
+              color: _statusColor(order.status.toValue).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              _statusLabel(order.orderStatus),
+              _statusLabel(order.status.toValue),
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: _statusColor(order.orderStatus),
+                color: _statusColor(order.status.toValue),
               ),
             ),
           ),

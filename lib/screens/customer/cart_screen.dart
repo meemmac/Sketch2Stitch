@@ -228,8 +228,6 @@ class _CartScreenState extends State<CartScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final activeOrderCount = OrderStore.instance.activeOrders.length;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF9FBF9),
       appBar: AppBar(
@@ -242,38 +240,46 @@ class _CartScreenState extends State<CartScreen> {
         elevation: 0,
         foregroundColor: Colors.black,
         actions: [
-          // Entry point to Running Orders. Badge shows how many orders
-          // still need a customer decision (isActive == true). This never
-          // gates the cart — it's purely a navigation shortcut.
+          // Entry point to Running Orders. Badge streams the live count of
+          // orders still needing a customer decision (Orders.status in
+          // OrderService.activeOrderStatuses), so it updates the moment an
+          // order is placed or resolved. This never gates the cart — it's
+          // purely a navigation shortcut.
           Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                IconButton(
-                  onPressed: _openRunningOrders,
-                  icon: const Icon(Icons.local_shipping_outlined),
-                  tooltip: "Running Orders",
-                ),
-                if (activeOrderCount > 0)
-                  Positioned(
-                    right: 4,
-                    top: 4,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.redAccent,
-                        shape: BoxShape.circle,
-                      ),
-                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                      child: Text(
-                        '$activeOrderCount',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
+            child: StreamBuilder<int>(
+              stream: _activeOrderCountStream,
+              builder: (context, snapshot) {
+                final activeOrderCount = snapshot.data ?? 0;
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    IconButton(
+                      onPressed: _openRunningOrders,
+                      icon: const Icon(Icons.local_shipping_outlined),
+                      tooltip: "Running Orders",
                     ),
-                  ),
-              ],
+                    if (activeOrderCount > 0)
+                      Positioned(
+                        right: 4,
+                        top: 4,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.redAccent,
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                          child: Text(
+                            '$activeOrderCount',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
           ),
         ],
