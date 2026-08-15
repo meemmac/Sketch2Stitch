@@ -170,7 +170,11 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
         'phone': updated.phone,
         'address': updated.address,
         if (_currentRole != UserRole.customer) 'about': updated.about,
-        'profilePicture': updated.profilePicture ?? '',
+        // Only Tailor/Retailer carry a picture in the schema — the editor
+        // hides the picker for customers, so writing an always-empty
+        // `profilePicture` onto the Customer document is skipped too.
+        if (_currentRole != UserRole.customer)
+          'profilePicture': updated.profilePicture ?? '',
         if (updated.location != null) 'location': updated.location,
       });
 
