@@ -252,14 +252,251 @@ class OrderService {
             .toList());
   }
 
-  /// Updates the status of a sub-order.
-  Future<void> updateOrderStatus(String subOrderId, String newStatus) async {
+  /// Streams sub-orders with full details (customer, products, items) for a retailer.
+  Stream<List<Map<String, dynamic>>> streamDetailedRetailerOrders(String retailerId) {
+    /* 
+    // PREVIOUS SEQUENTIAL VERSION (Slower)
+    return _db
+        .collection(_subOrdersCollection)
+        .where('retailerId', isEqualTo: retailerId)
+        .snapshots()
+        .asyncMap((subOrdersSnap) async {
+      List<Map<String, dynamic>> detailedOrders = [];
+
+      for (var subOrderDoc in subOrdersSnap.docs) {
+        final subOrderData = subOrderDoc.data();
+        final String subOrderId = subOrderDoc.id;
+        final String orderId = subOrderData['orderId'];
+
+        // Fetch parent order
+        final orderDoc = await _db.collection(_ordersCollection).doc(orderId).get();
+        if (!orderDoc.exists) continue;
+        final orderData = orderDoc.data()!;
+
+        // Fetch customer
+        final String customerId = orderData['customerId'];
+        final customerDoc = await _db.collection('Customer').doc(customerId).get();
+        if (!customerDoc.exists) continue;
+        final customerData = customerDoc.data()!;
+
+        // Fetch items
+        final itemsSnap = await _db
+            .collection(_orderItemsCollection)
+            .where('subOrderId', isEqualTo: subOrderId)
+            .get();
+
+        List<Map<String, dynamic>> itemsList = [];
+        for (var itemDoc in itemsSnap.docs) {
+          final itemData = itemDoc.data();
+          final String productId = itemData['productId'];
+          final int optionId = itemData['optionId'];
+
+          // Fetch product
+          final productDoc = await _db.collection('Products').doc(productId).get();
+          if (productDoc.exists) {
+            final productData = productDoc.data()!;
+            final List<dynamic> colorOptions = productData['colorOptions'] ?? [];
+            final option = colorOptions.firstWhere(
+              (o) => o['optionId'] == optionId,
+              orElse: () => null,
+            );
+
+            final rawImages = (option?['image'] as List?)?.map((e) => e.toString()).toList() ?? [];
+            final resolvedImages = resolveImageUrls(rawImages);
+
+            itemsList.add({
+              'name': productData['productName'] ?? 'Unknown Product',
+              'quantity': itemData['quantity'] ?? 1,
+              'price': (option?['price'] ?? 0).toDouble(),
+              'imagePath': resolvedImages.isNotEmpty ? resolvedImages.first : '',
+              'color': option?['color'] ?? 'N/A',
+              'description': productData['description'] ?? '',
+              'careSymbol': productData['careSymbol'] ?? [],
+            });
+          }
+        }
+
+        if (itemsList.isEmpty) continue;
+
+        detailedOrders.add({
+          'subOrder': {...subOrderData, 'id': subOrderId},
+          'order': {...orderData, 'id': orderId},
+          'customer': customerData,
+          'items': itemsList,
+        });
+      }
+      return detailedOrders;
+    });
+    */
+
+    // OPTIMIZED PARALLEL VERSION
+    return _db
+        .collection(_subOrdersCollection)
+        .where('retailerId', isEqualTo: retailerId)
+        .snapshots()
+        .asyncMap((subOrdersSnap) async {
+      // Internal caches to avoid redundant fetches within the same snapshot update
+      final Map<String, Map<String, dynamic>> orderCache = {};
+      final Map<String, Map<String, dynamic>> customerCache = {};
+      final Map<String, Map<String, dynamic>> productCache = {};
+      final Map<String, String?> tailorNameCache = {};
+
+      // Process all sub-orders in parallel
+      final List<Map<String, dynamic>?> results = await Future.wait(
+        subOrdersSnap.docs.map((subOrderDoc) async {
+          try {
+            final subOrderData = subOrderDoc.data();
+            final String subOrderId = subOrderDoc.id;
+            final String orderId = subOrderData['orderId'];
+
+            // 1. Fetch parent order (with cache)
+            if (!orderCache.containsKey(orderId)) {
+              final doc = await _db.collection(_ordersCollection).doc(orderId).get();
+              if (doc.exists) orderCache[orderId] = doc.data()!;
+            }
+            final orderData = orderCache[orderId];
+            if (orderData == null) return null;
+
+            final String customerId = orderData['customerId'];
+
+            // 2. Fetch customer and order items in parallel
+            final futures = await Future.wait([
+              // Fetch customer (with cache)
+              (() async {
+                if (!customerCache.containsKey(customerId)) {
+                  final doc = await _db.collection('Customer').doc(customerId).get();
+                  if (doc.exists) customerCache[customerId] = doc.data()!;
+                }
+                return customerCache[customerId];
+              })(),
+              // Fetch items query
+              _db.collection(_orderItemsCollection).where('subOrderId', isEqualTo: subOrderId).get(),
+              // Fetch tailor name if needed (with cache)
+              (() async {
+                if (subOrderData['deliveryDestination'] == 'tailor') {
+                  if (!tailorNameCache.containsKey(orderId)) {
+                    final jobSnap = await _db.collection(_tailorJobsCollection)
+                        .where('orderId', isEqualTo: orderId).limit(1).get();
+                    if (jobSnap.docs.isNotEmpty) {
+                      final tId = jobSnap.docs.first.data()['tailorId'];
+                      final tDoc = await _db.collection('Tailor').doc(tId).get();
+                      tailorNameCache[orderId] = tDoc.data()?['name'];
+                    } else {
+                      tailorNameCache[orderId] = null;
+                    }
+                  }
+                  return tailorNameCache[orderId];
+                }
+                return null;
+              })(),
+            ]);
+
+            final customerData = futures[0] as Map<String, dynamic>?;
+            final itemsSnap = futures[1] as QuerySnapshot<Map<String, dynamic>>;
+            final tailorName = futures[2] as String?;
+
+            if (customerData == null || itemsSnap.docs.isEmpty) return null;
+
+            // 3. Fetch all products for items in parallel
+            final List<Map<String, dynamic>> itemsList = await Future.wait(
+              itemsSnap.docs.map((itemDoc) async {
+                final itemData = itemDoc.data();
+                final String productId = itemData['productId'];
+                final int optionId = itemData['optionId'];
+
+                if (!productCache.containsKey(productId)) {
+                  final doc = await _db.collection('Products').doc(productId).get();
+                  if (doc.exists) productCache[productId] = doc.data()!;
+                }
+                
+                final productData = productCache[productId];
+                if (productData == null) return null;
+
+                final List<dynamic> colorOptions = productData['colorOptions'] ?? [];
+                final option = colorOptions.firstWhere(
+                  (o) => o['optionId'] == optionId,
+                  orElse: () => null,
+                );
+
+                final rawImages = (option?['image'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                final resolvedImages = resolveImageUrls(rawImages);
+
+                return {
+                  'name': productData['productName'] ?? 'Unknown Product',
+                  'quantity': itemData['quantity'] ?? 1,
+                  'price': (option?['price'] ?? 0).toDouble(),
+                  'imagePath': resolvedImages.isNotEmpty ? resolvedImages.first : '',
+                  'color': option?['color'] ?? 'N/A',
+                  'description': productData['description'] ?? '',
+                  'careSymbol': productData['careSymbol'] ?? [],
+                };
+              }),
+            ).then((list) => list.whereType<Map<String, dynamic>>().toList());
+
+            if (itemsList.isEmpty) return null;
+
+            return {
+              'subOrder': {...subOrderData, 'id': subOrderId},
+              'order': {...orderData, 'id': orderId},
+              'customer': customerData,
+              'items': itemsList,
+              'tailorName': tailorName,
+            };
+          } catch (e) {
+            debugPrint("OrderService: Error processing sub-order: $e");
+            return null;
+          }
+        }),
+      );
+
+      return results.whereType<Map<String, dynamic>>().toList();
+    });
+  }
+
+  /// Updates the status of a sub-order and synchronizes it with the parent order based on business rules.
+  Future<void> updateOrderStatus(String subOrderId, String newStatus, {String? parentOrderId}) async {
     try {
-      await _db.collection(_subOrdersCollection).doc(subOrderId).update({
-        'status': newStatus.toLowerCase(),
-      });
+      final statusLower = newStatus.toLowerCase();
+      debugPrint("OrderService: Updating sub-order $subOrderId to status: $statusLower");
+      
+      // Fetch sub-order metadata to check destination
+      final subOrderDoc = await _db.collection(_subOrdersCollection).doc(subOrderId).get();
+      if (!subOrderDoc.exists) throw Exception("Sub-order $subOrderId not found");
+      
+      final subOrderData = subOrderDoc.data()!;
+      final String orderId = parentOrderId ?? subOrderData['orderId'];
+      final String destination = (subOrderData['deliveryDestination'] ?? 'customer').toString().toLowerCase();
+
+      final batch = _db.batch();
+      
+      // 1. Prepare updates for sub-order
+      final Map<String, dynamic> subOrderUpdates = {
+        'status': statusLower,
+      };
+      if (statusLower == 'delivered') {
+        subOrderUpdates['deliveryDate'] = DateTime.now().toIso8601String();
+      }
+      batch.update(_db.collection(_subOrdersCollection).doc(subOrderId), subOrderUpdates);
+      
+      // 2. Parent Order status logic:
+      // "order status will only change when ONLY customer is involved and retailer press delivered"
+      // Otherwise, it stays 'processing'.
+      if (destination == 'customer' && statusLower == 'delivered') {
+        debugPrint("OrderService: Direct-to-Customer delivery detected. Marking parent order $orderId as completed.");
+        batch.update(_db.collection(_ordersCollection).doc(orderId), {
+          'status': 'completed',
+        });
+      } else {
+        debugPrint("OrderService: Tailor-bound or partial step detected. Keeping parent order $orderId as processing.");
+        batch.update(_db.collection(_ordersCollection).doc(orderId), {
+          'status': 'processing',
+        });
+      }
+
+      await batch.commit();
+      debugPrint("OrderService: Update successful for $subOrderId and parent $orderId");
     } catch (e) {
-      debugPrint('Error updating order status: $e');
+      debugPrint('Error updating order status for $subOrderId: $e');
       rethrow;
     }
   }
@@ -371,27 +608,35 @@ class OrderService {
 
   /// Accepts a tailor job request and sets initial terms.
   Future<void> acceptTailorJob(
-    String orderId,
+    String tailorJobId,
     double servicePrice,
     DateTime estimatedDate, {
     double? deliveryCharge,
   }) async {
     try {
-      final snap = await _db
-          .collection(_tailorJobsCollection)
-          .where('orderId', isEqualTo: orderId)
-          .limit(1)
-          .get();
+      final jobDoc = await _db.collection(_tailorJobsCollection).doc(tailorJobId).get();
+      if (!jobDoc.exists) throw Exception('Tailor job not found');
+      final orderId = jobDoc.data()?['orderId'];
 
-      if (snap.docs.isEmpty) throw Exception('Tailor job not found');
-
-      await snap.docs.first.reference.update({
+      final batch = _db.batch();
+      
+      // 1. Update Tailor Job
+      batch.update(_db.collection(_tailorJobsCollection).doc(tailorJobId), {
         'status': TailorJobStatus.confirmed.toValue,
         'quoteAmount': servicePrice,
         if (deliveryCharge != null) 'deliveryCharge': deliveryCharge,
         'estimatedDeliveryDate': estimatedDate.toIso8601String(),
         'confirmedAt': FieldValue.serverTimestamp(),
       });
+
+      // 2. Update parent Order
+      if (orderId != null) {
+        batch.update(_db.collection(_ordersCollection).doc(orderId), {
+          'status': OrderStatus.processing.toValue,
+        });
+      }
+
+      await batch.commit();
     } catch (e) {
       debugPrint('Error accepting tailor job: $e');
       rethrow;
@@ -399,20 +644,28 @@ class OrderService {
   }
 
   /// Declines a tailor job request.
-  Future<void> declineTailorJob(String orderId, String reason) async {
+  Future<void> declineTailorJob(String tailorJobId, String reason) async {
     try {
-      final snap = await _db
-          .collection(_tailorJobsCollection)
-          .where('orderId', isEqualTo: orderId)
-          .limit(1)
-          .get();
+      final jobDoc = await _db.collection(_tailorJobsCollection).doc(tailorJobId).get();
+      if (!jobDoc.exists) throw Exception('Tailor job not found');
+      final orderId = jobDoc.data()?['orderId'];
 
-      if (snap.docs.isEmpty) throw Exception('Tailor job not found');
+      final batch = _db.batch();
 
-      await snap.docs.first.reference.update({
+      // 1. Update Tailor Job
+      batch.update(_db.collection(_tailorJobsCollection).doc(tailorJobId), {
         'status': TailorJobStatus.tailorDeclined.toValue,
         'rejectionReason': reason,
       });
+
+      // 2. Update parent Order
+      if (orderId != null) {
+        batch.update(_db.collection(_ordersCollection).doc(orderId), {
+          'status': OrderStatus.processing.toValue,
+        });
+      }
+
+      await batch.commit();
     } catch (e) {
       debugPrint('Error declining tailor job: $e');
       rethrow;
@@ -420,19 +673,30 @@ class OrderService {
   }
 
   /// Updates work progress for a tailor job.
-  Future<void> updateWorkProgress(String orderId, String status) async {
+  Future<void> updateWorkProgress(String tailorJobId, String status) async {
     try {
-      final snap = await _db
-          .collection(_tailorJobsCollection)
-          .where('orderId', isEqualTo: orderId)
-          .limit(1)
-          .get();
+      final statusLower = status.toLowerCase();
+      final jobDoc = await _db.collection(_tailorJobsCollection).doc(tailorJobId).get();
+      if (!jobDoc.exists) throw Exception('Tailor job not found');
+      final orderId = jobDoc.data()?['orderId'];
 
-      if (snap.docs.isEmpty) throw Exception('Tailor job not found');
+      final batch = _db.batch();
 
-      await snap.docs.first.reference.update({
-        'status': status.toLowerCase(),
+      // 1. Update Tailor Job
+      batch.update(_db.collection(_tailorJobsCollection).doc(tailorJobId), {
+        'status': statusLower,
       });
+
+      // 2. Update parent Order
+      if (orderId != null) {
+        batch.update(_db.collection(_ordersCollection).doc(orderId), {
+          'status': (statusLower == 'completed') 
+              ? OrderStatus.completed.toValue 
+              : OrderStatus.processing.toValue,
+        });
+      }
+
+      await batch.commit();
     } catch (e) {
       debugPrint('Error updating work progress: $e');
       rethrow;
@@ -440,17 +704,9 @@ class OrderService {
   }
 
   /// Updates pricing or delivery terms for a job.
-  Future<void> editStitchingTerms(String orderId, double newPrice, DateTime newDate) async {
+  Future<void> editStitchingTerms(String tailorJobId, double newPrice, DateTime newDate) async {
     try {
-      final snap = await _db
-          .collection(_tailorJobsCollection)
-          .where('orderId', isEqualTo: orderId)
-          .limit(1)
-          .get();
-
-      if (snap.docs.isEmpty) throw Exception('Tailor job not found');
-
-      await snap.docs.first.reference.update({
+      await _db.collection(_tailorJobsCollection).doc(tailorJobId).update({
         'quoteAmount': newPrice,
         'estimatedDeliveryDate': newDate.toIso8601String(),
       });
@@ -548,13 +804,36 @@ class OrderService {
   /// Updates the status of a tailor job.
   Future<void> updateTailorJobStatus(String tailorJobId, TailorJobStatus status) async {
     try {
-      await _db.collection(_tailorJobsCollection).doc(tailorJobId).update({
+      final jobDoc = await _db.collection(_tailorJobsCollection).doc(tailorJobId).get();
+      if (!jobDoc.exists) throw Exception('Tailor job not found');
+      final orderId = jobDoc.data()?['orderId'];
+
+      final batch = _db.batch();
+
+      // 1. Update Tailor Job
+      batch.update(_db.collection(_tailorJobsCollection).doc(tailorJobId), {
         'status': status.toValue,
       });
+
+      // 2. Update Parent Order
+      if (orderId != null) {
+        batch.update(_db.collection(_ordersCollection).doc(orderId), {
+          'status': _mapTailorJobToOrderStatus(status.toValue).toValue,
+        });
+      }
+
+      await batch.commit();
     } catch (e) {
       debugPrint('Error updating tailor job status: $e');
       rethrow;
     }
+  }
+
+  OrderStatus _mapTailorJobToOrderStatus(String tailorJobStatus) {
+    if (tailorJobStatus.toLowerCase() == 'completed') {
+      return OrderStatus.completed;
+    }
+    return OrderStatus.processing;
   }
 
   /// Submits a price quote for a tailor job.
@@ -575,15 +854,31 @@ class OrderService {
   /// Records a customer's response to a tailor's quote.
   Future<void> respondToQuote(String tailorJobId, QuoteStatus response) async {
     try {
+      final jobDoc = await _db.collection(_tailorJobsCollection).doc(tailorJobId).get();
+      if (!jobDoc.exists) throw Exception('Tailor job not found');
+      final orderId = jobDoc.data()?['orderId'];
+
       final status = response == QuoteStatus.accepted 
           ? TailorJobStatus.confirmed 
           : TailorJobStatus.rejected;
           
-      await _db.collection(_tailorJobsCollection).doc(tailorJobId).update({
+      final batch = _db.batch();
+
+      // 1. Update Tailor Job
+      batch.update(_db.collection(_tailorJobsCollection).doc(tailorJobId), {
         'quoteStatus': response.toValue,
         'status': status.toValue,
         if (response == QuoteStatus.accepted) 'confirmedAt': FieldValue.serverTimestamp(),
       });
+
+      // 2. Update Parent Order
+      if (orderId != null) {
+        batch.update(_db.collection(_ordersCollection).doc(orderId), {
+          'status': _mapTailorJobToOrderStatus(status.toValue).toValue,
+        });
+      }
+
+      await batch.commit();
     } catch (e) {
       debugPrint('Error responding to quote: $e');
       rethrow;
@@ -644,6 +939,140 @@ class OrderService {
     // Strip leading slash if present.
     final cleaned = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
     return 'https://res.cloudinary.com/${CloudinaryService.cloudName}/image/upload/$cleaned';
+  }
+
+  /// Streams detailed jobs for a specific tailor.
+  Stream<List<Map<String, dynamic>>> streamDetailedTailorOrders(String tailorId) {
+    debugPrint("OrderService: Starting streamDetailedTailorOrders for tailor: $tailorId");
+    return _db
+        .collection(_tailorJobsCollection)
+        .where('tailorId', isEqualTo: tailorId)
+        .snapshots()
+        .asyncMap((jobsSnap) async {
+      debugPrint("OrderService: Found ${jobsSnap.docs.length} jobs for tailor $tailorId");
+      final Map<String, Map<String, dynamic>> orderCache = {};
+      final Map<String, Map<String, dynamic>> customerCache = {};
+      final Map<String, Map<String, dynamic>> productCache = {};
+      final Map<String, Map<String, dynamic>> measurementCache = {};
+
+      final List<Map<String, dynamic>?> results = await Future.wait(
+        jobsSnap.docs.map((jobDoc) async {
+          try {
+            final jobData = jobDoc.data();
+            final String orderId = jobData['orderId'];
+            final String customerId = jobData['customerId'] ?? ''; // Might be in Order doc instead
+            final String measurementId = jobData['measurementId'] ?? '';
+
+            // 1. Fetch parent order
+            if (!orderCache.containsKey(orderId)) {
+              final doc = await _db.collection(_ordersCollection).doc(orderId).get();
+              if (doc.exists) orderCache[orderId] = doc.data()!;
+            }
+            final orderData = orderCache[orderId];
+            if (orderData == null) return null;
+
+            final actualCustomerId = customerId.isNotEmpty ? customerId : orderData['customerId'];
+
+            // 2. Fetch customer, measurement and sub-orders in parallel
+            final futures = await Future.wait([
+              // Fetch customer
+              (() async {
+                if (!customerCache.containsKey(actualCustomerId)) {
+                  final doc = await _db.collection('Customer').doc(actualCustomerId).get();
+                  if (doc.exists) customerCache[actualCustomerId] = doc.data()!;
+                }
+                return customerCache[actualCustomerId];
+              })(),
+              // Fetch measurement
+              (() async {
+                if (measurementId.isNotEmpty && !measurementCache.containsKey(measurementId)) {
+                  final doc = await _db.collection('Measurement').doc(measurementId).get();
+                  if (doc.exists) measurementCache[measurementId] = doc.data()!;
+                }
+                return measurementCache[measurementId];
+              })(),
+              // Fetch sub-orders for this main order
+              _db.collection(_subOrdersCollection).where('orderId', isEqualTo: orderId).get(),
+            ]);
+
+            final customerData = futures[0] as Map<String, dynamic>?;
+            final measurementData = futures[1] as Map<String, dynamic>?;
+            final subOrdersSnap = futures[2] as QuerySnapshot<Map<String, dynamic>>;
+
+            if (customerData == null) return null;
+
+            // 3. Fetch all items for all sub-orders in parallel
+            final List<Map<String, dynamic>> allItemsList = [];
+            
+            final subOrderResults = await Future.wait(
+              subOrdersSnap.docs.map((soDoc) async {
+                final soId = soDoc.id;
+                final itemsSnap = await _db
+                    .collection(_orderItemsCollection)
+                    .where('subOrderId', isEqualTo: soId)
+                    .get();
+                
+                return Future.wait(itemsSnap.docs.map((itemDoc) async {
+                  final itemData = itemDoc.data();
+                  final String productId = itemData['productId'];
+                  final int optionId = itemData['optionId'];
+
+                  if (!productCache.containsKey(productId)) {
+                    final doc = await _db.collection('Products').doc(productId).get();
+                    if (doc.exists) productCache[productId] = doc.data()!;
+                  }
+                  
+                  final productData = productCache[productId];
+                  if (productData == null) return null;
+
+                  final List<dynamic> colorOptions = productData['colorOptions'] ?? [];
+                  final option = colorOptions.firstWhere(
+                    (o) => o['optionId'] == optionId,
+                    orElse: () => null,
+                  );
+
+                  final rawImages = (option?['image'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                  final resolvedImages = resolveImageUrls(rawImages);
+
+                  return {
+                    'name': productData['productName'] ?? 'Unknown Product',
+                    'quantity': itemData['quantity'] ?? 1,
+                    'price': (option?['price'] ?? 0).toDouble(),
+                    'imagePath': resolvedImages.isNotEmpty ? resolvedImages.first : '',
+                    'color': option?['color'] ?? 'N/A',
+                    'description': productData['description'] ?? '',
+                    'careSymbol': productData['careSymbol'] ?? [],
+                    'instructions': jobData['specialInstructions'] ?? '',
+                  };
+                }));
+              })
+            );
+
+            for (var list in subOrderResults) {
+              allItemsList.addAll(list.whereType<Map<String, dynamic>>());
+            }
+
+            if (allItemsList.isEmpty) {
+              debugPrint("OrderService: Skipping tailor job ${jobDoc.id} because no items were found.");
+              return null;
+            }
+
+            return {
+              'job': {...jobData, 'id': jobDoc.id},
+              'order': {...orderData, 'id': orderId},
+              'customer': customerData,
+              'measurement': measurementData,
+              'items': allItemsList,
+            };
+          } catch (e) {
+            debugPrint("OrderService: Error processing tailor job: $e");
+            return null;
+          }
+        }),
+      );
+
+      return results.whereType<Map<String, dynamic>>().toList();
+    });
   }
 
   /// Verifies if the current logged-in user matches the tailor ID.
