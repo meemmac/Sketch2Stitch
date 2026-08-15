@@ -559,6 +559,92 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
           iconColor: Colors.red.shade700,
           title: 'Order Cancelled',
         );
+
+      // ── Fulfilment progress ──
+      case NotificationDbType.suborderPreparing:
+        return _NotificationStyle(
+          background: const Color(0xFFFBE7C0),
+          icon: Icons.inventory_rounded,
+          iconColor: Colors.orange.shade800,
+          title: 'Preparing Your Order',
+        );
+      case NotificationDbType.suborderPacked:
+        return _NotificationStyle(
+          background: const Color(0xFFD3E9F7),
+          icon: Icons.inventory_2_rounded,
+          iconColor: Colors.blue.shade700,
+          title: 'Order Packed',
+        );
+      case NotificationDbType.itemShipped:
+        return _NotificationStyle(
+          background: const Color(0xFFD3E9F7),
+          icon: Icons.local_shipping_rounded,
+          iconColor: Colors.blue.shade700,
+          title: 'Order Shipped',
+        );
+      case NotificationDbType.garmentCompleted:
+        return _NotificationStyle(
+          background: const Color(0xFFCDEFD3),
+          icon: Icons.checkroom_rounded,
+          iconColor: Colors.green.shade800,
+          title: 'Garment Ready',
+        );
+
+      // ── Tailor selection & quotes ──
+      case NotificationDbType.tailorSearchPrompt:
+        return _NotificationStyle(
+          background: const Color(0xFFFBE7C0),
+          icon: Icons.person_search_rounded,
+          iconColor: Colors.orange.shade800,
+          title: 'Choose a Tailor',
+        );
+      case NotificationDbType.itemWindowClosing:
+        return _NotificationStyle(
+          background: const Color(0xFFF7D6D6),
+          icon: Icons.timer_rounded,
+          iconColor: Colors.red.shade700,
+          title: 'Selection Window Closing',
+        );
+      case NotificationDbType.quoteReceived:
+        return _NotificationStyle(
+          background: const Color(0xFFD3E9F7),
+          icon: Icons.request_quote_rounded,
+          iconColor: Colors.blue.shade700,
+          title: 'Quote Received',
+        );
+      case NotificationDbType.quoteExpired:
+        return _NotificationStyle(
+          background: const Color(0xFFF7D6D6),
+          icon: Icons.hourglass_disabled_rounded,
+          iconColor: Colors.red.shade700,
+          title: 'Quote Expired',
+        );
+
+      // ── Payments ──
+      case NotificationDbType.paymentConfirmed:
+        return _NotificationStyle(
+          background: const Color(0xFFCDEFD3),
+          icon: Icons.payments_rounded,
+          iconColor: Colors.green.shade800,
+          title: 'Payment Confirmed',
+        );
+
+      // ── Shared ──
+      case NotificationDbType.newMessage:
+        return _NotificationStyle(
+          background: const Color(0xFFD3E9F7),
+          icon: Icons.chat_bubble_rounded,
+          iconColor: Colors.blue.shade700,
+          title: 'New Message',
+        );
+      case NotificationDbType.reviewReceived:
+        return _NotificationStyle(
+          background: const Color(0xFFFBE7C0),
+          icon: Icons.star_rounded,
+          iconColor: Colors.orange.shade800,
+          title: 'New Review',
+        );
+
       default:
         return _NotificationStyle(
           background: const Color(0xFFFBE7C0),
@@ -630,6 +716,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
 
   _NotificationStyle _retailerStyleFor(NotificationDbType type) {
     switch (type) {
+      // ── Orders ──
       case NotificationDbType.suborderPlaced:
         return _NotificationStyle(
           background: const Color(0xFFCDEFD3),
@@ -637,6 +724,50 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
           iconColor: Colors.green.shade800,
           title: 'New Order Placed',
         );
+      case NotificationDbType.suborderPreparing:
+        return _NotificationStyle(
+          background: const Color(0xFFFBE7C0),
+          icon: Icons.inventory_rounded,
+          iconColor: Colors.orange.shade800,
+          title: 'Order Preparing',
+        );
+      case NotificationDbType.suborderPacked:
+        return _NotificationStyle(
+          background: const Color(0xFFD3E9F7),
+          icon: Icons.inventory_2_rounded,
+          iconColor: Colors.blue.shade700,
+          title: 'Order Packed',
+        );
+      case NotificationDbType.itemShipped:
+        return _NotificationStyle(
+          background: const Color(0xFFD3E9F7),
+          icon: Icons.local_shipping_rounded,
+          iconColor: Colors.blue.shade700,
+          title: 'Order Shipped',
+        );
+      case NotificationDbType.suborderDelivered:
+        return _NotificationStyle(
+          background: const Color(0xFFD3E9F7),
+          icon: Icons.check_circle_outline_rounded,
+          iconColor: Colors.blue.shade700,
+          title: 'Order Delivered',
+        );
+      case NotificationDbType.orderCompleted:
+        return _NotificationStyle(
+          background: const Color(0xFFCDEFD3),
+          icon: Icons.task_alt_rounded,
+          iconColor: Colors.green.shade800,
+          title: 'Order Completed',
+        );
+      case NotificationDbType.jobRejected:
+        return _NotificationStyle(
+          background: const Color(0xFFF7D6D6),
+          icon: Icons.cancel_rounded,
+          iconColor: Colors.red.shade700,
+          title: 'Order Cancelled',
+        );
+
+      // ── Inventory ──
       case NotificationDbType.deliveryReminder:
         return _NotificationStyle(
           background: const Color(0xFFF7D6D6),
@@ -644,6 +775,8 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
           iconColor: Colors.red.shade700,
           title: 'Stock Alert',
         );
+
+      // ── Tailor ──
       case NotificationDbType.jobConfirmed:
         return _NotificationStyle(
           background: const Color(0xFFD3E9F7),
@@ -651,6 +784,46 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
           iconColor: Colors.blue.shade700,
           title: 'Tailor Assigned',
         );
+      case NotificationDbType.materialsArrived:
+        return _NotificationStyle(
+          background: const Color(0xFFCDEFD3),
+          icon: Icons.move_to_inbox_rounded,
+          iconColor: Colors.green.shade800,
+          title: 'Materials Delivered to Tailor',
+        );
+
+      // ── Payments ──
+      case NotificationDbType.paymentConfirmed:
+        return _NotificationStyle(
+          background: const Color(0xFFCDEFD3),
+          icon: Icons.payments_rounded,
+          iconColor: Colors.green.shade800,
+          title: 'Payment Received',
+        );
+      case NotificationDbType.paymentReleased:
+        return _NotificationStyle(
+          background: const Color(0xFFCDEFD3),
+          icon: Icons.account_balance_wallet_rounded,
+          iconColor: Colors.green.shade800,
+          title: 'Payment Released',
+        );
+
+      // ── Shared ──
+      case NotificationDbType.newMessage:
+        return _NotificationStyle(
+          background: const Color(0xFFD3E9F7),
+          icon: Icons.chat_bubble_rounded,
+          iconColor: Colors.blue.shade700,
+          title: 'New Message',
+        );
+      case NotificationDbType.reviewReceived:
+        return _NotificationStyle(
+          background: const Color(0xFFFBE7C0),
+          icon: Icons.star_rounded,
+          iconColor: Colors.orange.shade800,
+          title: 'New Review',
+        );
+
       default:
         return _NotificationStyle(
           background: const Color(0xFFFBE7C0),
@@ -750,6 +923,58 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
           iconColor: Colors.red.shade700,
           title: 'Order Cancelled',
         );
+      case NotificationDbType.jobConfirmed:
+        return _NotificationStyle(
+          background: const Color(0xFFCDEFD3),
+          icon: Icons.verified_rounded,
+          iconColor: Colors.green.shade800,
+          title: 'Job Confirmed',
+        );
+      case NotificationDbType.materialsArrived:
+        return _NotificationStyle(
+          background: const Color(0xFFD3E9F7),
+          icon: Icons.move_to_inbox_rounded,
+          iconColor: Colors.blue.shade700,
+          title: 'Materials Arrived',
+        );
+      case NotificationDbType.quoteExpired:
+        return _NotificationStyle(
+          background: const Color(0xFFF7D6D6),
+          icon: Icons.hourglass_disabled_rounded,
+          iconColor: Colors.red.shade700,
+          title: 'Quote Expired',
+        );
+      case NotificationDbType.garmentCompleted:
+        return _NotificationStyle(
+          background: const Color(0xFFCDEFD3),
+          icon: Icons.checkroom_rounded,
+          iconColor: Colors.green.shade800,
+          title: 'Garment Completed',
+        );
+      case NotificationDbType.paymentReleased:
+        return _NotificationStyle(
+          background: const Color(0xFFCDEFD3),
+          icon: Icons.account_balance_wallet_rounded,
+          iconColor: Colors.green.shade800,
+          title: 'Payment Released',
+        );
+
+      // ── Shared ──
+      case NotificationDbType.newMessage:
+        return _NotificationStyle(
+          background: const Color(0xFFD3E9F7),
+          icon: Icons.chat_bubble_rounded,
+          iconColor: Colors.blue.shade700,
+          title: 'New Message',
+        );
+      case NotificationDbType.reviewReceived:
+        return _NotificationStyle(
+          background: const Color(0xFFFBE7C0),
+          icon: Icons.star_rounded,
+          iconColor: Colors.orange.shade800,
+          title: 'New Review',
+        );
+
       default:
         return _NotificationStyle(
           background: const Color(0xFFFBE7C0),
