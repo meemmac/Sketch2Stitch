@@ -14,6 +14,7 @@ import 'messaging/chat_screen.dart'; // adjust path to match your folder structu
 // Add `shared_preferences` to pubspec.yaml if it isn't already a dependency.
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/bkash_service.dart';
+import '../../widgets/top_feedback_banner.dart';
 import '../../services/measurement_service.dart';
 import '../../services/tailor_service.dart';
 import '../../services/user_session.dart';
@@ -444,10 +445,10 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   Future<void> _goToMeasurementScreen() async {
     final customerId = UserSession.instance.uid;
     if (customerId == null || customerId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please sign in again to edit your measurements.'),
-        ),
+      AppFeedback.show(
+        context,
+        'Please sign in again to edit your measurements.',
+        isError: true,
       );
       return;
     }
@@ -2102,9 +2103,8 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
     final path = await _exportImage();
     if (!mounted) return;
     if (path == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Couldn't save the sketch. Try again.")),
-      );
+      AppFeedback.show(context, "Couldn't save the sketch. Try again.",
+          isError: true);
       return;
     }
     Navigator.pop(context, path);

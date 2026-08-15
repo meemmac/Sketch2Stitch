@@ -21,6 +21,7 @@ import '../screens/customer/cart_screen.dart';
 import '../screens/customer/orders/order_detail_screen.dart';
 import '../screens/customer/messaging/conversations_screen.dart';
 import '../utils/validation_utils.dart';
+import 'top_feedback_banner.dart';
 
 /// Placeholder avatar showing the first letter of [name] on a tinted
 /// background — used wherever no profile picture has been set yet.
@@ -39,128 +40,6 @@ Widget _initialAvatar(String name, Color themeColor, {double fontSize = 22}) {
       ),
     ),
   );
-}
-
-/// Glassmorphic feedback banner shown pinned to the top of the screen —
-/// mirrors the banner used on the registration flow so success/error
-/// messages read consistently across the app instead of a bottom SnackBar.
-class TopFeedbackBanner extends StatelessWidget {
-  final String message;
-  final bool isError;
-  final VoidCallback onClose;
-
-  const TopFeedbackBanner({
-    super.key,
-    required this.message,
-    required this.isError,
-    required this.onClose,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: SafeArea(
-          bottom: false,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: isError
-                      ? const Color(0xFFFFEBEE).withValues(alpha: 0.92)
-                      : const Color(0xFFC8E6C9).withValues(alpha: 0.92),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: isError
-                        ? const Color(0xFFFFCDD2)
-                        : const Color(0xFF9CCC9F),
-                    width: 1.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color:
-                          (isError
-                                  ? const Color(0xFFD32F2F)
-                                  : const Color(0xFF2E7D32))
-                              .withValues(alpha: 0.10),
-                      blurRadius: 20,
-                      spreadRadius: 1,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isError
-                            ? const Color(0xFFE53935)
-                            : const Color(0xFF4CAF50),
-                        border: Border.all(
-                          color: isError
-                              ? const Color(0xFFEF9A9A)
-                              : const Color(0xFFA5D6A7),
-                          width: 1,
-                        ),
-                      ),
-                      child: Icon(
-                        isError ? Icons.close_rounded : Icons.check_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        message,
-                        style: const TextStyle(
-                          color: Color(0xFF222222),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                          height: 1.35,
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: onClose,
-                      child: Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withValues(alpha: 0.35),
-                        ),
-                        child: Icon(
-                          Icons.close_rounded,
-                          color: Colors.black.withValues(alpha: 0.45),
-                          size: 18,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 /// Model class representing the profile information for the drawer.
@@ -376,7 +255,12 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                                     UserSession.instance.logout();
 
                                     if (!mounted) return;
-                                    _showFeedback("Logged out successfully!");
+                                    // Overlay banner so it survives the
+                                    // navigation to the welcome screen.
+                                    AppFeedback.show(
+                                      context,
+                                      "Logged out successfully!",
+                                    );
                                     Navigator.pushAndRemoveUntil(
                                       context,
                                       MaterialPageRoute(

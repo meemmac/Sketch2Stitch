@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:ui';
 import '../../../models/measurement.dart';
 import '../../../models/tailor.dart';
 import 'reviews_screen.dart';

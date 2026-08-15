@@ -10,6 +10,7 @@ import '../../services/ai_service.dart';
 import '../../services/user_session.dart';
 import '../../services/virtual_trial_service.dart';
 import '../../models/customer.dart' show kVirtualTrialMonthlyLimit;
+import '../../widgets/top_feedback_banner.dart';
 import '../../utils/api_config.dart';
 import '../../widgets/dashboard_drawer.dart';
 import 'home_screen.dart';
@@ -260,9 +261,9 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   void _removeReference(int index) =>
       setState(() => _referenceImages.removeAt(index));
 
-  void _showSnack(String msg) {
+  void _showSnack(String msg, {bool isError = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    AppFeedback.show(context, msg, isError: isError);
   }
 
   String _formatDate(DateTime? d) {
