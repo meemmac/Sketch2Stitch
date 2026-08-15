@@ -24,7 +24,17 @@ class CartSnapshot {
   final List<CartLine> lines;
   final Map<String, RetailerInfo> retailers;
 
-  const CartSnapshot({required this.lines, required this.retailers});
+  /// The customer's saved location at the time the snapshot was built — the
+  /// exact coordinates the per-retailer delivery charges were computed from.
+  /// Persisted onto each `Sub-orders.deliveryPoint` at checkout so the charge
+  /// can be audited later. Null when the customer has no saved location.
+  final GeoPoint? customerLocation;
+
+  const CartSnapshot({
+    required this.lines,
+    required this.retailers,
+    this.customerLocation,
+  });
 
   static const empty = CartSnapshot(lines: [], retailers: {});
 
@@ -269,7 +279,8 @@ class CartService {
           .firstWhere((o) => o?.optionId == item.optionId, orElse: () => null);
       if (option == null) continue; // colour option retired since it was added
 
-      final image = _resolveOptionImage(option);
+      final fullImage = _resolveOptionImage(option);
+      final image = _thumbnail(fullImage);
 
       lines.add(CartLine(
         id: item.id,

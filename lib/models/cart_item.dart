@@ -86,6 +86,13 @@ class CartLine {
   final String productName;
   final String colorName;
   final String image;
+
+  /// The same chosen-option image at its original (untransformed) size.
+  /// [image] is a 200×200 thumbnail for cart rows; anything that displays the
+  /// garment large — the Virtual Trial reference grid, its full-screen viewer
+  /// — should use this instead so it isn't upscaling a thumbnail.
+  final String fullImage;
+
   final bool isAsset;
   final double price;
 
@@ -101,10 +108,11 @@ class CartLine {
     required this.productName,
     required this.colorName,
     required this.image,
+    String? fullImage,
     required this.price,
     this.stock = 0,
     this.isAsset = false,
-  });
+  }) : fullImage = fullImage ?? image;
 
   double get lineTotal => price * quantity;
 
