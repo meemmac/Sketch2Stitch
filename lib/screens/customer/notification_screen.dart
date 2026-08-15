@@ -81,14 +81,15 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
 
   Widget _buildBody(AsyncSnapshot<List<AppNotification>> snapshot) {
     if (snapshot.hasError) {
-      debugPrint('[NotificationScreen] Stream Error: ${snapshot.error}');
-      return Center(
+      // The raw Firestore error can carry document paths and query details,
+      // so the user gets a plain message instead.
+      return const Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(24),
           child: Text(
-            'Error loading notifications:\n${snapshot.error}',
+            "Couldn't load your notifications. Please try again.",
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.red),
+            style: TextStyle(color: Colors.red),
           ),
         ),
       );

@@ -179,9 +179,10 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       if (mounted) {
         _showFeedback('Profile updated successfully.');
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
-        _showFeedback('Failed to save profile: $e', isError: true);
+        _showFeedback("Couldn't save your profile. Please try again.",
+            isError: true);
       }
     }
   }
@@ -814,9 +815,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       text: widget.initialProfile.about ?? '',
     );
     _profilePicturePath = widget.initialProfile.profilePicture;
-    _selectedLocation =
-        widget.initialProfile.location ??
-        const GeoPoint(23.8103, 90.4125); // dummy Dhaka coordinates for now
+    // Left null when the profile has no pinned location, so the "Please pin
+    // your location before saving" check below can actually fire. Defaulting
+    // to a fixed coordinate silently saved a location the user never chose.
+    _selectedLocation = widget.initialProfile.location;
   }
 
   Future<void> _pickImage() async {

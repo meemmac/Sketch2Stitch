@@ -227,6 +227,10 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   AppearanceProfile? _usedProfile; // snapshot shown in summary card
 
   // ── Progress tracking ──────────────────────────────────────────
+  /// True once the user has tapped any appearance-profile control.
+  // ignore: unused_field
+  bool _profileConfigured = false;
+
   /// True once the user has expanded the Advanced Measurements tile.
   bool _measurementsReviewed = false;
   // ── Appearance mode toggle ──────────────────────────────────────

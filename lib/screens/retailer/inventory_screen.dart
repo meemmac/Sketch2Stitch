@@ -2265,9 +2265,10 @@ class _InventoryScreenState extends State<InventoryScreen>
                                 try {
                                   await _inventoryService.deleteProduct(item.id);
                                   _showFeedback("Product deleted successfully!");
-                                } catch (e) {
-                                  debugPrint("Error deleting product: $e");
-                                  _showFeedback("Error deleting product: $e", isError: true);
+                                } catch (_) {
+                                  _showFeedback(
+                                      "Couldn't delete the product. Please try again.",
+                                      isError: true);
                                 }
                               }
                             }),

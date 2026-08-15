@@ -908,7 +908,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                       Navigator.pop(context);
                       _showBanner("Request accepted", isError: false);
                     } catch (e) {
-                      _showBanner("Error: $e");
+                      _showBanner("Something went wrong. Please try again.");
                     }
                   },
                 ),
@@ -932,7 +932,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                       Navigator.pop(context);
                       _showBanner("Stitching started", isError: false);
                     } catch (e) {
-                      _showBanner("Error: $e");
+                      _showBanner("Something went wrong. Please try again.");
                     }
                   },
                 ),
@@ -947,7 +947,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                       Navigator.pop(context);
                       _showBanner("Work marked as completed", isError: false);
                     } catch (e) {
-                      _showBanner("Error: $e");
+                      _showBanner("Something went wrong. Please try again.");
                     }
                   },
                 ),
@@ -1129,7 +1129,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 Navigator.pop(modalContext);
                 _showBanner("Job Accepted Successfully!", isError: false);
               } catch (e) {
-                _showBanner("Error: $e");
+                _showBanner("Something went wrong. Please try again.");
               }
             } : null,
             style: ElevatedButton.styleFrom(
@@ -1481,7 +1481,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                       _showBanner("Request declined successfully.", isError: false);
                       if (onDone != null) onDone();
                     }).catchError((e) {
-                      _showBanner("Error: $e");
+                      _showBanner("Something went wrong. Please try again.");
                     });
                   },
                   style: ElevatedButton.styleFrom(
@@ -1539,7 +1539,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 Navigator.pop(context);
                 _showBanner("Price updated", isError: false);
               } catch (e) {
-                _showBanner("Error: $e");
+                _showBanner("Something went wrong. Please try again.");
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: primaryGreen),
@@ -1898,7 +1898,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   _showBanner("Capacity updated successfully!", isError: false);
                 } catch (e) {
                   debugPrint("Error updating maximum order: $e");
-                  _showBanner("Failed to update server: $e", isError: true);
+                  _showBanner("Couldn't save the change. Please try again.", isError: true);
                 }
               } else {
                 _showBanner("Local capacity updated (Not logged in)", isError: false);

@@ -314,9 +314,10 @@ class _MeasurementScreenState extends State<MeasurementScreen>
       if (mounted) {
         showFeedback('Measurements saved successfully.');
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
-        showFeedback('Failed to save measurements: $e', isError: true);
+        showFeedback("Couldn't save your measurements. Please try again.",
+            isError: true);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);

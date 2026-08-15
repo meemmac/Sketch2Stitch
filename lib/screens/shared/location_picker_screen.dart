@@ -79,7 +79,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       }
     } catch (e) {
       if (mounted) {
-        AppFeedback.show(context, 'Search error: $e', isError: true);
+        AppFeedback.show(context, "Couldn't search right now. Try again.",
+            isError: true);
       }
     } finally {
       if (mounted) setState(() => _searching = false);
@@ -119,7 +120,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       _mapController.move(target, 16);
     } catch (e) {
       if (mounted) {
-        AppFeedback.show(context, 'Could not get current location: $e',
+        AppFeedback.show(context, 'Could not get your current location.',
             isError: true);
       }
     } finally {

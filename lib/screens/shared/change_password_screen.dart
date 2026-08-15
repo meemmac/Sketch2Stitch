@@ -153,10 +153,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       if (!mounted) return;
       setState(() => _isSaving = false);
       _showFeedback(e.message, isError: true);
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() => _isSaving = false);
-      _showFeedback('Failed to change password: $e', isError: true);
+      _showFeedback("Couldn't change your password. Please try again.",
+          isError: true);
     }
   }
 

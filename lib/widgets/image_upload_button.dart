@@ -87,7 +87,7 @@ class _ImageUploadButtonState extends State<ImageUploadButton> {
       }
     } catch (e) {
       widget.onUploadError?.call(e.toString());
-      _showSnackBar('Upload failed: $e', isError: true);
+      _showSnackBar('Upload failed. Please try again.', isError: true);
     } finally {
       if (mounted) {
         setState(() => _isUploading = false);
