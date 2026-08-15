@@ -95,13 +95,19 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       final uri = Uri.parse(
         'https://nominatim.openstreetmap.org/search'
         '?q=${Uri.encodeQueryComponent(trimmed)}'
-        '&format=json&addressdetails=1&limit=5',
+        // Soft-biased to Bangladesh: the viewbox lifts local matches without
+        // `bounded=1`, so foreign places still appear, just lower down. An
+        // unbiased search lets same-named foreign places crowd them out.
+        '&format=json&addressdetails=1&limit=15'
+        '&viewbox=88.0,26.7,92.7,20.5',
       );
       final response = await http.get(
         uri,
         headers: {
           'User-Agent': 'com.example.sketch2stitch',
-          'Accept-Language': 'en',
+          // Bangla first so places tagged only in Bangla still match, with
+          // English as the fallback label.
+          'Accept-Language': 'bn,en',
         },
       );
 

@@ -473,12 +473,18 @@ class SharedService {
           'q':              query,
           'format':         'json',
           'addressdetails': '1',
-          'limit':          '5',
+          'limit':          '15',
+          // Bias to Bangladesh — an unbiased global search lets same-named
+          // foreign places outrank local ones and crowd them out.
+          'countrycodes':   'bd',
         },
       );
 
       final response = await http
-          .get(uri, headers: {'User-Agent': 'Sketch2Stitch/1.0'})
+          .get(uri, headers: {
+            'User-Agent':      'Sketch2Stitch/1.0',
+            'Accept-Language': 'bn,en',
+          })
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 200) return [];
