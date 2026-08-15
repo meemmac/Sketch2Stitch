@@ -74,9 +74,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _payRetailer(String retailerId) async {
     setState(() => _payingRetailerId = retailerId);
     try {
-      final subtotal = widget.cartLines
-          .where((l) => l.retailerId == retailerId)
-          .fold<double>(0, (sum, l) => sum + l.lineTotal);
+      final lines =
+          widget.cartLines.where((l) => l.retailerId == retailerId).toList();
+
+      // Stock can move between opening the cart and paying, so re-check this
+      // retailer's lines before taking any money. placeOrder() re-validates
+      // atomically at the end too — this is purely so the customer finds out
+      // before they pay rather than after.
+      final problems = await _checkoutService.validateStock(
+        lines
+            .map((l) => OrderItemInput(
+                  productId: l.productId,
+                  optionId: l.optionId,
+                  quantity: l.quantity,
+                ))
+            .toList(),
+      );
+
+      if (!mounted) return;
+      if (problems.isNotEmpty) {
+        setState(() => _payingRetailerId = null);
+        _showPaymentError(problems.first);
+        return;
+      }
+
+      final subtotal = lines.fold<double>(0, (sum, l) => sum + l.lineTotal);
       final amount = subtotal + _deliveryChargeFor(retailerId);
 
       // Step 1 + 2: grant token, create payment — get bkashURL.
