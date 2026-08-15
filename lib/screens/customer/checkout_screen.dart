@@ -43,6 +43,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final Set<String> _paidRetailers = {};
   String? _payingRetailerId;
 
+  final CheckoutService _checkoutService = CheckoutService();
+  final CartService _cartService = CartService();
+
+  String get _customerId => UserSession.instance.uid ?? '';
+
   Map<String, List<CartLine>> get _groupedByRetailer {
     final Map<String, List<CartLine>> grouped = {};
     for (final line in widget.cartLines) {
@@ -149,26 +154,86 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
   }
 
-  /// Clears the cart, starts exactly ONE new order from this checkout's
-  /// sub-orders, and navigates into that order's tailoring setup. This is
-  /// the only place a new OrderRecord gets created.
-  void _continueToTailoring() {
-    widget.onOrderPlaced(); // clears the cart
+  /// Creates the order in Firestore, clears the cart, starts a local
+  /// OrderRecord, and navigates into that order's tailoring setup.
+  Future<void> _continueToTailoring() async {
+    try {
+      // Step 1: Create the order in Firestore.
+      final fireOrder = await _checkoutService.createOrder(
+        _customerId,
+        {'tailorSelectionDeadline': DateTime.now().add(const Duration(days: 3))},
+      );
 
-    final order = OrderStore.instance.startOrder(widget.subOrders);
+      // Step 2: Create each sub-order and its items in Firestore.
+      final fireSubOrders = <SubOrder>[];
+      for (final subOrder in widget.subOrders) {
+        final fireSubOrder = await _checkoutService.createSubOrder(
+          fireOrder.id,
+          subOrder.retailerId,
+          {
+            'itemsSubtotal': subOrder.itemsSubtotal,
+            'deliveryCharge': subOrder.deliveryCharge,
+            'deliveryDestination': 'customer', // Default; customizable later
+            'status': SubOrderStatus.preparing.name,
+          },
+        );
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => TailoringSetupScreen(
-          orderId: order.orderId,
-          orderDate: order.orderDate,
-          savedMeasurements: [widget.measurement],
-          subOrders: order.subOrders, // the stamped copies, not widget.subOrders
-          callbacks: buildTailoringCallbacks(order.orderId),
+        // Convert CartLine → OrderItemInput for this sub-order.
+        final items = widget.cartLines
+            .where((l) => l.retailerId == subOrder.retailerId)
+            .map((l) => OrderItemInput(
+                  productId: l.productId,
+                  optionId: l.optionId,
+                  quantity: l.quantity,
+                ))
+            .toList();
+
+        if (items.isNotEmpty) {
+          await _checkoutService.createOrderItems(fireSubOrder.id, items);
+        }
+
+        fireSubOrders.add(fireSubOrder);
+      }
+
+      // Step 3: Record the payment for this order.
+      await _checkoutService.recordPayment(
+        fireOrder.id,
+        {
+          'method': 'bkash',
+          'amount': widget.grandTotal,
+          'targetType': 'order',
+          'targetId': fireOrder.id,
+          'status': PaymentStatus.completed.toValue,
+        },
+      );
+
+      // Step 4: Clear the Firestore cart.
+      await _cartService.clearCart(_customerId);
+
+      // Step 5: Create local OrderStore entry for the UI flow.
+      final order = OrderStore.instance.startOrder(fireSubOrders);
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TailoringSetupScreen(
+            orderId: order.orderId,
+            orderDate: order.orderDate,
+            savedMeasurements: [widget.measurement],
+            subOrders: order.subOrders,
+            callbacks: buildTailoringCallbacks(order.orderId),
+          ),
         ),
-      ),
-    );
+      );
+    } on CheckoutServiceException catch (e) {
+      if (!mounted) return;
+      _showPaymentError('Order creation failed: ${e.message}');
+    } catch (e) {
+      debugPrint('[Checkout] Order creation error: $e');
+      if (!mounted) return;
+      _showPaymentError('Could not place your order. Please try again.');
+    }
   }
 
   @override
