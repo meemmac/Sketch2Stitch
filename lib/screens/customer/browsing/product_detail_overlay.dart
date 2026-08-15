@@ -5,6 +5,7 @@ import 'package:sketch2stitch/services/cart_service.dart';
 import 'package:sketch2stitch/services/user_session.dart';
 import '../../../widgets/video_preview_player.dart';
 import '../../../widgets/care_info_tooltip.dart';
+import '../../../widgets/top_feedback_banner.dart';
 
 class ProductDetailOverlay extends StatefulWidget {
   final Product product;
@@ -92,9 +93,9 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
       return;
     }
 
-    // Captured up front: the confirmation snackbar is shown after this
+    // Captured up front: the confirmation banner is shown after this
     // sheet has been popped, so `context` is no longer usable by then.
-    final messenger = ScaffoldMessenger.of(context);
+    final overlay = Overlay.of(context, rootOverlay: true);
     final navigator = Navigator.of(context);
 
     setState(() => _isAddingToCart = true);
@@ -106,12 +107,12 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
         _quantity,
       );
       navigator.pop();
-      _showSnack('Added to cart!', messenger: messenger);
+      _showSnack('Added to cart!', overlay: overlay);
     } catch (e) {
       _showSnack(
         e is CartServiceException ? e.message : 'Could not add to cart.',
         isError: true,
-        messenger: messenger,
+        overlay: overlay,
       );
     } finally {
       if (mounted) setState(() => _isAddingToCart = false);
@@ -121,16 +122,11 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
   void _showSnack(
     String message, {
     bool isError = false,
-    ScaffoldMessengerState? messenger,
+    OverlayState? overlay,
   }) {
-    (messenger ?? ScaffoldMessenger.of(context)).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor:
-            isError ? Colors.red.shade700 : const Color(0xFF4E8B6F),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    final target = overlay ?? Overlay.maybeOf(context, rootOverlay: true);
+    if (target == null) return;
+    AppFeedback.showInOverlay(target, message, isError: isError);
   }
 
   @override

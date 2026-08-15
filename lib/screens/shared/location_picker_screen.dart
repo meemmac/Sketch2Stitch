@@ -5,6 +5,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import '../../widgets/top_feedback_banner.dart';
 
 /// Free, no-API-key map picker built on flutter_map + OpenStreetMap-based
 /// tiles. Returns a Firestore GeoPoint via Navigator.pop when confirmed.
@@ -70,18 +71,15 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           _searchResults = results.cast<Map<String, dynamic>>();
         });
         if (results.isEmpty && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No results found for that location')),
-          );
+          AppFeedback.show(context, 'No results found for that location',
+              isError: true);
         }
       } else {
         throw Exception('Search failed (${response.statusCode})');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Search error: $e')),
-        );
+        AppFeedback.show(context, 'Search error: $e', isError: true);
       }
     } finally {
       if (mounted) setState(() => _searching = false);
@@ -121,9 +119,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       _mapController.move(target, 16);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not get current location: $e')),
-        );
+        AppFeedback.show(context, 'Could not get current location: $e',
+            isError: true);
       }
     } finally {
       if (mounted) setState(() => _locating = false);

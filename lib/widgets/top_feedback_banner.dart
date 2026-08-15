@@ -189,6 +189,18 @@ class AppFeedback {
   }) {
     final overlay = Overlay.maybeOf(context, rootOverlay: true);
     if (overlay == null) return;
+    showInOverlay(overlay, message, isError: isError, duration: duration);
+  }
+
+  /// Same banner, for callers that captured the overlay before an await
+  /// (e.g. a sheet that pops itself before showing the confirmation).
+  static void showInOverlay(
+    OverlayState overlay,
+    String message, {
+    bool isError = false,
+    Duration duration = const Duration(seconds: 3),
+  }) {
+    if (!overlay.mounted) return;
 
     dismiss();
 

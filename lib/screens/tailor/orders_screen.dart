@@ -10,6 +10,7 @@ import '../../../services/user_session.dart';
 import '../../../services/order_service.dart';
 import '../../../models/tailor_job.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../widgets/top_feedback_banner.dart';
 
 enum TailorOrderStatus { pending, confirmed, inProgress, ready, completed, cancelled }
 
@@ -109,9 +110,6 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
   bool _isLoading = true;
 
   // Top feedback state (matching RegisterScreen)
-  String? _feedbackMessage;
-  Color? _feedbackColor;
-  Timer? _feedbackTimer;
 
   final Color primaryGreen = const Color(0xFF4F7942);
 
@@ -239,36 +237,12 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
   void dispose() {
     _searchController.dispose();
     _ordersSubscription?.cancel();
-    _feedbackTimer?.cancel();
     super.dispose();
   }
 
   void _showBanner(String message, {bool isError = true}) {
-    // Show standard SnackBar so it's visible over bottom sheets
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red.shade700 : Colors.green.shade700,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
-
-    // Keep the custom banner for the main screen if no sheet is open
-    _feedbackTimer?.cancel();
-    setState(() {
-      _feedbackMessage = message;
-      _feedbackColor = isError ? Colors.red.shade700 : Colors.green.shade700;
-    });
-
-    _feedbackTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted) {
-        setState(() {
-          _feedbackMessage = null;
-        });
-      }
-    });
+    // Single app-wide top banner; also visible over bottom sheets.
+    AppFeedback.show(context, message, isError: isError);
   }
 
   final List<TailorOrder> _orders = [];
@@ -570,116 +544,6 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                       emptyText: "No completed orders found",
                     ),
                 ],
-              ),
-            // Top Feedback Banner
-            if (_feedbackMessage != null)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  child: SafeArea(
-                    bottom: false,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _feedbackColor == Colors.red.shade700
-                                ? const Color(0xFFFFEBEE).withValues(alpha: 0.92)
-                                : const Color(0xFFC8E6C9).withValues(alpha: 0.92),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: _feedbackColor == Colors.red.shade700
-                                  ? const Color(0xFFFFCDD2)
-                                  : const Color(0xFF9CCC9F),
-                              width: 1.2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _feedbackColor == Colors.red.shade700
-                                    ? const Color(0xFFD32F2F).withValues(alpha: 0.10)
-                                    : const Color(0xFF2E7D32).withValues(alpha: 0.10),
-                                blurRadius: 20,
-                                spreadRadius: 1,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 38,
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: _feedbackColor == Colors.red.shade700
-                                      ? const Color(0xFFE53935)
-                                      : const Color(0xFF4CAF50),
-                                  border: Border.all(
-                                    color: _feedbackColor == Colors.red.shade700
-                                        ? const Color(0xFFEF9A9A)
-                                        : const Color(0xFFA5D6A7),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Icon(
-                                  _feedbackColor == Colors.red.shade700
-                                      ? Icons.close_rounded
-                                      : Icons.check_rounded,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  _feedbackMessage!,
-                                  style: const TextStyle(
-                                    color: Color(0xFF222222),
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
-                                    height: 1.35,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _feedbackMessage = null;
-                                  });
-                                },
-                                child: Container(
-                                  width: 28,
-                                  height: 28,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.white.withValues(alpha: 0.35),
-                                  ),
-                                  child: Icon(
-                                    Icons.close_rounded,
-                                    color: Colors.black.withValues(alpha: 0.45),
-                                    size: 18,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
               ),
           ],
         ),

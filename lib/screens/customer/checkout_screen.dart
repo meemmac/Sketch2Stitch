@@ -9,6 +9,7 @@ import '../../services/bkash_service.dart';
 import 'bkash_payment_screen.dart';
 import '../../services/checkout_service.dart';
 import '../../services/user_session.dart';
+import '../../widgets/top_feedback_banner.dart';
 
 /// ─── Checkout Screen ────────────────────────────────────────────────────
 ///
@@ -135,19 +136,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _trxIds[retailerId] = executed.trxID;
         _payingRetailerId = null;
       });
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: const Text('Payment confirmed successfully'),
-            backgroundColor: const Color(0xFF1B5E20),
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
+      AppFeedback.show(context, 'Payment confirmed successfully');
     } on BkashException catch (e) {
       if (!mounted) return;
       _showPaymentError(e.message);
@@ -167,19 +156,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _showPaymentError(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red.shade800,
-          duration: const Duration(seconds: 5),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+    AppFeedback.show(
+      context,
+      message,
+      isError: true,
+      duration: const Duration(seconds: 5),
+    );
   }
 
   /// Creates the order in Firestore, clears the cart, starts a local

@@ -10,6 +10,7 @@ import 'browsing/browse_shell.dart';
 import 'running_orders_screen.dart';
 import '../../models/sub_order.dart';
 import 'virtual_trial_screen.dart';
+import '../../widgets/top_feedback_banner.dart';
 
 // `CartLine` and `RetailerInfo` now live in models/cart_item.dart and are
 // built by CartService from `Cart-Items` -> `Products` -> `Retailer`.
@@ -82,13 +83,12 @@ class _CartScreenState extends State<CartScreen> {
 
   void _showError(Object error) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(error is CartServiceException
-            ? error.message
-            : 'Something went wrong. Please try again.'),
-        backgroundColor: Colors.red.shade700,
-      ),
+    AppFeedback.show(
+      context,
+      error is CartServiceException
+          ? error.message
+          : 'Something went wrong. Please try again.',
+      isError: true,
     );
   }
 
@@ -202,12 +202,10 @@ class _CartScreenState extends State<CartScreen> {
   /// into an existing order — that's what Running Orders is for.
   void _checkout() {
     if (_measurement == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Add your measurements in your profile before checking out.',
-          ),
-        ),
+      AppFeedback.show(
+        context,
+        'Add your measurements in your profile before checking out.',
+        isError: true,
       );
       return;
     }

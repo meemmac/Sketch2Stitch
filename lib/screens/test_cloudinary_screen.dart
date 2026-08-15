@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/widgets/cloudinary_image.dart';
 import 'package:sketch2stitch/widgets/image_upload_button.dart';
+import 'package:sketch2stitch/widgets/top_feedback_banner.dart';
 
 class TestCloudinaryScreen extends StatefulWidget {
   const TestCloudinaryScreen({super.key});
