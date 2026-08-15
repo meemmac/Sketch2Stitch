@@ -353,46 +353,30 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     );
 
     try {
-      // 1. Call Gemini for fabric estimation
+      // 1. Load the reference images the result must actually be based on:
+      //    the garments the customer picked in the cart (their chosen colour
+      //    option) first, then any references they uploaded here.
       setState(() {
-        _statusMessage = 'Estimating fabric requirements with Gemini...';
+        _statusMessage = 'Loading your selected designs...';
       });
+      final referenceBytes = await _loadReferenceBytes();
 
-      final fabric = await AIService.estimateFabricWithGemini(
+      // 2. One call: Gemini estimates the fabric AND generates the try-on
+      //    image from those same references, so the preview shows the garment
+      //    the customer chose rather than an unrelated stock photo.
+      final (imageBytes, fabric) =
+          await AIService.generateVirtualTrialFromProfile(
         geminiApiKey: geminiKey,
+        hfToken: APIConfig.hfToken,
+        profile: profileSnapshot,
+        referenceImageBytes: referenceBytes,
         measurements: _measurements,
         stylePreferences: _selectedStyles.toList(),
         customInstructions: _customInstructionsController.text.trim(),
+        onStatus: (status) {
+          if (mounted) setState(() => _statusMessage = status);
+        },
       );
-
-      // 2. Local mock delay for image loading
-      setState(() {
-        _statusMessage = 'Loading virtual trial preview...';
-      });
-      await Future.delayed(const Duration(seconds: 1));
-
-      // 3. Load random mock image from assets (image generation is disconnected from API)
-      final List<String> mockImages = [
-        'crochet.jpg',
-        'embroidery.jpg',
-        'fab.jpg',
-        'fab2.jpg',
-        'fabric_waves.jpg',
-        'gorgeous.jpg',
-        'lace.jpg',
-        'saree.jpg',
-        'silk.jpg',
-        'tassel.jpg',
-        'textile.jpg',
-      ];
-      mockImages.shuffle();
-      final selectedAssetName = 'assets/images/${mockImages.first}';
-
-      // Load image bytes from Flutter asset bundle
-      final assetData = await DefaultAssetBundle.of(
-        context,
-      ).load(selectedAssetName);
-      final imageBytes = assetData.buffer.asUint8List();
 
       if (!mounted) return;
       setState(() {
