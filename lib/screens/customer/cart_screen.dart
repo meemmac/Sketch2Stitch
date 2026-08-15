@@ -4,9 +4,9 @@ import '../../models/measurement.dart';
 import 'package:sketch2stitch/screens/customer/checkout_screen.dart';
 import '../../services/cart_service.dart';
 import '../../services/measurement_service.dart';
+import '../../services/order_service.dart';
 import '../../services/user_session.dart';
 import 'browsing/browse_shell.dart';
-import 'order_session.dart';
 import 'running_orders_screen.dart';
 import '../../models/sub_order.dart';
 import 'virtual_trial_screen.dart';
@@ -21,8 +21,8 @@ export '../../models/cart_item.dart' show CartLine, RetailerInfo;
 /// IMPORTANT: this screen NEVER blocks on existing orders. A customer can
 /// have any number of orders in progress (visible via the Running Orders
 /// entry point below) and still freely browse, add to cart, and check out
-/// a brand-new order at any time. Checkout always starts a NEW OrderRecord
-/// — it never redirects into an existing order's tailoring flow.
+/// a brand-new order at any time. Checkout always creates a NEW `Orders`
+/// document — it never redirects into an existing order's tailoring flow.
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -34,11 +34,16 @@ class CartScreen extends StatefulWidget {
 class _CartScreenState extends State<CartScreen> {
   final CartService _cartService = CartService();
   final MeasurementService _measurementService = MeasurementService();
+  final OrderService _orderService = OrderService();
 
   String get _customerId => UserSession.instance.uid ?? '';
 
   /// Live cart from Firestore, hydrated with product + retailer details.
   Stream<CartSnapshot>? _cartStream;
+
+  /// Live count of orders still needing a customer decision, for the
+  /// Running Orders badge in the app bar.
+  Stream<int>? _activeOrderCountStream;
 
   /// Latest snapshot, kept so checkout and the summary bar can read it
   /// without waiting on the stream again.
@@ -58,6 +63,9 @@ class _CartScreenState extends State<CartScreen> {
     _cartStream = _customerId.isEmpty
         ? const Stream<CartSnapshot>.empty()
         : _cartService.streamCart(_customerId);
+    _activeOrderCountStream = _customerId.isEmpty
+        ? const Stream<int>.empty()
+        : _orderService.streamActiveOrderCount(_customerId);
     _loadMeasurement();
   }
 
@@ -118,9 +126,9 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   /// Sub-orders built from the CURRENT cart snapshot. `orderId` is left
-  /// blank here on purpose — it doesn't exist yet. OrderStore.startOrder()
-  /// stamps the real orderId onto a copy of these once checkout actually
-  /// creates the order.
+  /// blank here on purpose — it doesn't exist yet.
+  /// CheckoutService.placeOrder() stamps the real orderId onto the
+  /// `Sub-orders` documents it writes once checkout creates the order.
   List<SubOrder> get _subOrders {
     return _groupedByRetailer.entries.map((entry) {
       final retailerId = entry.key;
