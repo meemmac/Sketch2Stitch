@@ -159,7 +159,7 @@ class AuthService {
       switch (e.code) {
         case 'wrong-password':
         case 'invalid-credential':
-									          throw AuthServiceException('Your current password is incorrect.');
+          throw AuthServiceException('Your current password is incorrect.');
         case 'requires-recent-login':
           throw AuthServiceException(
             'For security, please log out and log back in before changing your password.',

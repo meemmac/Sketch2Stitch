@@ -1209,16 +1209,31 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 const SizedBox(height: 14),
               ],
+              // Email is the account's login identity — it is shown for
+              // reference but cannot be edited here.
               TextField(
                 controller: _emailController,
-                style: fieldTextStyle,
+                style: fieldTextStyle.copyWith(color: Colors.black54),
+                readOnly: true,
+                enableInteractiveSelection: false,
                 decoration: InputDecoration(
                   labelText: "Email",
                   labelStyle: fieldLabelStyle,
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.email_outlined),
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.email_outlined),
+                  suffixIcon: const Icon(
+                    Icons.lock_outline,
+                    size: 18,
+                    color: Colors.black26,
+                  ),
+                  filled: true,
+                  fillColor: Colors.black.withValues(alpha: 0.03),
+                  helperText: "Your login email can't be changed.",
+                  helperStyle: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.black45,
+                  ),
                 ),
-                keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 14),
               TextField(
