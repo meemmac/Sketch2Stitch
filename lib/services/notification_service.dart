@@ -168,9 +168,16 @@ class NotificationService {
         DocumentSnapshot? lastDoc,
       }) async {
     try {
+      final cleanUserId = userId.trim();
+
+      if (cleanUserId.isEmpty) {
+        debugPrint('[NotificationService] Warning: Empty UID provided for getNotifications');
+        return [];
+      }
+
       Query query = _db
           .collection(_collection)
-          .where('userId', isEqualTo: userId)
+          .where('userId', isEqualTo: cleanUserId)
           .orderBy('createdAt', descending: true)
           .limit(limit);
 
@@ -198,10 +205,17 @@ class NotificationService {
   /// Marks all notifications for a user as read.
   Future<void> markAllNotificationsRead(String userId) async {
     try {
+      final cleanUserId = userId.trim();
+
+      if (cleanUserId.isEmpty) {
+        debugPrint('[NotificationService] Warning: Empty UID provided for markAllNotificationsRead');
+        return;
+      }
+
       final batch = _db.batch();
       final unread = await _db
           .collection(_collection)
-          .where('userId', isEqualTo: userId)
+          .where('userId', isEqualTo: cleanUserId)
           .where('isRead', isEqualTo: false)
           .get();
 
@@ -219,10 +233,17 @@ class NotificationService {
   /// Deletes all notifications for a specific user.
   Future<void> deleteAllNotifications(String userId) async {
     try {
+      final cleanUserId = userId.trim();
+
+      if (cleanUserId.isEmpty) {
+        debugPrint('[NotificationService] Warning: Empty UID provided for deleteAllNotifications');
+        return;
+      }
+
       final batch = _db.batch();
       final snapshots = await _db
           .collection(_collection)
-          .where('userId', isEqualTo: userId)
+          .where('userId', isEqualTo: cleanUserId)
           .get();
 
 
@@ -230,7 +251,7 @@ class NotificationService {
         batch.delete(doc.reference);
       }
       await batch.commit();
-      debugPrint('[NotificationService] All notifications deleted for UID: $userId');
+      debugPrint('[NotificationService] All notifications deleted for UID: $cleanUserId');
     } catch (e) {
       debugPrint('Error deleting notifications: $e');
     }
@@ -239,9 +260,17 @@ class NotificationService {
 
   /// Returns the count of unread notifications for a user.
   Stream<int> getUnreadNotificationCount(String userId) {
+    final cleanUserId = userId.trim();
+    debugPrint('[NotificationService] Getting unread count for UID: "$cleanUserId"');
+
+    if (cleanUserId.isEmpty) {
+      debugPrint('[NotificationService] Warning: Empty UID provided for notification count');
+      return Stream.value(0);
+    }
+
     return _db
         .collection(_collection)
-        .where('userId', isEqualTo: userId)
+        .where('userId', isEqualTo: cleanUserId)
         .where('isRead', isEqualTo: false)
         .snapshots()
         .map((snap) => snap.docs.length);
