@@ -5,16 +5,16 @@ import 'order_item.dart';
 class ColorOption {
   final int optionId;
   final String color;
-  final String? image;
-  final String? video;
+  final List<String> image; // Matches "image" array in Firestore schema
+  final List<String> video; // Matches "video" array in Firestore schema
   final double price;
   final int stock;
 
   ColorOption({
     required this.optionId,
     required this.color,
-    this.image,
-    this.video,
+    required this.image,
+    required this.video,
     required this.price,
     this.stock = 0,
   });
@@ -22,8 +22,8 @@ class ColorOption {
   ColorOption copyWith({
     int? optionId,
     String? color,
-    String? image,
-    String? video,
+    List<String>? image,
+    List<String>? video,
     double? price,
     int? stock,
   }) {
@@ -40,20 +40,63 @@ class ColorOption {
   Map<String, dynamic> toJson() => {
     'optionId': optionId,
     'color': color,
-    if (image != null) 'image': image,
-    if (video != null) 'video': video,
+    'image': image, // Schema field: image
+    'video': video, // Schema field: video
     'price': price,
     'stock': stock,
   };
 
   factory ColorOption.fromJson(Map<String, dynamic> json) {
+    // Schema field names are singular: 'image' and 'video'
+    List<String> imageList = [];
+    if (json['image'] is List) {
+      imageList = List<String>.from(json['image']);
+    } else if (json['images'] is List) {
+      // Compatibility with previous plural format
+      imageList = List<String>.from(json['images']);
+    } else if (json['image'] != null) {
+      // Handle legacy single string if any
+      imageList = [json['image'].toString()];
+    }
+
+    List<String> videoList = [];
+    if (json['video'] is List) {
+      videoList = List<String>.from(json['video']);
+    } else if (json['videos'] is List) {
+      // Compatibility with previous plural format
+      videoList = List<String>.from(json['videos']);
+    } else if (json['video'] != null) {
+      // Handle legacy single string if any
+      videoList = [json['video'].toString()];
+    }
+
     return ColorOption(
       optionId: json['optionId'] ?? 0,
       color: json['color'] ?? '',
-      image: json['image'],
-      video: json['video'],
+      image: imageList,
+      video: videoList,
       price: (json['price'] ?? 0).toDouble(),
       stock: json['stock'] ?? 0,
+    );
+  }
+}
+
+/// Represents a material component of a fabric
+class MaterialBlend {
+  final String type;
+  final double blend;
+
+  MaterialBlend({required this.type, required this.blend});
+
+  Map<String, dynamic> toJson() => {
+    'type': type,
+    'blend': blend,
+  };
+
+  factory MaterialBlend.fromJson(Map<String, dynamic> json) {
+    return MaterialBlend(
+      type: json['type'] ?? '',
+      blend: (json['blend'] ?? 0).toDouble(),
     );
   }
 }
@@ -63,8 +106,9 @@ class Product {
   final String retailerId;
   final String productName;
   final String category;
-  final String materialType;
-  final List<ColorOption> colorOptions; // Changed from List<String> to List<ColorOption>
+  final String productCode;
+  final List<MaterialBlend> materialType;
+  final List<ColorOption> colorOptions;
   final String description;
   final List<String> careSymbol;
   
@@ -76,6 +120,7 @@ class Product {
     required this.retailerId,
     required this.productName,
     required this.category,
+    required this.productCode,
     required this.materialType,
     required this.colorOptions,
     required this.description,
@@ -83,7 +128,7 @@ class Product {
     this.orderItems = const [],
   });
 
-  /// Get all available colors as strings (for backward compatibility)
+  /// Get all available colors as strings
   List<String> get colorNames => colorOptions.map((c) => c.color).toList();
   
   /// Get the minimum price across all color options
@@ -98,7 +143,7 @@ class Product {
     return colorOptions.map((c) => c.price).reduce((a, b) => a > b ? a : b);
   }
   
-  /// Get price range as string (e.g., "Tk 650 - 700")
+  /// Get price range as string
   String get priceRange {
     if (colorOptions.isEmpty) return 'Tk 0';
     if (minPrice == maxPrice) return 'Tk ${minPrice.toStringAsFixed(0)}';
@@ -110,7 +155,8 @@ class Product {
     String? retailerId,
     String? productName,
     String? category,
-    String? materialType,
+    String? productCode,
+    List<MaterialBlend>? materialType,
     List<ColorOption>? colorOptions,
     String? description,
     List<String>? careSymbol,
@@ -121,6 +167,7 @@ class Product {
       retailerId: retailerId ?? this.retailerId,
       productName: productName ?? this.productName,
       category: category ?? this.category,
+      productCode: productCode ?? this.productCode,
       materialType: materialType ?? this.materialType,
       colorOptions: colorOptions ?? this.colorOptions,
       description: description ?? this.description,
@@ -130,50 +177,52 @@ class Product {
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'retailerId': retailerId,
     'productName': productName,
+    'retailerId': retailerId,
     'category': category,
-    'materialType': materialType,
+    'productCode': productCode,
+    'materialType': materialType.map((m) => m.toJson()).toList(),
     'colorOptions': colorOptions.map((c) => c.toJson()).toList(),
     'description': description,
     'careSymbol': careSymbol,
   };
 
-  factory Product.fromJson(Map<String, dynamic> json) {
-    // Parse colorOptions - could be List<Map> (new format) or List<String> (old format)
+  factory Product.fromJson(Map<String, dynamic> json, {String? id}) {
+    // Parse colorOptions
     List<ColorOption> colorOptionsList = [];
-    
     final rawColorOptions = json['colorOptions'];
     if (rawColorOptions != null && rawColorOptions is List) {
       colorOptionsList = rawColorOptions.map((item) {
         if (item is Map<String, dynamic>) {
-          // New format: ColorOption object
           return ColorOption.fromJson(item);
-        } else if (item is String) {
-          // Old format: just color names (fallback)
-          return ColorOption(
-            optionId: colorOptionsList.length + 1,
-            color: item,
-            price: 0.0,
-            stock: 0,
-          );
         }
         return ColorOption(
           optionId: 0,
           color: item.toString(),
+          image: [],
+          video: [],
           price: 0.0,
           stock: 0,
         );
       }).toList();
     }
 
+    // Parse materialType
+    List<MaterialBlend> materialTypeItems = [];
+    final rawMaterialType = json['materialType'];
+    if (rawMaterialType != null && rawMaterialType is List) {
+      materialTypeItems = rawMaterialType
+          .map((item) => MaterialBlend.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
+    }
+
     return Product(
-      id: json['id'] ?? '',
+      id: id ?? json['id'] ?? '',
       retailerId: json['retailerId'] ?? '',
       productName: json['productName'] ?? '',
       category: json['category'] ?? '',
-      materialType: json['materialType'] ?? '',
+      productCode: json['productCode'] ?? '',
+      materialType: materialTypeItems,
       colorOptions: colorOptionsList,
       description: json['description'] ?? '',
       careSymbol: List<String>.from(json['careSymbol'] ?? []),

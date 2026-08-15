@@ -11,14 +11,14 @@ class CloudinaryService {
   static const String uploadPreset = 'sketch2stitch'; // Your preset name from the image
   
   static String get uploadUrl => 
-      'https://api.cloudinary.com/v1_1/$cloudName/image/upload';
+      'https://api.cloudinary.com/v1_1/$cloudName/auto/upload';
   
   final ImagePicker _picker = ImagePicker();
 
-  Future<String?> uploadImage(File imageFile, {String? folder}) async {
+  Future<String?> uploadImage(File file, {String? folder}) async {
     try {
-      if (!await imageFile.exists()) {
-        throw Exception('Image file does not exist');
+      if (!await file.exists()) {
+        throw Exception('File does not exist');
       }
 
       var request = http.MultipartRequest('POST', Uri.parse(uploadUrl));
@@ -26,20 +26,21 @@ class CloudinaryService {
       request.files.add(
         await http.MultipartFile.fromPath(
           'file',
-          imageFile.path,
-          filename: path.basename(imageFile.path),
+          file.path,
+          filename: path.basename(file.path),
         ),
       );
 
       // Using your preset: sketch2stitch
       request.fields['upload_preset'] = uploadPreset;
+      request.fields['resource_type'] = 'auto'; // Explicitly set to auto
       if (folder != null && folder.isNotEmpty) {
         request.fields['folder'] = folder;
       }
 
       print('📤 Uploading image to Cloudinary...');
       print('📁 Folder: ${folder ?? 'root'}');
-      print('📎 File: ${path.basename(imageFile.path)}');
+      print('📎 File: ${path.basename(file.path)}');
       print('🌐 URL: $uploadUrl');
       print('🔑 Preset: $uploadPreset');
 

@@ -55,6 +55,32 @@ class MeasurementService {
     }
   }
 
+  // ── getOrCreateMeasurement ─────────────────────────────────────────────────
+
+  /// Returns the customer's existing [Measurement], or — if this is a brand
+  /// new customer with no record yet — creates one with every field set to
+  /// `0` and returns that instead.
+  ///
+  /// This is the method you want to call the moment a user lands on the
+  /// measurement screen (right after registration, or any time after), so
+  /// there's always a valid document to read from and update. It avoids a
+  /// race where two callers both see "no measurement" and both try to
+  /// create one, by re-checking right before the write.
+  Future<Measurement> getOrCreateMeasurement(String customerId) async {
+    final existing = await getMeasurement(customerId);
+    if (existing != null) return existing;
+
+    try {
+      return await createMeasurement(customerId, Measurement.empty(customerId).toJson());
+    } on MeasurementServiceException {
+      // Narrow race window: another call created it between our read and
+      // write above. Re-fetch once instead of creating a duplicate doc.
+      final recheck = await getMeasurement(customerId);
+      if (recheck != null) return recheck;
+      rethrow;
+    }
+  }
+
   // ── createMeasurement ──────────────────────────────────────────────────────
 
   /// Creates a new measurement document for [customerId] in the `Measurement`
@@ -67,8 +93,12 @@ class MeasurementService {
     Map<String, dynamic> data,
   ) async {
     try {
+      // 'id' is the Firestore doc id, not a field to store inside the
+      // document — strip it (Measurement.toJson() includes it as '' for
+      // brand-new/unsaved records).
       final payload = Map<String, dynamic>.from(data)
-        ..['customerId'] = customerId;
+        ..['customerId'] = customerId
+        ..remove('id');
 
       final ref = await _db.collection(_measurements).add(payload);
       final snap = await ref.get();
@@ -93,8 +123,9 @@ class MeasurementService {
     Map<String, dynamic> data,
   ) async {
     try {
+      final payload = Map<String, dynamic>.from(data)..remove('id');
       final ref = _db.collection(_measurements).doc(measurementId);
-      await ref.update(data);
+      await ref.update(payload);
       final snap = await ref.get();
 
       if (!snap.exists) {

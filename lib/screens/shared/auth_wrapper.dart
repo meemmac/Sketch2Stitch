@@ -92,7 +92,7 @@ class AuthWrapper extends StatelessWidget {
         location = profile.location;
       } else if (profile is Retailer) {
         shopName = profile.shopName;
-        name = profile.shopName; 
+        name = profile.shopName;
         rating = profile.rating;
         profilePicture = profile.profilePicture;
         about = profile.about;
@@ -102,9 +102,9 @@ class AuthWrapper extends StatelessWidget {
       final drawerData = DrawerProfileData(
         name: name,
         shopName: shopName,
-        email: profile.email,
-        phone: profile.phone,
-        address: profile.address,
+        email: profile.email ?? '',
+        phone: profile.phone ?? '',
+        address: profile.address ?? '',
         rating: rating,
         location: location,
         profilePicture: profilePicture,
@@ -112,7 +112,7 @@ class AuthWrapper extends StatelessWidget {
       );
 
       // Save to global session
-      UserSession.instance.setSession(drawerData, role);
+      UserSession.instance.setSession(drawerData, role, uid: uid);
       
       return role;
     } catch (e) {

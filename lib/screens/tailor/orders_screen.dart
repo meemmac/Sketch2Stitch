@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:ui';
 import '../../../models/measurement.dart';
+import '../../../models/tailor.dart';
 import 'reviews_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../services/tailor_service.dart';
+import '../../../services/user_session.dart';
 
 enum TailorOrderStatus { pending, confirmed, inProgress, ready, completed, cancelled }
 
@@ -74,7 +79,9 @@ class TailorOrder {
 enum OrderFilterPreset { last3Months, last6Months, custom }
 
 class TailorOrdersScreen extends StatefulWidget {
-  const TailorOrdersScreen({super.key});
+  final Tailor? tailor; 
+
+  const TailorOrdersScreen({super.key, this.tailor});
 
   @override
   State<TailorOrdersScreen> createState() => _TailorOrdersScreenState();
@@ -88,13 +95,68 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
   DateTime? _customEndDate;
   int _selectedTabIndex = 1; // 0: Pending, 1: Current, 2: Completed
   String _selectedStatus = "All";
+  late Tailor _tailor; 
+  final TailorService _tailorService = TailorService(); //Added service
+
+  // Top feedback state (matching RegisterScreen)
+  String? _feedbackMessage;
+  Color? _feedbackColor;
+  Timer? _feedbackTimer;
 
   final Color primaryGreen = const Color(0xFF4F7942);
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.tailor != null) {
+      _tailor = widget.tailor!;
+    } else {
+      _tailor = Tailor(
+        id: "T-123",
+        name: "Loading...",
+        email: "",
+        phone: "",
+        address: "",
+        rating: 5.0,
+        maxOrder: null, // Defaults to Not Set (unlimited)
+      );
+      _fetchTailorProfile();
+    }
+  }
+
+  Future<void> _fetchTailorProfile() async {
+    final uid = UserSession.instance.uid;
+    if (uid != null) {
+      final t = await _tailorService.getTailorProfile(uid);
+      if (t != null && mounted) {
+        setState(() {
+          _tailor = t;
+        });
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
+    _feedbackTimer?.cancel();
     super.dispose();
+  }
+
+  void _showBanner(String message, {bool isError = true}) {
+    _feedbackTimer?.cancel();
+    setState(() {
+      _feedbackMessage = message;
+      _feedbackColor = isError ? Colors.red.shade700 : Colors.green.shade700;
+    });
+
+    _feedbackTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() {
+          _feedbackMessage = null;
+        });
+      }
+    });
   }
 
   final Measurement _mockMeasurement = Measurement(
@@ -291,98 +353,223 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF9FBF9),
       body: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(horizontalPadding, 18, horizontalPadding, 24),
+        child: Stack(
           children: [
-            Row(
+            ListView(
+              padding: EdgeInsets.fromLTRB(horizontalPadding, 18, horizontalPadding, 24),
               children: [
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "Tailoring Orders",
+                        style: TextStyle(
+                          fontSize: screenWidth > 400 ? 30 : 24,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _showFilterSheet,
+                      icon: Icon(Icons.filter_list, color: primaryGreen),
+                      tooltip: "Filter orders",
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    "Tailoring Orders",
-                    style: TextStyle(
-                      fontSize: screenWidth > 400 ? 30 : 24,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black87,
+                const SizedBox(height: 16),
+                _buildSearchAndFilter(),
+                const SizedBox(height: 20),
+                _buildMaxOrderButton(), // 🆕 Replaced capacity section with button
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _sectionToggle(
+                        label: "Pending",
+                        isSelected: _selectedTabIndex == 0,
+                        count: _pendingOrders.length,
+                        onTap: () => setState(() {
+                          _selectedTabIndex = 0;
+                          _selectedStatus = "All";
+                        }),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _sectionToggle(
+                        label: "Ongoing",
+                        isSelected: _selectedTabIndex == 1,
+                        count: _currentWorkOrders.length,
+                        onTap: () => setState(() {
+                          _selectedTabIndex = 1;
+                          _selectedStatus = "All";
+                        }),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _sectionToggle(
+                        label: "Completed",
+                        isSelected: _selectedTabIndex == 2,
+                        count: _completedOrders.length,
+                        onTap: () => setState(() {
+                          _selectedTabIndex = 2;
+                          _selectedStatus = "All";
+                        }),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                if (_selectedTabIndex == 0)
+                  _ordersSection(
+                    title: "New Requests",
+                    icon: Icons.pending_actions,
+                    orders: _pendingOrders,
+                    emptyText: "No pending requests",
+                  )
+                else if (_selectedTabIndex == 1)
+                  _ordersSection(
+                    title: "Active Orders",
+                    icon: Icons.assignment_outlined,
+                    orders: _currentWorkOrders,
+                    emptyText: "No active tailoring requests",
+                  )
+                else
+                  _ordersSection(
+                    title: "Finished Work",
+                    icon: Icons.task_alt,
+                    orders: _completedOrders,
+                    emptyText: "No completed orders found",
+                  ),
+              ],
+            ),
+            // 🆕 Top Feedback Banner (matching RegisterScreen)
+            if (_feedbackMessage != null)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: SafeArea(
+                    bottom: false,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            // Glass background
+                            color: _feedbackColor == Colors.red.shade700
+                                ? const Color(0xFFFFEBEE).withValues(alpha: 0.92)
+                                : const Color(0xFFC8E6C9).withValues(alpha: 0.92),
+
+                            borderRadius: BorderRadius.circular(18),
+
+                            // Soft border like the screenshot
+                            border: Border.all(
+                              color: _feedbackColor == Colors.red.shade700
+                                  ? const Color(0xFFFFCDD2)
+                                  : const Color(0xFF9CCC9F),
+                              width: 1.2,
+                            ),
+
+                            // Soft glass shadow
+                            boxShadow: [
+                              BoxShadow(
+                                color: _feedbackColor == Colors.red.shade700
+                                    ? const Color(0xFFD32F2F).withValues(alpha: 0.10)
+                                    : const Color(0xFF2E7D32).withValues(alpha: 0.10),
+                                blurRadius: 20,
+                                spreadRadius: 1,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              // Icon Circle
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: _feedbackColor == Colors.red.shade700
+                                      ? const Color(0xFFE53935)
+                                      : const Color(0xFF4CAF50),
+                                  border: Border.all(
+                                    color: _feedbackColor == Colors.red.shade700
+                                        ? const Color(0xFFEF9A9A)
+                                        : const Color(0xFFA5D6A7),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Icon(
+                                  _feedbackColor == Colors.red.shade700
+                                      ? Icons.close_rounded
+                                      : Icons.check_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              // Message
+                              Expanded(
+                                child: Text(
+                                  _feedbackMessage!,
+                                  style: const TextStyle(
+                                    color: Color(0xFF222222),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                    height: 1.35,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Close Button
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _feedbackMessage = null;
+                                  });
+                                },
+                                child: Container(
+                                  width: 28,
+                                  height: 28,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.white.withValues(alpha: 0.35),
+                                  ),
+                                  child: Icon(
+                                    Icons.close_rounded,
+                                    color: Colors.black.withValues(alpha: 0.45),
+                                    size: 18,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-                IconButton(
-                  onPressed: _showFilterSheet,
-                  icon: Icon(Icons.filter_list, color: primaryGreen),
-                  tooltip: "Filter orders",
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildSearchAndFilter(),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: _sectionToggle(
-                    label: "Pending",
-                    isSelected: _selectedTabIndex == 0,
-                    count: _pendingOrders.length,
-                    onTap: () => setState(() {
-                      _selectedTabIndex = 0;
-                      _selectedStatus = "All";
-                    }),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _sectionToggle(
-                    label: "Ongoing",
-                    isSelected: _selectedTabIndex == 1,
-                    count: _currentWorkOrders.length,
-                    onTap: () => setState(() {
-                      _selectedTabIndex = 1;
-                      _selectedStatus = "All";
-                    }),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _sectionToggle(
-                    label: "Completed",
-                    isSelected: _selectedTabIndex == 2,
-                    count: _completedOrders.length,
-                    onTap: () => setState(() {
-                      _selectedTabIndex = 2;
-                      _selectedStatus = "All";
-                    }),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            if (_selectedTabIndex == 0)
-              _ordersSection(
-                title: "New Requests",
-                icon: Icons.pending_actions,
-                orders: _pendingOrders,
-                emptyText: "No pending requests",
-              )
-            else if (_selectedTabIndex == 1)
-              _ordersSection(
-                title: "Active Orders",
-                icon: Icons.assignment_outlined,
-                orders: _currentWorkOrders,
-                emptyText: "No active tailoring requests",
-              )
-            else
-              _ordersSection(
-                title: "Finished Work",
-                icon: Icons.task_alt,
-                orders: _completedOrders,
-                emptyText: "No completed orders found",
               ),
           ],
         ),
@@ -648,7 +835,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5))],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -678,7 +865,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                      decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(999)),
+                      decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(999)),
                       child: Text(_getStatusText(order.status), style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w900)),
                     ),
                     if (order.status == TailorOrderStatus.inProgress)
@@ -948,7 +1135,8 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
             onPressed: canAccept ? () {
               setState(() => order.status = TailorOrderStatus.confirmed);
               Navigator.pop(modalContext);
-              ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text("Job Accepted Successfully!")));
+              // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Job Accepted Successfully!")));
+              _showBanner("Job Accepted Successfully!", isError: false);
             } : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryGreen,
@@ -1232,7 +1420,35 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text("Please tell us why you're declining this request. This feedback helps customers understand.", style: TextStyle(color: Colors.black54, fontSize: 12)),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
+            const Text("Quick Reasons:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                "Unable to work with selected material",
+                "Order requirements are unclear",
+                "Delivery location issue"
+              ].map((reason) => GestureDetector(
+                onTap: () {
+                  controller.text = reason;
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Text(
+                    reason,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87),
+                  ),
+                ),
+              )).toList(),
+            ),
+            const SizedBox(height: 18),
             TextField(
               controller: controller,
               maxLines: 3,
@@ -1249,6 +1465,8 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
             ),
           ],
         ),
+
+
         actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
           Row(
@@ -1265,13 +1483,16 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 child: ElevatedButton(
                   onPressed: () {
                     if (controller.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please provide a reason")));
+                      // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please provide a reason")));
+                      _showBanner("Please provide a reason", isError: true);
                       return;
                     }
                     setState(() {
                       order.status = TailorOrderStatus.cancelled;
                     });
                     Navigator.pop(context);
+                    // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Request declined successfully.")));
+                    _showBanner("Request declined successfully.", isError: false);
                     if (onDone != null) onDone();
                   },
                   style: ElevatedButton.styleFrom(
@@ -1353,9 +1574,10 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
               child: IconButton(
                 icon: const Icon(Icons.download, color: Colors.white, size: 30),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Reference image download started...")),
-                  );
+                  // ScaffoldMessenger.of(context).showSnackBar(
+                  //   const SnackBar(content: Text("Reference image download started...")),
+                  // );
+                  _showBanner("Reference image download started...", isError: false);
                 },
               ),
             ),
@@ -1498,5 +1720,219 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
   String _formatDate(DateTime date) {
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     return "${date.day} ${months[date.month - 1]} ${date.year}";
+  }
+
+  /*
+  // ORIGINAL Max Order section
+  Widget _buildMaxOrderButton() {
+    final int? maxOrder = _tailor.maxOrder;
+    final String label = maxOrder == null ? "Maximum Orders: Not Set" : "Maximum Orders: $maxOrder";
+    
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.green.shade100, width: 1.5),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.bolt_outlined, size: 20, color: primaryGreen),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                  color: Colors.green.shade900,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _showMaxOrderDialog,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryGreen,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              "Update Maximum Orders",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+  */
+
+  // Added Max Order Info and Update Button
+  Widget _buildMaxOrderButton() {
+    final int? maxOrder = _tailor.maxOrder;
+    final String value = maxOrder == null ? "Not Set" : "$maxOrder";
+    
+    return InkWell(
+      onTap: _showMaxOrderDialog,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.green.shade100, width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: primaryGreen.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.bolt_rounded, size: 20, color: primaryGreen),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              "Maximum Order Capacity:",
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: Colors.black54,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              value,
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+                color: primaryGreen,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              maxOrder == null ? "Set" : "Update",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: primaryGreen,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right_rounded, size: 16, color: primaryGreen),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showMaxOrderDialog() {
+    final controller = TextEditingController(
+      text: _tailor.maxOrder?.toString() ?? "",
+    );
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          "Set Maximum Orders",
+          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Set the maximum number of orders you can handle. Leave empty for unlimited orders.",
+              style: TextStyle(color: Colors.black54, fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                hintText: "Enter amount (e.g. 10)",
+                filled: true,
+                fillColor: Colors.grey.shade50,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade200),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final val = controller.text.trim();
+              final newMaxOrder = val.isEmpty ? null : int.tryParse(val);
+              
+              // Only proceed if the value has actually changed
+              if (newMaxOrder == _tailor.maxOrder) {
+                Navigator.pop(context);
+                return;
+              }
+
+              // Dismiss dialog immediately
+              Navigator.pop(context);
+
+              setState(() {
+                _tailor = _tailor.copyWith(maxOrder: newMaxOrder);
+              });
+
+              // Persistence logic
+              final uid = UserSession.instance.uid;
+              if (uid != null) {
+                try {
+                  await _tailorService.updateTailorProfile(uid, {'maxOrder': newMaxOrder});
+                  _showBanner("Capacity updated successfully!", isError: false);
+                } catch (e) {
+                  debugPrint("Error updating maximum order: $e");
+                  _showBanner("Failed to update server: $e", isError: true);
+                }
+              } else {
+                _showBanner("Local capacity updated (Not logged in)", isError: false);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryGreen,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              "Save",
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

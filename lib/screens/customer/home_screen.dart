@@ -409,7 +409,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         ),
         const SizedBox(width: 10),
         _navPill(
-          'Favorites',
+          'Wishlist',
           Icons.favorite_border_rounded,
           () => _scrollToSection(_favoritesKey),
         ),
@@ -817,7 +817,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader('Favorites'),
+        _buildSectionHeader('Wishlist'),
         const SizedBox(height: 12),
         _buildFavoritesTabBar(),
         const SizedBox(height: 14),
@@ -834,7 +834,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           children: [
             _buildRetailerRow(items),
             _buildSeeAllButton(
-              () => _openSeeAllRetailers('Favorite Retailers', items),
+              () => _openSeeAllRetailers('Wish-listed Retailers', items),
             ),
           ],
         );
@@ -844,7 +844,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           children: [
             _buildTailorRow(items),
             _buildSeeAllButton(
-              () => _openSeeAllTailors('Favorite Tailors', items),
+              () => _openSeeAllTailors('Wish-listed Tailors', items),
             ),
           ],
         );
@@ -854,7 +854,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           children: [
             _buildFabricRow(items),
             _buildSeeAllButton(
-              () => _openSeeAllProducts('Favorite Fabrics & Elements', items),
+              () => _openSeeAllProducts('Wish-listed Fabrics & Elements', items),
             ),
           ],
         );
@@ -1108,8 +1108,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   }
 
   Widget _buildFabricCard(Product product) {
-    final coverImage = product.colorOptions.isNotEmpty
-        ? product.colorOptions.first.image
+    final coverImage = product.colorOptions.isNotEmpty && product.colorOptions.first.image.isNotEmpty
+        ? product.colorOptions.first.image.first
         : null;
     final bool outOfStock = product.colorOptions.every((c) => c.stock <= 0);
 
@@ -1349,7 +1349,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         return fabricData.materialDisplay;
       }
     }
-    final material = product.materialType.trim();
+    final material = product.materialType.isNotEmpty ? product.materialType.first.type : "";
     if (material.isEmpty || material == "N/A") {
       return "N/A";
     }
