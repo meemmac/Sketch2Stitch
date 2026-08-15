@@ -232,22 +232,13 @@ class AuthService {
   Future<dynamic> getUserProfile(String uid, UserRole role) async {
     try {
       final collection = _getCollectionForRole(role);
-      debugPrint('[AuthService] Fetching profile from $collection for UID: $uid');
       final doc = await _firestore.collection(collection).doc(uid).get();
 
-
-
-
       if (!doc.exists || doc.data() == null) {
-        debugPrint('[AuthService] No document found in $collection for UID: $uid');
         return null;
       }
 
-
-
-
       final data = doc.data()!;
-      debugPrint('[AuthService] Data found: $data');
       switch (role) {
         case UserRole.customer:
           return Customer.fromJson(data, id: uid);

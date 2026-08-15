@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../models/appearance_profile.dart';
 import '../../models/user_role.dart';
 import '../../services/ai_service.dart';
+import '../../services/measurement_service.dart';
 import '../../services/user_session.dart';
 import '../../services/virtual_trial_service.dart';
 import '../../models/customer.dart' show kVirtualTrialMonthlyLimit;
@@ -15,7 +16,6 @@ import '../../utils/api_config.dart';
 import '../../widgets/dashboard_drawer.dart';
 import 'home_screen.dart';
 import 'package:gal/gal.dart';
-import '../../widgets/color_wheel_picker.dart';
 import '../../widgets/color_picker_row.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -131,16 +131,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   Color _skinBaseColor =
       _skinSwatches[2].$1; // matches AppearanceProfile's default (medium)
   double _skinAdjustDelta = 0;
-  Color? _customSkinColorValue; // set when user picks from the skin wheel
   final _customAccessoriesController = TextEditingController();
-
-  // =========================================================================
-  // FUTURE INTEGRATION PLACEHOLDER:
-  // When linking Virtual Trial to Cart / Order details, these variables
-  // will hold passed garment item parts, sketches, or measurements.
-  // Example call: VirtualTrialScreen(prefillGarments: ['Kameez', 'Salwar'], measurements: ...)
-  // =========================================================================
-  final List<String> _prefilledGarmentParts = [];
 
   // ── Virtual Trial quota state ──────────────────────────────────────────────
   // Mirrors the signed-in customer's `vtUsed` / `vtResetDate` fields. Loaded
@@ -160,14 +151,54 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   @override
   void initState() {
     super.initState();
-    // In future dev, bind these passed values to selection controllers:
-    debugPrint('Autofill parts loaded: ${_prefilledGarmentParts.length}');
-
     if (widget.prefillAssetImages != null) {
       _prefilledAssetImages.addAll(widget.prefillAssetImages!);
     }
 
     _loadQuota();
+    _loadSavedMeasurements();
+  }
+
+  /// Pre-fills the Advanced Measurements fields with the customer's own saved
+  /// measurements. Without this the section showed generic standard sizes, so
+  /// the generated trial ignored the measurements the customer had entered.
+  Future<void> _loadSavedMeasurements() async {
+    if (_customerId.isEmpty) return;
+    try {
+      final saved = await MeasurementService().getMeasurement(_customerId);
+      if (saved == null || !mounted) return;
+
+      // Keyed by the same labels used to build `_measurements`.
+      final values = <String, double>{
+        'Upper Bust / Over Bust': saved.upperBustCircumference,
+        'Round Shoulder': saved.roundShoulderCircumference,
+        'Hips': saved.hipsCircumference,
+        'Under Bust': saved.underBustCircumference,
+        'Bust': saved.bustCircumference,
+        'Waist': saved.waist,
+        'Shoulder to Knee': saved.shoulderToKnee,
+        'Shoulder to Under Bust': saved.shoulderToUnderBust,
+        'Shoulder to Bust': saved.shoulderToBust,
+        'Thigh': saved.thigh,
+        'Knee': saved.knee,
+        'Ankle': saved.ankle,
+        'Waist to Ankle': saved.waistToAnkle,
+        'Shoulder to Ankle': saved.shoulderToAnkle,
+      };
+
+      setState(() {
+        values.forEach((label, value) {
+          // A zero means the customer never filled that field in — keep the
+          // standard default rather than sending 0" to the generator.
+          if (value <= 0) return;
+          final formatted =
+              value == value.roundToDouble() ? value.toStringAsFixed(0) : '$value';
+          _measurements[label]?.text = '$formatted"';
+        });
+      });
+    } catch (_) {
+      // Non-fatal: the standard defaults stay in place.
+    }
   }
 
   /// Pulls the real quota off the Customer document, rolling the monthly
@@ -196,9 +227,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   AppearanceProfile? _usedProfile; // snapshot shown in summary card
 
   // ── Progress tracking ──────────────────────────────────────────
-  /// True once the user has tapped any appearance-profile control.
-  bool _profileConfigured = false;
-
   /// True once the user has expanded the Advanced Measurements tile.
   bool _measurementsReviewed = false;
   // ── Appearance mode toggle ──────────────────────────────────────

@@ -34,11 +34,9 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     
     if (uid == null) {
-      debugPrint('[NotificationScreen] Waiting for valid Firebase UID...');
       return Stream.value([]);
     }
 
-    debugPrint('[NotificationScreen] Connecting to live backend for UID: "$uid"');
     return NotificationService().streamNotifications(uid);
   }
 
@@ -112,7 +110,6 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
 
 
     final notifications = snapshot.data ?? [];
-    debugPrint('[NotificationScreen] Loaded ${notifications.length} notifications');
     if (notifications.isEmpty) {
       return _buildEmptyState();
     }

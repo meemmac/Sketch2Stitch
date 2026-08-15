@@ -200,8 +200,8 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
         });
       }
       
-    } catch (e) {
-      print('Error loading conversation status: $e');
+    } catch (_) {
+      // Non-fatal: the conversation still opens without the cached status.
     }
   }
 
@@ -220,8 +220,8 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
         widget.onConversationRead!(widget.conversationId);
       }
       
-    } catch (e) {
-      print('Error marking as read: $e');
+    } catch (_) {
+      // Non-fatal: the unread badge just stays until the next open.
     }
   }
 

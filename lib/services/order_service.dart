@@ -541,7 +541,6 @@ class OrderService {
   Future<void> updateOrderStatus(String subOrderId, String newStatus, {String? parentOrderId}) async {
     try {
       final statusLower = newStatus.toLowerCase();
-      debugPrint("OrderService: Updating sub-order $subOrderId to status: $statusLower");
       
       // Fetch sub-order metadata to check destination
       final subOrderDoc = await _db.collection(_subOrdersCollection).doc(subOrderId).get();
@@ -566,19 +565,16 @@ class OrderService {
       // "order status will only change when ONLY customer is involved and retailer press delivered"
       // Otherwise, it stays 'processing'.
       if (destination == 'customer' && statusLower == 'delivered') {
-        debugPrint("OrderService: Direct-to-Customer delivery detected. Marking parent order $orderId as completed.");
         batch.update(_db.collection(_ordersCollection).doc(orderId), {
           'status': 'completed',
         });
       } else {
-        debugPrint("OrderService: Tailor-bound or partial step detected. Keeping parent order $orderId as processing.");
         batch.update(_db.collection(_ordersCollection).doc(orderId), {
           'status': 'processing',
         });
       }
 
       await batch.commit();
-      debugPrint("OrderService: Update successful for $subOrderId and parent $orderId");
     } catch (e) {
       debugPrint('Error updating order status for $subOrderId: $e');
       rethrow;
@@ -1032,13 +1028,11 @@ class OrderService {
 
   /// Streams detailed jobs for a specific tailor.
   Stream<List<Map<String, dynamic>>> streamDetailedTailorOrders(String tailorId) {
-    debugPrint("OrderService: Starting streamDetailedTailorOrders for tailor: $tailorId");
     return _db
         .collection(_tailorJobsCollection)
         .where('tailorId', isEqualTo: tailorId)
         .snapshots()
         .asyncMap((jobsSnap) async {
-      debugPrint("OrderService: Found ${jobsSnap.docs.length} jobs for tailor $tailorId");
       final Map<String, Map<String, dynamic>> orderCache = {};
       final Map<String, Map<String, dynamic>> customerCache = {};
       final Map<String, Map<String, dynamic>> productCache = {};
@@ -1142,7 +1136,6 @@ class OrderService {
             }
 
             if (allItemsList.isEmpty) {
-              debugPrint("OrderService: Skipping tailor job ${jobDoc.id} because no items were found.");
               return null;
             }
 

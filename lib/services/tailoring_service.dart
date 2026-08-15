@@ -166,7 +166,6 @@ class TailoringService {
     for (final path in localPaths) {
       final file = File(path);
       if (!file.existsSync()) {
-        debugPrint('[TailoringService] skipping missing design file: $path');
         continue;
       }
 

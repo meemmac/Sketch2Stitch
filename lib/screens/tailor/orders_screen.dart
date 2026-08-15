@@ -134,14 +134,11 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
 
   void _listenToOrders() {
     final tailorId = UserSession.instance.uid;
-    debugPrint("TailorOrdersScreen: Listening for Tailor ID: $tailorId");
     if (tailorId == null) {
-      debugPrint("TailorOrdersScreen: No logged in user ID found.");
       return;
     }
 
     _ordersSubscription = _orderService.streamDetailedTailorOrders(tailorId).listen((data) {
-      debugPrint("TailorOrdersScreen: Received ${data.length} jobs from stream.");
       if (!mounted) return;
       setState(() {
         _orders.clear();
@@ -152,7 +149,6 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           final items = map['items'] as List<dynamic>;
           final measurementMap = map['measurement'];
 
-          debugPrint("TailorOrdersScreen: Processing job ${job['id']} with status ${job['status']}");
 
           _orders.add(TailorOrder(
             id: job['id'],

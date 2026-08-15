@@ -86,10 +86,8 @@ class _TestCloudinaryScreenState extends State<TestCloudinaryScreen> {
                 setState(() {
                   _uploadedImageUrl = url;
                 });
-                print('✅ Uploaded: $url');
               },
               onUploadError: (error) {
-                print('❌ Error: $error');
                 _showSnackBar('Upload failed: $error', isError: true);
               },
             ),
@@ -460,7 +458,6 @@ class _TestCloudinaryScreenState extends State<TestCloudinaryScreen> {
     // Simple copy without clipboard package
     // You can add clipboard functionality later if needed
     _showSnackBar('URL copied to clipboard!', isError: false);
-    print('📋 Copied: $text');
   }
 
   void _clearMultipleImages() {

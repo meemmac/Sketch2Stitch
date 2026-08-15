@@ -391,7 +391,6 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
 
   void _updateOrderStatus(RetailerOrder order, String newStatus) async {
     try {
-      debugPrint("RetailerOrdersScreen: Changing status for sub-order ${order.id} (Parent: ${order.orderId}) to $newStatus");
       await _orderService.updateOrderStatus(order.id, newStatus, parentOrderId: order.orderId);
       if (!mounted) return;
       setState(() {

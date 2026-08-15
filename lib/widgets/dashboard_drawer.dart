@@ -175,7 +175,6 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       });
 
       UserSession.instance.currentProfile.value = updated;
-      debugPrint("Profile updated: ${updated.name} (${_currentRole.name})");
 
       if (mounted) {
         _showFeedback('Profile updated successfully.');
@@ -250,7 +249,6 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                                 // Logout Section
                                 DrawerLogoutButton(
                                   onLogoutPressed: () async {
-                                    debugPrint("Logout pressed");
                                     await AuthService().signOut();
                                     UserSession.instance.logout();
 
@@ -619,7 +617,6 @@ class DrawerNavigationSection extends StatelessWidget {
                   ),
                 );
               } else {
-                debugPrint("Navigation clicked: ${item['title']}");
                 onFeedback("Navigation trigger: ${item['title']}");
               }
             },

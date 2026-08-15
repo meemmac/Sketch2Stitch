@@ -19,10 +19,8 @@ class NotificationService {
   /// Streams real-time notifications for a specific user.
   Stream<List<AppNotification>> streamNotifications(String uid) {
     final cleanUid = uid.trim();
-    debugPrint('[NotificationService] Streaming for UID: "$cleanUid"');
     
     if (cleanUid.isEmpty) {
-      debugPrint('[NotificationService] Warning: Empty UID provided');
       return Stream.value([]);
     }
 
@@ -33,7 +31,6 @@ class NotificationService {
         .where('userId', isEqualTo: cleanUid)
         .snapshots()
         .map((snapshot) {
-      debugPrint('[NotificationService] Snapshot received with ${snapshot.docs.length} docs');
       final items = snapshot.docs.map((doc) {
         return AppNotification.fromJson(doc.data(), doc.id);
       }).toList();
@@ -303,7 +300,6 @@ class NotificationService {
       final cleanUserId = userId.trim();
 
       if (cleanUserId.isEmpty) {
-        debugPrint('[NotificationService] Warning: Empty UID provided for getNotifications');
         return [];
       }
 
@@ -340,7 +336,6 @@ class NotificationService {
       final cleanUserId = userId.trim();
 
       if (cleanUserId.isEmpty) {
-        debugPrint('[NotificationService] Warning: Empty UID provided for markAllNotificationsRead');
         return;
       }
 
@@ -368,7 +363,6 @@ class NotificationService {
       final cleanUserId = userId.trim();
 
       if (cleanUserId.isEmpty) {
-        debugPrint('[NotificationService] Warning: Empty UID provided for deleteAllNotifications');
         return;
       }
 
@@ -383,7 +377,6 @@ class NotificationService {
         batch.delete(doc.reference);
       }
       await batch.commit();
-      debugPrint('[NotificationService] All notifications deleted for UID: $cleanUserId');
     } catch (e) {
       debugPrint('Error deleting notifications: $e');
     }
@@ -393,10 +386,8 @@ class NotificationService {
   /// Returns the count of unread notifications for a user.
   Stream<int> getUnreadNotificationCount(String userId) {
     final cleanUserId = userId.trim();
-    debugPrint('[NotificationService] Getting unread count for UID: "$cleanUserId"');
 
     if (cleanUserId.isEmpty) {
-      debugPrint('[NotificationService] Warning: Empty UID provided for notification count');
       return Stream.value(0);
     }
 

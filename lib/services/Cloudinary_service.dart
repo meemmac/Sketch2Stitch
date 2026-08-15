@@ -38,30 +38,19 @@ class CloudinaryService {
         request.fields['folder'] = folder;
       }
 
-      print('📤 Uploading image to Cloudinary...');
-      print('📁 Folder: ${folder ?? 'root'}');
-      print('📎 File: ${path.basename(file.path)}');
-      print('🌐 URL: $uploadUrl');
-      print('🔑 Preset: $uploadPreset');
-
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
 
-      print('📥 Response status: ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(responseBody);
-        final secureUrl = jsonResponse['secure_url'] as String?;
-        print('✅ Upload successful!');
-        print('🔗 URL: $secureUrl');
-        return secureUrl;
+        return jsonResponse['secure_url'] as String?;
       } else {
-        print('❌ Upload failed with status: ${response.statusCode}');
-        print('📄 Response: $responseBody');
-        throw Exception('Upload failed (${response.statusCode}): $responseBody');
+        // The status code is enough to diagnose an upload failure; the raw
+        // response body can carry the signed request details, so it is not
+        // surfaced.
+        throw Exception('Upload failed (${response.statusCode})');
       }
     } catch (e) {
-      print('❌ Upload error: $e');
       return null;
     }
   }
@@ -82,8 +71,7 @@ class CloudinaryService {
         return File(pickedFile.path);
       }
       return null;
-    } catch (e) {
-      print('❌ Error picking image from gallery: $e');
+    } catch (_) {
       return null;
     }
   }
@@ -104,8 +92,7 @@ class CloudinaryService {
         return File(pickedFile.path);
       }
       return null;
-    } catch (e) {
-      print('❌ Error taking photo from camera: $e');
+    } catch (_) {
       return null;
     }
   }
@@ -139,8 +126,7 @@ class CloudinaryService {
       final newUri = uri.replace(path: newPath.join('/'));
       
       return newUri.toString();
-    } catch (e) {
-      print('❌ Error optimizing image URL: $e');
+    } catch (_) {
       return imageUrl;
     }
   }

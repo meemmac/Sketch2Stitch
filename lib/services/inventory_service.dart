@@ -194,7 +194,6 @@ class InventoryService {
       
       final file = File(cleanPath);
       if (!await file.exists()) {
-        debugPrint('File not found for upload: $cleanPath');
         continue;
       }
 
@@ -211,6 +210,5 @@ class InventoryService {
   /// Delete media from storage (Placeholder).
   Future<void> deleteMedia(String fileUrl) async {
     // Cloudinary deletion typically requires backend-signed requests for security.
-    debugPrint('Media deletion requested for: $fileUrl');
   }
 }
