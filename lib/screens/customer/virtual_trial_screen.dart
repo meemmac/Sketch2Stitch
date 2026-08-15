@@ -780,15 +780,77 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     );
   }
 
+  /// Wraps a thumbnail so tapping it opens the image full-screen, with a small
+  /// corner badge so the affordance is visible. Grid thumbs are ~100pt wide,
+  /// which is too small to judge a fabric or a print by.
+  Widget _enlargeable(ImageProvider image, {required Widget child}) {
+    return GestureDetector(
+      onTap: () => _openImageViewer(image),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          child,
+          Positioned(
+            bottom: 4,
+            left: 4,
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.black54,
+                shape: BoxShape.circle,
+              ),
+              padding: const EdgeInsets.all(3),
+              child: const Icon(
+                Icons.zoom_out_map,
+                size: 13,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Full-screen, pinch-zoomable view of a single reference image.
+  void _openImageViewer(ImageProvider image) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (dialogContext) => Stack(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.of(dialogContext).pop(),
+            child: InteractiveViewer(
+              minScale: 1,
+              maxScale: 4,
+              child: Center(
+                child: Image(image: image, fit: BoxFit.contain),
+              ),
+            ),
+          ),
+          Positioned(
+            top: MediaQuery.of(dialogContext).padding.top + 8,
+            right: 12,
+            child: IconButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              icon: const Icon(Icons.close, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _referenceThumb(int index) {
+    final image = FileImage(File(_referenceImages[index].path));
     return Stack(
       fit: StackFit.expand,
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.file(
-            File(_referenceImages[index].path),
-            fit: BoxFit.cover,
+        _enlargeable(
+          image,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image(image: image, fit: BoxFit.cover),
           ),
         ),
         Positioned(
