@@ -34,42 +34,102 @@ class NotificationService {
         .snapshots()
         .map((snapshot) {
       debugPrint('[NotificationService] Snapshot received with ${snapshot.docs.length} docs');
-      return snapshot.docs.map((doc) {
+      final items = snapshot.docs.map((doc) {
         return AppNotification.fromJson(doc.data(), doc.id);
       }).toList();
+      // Sort newest-first client-side. Doing it here rather than with an
+      // orderBy avoids requiring a composite index on (userId, createdAt),
+      // which the equality filter above would otherwise force.
+      items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return items;
     });
   }
 
-  /// Fetches the profile picture URL of the person who sent the notification.
-  /// Used for Customer notifications to show Tailor/Retailer photos.
-  Future<String?> getSenderProfilePicture(AppNotification n) async {
+  /// Fetches the Cloudinary profile picture URL of the *counterparty* on a
+  /// notification — the other party the notification is about, as seen by
+  /// [viewerRole].
+  ///
+  /// Returns null whenever the counterparty is a Customer: the `Customer`
+  /// schema has no `profilePicture` field (only `Tailor` and `Retailer` do), so
+  /// those notifications fall back to an initials avatar in the UI.
+  Future<String?> getCounterpartyProfilePicture(
+    AppNotification n,
+    UserRole viewerRole,
+  ) async {
     try {
-      // 1. If it's a retailer notification (based on subOrderId)
-      if (n.subOrderId != null && n.subOrderId!.isNotEmpty) {
-        final subOrderDoc = await _db.collection('Sub-orders').doc(n.subOrderId).get();
-        if (subOrderDoc.exists) {
-          final retailerId = subOrderDoc.data()?['retailerId'];
-          if (retailerId != null) {
-            final retailerDoc = await _db.collection('Retailer').doc(retailerId).get();
-            return retailerDoc.data()?['profilePicture'] as String?;
+      switch (viewerRole) {
+        case UserRole.customer:
+          // A customer's counterparty is the Retailer handling the sub-order,
+          // or the Tailor handling the tailor job.
+          if (n.subOrderId != null && n.subOrderId!.isNotEmpty) {
+            return await _retailerPictureFromSubOrder(n.subOrderId!);
           }
-        }
-      }
+          if (n.tailorJobId != null && n.tailorJobId!.isNotEmpty) {
+            return await _tailorPictureFromJob(n.tailorJobId!);
+          }
+          return null;
 
-      // 2. If it's a tailor notification (based on tailorJobId)
-      if (n.tailorJobId != null && n.tailorJobId!.isNotEmpty) {
-        final tailorJobDoc = await _db.collection('Tailor-jobs').doc(n.tailorJobId).get();
-        if (tailorJobDoc.exists) {
-          final tailorId = tailorJobDoc.data()?['tailorId'];
-          if (tailorId != null) {
-            final tailorDoc = await _db.collection('Tailor').doc(tailorId).get();
-            return tailorDoc.data()?['profilePicture'] as String?;
+        case UserRole.retailer:
+          // Only 'Tailor Assigned' is about another business party. Every other
+          // retailer notification originates from the Customer (or is a system
+          // stock alert), so it keeps its own category styling / initials.
+          if (n.type == NotificationDbType.jobConfirmed) {
+            if (n.tailorJobId != null && n.tailorJobId!.isNotEmpty) {
+              return await _tailorPictureFromJob(n.tailorJobId!);
+            }
+            // Fall back to locating the job by order when the notification
+            // predates the tailorJobId field being written.
+            if (n.orderId.isNotEmpty) {
+              final jobQuery = await _db
+                  .collection('Tailor-jobs')
+                  .where('orderId', isEqualTo: n.orderId)
+                  .limit(1)
+                  .get();
+              if (jobQuery.docs.isNotEmpty) {
+                return await _tailorPicture(jobQuery.docs.first.data()['tailorId']);
+              }
+            }
           }
-        }
+          return null;
+
+        case UserRole.tailor:
+          // Every tailor notification originates from the Customer, who has no
+          // profile picture in the schema.
+          return null;
       }
     } catch (e) {
-      debugPrint('Error fetching sender profile picture: $e');
+      debugPrint('Error fetching counterparty profile picture: $e');
     }
+    return null;
+  }
+
+  /// Sub-orders/{id}.retailerId -> Retailer/{retailerId}.profilePicture
+  Future<String?> _retailerPictureFromSubOrder(String subOrderId) async {
+    final subOrderDoc = await _db.collection('Sub-orders').doc(subOrderId).get();
+    if (!subOrderDoc.exists) return null;
+    final retailerId = subOrderDoc.data()?['retailerId'];
+    if (retailerId == null || retailerId is! String || retailerId.isEmpty) return null;
+    final retailerDoc = await _db.collection('Retailer').doc(retailerId).get();
+    return _nonEmpty(retailerDoc.data()?['profilePicture']);
+  }
+
+  /// Tailor-jobs/{id}.tailorId -> Tailor/{tailorId}.profilePicture
+  Future<String?> _tailorPictureFromJob(String tailorJobId) async {
+    final jobDoc = await _db.collection('Tailor-jobs').doc(tailorJobId).get();
+    if (!jobDoc.exists) return null;
+    return _tailorPicture(jobDoc.data()?['tailorId']);
+  }
+
+  Future<String?> _tailorPicture(dynamic tailorId) async {
+    if (tailorId == null || tailorId is! String || tailorId.isEmpty) return null;
+    final tailorDoc = await _db.collection('Tailor').doc(tailorId).get();
+    return _nonEmpty(tailorDoc.data()?['profilePicture']);
+  }
+
+  /// Treats an empty/blank stored URL the same as a missing one, so the UI
+  /// falls back to initials instead of handing NetworkImage an invalid URL.
+  static String? _nonEmpty(dynamic value) {
+    if (value is String && value.trim().isNotEmpty) return value.trim();
     return null;
   }
 
@@ -485,7 +545,10 @@ class NotificationService {
       userRole: UserRole.retailer,
       type: NotificationDbType.deliveryReminder, // Best fit for stock alert
       message: 'Low stock alert: $productName ($colorName) has only $stock units left.',
-      orderId: 'N/A',
+      // The Notifications schema has no dedicated productId field, so the
+      // productId is carried in orderId — the "Product ID" footer label on the
+      // retailer card (see notification_screen.dart) reads it from there.
+      orderId: productId,
     );
   }
 

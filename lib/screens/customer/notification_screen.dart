@@ -221,10 +221,11 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   }
 
   Widget _buildAvatar(AppNotification n, _NotificationStyle style) {
-    // 1. Handle System Notifications (e.g. Stock Alerts for Retailers)
-    final isStockAlert = widget.role == UserRole.retailer && 
+    // 1. Handle System Notifications (e.g. Stock Alerts for Retailers) — these
+    // are about a product, not a person, so there is no profile picture to show.
+    final isStockAlert = widget.role == UserRole.retailer &&
                          n.type == NotificationDbType.deliveryReminder;
-    
+
     if (isStockAlert) {
       return CircleAvatar(
         radius: 22,
@@ -233,40 +234,54 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
       );
     }
 
-    // 2. Profile picture lookup for Customers (to see Tailor/Retailer photos)
-    if (widget.role == UserRole.customer) {
-      final cacheKey = n.subOrderId ?? n.tailorJobId ?? n.orderId;
-      
-      // If we already know the URL, show it immediately
-      if (_profileCache.containsKey(cacheKey) && _profileCache[cacheKey] is String) {
-        return CircleAvatar(
-          radius: 22,
-          backgroundColor: Colors.white,
-          backgroundImage: NetworkImage(_profileCache[cacheKey] as String),
-        );
-      }
+    // 2. Show a profile picture only when the counterparty is a Tailor or a
+    // Retailer (they have `profilePicture` in the schema). When the counterparty
+    // is a Customer, the service returns null and we fall back to initials —
+    // that keeps each role's notification categories visually distinct.
+    final cacheKey = '${_cacheKeyFor(n)}_pic';
 
-      // Otherwise, fetch it once and store it in cache
-      return FutureBuilder<String?>(
-        future: NotificationService().getSenderProfilePicture(n),
-        builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data != null) {
-            _profileCache[cacheKey] = snapshot.data;
-            return CircleAvatar(
-              radius: 22,
-              backgroundColor: Colors.white,
-              backgroundImage: NetworkImage(snapshot.data!),
-            );
-          }
-          
-          // While loading or if no picture found, show initials
-          return _buildInitialsAvatar(n, style);
-        },
+    // If we already know the URL, show it immediately
+    if (_profileCache[cacheKey] is String) {
+      return CircleAvatar(
+        radius: 22,
+        backgroundColor: Colors.white,
+        backgroundImage: NetworkImage(_profileCache[cacheKey] as String),
       );
     }
 
-    // For Tailors/Retailers receiving from Customers, always use initials
-    return _buildInitialsAvatar(n, style);
+    // A cached null means "already looked up, this one has no picture" — don't
+    // re-issue the Firestore reads on every rebuild.
+    if (_profileCache.containsKey(cacheKey)) {
+      return _buildInitialsAvatar(n, style);
+    }
+
+    return FutureBuilder<String?>(
+      future: NotificationService().getCounterpartyProfilePicture(n, widget.role),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done) {
+          _profileCache[cacheKey] = snapshot.data;
+        }
+        if (snapshot.hasData && snapshot.data != null) {
+          return CircleAvatar(
+            radius: 22,
+            backgroundColor: Colors.white,
+            backgroundImage: NetworkImage(snapshot.data!),
+          );
+        }
+
+        // While loading or if no picture found, show initials
+        return _buildInitialsAvatar(n, style);
+      },
+    );
+  }
+
+  /// Per-notification cache key. Must never collapse to an empty string: the
+  /// `Notifications` schema has no `orderId` field, so subOrderId/tailorJobId/
+  /// orderId can all be blank and every such notification would otherwise share
+  /// one cache entry (and show another notification's avatar and order ID).
+  String _cacheKeyFor(AppNotification n) {
+    final linked = n.subOrderId ?? n.tailorJobId ?? n.orderId;
+    return (linked.isNotEmpty) ? linked : n.id;
   }
 
   Widget _buildInitialsAvatar(AppNotification n, _NotificationStyle style) {
@@ -311,10 +326,10 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   Widget _buildNotificationItem(AppNotification n) {
     // The Notifications collection never stores orderId directly — every role needs the same
     // subOrderId/tailorJobId -> orderId resolution, not just Tailor/Retailer.
-    final cacheKey = n.subOrderId ?? n.tailorJobId ?? n.orderId;
-    
-    if (_profileCache.containsKey("${cacheKey}_resolved")) {
-      final data = _profileCache["${cacheKey}_resolved"] as Map<String, String?>;
+    final cacheKey = '${_cacheKeyFor(n)}_resolved';
+
+    if (_profileCache[cacheKey] is Map<String, String?>) {
+      final data = _profileCache[cacheKey] as Map<String, String?>;
       return _buildRoleCardWithResolvedData(n, data);
     }
 
@@ -322,19 +337,22 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
       future: NotificationService().getResolvedNotificationData(n),
       builder: (context, snapshot) {
         if (snapshot.hasData && snapshot.data != null) {
-          _profileCache["${cacheKey}_resolved"] = snapshot.data;
+          _profileCache[cacheKey] = snapshot.data;
           return _buildRoleCardWithResolvedData(n, snapshot.data!);
         }
-        
+
         return _buildOriginalCardByRole(n);
       },
     );
   }
 
   Widget _buildRoleCardWithResolvedData(AppNotification n, Map<String, String?> data) {
-    // Temporarily swap data in memory for UI display
+    // Temporarily swap data in memory for UI display.
+    // `customerName` is the counterparty only for Tailors/Retailers — for a
+    // Customer viewing their own notifications it is their own name, which must
+    // not be used as the sender's initial.
     final tempNotification = n.copyWith(
-      senderName: data['customerName'],
+      senderName: widget.role == UserRole.customer ? null : data['customerName'],
       orderId: data['orderId'] ?? n.orderId,
       cancelReason: data['rejectionReason'],
     );
@@ -418,11 +436,20 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   }
 
   Widget _buildCustomerCancelRow(AppNotification n) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 8,
+      runSpacing: 6,
       children: [
-        Text('Order ID: ${n.orderId}', style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.55))),
+        Text(
+          'Order ID: ${n.orderId}',
+          style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.55)),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
+        ),
         Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             if (n.cancelReason != null && n.cancelReason!.isNotEmpty)
               Padding(
@@ -744,16 +771,20 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
 
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text('$idLabel: $idValue', style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.55))),
-        Row(
-          children: [
-            Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withValues(alpha: 0.45)),
-            const SizedBox(width: 4),
-            Text(timeago.format(n.createdAt), style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.55))),
-          ],
+        Expanded(
+          child: Text(
+            '$idLabel: $idValue',
+            style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.55)),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
         ),
+        const SizedBox(width: 8),
+        Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withValues(alpha: 0.45)),
+        const SizedBox(width: 4),
+        Text(timeago.format(n.createdAt), style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.55))),
       ],
     );
   }
