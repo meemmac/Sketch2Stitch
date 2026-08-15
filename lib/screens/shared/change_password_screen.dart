@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../utils/validation_utils.dart';
-import '../../widgets/dashboard_drawer.dart' show TopFeedbackBanner;
+import '../../widgets/top_feedback_banner.dart' show TopFeedbackBanner;
 import '../../widgets/password_strength_indicator.dart';
 
 /// Change-password screen, shared across all three roles (customer, tailor,
