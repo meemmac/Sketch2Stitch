@@ -5,6 +5,9 @@ import 'package:image_picker/image_picker.dart';
 import '../../models/appearance_profile.dart';
 import '../../models/user_role.dart';
 import '../../services/ai_service.dart';
+import '../../services/user_session.dart';
+import '../../services/virtual_trial_service.dart';
+import '../../models/customer.dart' show kVirtualTrialMonthlyLimit;
 import '../../utils/api_config.dart';
 import '../../widgets/dashboard_drawer.dart';
 import 'home_screen.dart';
@@ -22,12 +25,9 @@ const _ink = Color(0xFF1A2C22);
 const _cardBg = Color(0xFFFBFDF9);
 const _border = Color(0xFFDDEBE3);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Virtual Trial quota (frontend-only placeholder for now)
-// TODO(backend): replace with real value pulled from Customer doc (Firestore).
-// Flat limit, no tiers — see kVirtualTrialMonthlyLimit.
-// ─────────────────────────────────────────────────────────────────────────────
-const int kVirtualTrialMonthlyLimit = 20;
+// The monthly quota itself lives with the Customer model (`vtUsed` /
+// `vtResetDate` are fields on that document) and is imported above — flat
+// limit, no tiers.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Style-preference chip data
@@ -139,10 +139,14 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   // =========================================================================
   final List<String> _prefilledGarmentParts = [];
 
-  // ── Virtual Trial quota state (frontend placeholder) ───────────────────────
-  // TODO(backend): load these three from the Customer doc on init, and
-  // persist `_vtUsed` + `_vtResetDate` server-side after each successful
-  // generation instead of mutating them locally.
+  // ── Virtual Trial quota state ──────────────────────────────────────────────
+  // Mirrors the signed-in customer's `vtUsed` / `vtResetDate` fields. Loaded
+  // in initState and re-read from the server after every increment, so this is
+  // a cache of Firestore rather than the source of truth.
+  final VirtualTrialService _vtService = VirtualTrialService();
+
+  String get _customerId => UserSession.instance.uid ?? '';
+
   int _vtUsed = 0;
   DateTime? _vtResetDate;
 

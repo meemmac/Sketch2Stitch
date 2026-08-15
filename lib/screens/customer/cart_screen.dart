@@ -789,8 +789,14 @@ class _CartScreenState extends State<CartScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (_) => VirtualTrialScreen(
-                                prefillAssetImages:
-                                    _cartLines.map((l) => l.image).toList(),
+                                // Full-size images of the exact colour options
+                                // the customer chose — not the 64pt cart
+                                // thumbnails, which would upscale badly in the
+                                // trial's grid and full-screen viewer.
+                                prefillAssetImages: _cartLines
+                                    .map((l) => l.fullImage)
+                                    .where((p) => p.isNotEmpty)
+                                    .toList(),
                               ),
                             ),
                           ),
