@@ -13,7 +13,7 @@ import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
-import 'package:sketch2stitch/screens/customer/cart_screen.dart';
+import 'package:sketch2stitch/widgets/cart_icon_button.dart';
 import '../../widgets/dashboard_drawer.dart';
 import 'virtual_trial_screen.dart';
 import 'notification_screen.dart';
@@ -377,20 +377,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
               onPressed: _openOrderList,
               tooltip: 'My Orders',
             ),
-          if (_currentRole == UserRole.customer)
-            IconButton(
-              icon: const Icon(
-                Icons.shopping_cart_outlined,
-                color: Colors.black87,
-              ),
-              iconSize: 28,
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CartScreen()),
-                );
-              },
-            ),
+          if (_currentRole == UserRole.customer) const CartIconButton(),
         ],
       ),
     );

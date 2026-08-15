@@ -126,7 +126,7 @@ class _CartScreenState extends State<CartScreen> {
       final retailerId = entry.key;
       final lines = entry.value;
       final subtotal = lines.fold<double>(0, (sum, l) => sum + l.lineTotal);
-      final deliveryCharge = _retailers[retailerId]?.deliveryCharge ?? 0;
+      final retailer = _retailers[retailerId];
 
       return SubOrder(
         id: retailerId, // placeholder key until real Sub-orders docs exist
@@ -134,7 +134,8 @@ class _CartScreenState extends State<CartScreen> {
         retailerId: retailerId,
         status: SubOrderStatus.preparing,
         itemsSubtotal: subtotal,
-        deliveryCharge: deliveryCharge,
+        deliveryCharge: retailer?.deliveryCharge ?? 0,
+        deliveryDistanceKm: retailer?.distanceKm,
       );
     }).toList();
   }
@@ -403,6 +404,7 @@ class _CartScreenState extends State<CartScreen> {
     final retailer = _retailers[retailerId];
     final shopName = retailer?.shopName ?? "Unknown Retailer";
     final deliveryCharge = retailer?.deliveryCharge ?? 0;
+    final distanceKm = retailer?.distanceKm;
     final itemCount = lines.fold<int>(0, (sum, l) => sum + l.quantity);
     final subtotal = lines.fold<double>(0, (sum, l) => sum + l.lineTotal);
 
@@ -514,6 +516,18 @@ class _CartScreenState extends State<CartScreen> {
                             color: Colors.black54,
                           ),
                         ),
+                        // Distance the fee was derived from, so the amount
+                        // doesn't look arbitrary.
+                        if (distanceKm != null) ...[
+                          const SizedBox(width: 4),
+                          Text(
+                            "(${distanceKm.toStringAsFixed(1)} km)",
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     Text(
