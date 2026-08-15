@@ -221,7 +221,19 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   }
 
   Widget _buildAvatar(AppNotification n, _NotificationStyle style) {
-    // Only perform profile picture lookup for Customers (to see Tailor/Retailer photos)
+    // 1. Handle System Notifications (e.g. Stock Alerts for Retailers)
+    final isStockAlert = widget.role == UserRole.retailer && 
+                         n.type == NotificationDbType.deliveryReminder;
+    
+    if (isStockAlert) {
+      return CircleAvatar(
+        radius: 22,
+        backgroundColor: Colors.red.shade50,
+        child: Icon(Icons.inventory_2_outlined, color: Colors.red.shade700, size: 20),
+      );
+    }
+
+    // 2. Profile picture lookup for Customers (to see Tailor/Retailer photos)
     if (widget.role == UserRole.customer) {
       final cacheKey = n.subOrderId ?? n.tailorJobId ?? n.orderId;
       
@@ -258,19 +270,20 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   }
 
   Widget _buildInitialsAvatar(AppNotification n, _NotificationStyle style) {
-    String? name;
+    // 1. Use the name fetched from the Customer Table (senderName) if available
+    String? name = n.senderName;
 
 
-    // 🧠 Smart Name Parser
-    // Since we don't store senderName or ProfilePic in the notification,
-    // we extract the name from the message text to show initials.
-    final msg = n.message.toLowerCase();
-    if (msg.contains('from ')) {
-      final parts = n.message.split(RegExp(r'from ', caseSensitive: false));
-      if (parts.length > 1) name = parts[1].trim().split(' ')[0];
-    } else if (msg.contains('by ')) {
-      final parts = n.message.split(RegExp(r'by ', caseSensitive: false));
-      if (parts.length > 1) name = parts[1].trim().split(' ')[0];
+    // 2. Backup: Smart Name Parser (only if database name is missing)
+    if (name == null || name.trim().isEmpty) {
+      final msg = n.message.toLowerCase();
+      if (msg.contains('from ')) {
+        final parts = n.message.split(RegExp(r'from ', caseSensitive: false));
+        if (parts.length > 1) name = parts[1].trim().split(' ')[0];
+      } else if (msg.contains('by ')) {
+        final parts = n.message.split(RegExp(r'by ', caseSensitive: false));
+        if (parts.length > 1) name = parts[1].trim().split(' ')[0];
+      }
     }
 
 
