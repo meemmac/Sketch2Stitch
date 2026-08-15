@@ -83,16 +83,22 @@ class _RunningOrdersScreenState extends State<RunningOrdersScreen> {
     }
   }
 
-  void _continueOrder(BuildContext context, OrderRecord order) {
+  Future<void> _continueOrder(BuildContext context, Order order) async {
+    // The measurement load starts in initState, so this normally resolves
+    // immediately; awaiting it guards the rare case where the customer taps
+    // Continue before the first read comes back.
+    await _measurementLoad;
+    if (!context.mounted) return;
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => TailoringSetupScreen(
-          orderId: order.orderId,
+          orderId: order.id,
           orderDate: order.orderDate,
-          savedMeasurements: [_measurement],
-          subOrders: order.subOrders,
-          callbacks: buildTailoringCallbacks(order.orderId),
+          savedMeasurements: _measurement == null ? const [] : [_measurement!],
+          subOrders: order.subOrders ?? const [],
+          callbacks: buildTailoringCallbacks(order.id),
         ),
       ),
     );
@@ -100,8 +106,6 @@ class _RunningOrdersScreenState extends State<RunningOrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final orders = OrderStore.instance.activeOrders;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF9FBF9),
       appBar: AppBar(
@@ -111,7 +115,50 @@ class _RunningOrdersScreenState extends State<RunningOrdersScreen> {
         elevation: 0,
         foregroundColor: Colors.black,
       ),
-      body: orders.isEmpty ? _buildEmptyState() : _buildList(context, orders),
+      body: StreamBuilder<List<Order>>(
+        stream: _ordersStream,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return _buildErrorState(snapshot.error);
+          }
+          // Only the very first frame shows a spinner — later snapshots
+          // keep the current list on screen while the new one arrives.
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final orders = snapshot.data!;
+          return orders.isEmpty
+              ? _buildEmptyState()
+              : _buildList(context, orders);
+        },
+      ),
+    );
+  }
+
+  Widget _buildErrorState(Object? error) {
+    debugPrint('[RunningOrders] order stream failed: $error');
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off_rounded, size: 56, color: Colors.grey.shade300),
+            const SizedBox(height: 12),
+            const Text(
+              "Couldn't load your running orders",
+              style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              "Check your connection and try again.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -137,7 +184,7 @@ class _RunningOrdersScreenState extends State<RunningOrdersScreen> {
     );
   }
 
-  Widget _buildList(BuildContext context, List<OrderRecord> orders) {
+  Widget _buildList(BuildContext context, List<Order> orders) {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: orders.length,
@@ -146,9 +193,10 @@ class _RunningOrdersScreenState extends State<RunningOrdersScreen> {
     );
   }
 
-  Widget _buildOrderCard(BuildContext context, OrderRecord order) {
-    final subOrderCount = order.subOrders.length;
-    final total = order.subOrders.fold<double>(
+  Widget _buildOrderCard(BuildContext context, Order order) {
+    final subOrders = order.subOrders ?? const [];
+    final subOrderCount = subOrders.length;
+    final total = subOrders.fold<double>(
       0,
       (sum, s) => sum + s.itemsSubtotal + s.deliveryCharge,
     );
