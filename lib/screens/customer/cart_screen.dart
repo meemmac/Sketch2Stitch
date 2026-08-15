@@ -1,63 +1,20 @@
 import 'package:flutter/material.dart';
+import '../../models/cart_item.dart';
 import '../../models/measurement.dart';
 import 'package:sketch2stitch/screens/customer/checkout_screen.dart';
+import '../../services/cart_service.dart';
+import '../../services/measurement_service.dart';
+import '../../services/user_session.dart';
 import 'browsing/browse_shell.dart';
 import 'order_session.dart';
 import 'running_orders_screen.dart';
 import '../../models/sub_order.dart';
 import 'virtual_trial_screen.dart';
 
-/// ─── Local Cart Models ──────────────────────────────────────────────────
-///
-/// These mirror the DB shape (`Order-Items`: productId, quantity, optionId)
-/// but are flattened/denormalized here for display, since the cart screen
-/// needs product + retailer + color-option details joined together.
-/// Once wired to the backend, `CartLine` would be built by joining
-/// `Order-Items` -> `Products` (for name/colorOptions/retailerId) ->
-/// `Retailer` (for shopName), instead of using the mock data below.
-
-class CartLine {
-  final String productId;
-  final int optionId;
-  int quantity;
-
-  final String retailerId;
-  final String productName;
-  final String colorName;
-  final String image;
-  final bool isAsset;
-  final double price;
-
-  CartLine({
-    required this.productId,
-    required this.optionId,
-    required this.quantity,
-    required this.retailerId,
-    required this.productName,
-    required this.colorName,
-    required this.image,
-    required this.price,
-    this.isAsset = false,
-  });
-
-  double get lineTotal => price * quantity;
-}
-
-class RetailerInfo {
-  final String id;
-  final String shopName;
-  // Flat delivery fee charged per retailer (i.e. per Sub-order), shown
-  // alongside that retailer's items subtotal. Mirrors
-  // Sub-orders.deliveryCharge — swap this mock map for a real per-retailer
-  // delivery calculation once the backend is connected.
-  final double deliveryCharge;
-
-  const RetailerInfo({
-    required this.id,
-    required this.shopName,
-    this.deliveryCharge = 0,
-  });
-}
+// `CartLine` and `RetailerInfo` now live in models/cart_item.dart and are
+// built by CartService from `Cart-Items` -> `Products` -> `Retailer`.
+// Re-exported here so existing importers (e.g. CheckoutScreen) keep working.
+export '../../models/cart_item.dart' show CartLine, RetailerInfo;
 
 /// ─── Cart Screen ────────────────────────────────────────────────────────
 ///
@@ -75,93 +32,82 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  // Mock `Retailer` collection lookup. Replace with a real fetch keyed by
-  // Products.retailerId once the backend is connected.
-  final Map<String, RetailerInfo> _retailers = {
-    "RET001": const RetailerInfo(
-      id: "RET001",
-      shopName: "Elegant Fabrics Ltd.",
-      deliveryCharge: 80,
-    ),
-    "RET002": const RetailerInfo(
-      id: "RET002",
-      shopName: "Dhaka Silk House",
-      deliveryCharge: 120,
-    ),
-  };
+  final CartService _cartService = CartService();
+  final MeasurementService _measurementService = MeasurementService();
 
-  // Mock single measurement profile. Replace with a real fetch by
-  // customerId once the backend is connected — one customer, one profile.
-  final Measurement _measurement = Measurement(
-    id: "MEAS001",
-    customerId: "CUST001",
-    upperBustCircumference: 34,
-    roundShoulderCircumference: 40,
-    hipsCircumference: 38,
-    underBustCircumference: 30,
-    bustCircumference: 36,
-    waist: 28,
-    shoulderToKnee: 38,
-    shoulderToUnderBust: 15,
-    shoulderToBust: 10,
-    thigh: 22,
-    knee: 15,
-    ankle: 9,
-    waistToAnkle: 40,
-    shoulderToAnkle: 58,
-  );
+  String get _customerId => UserSession.instance.uid ?? '';
 
-  void _clearCart() {
-    setState(() => _cartLines.clear());
+  /// Live cart from Firestore, hydrated with product + retailer details.
+  Stream<CartSnapshot>? _cartStream;
+
+  /// Latest snapshot, kept so checkout and the summary bar can read it
+  /// without waiting on the stream again.
+  CartSnapshot _snapshot = CartSnapshot.empty;
+
+  /// The customer's single measurement profile, loaded once and handed to
+  /// CheckoutScreen. Null until loaded (or when none exists yet).
+  Measurement? _measurement;
+
+  /// Ids of lines with an in-flight write, so their row can be disabled
+  /// instead of firing duplicate updates.
+  final Set<String> _busyLineIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _cartStream = _customerId.isEmpty
+        ? const Stream<CartSnapshot>.empty()
+        : _cartService.streamCart(_customerId);
+    _loadMeasurement();
   }
 
-  // Mock cart lines, standing in for joined Order-Items + Products data.
-  final List<CartLine> _cartLines = [
-    CartLine(
-      productId: "PROD001",
-      optionId: 1,
-      quantity: 2,
-      retailerId: "RET001",
-      productName: "Premium Egyptian Cotton",
-      colorName: "White",
-      image: 'assets/images/fab.jpg',
-      isAsset: true,
-      price: 650,
-    ),
-    CartLine(
-      productId: "PROD001",
-      optionId: 2,
-      quantity: 1,
-      retailerId: "RET001",
-      productName: "Premium Egyptian Cotton",
-      colorName: "Beige",
-      image: 'assets/images/fab2.jpg',
-      isAsset: true,
-      price: 680,
-    ),
-    CartLine(
-      productId: "PROD002",
-      optionId: 1,
-      quantity: 1,
-      retailerId: "RET002",
-      productName: "Golden Silk Blend",
-      colorName: "Gold",
-      image: 'assets/images/silk.jpg',
-      isAsset: true,
-      price: 1800,
-    ),
-    CartLine(
-      productId: "PROD003",
-      optionId: 1,
-      quantity: 3,
-      retailerId: "RET002",
-      productName: "Printed Scarf",
-      colorName: "Multi",
-      image: 'assets/images/saree.jpg',
-      isAsset: true,
-      price: 380,
-    ),
-  ];
+  Future<void> _loadMeasurement() async {
+    if (_customerId.isEmpty) return;
+    try {
+      final measurement = await _measurementService.getMeasurement(_customerId);
+      if (mounted) setState(() => _measurement = measurement);
+    } catch (_) {
+      // Checkout surfaces the "no measurements yet" case itself; a failed
+      // prefetch shouldn't block the cart from rendering.
+    }
+  }
+
+  void _showError(Object error) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(error is CartServiceException
+            ? error.message
+            : 'Something went wrong. Please try again.'),
+        backgroundColor: Colors.red.shade700,
+      ),
+    );
+  }
+
+  /// Runs a cart write, guarding against double taps on the same line and
+  /// surfacing service errors as a snackbar.
+  Future<void> _runLineAction(String lineId, Future<void> Function() action) async {
+    if (_busyLineIds.contains(lineId)) return;
+    setState(() => _busyLineIds.add(lineId));
+    try {
+      await action();
+    } catch (e) {
+      _showError(e);
+    } finally {
+      if (mounted) setState(() => _busyLineIds.remove(lineId));
+    }
+  }
+
+  Future<void> _clearCart() async {
+    try {
+      await _cartService.clearCart(_customerId);
+    } catch (e) {
+      _showError(e);
+    }
+  }
+
+  List<CartLine> get _cartLines => _snapshot.lines;
+  Map<String, RetailerInfo> get _retailers => _snapshot.retailers;
 
   Map<String, List<CartLine>> get _groupedByRetailer {
     final Map<String, List<CartLine>> grouped = {};
@@ -208,18 +154,21 @@ class _CartScreenState extends State<CartScreen> {
 
   double get _grandTotal => _itemsTotal + _deliveryTotal;
 
+  /// Increment is capped at the chosen option's remaining stock — the
+  /// service rejects anything above it, so the button is disabled instead.
   void _incrementQuantity(CartLine line) {
-    setState(() => line.quantity++);
+    _runLineAction(
+      line.id,
+      () => _cartService.updateQuantity(line.id, line.quantity + 1),
+    );
   }
 
+  /// Decrementing past 1 deletes the line, matching the existing UX.
   void _decrementQuantity(CartLine line) {
-    setState(() {
-      if (line.quantity > 1) {
-        line.quantity--;
-      } else {
-        _cartLines.remove(line);
-      }
-    });
+    _runLineAction(
+      line.id,
+      () => _cartService.updateQuantity(line.id, line.quantity - 1),
+    );
   }
 
   void _addMore() {
@@ -230,12 +179,23 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void _removeLine(CartLine line) {
-    setState(() => _cartLines.remove(line));
+    _runLineAction(line.id, () => _cartService.removeItem(line.id));
   }
 
   /// Always goes to CheckoutScreen for the CURRENT cart. Never redirects
   /// into an existing order — that's what Running Orders is for.
   void _checkout() {
+    if (_measurement == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Add your measurements in your profile before checking out.',
+          ),
+        ),
+      );
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -243,7 +203,7 @@ class _CartScreenState extends State<CartScreen> {
           cartLines: _cartLines,
           retailers: _retailers,
           grandTotal: _grandTotal,
-          measurement: _measurement,
+          measurement: _measurement!,
           subOrders: _subOrders,
           onOrderPlaced: _clearCart,
         ),
@@ -260,8 +220,6 @@ class _CartScreenState extends State<CartScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final grouped = _groupedByRetailer;
-    final retailerIds = grouped.keys.toList();
     final activeOrderCount = OrderStore.instance.activeOrders.length;
 
     return Scaffold(
@@ -315,28 +273,78 @@ class _CartScreenState extends State<CartScreen> {
       // Cart body is ALWAYS the cart — never swapped for an "active order"
       // blocking state. Existing orders are reachable only via the icon
       // above, never by hijacking this screen.
-      body: _cartLines.isEmpty
-          ? _buildEmptyState()
-          : Column(
-              children: [
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    itemCount: retailerIds.length,
-                    itemBuilder: (context, index) {
-                      final retailerId = retailerIds[index];
-                      final lines = grouped[retailerId]!;
-                      return _buildAnimatedRetailerSection(
-                        retailerId,
-                        lines,
-                        index,
-                      );
-                    },
-                  ),
+      body: StreamBuilder<CartSnapshot>(
+        stream: _cartStream,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return _buildErrorState(snapshot.error);
+          }
+
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          // Cache the latest snapshot so the summary bar, checkout handler
+          // and totals all read the same data the list is rendering.
+          _snapshot = snapshot.data ?? CartSnapshot.empty;
+
+          if (_cartLines.isEmpty) return _buildEmptyState();
+
+          final grouped = _groupedByRetailer;
+          final retailerIds = grouped.keys.toList();
+
+          return Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  itemCount: retailerIds.length,
+                  itemBuilder: (context, index) {
+                    final retailerId = retailerIds[index];
+                    final lines = grouped[retailerId]!;
+                    return _buildAnimatedRetailerSection(
+                      retailerId,
+                      lines,
+                      index,
+                    );
+                  },
                 ),
-                _buildSummaryBar(),
-              ],
+              ),
+              _buildSummaryBar(),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildErrorState(Object? error) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off_rounded, size: 48, color: Colors.red.shade200),
+            const SizedBox(height: 12),
+            Text(
+              error is CartServiceException
+                  ? error.message
+                  : "We couldn't load your cart.",
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.black54),
             ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: () => setState(() {
+                _cartStream = _cartService.streamCart(_customerId);
+              }),
+              child: const Text("Try again"),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -630,7 +638,9 @@ class _CartScreenState extends State<CartScreen> {
           ),
           const SizedBox(width: 4),
           GestureDetector(
-            onTap: () => _removeLine(line),
+            onTap: _busyLineIds.contains(line.id)
+                ? null
+                : () => _removeLine(line),
             child: Container(
               padding: const EdgeInsets.all(6),
               child: Icon(
@@ -646,6 +656,7 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Widget _buildQuantitySelector(CartLine line) {
+    final busy = _busyLineIds.contains(line.id);
     return Container(
       decoration: BoxDecoration(
         color: Colors.grey.shade100,
@@ -657,7 +668,7 @@ class _CartScreenState extends State<CartScreen> {
         children: [
           _qtyButton(
             icon: Icons.remove,
-            onTap: () => _decrementQuantity(line),
+            onTap: busy ? null : () => _decrementQuantity(line),
           ),
           SizedBox(
             width: 24,
@@ -672,19 +683,27 @@ class _CartScreenState extends State<CartScreen> {
           ),
           _qtyButton(
             icon: Icons.add,
-            onTap: () => _incrementQuantity(line),
+            // Never let the customer request more than the retailer has:
+            // the service would reject the write anyway.
+            onTap: busy || line.atStockLimit
+                ? null
+                : () => _incrementQuantity(line),
           ),
         ],
       ),
     );
   }
 
-  Widget _qtyButton({required IconData icon, required VoidCallback onTap}) {
+  Widget _qtyButton({required IconData icon, required VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(6),
-        child: Icon(icon, size: 14, color: Colors.green.shade800),
+        child: Icon(
+          icon,
+          size: 14,
+          color: onTap == null ? Colors.grey.shade400 : Colors.green.shade800,
+        ),
       ),
     );
   }

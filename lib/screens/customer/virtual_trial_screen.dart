@@ -670,12 +670,15 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                   itemCount: totalCount,
                   itemBuilder: (_, i) {
                     if (i < _prefilledAssetImages.length) {
+                      final path = _prefilledAssetImages[i];
+                      // Cart lines carry Cloudinary URLs for real products
+                      // and bundled asset paths for seeded demo data.
+                      final isRemote = path.startsWith('http');
                       return ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: Image.asset(
-                          _prefilledAssetImages[i],
-                          fit: BoxFit.cover,
-                        ),
+                        child: isRemote
+                            ? Image.network(path, fit: BoxFit.cover)
+                            : Image.asset(path, fit: BoxFit.cover),
                       );
                     }
                     return _referenceThumb(i - _prefilledAssetImages.length);

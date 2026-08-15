@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/user_role.dart';
+import 'package:sketch2stitch/services/cart_service.dart';
+import 'package:sketch2stitch/services/user_session.dart';
 import '../../../widgets/video_preview_player.dart';
 import '../../../widgets/care_info_tooltip.dart';
 
@@ -25,9 +27,12 @@ class ProductDetailOverlay extends StatefulWidget {
 }
 
 class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
+  final CartService _cartService = CartService();
+
   int _quantity = 1;
   late ColorOption? _selectedOption;
   bool _isFavorite = false;
+  bool _isAddingToCart = false;
 
   @override
   void initState() {
@@ -72,6 +77,60 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
       _selectedOption = option;
       _quantity = 1;
     });
+  }
+
+  /// Persists the chosen colour option + quantity to the customer's
+  /// `Cart-Items`. The service merges with an existing line for the same
+  /// product/option and rejects anything beyond available stock.
+  Future<void> _addToCart() async {
+    final option = _selectedOption;
+    if (option == null) return;
+
+    final customerId = UserSession.instance.uid;
+    if (customerId == null || customerId.isEmpty) {
+      _showSnack('Please sign in to add items to your cart.', isError: true);
+      return;
+    }
+
+    // Captured up front: the confirmation snackbar is shown after this
+    // sheet has been popped, so `context` is no longer usable by then.
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
+    setState(() => _isAddingToCart = true);
+    try {
+      await _cartService.addToCart(
+        customerId,
+        widget.product.id,
+        option.optionId,
+        _quantity,
+      );
+      navigator.pop();
+      _showSnack('Added to cart!', messenger: messenger);
+    } catch (e) {
+      _showSnack(
+        e is CartServiceException ? e.message : 'Could not add to cart.',
+        isError: true,
+        messenger: messenger,
+      );
+    } finally {
+      if (mounted) setState(() => _isAddingToCart = false);
+    }
+  }
+
+  void _showSnack(
+    String message, {
+    bool isError = false,
+    ScaffoldMessengerState? messenger,
+  }) {
+    (messenger ?? ScaffoldMessenger.of(context)).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor:
+            isError ? Colors.red.shade700 : const Color(0xFF4E8B6F),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -539,18 +598,8 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: !_inStock
-                            ? null
-                            : () {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Added to cart!'),
-                              backgroundColor: Color(0xFF4E8B6F),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        },
+                        onPressed:
+                            !_inStock || _isAddingToCart ? null : _addToCart,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2C5C44), // ✅ Dark green background
                           foregroundColor: Colors.white, // ✅ White text
@@ -560,14 +609,23 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                           ),
                           elevation: 2, // ✅ Slight elevation for better visibility
                         ),
-                        child: const Text(
-                          'Add to Cart',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
+                        child: _isAddingToCart
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Add to Cart',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
                       ),
                     ),
 
