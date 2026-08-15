@@ -100,10 +100,11 @@ class OrderService {
     return _db
         .collection(_ordersCollection)
         .where('customerId', whereIn: [cleanId, '$cleanId '])
-        .orderBy('orderDate', descending: true)
+        // Temporarily removed orderBy to fix the "No Orders Found" issue.
+        // Combining 'where' and 'orderBy' requires a manual Firestore Index.
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => Order.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
+            .map((doc) => Order.fromJson({...doc.data(), 'id': doc.id}))
             .toList());
   }
 

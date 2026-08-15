@@ -339,8 +339,8 @@ class OrderTrackScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.black.withOpacity(0.08)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3))],
+        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 3))],
       ),
       child: Row(
         children: [
@@ -371,7 +371,7 @@ class OrderTrackScreen extends StatelessWidget {
           style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Colors.black87),
         ),
         const SizedBox(height: 3),
-        Text(label, style: TextStyle(fontSize: 10.5, color: Colors.black.withOpacity(0.5))),
+        Text(label, style: TextStyle(fontSize: 10.5, color: Colors.black.withValues(alpha: 0.5))),
       ],
     );
   }
@@ -389,7 +389,7 @@ class OrderTrackScreen extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             deliveryAddress,
-            style: TextStyle(fontSize: 12.5, height: 1.4, color: Colors.black.withOpacity(0.65)),
+            style: TextStyle(fontSize: 12.5, height: 1.4, color: Colors.black.withValues(alpha: 0.65)),
           ),
         ],
       ),
@@ -455,13 +455,13 @@ class OrderTrackScreen extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     DateFormat('dd/MM/yyyy').format(event.date),
-                    style: TextStyle(fontSize: 11, color: Colors.black.withOpacity(0.45)),
+                    style: TextStyle(fontSize: 11, color: Colors.black.withValues(alpha: 0.45)),
                   ),
                   if (event.note != null) ...[
                     const SizedBox(height: 3),
                     Text(
                       event.note!,
-                      style: TextStyle(fontSize: 10.5, fontStyle: FontStyle.italic, color: Colors.black.withOpacity(0.4)),
+                      style: TextStyle(fontSize: 10.5, fontStyle: FontStyle.italic, color: Colors.black.withValues(alpha: 0.4)),
                     ),
                   ],
                 ],

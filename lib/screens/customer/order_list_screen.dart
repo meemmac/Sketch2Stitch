@@ -2,7 +2,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/models/order.dart';
-import 'package:sketch2stitch/services/auth_service.dart';
 import 'package:sketch2stitch/services/order_service.dart';
 import 'package:intl/intl.dart';
 import 'track_order.dart';
@@ -20,10 +19,17 @@ class OrderListScreen extends StatefulWidget {
 }
 
 class _OrderListScreenState extends State<OrderListScreen> {
-  Stream<List<Order>> _getOrdersStream() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return Stream.value([]);
-    return OrderService().streamCustomerOrders(user.uid);
+  late Stream<List<Order>> _ordersStream;
+
+
+  @override
+  void initState() {
+    super.initState();
+    // 🧠 Set up the stream once to keep the connection stable and reactive to auth
+    _ordersStream = FirebaseAuth.instance.authStateChanges().asyncExpand((user) {
+      if (user == null) return Stream.value([]);
+      return OrderService().streamCustomerOrders(user.uid);
+    });
   }
 
 
@@ -55,7 +61,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
         centerTitle: false,
       ),
       body: StreamBuilder<List<Order>>(
-        stream: _getOrdersStream(),
+        stream: _ordersStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -63,7 +69,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
 
           final orders = snapshot.data ?? [];
-          debugPrint('[OrderListScreen] Snapshot has ${orders.length} orders');
           
           if (orders.isEmpty) {
             return _buildEmptyState();
@@ -94,7 +99,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
             color: Colors.grey.shade300,
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'No Orders Found',
             style: TextStyle(
               fontSize: 20,
@@ -126,7 +131,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -200,7 +205,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: order.statusColor.withOpacity(0.1),
+                        color: order.statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
