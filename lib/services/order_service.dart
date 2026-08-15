@@ -95,22 +95,16 @@ class OrderService {
   /// Streams real-time orders for a specific customer.
   Stream<List<Order>> streamCustomerOrders(String customerId) {
     final cleanId = customerId.trim();
-    debugPrint('[OrderService] 🛰️ STARTING STREAM for customerId: "$cleanId"');
 
 
     return _db
         .collection(_ordersCollection)
         .where('customerId', whereIn: [cleanId, '$cleanId '])
+        .orderBy('orderDate', descending: true)
         .snapshots()
-        .map((snapshot) {
-      debugPrint('[OrderService] 📥 snapshot received! Total docs found: ${snapshot.docs.length}');
-      for (var doc in snapshot.docs) {
-        debugPrint('[OrderService]  - Found Order ID: ${doc.id} for Customer: ${doc.data()['customerId']}');
-      }
-      return snapshot.docs
-          .map((doc) => Order.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
-          .toList();
-    });
+        .map((snapshot) => snapshot.docs
+            .map((doc) => Order.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
+            .toList());
   }
 
 

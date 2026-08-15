@@ -21,17 +21,9 @@ class OrderListScreen extends StatefulWidget {
 
 class _OrderListScreenState extends State<OrderListScreen> {
   Stream<List<Order>> _getOrdersStream() {
-    // 🧠 Final session guard: Pull directly from Firebase Auth
     final user = FirebaseAuth.instance.currentUser;
-    
-    if (user == null) {
-      debugPrint('[OrderListScreen] User not logged in, returning empty stream');
-      return Stream.value([]);
-    }
-    
-    final uid = user.uid;
-    debugPrint('[OrderListScreen] Real-time order stream active for UID: "$uid"');
-    return OrderService().streamCustomerOrders(uid);
+    if (user == null) return Stream.value([]);
+    return OrderService().streamCustomerOrders(user.uid);
   }
 
 
@@ -92,9 +84,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
 
   Widget _buildEmptyState() {
-    final user = FirebaseAuth.instance.currentUser;
-    final uid = user?.uid ?? 'WAITING FOR SESSION...';
-    
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -105,8 +94,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
             color: Colors.grey.shade300,
           ),
           const SizedBox(height: 16),
-          Text(
-            user == null ? 'Please Sign In' : 'No Orders Found',
+          const Text(
+            'No Orders Found',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -114,30 +103,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            'Check your Firestore "Orders" collection.',
+          const Text(
+            'Your current order history is empty.',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey.shade400,
+              color: Colors.grey,
             ),
           ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(10)),
-            child: SelectableText(
-              "Your ID: $uid", 
-              style: const TextStyle(fontSize: 10, color: Colors.grey, fontFamily: 'monospace')
-            ),
-          ),
-          if (user != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: TextButton(
-                onPressed: () => setState(() {}),
-                child: const Text('Tap to Refresh'),
-              ),
-            ),
         ],
       ),
     );

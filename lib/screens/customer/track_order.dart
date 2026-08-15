@@ -78,11 +78,6 @@ class OrderTrackScreen extends StatelessWidget {
                     snapshot.hasError ? 'Error loading tracking data' : 'Order details not found',
                     style: const TextStyle(color: Colors.black54),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Searching for Order ID: $orderId',
-                    style: const TextStyle(color: Colors.grey, fontSize: 10),
-                  ),
                   TextButton(
                     onPressed: () => Navigator.pop(context),
                     child: const Text('Go Back'),
