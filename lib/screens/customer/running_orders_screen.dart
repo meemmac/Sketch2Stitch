@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../models/measurement.dart';
-import 'order_session.dart';
+import '../../models/order.dart';
+import '../../services/measurement_service.dart';
+import '../../services/order_service.dart';
+import '../../services/user_session.dart';
 import 'tailoring_setup_screen.dart';
 import 'tailoring_callbacks.dart';
 
@@ -14,29 +17,45 @@ import 'tailoring_callbacks.dart';
 ///
 /// This screen never blocks or is blocked by CartScreen — it's a pure
 /// navigation shortcut into an existing TailoringSetupScreen instance.
-class RunningOrdersScreen extends StatelessWidget {
+///
+/// Both the order list and the customer's saved measurement come from
+/// Firestore (`Orders` + `Sub-orders` via OrderService, `Measurement` via
+/// MeasurementService). The list is a live stream, so a tailor's quote or
+/// an order going terminal on another device updates this screen without
+/// a manual refresh.
+class RunningOrdersScreen extends StatefulWidget {
   const RunningOrdersScreen({super.key});
 
-  // TODO: replace with the real saved measurement fetch (same source used
-  // by CartScreen/CheckoutScreen) once the backend is connected.
-  static final Measurement _measurement = Measurement(
-    id: "MEAS001",
-    customerId: "CUST001",
-    upperBustCircumference: 34,
-    roundShoulderCircumference: 40,
-    hipsCircumference: 38,
-    underBustCircumference: 30,
-    bustCircumference: 36,
-    waist: 28,
-    shoulderToKnee: 38,
-    shoulderToUnderBust: 15,
-    shoulderToBust: 10,
-    thigh: 22,
-    knee: 15,
-    ankle: 9,
-    waistToAnkle: 40,
-    shoulderToAnkle: 58,
-  );
+  @override
+  State<RunningOrdersScreen> createState() => _RunningOrdersScreenState();
+}
+
+class _RunningOrdersScreenState extends State<RunningOrdersScreen> {
+  final OrderService _orderService = OrderService();
+  final MeasurementService _measurementService = MeasurementService();
+
+  late final String? _customerId = UserSession.instance.uid;
+  late final Stream<List<Order>> _ordersStream = _customerId == null
+      ? Stream.value(const <Order>[])
+      : _orderService.streamActiveCustomerOrders(_customerId!);
+
+  // Fetched once per visit rather than per card — the same measurement is
+  // handed to whichever order the customer continues into, and it can't
+  // change while this screen is on top. Null until it loads, and stays
+  // null for a customer who hasn't saved measurements yet; the Continue
+  // button waits on the load and TailoringSetupScreen already handles the
+  // empty case (it prompts the customer to enter measurements).
+  Measurement? _measurement;
+  late final Future<void> _measurementLoad = _loadMeasurement();
+
+  Future<void> _loadMeasurement() async {
+    if (_customerId == null) return;
+    try {
+      _measurement = await _measurementService.getMeasurement(_customerId!);
+    } catch (e) {
+      debugPrint('[RunningOrders] measurement fetch failed: $e');
+    }
+  }
 
   String _statusLabel(String status) {
     switch (status) {
