@@ -142,9 +142,7 @@ class VirtualTrialService {
           );
         }
 
-        final data = snap.data()!;
-        final currentUsed = (data['vtUsed'] as num?)?.toInt() ?? 0;
-        final existingReset = data['vtResetDate'];
+        final existingReset = snap.data()?['vtResetDate'];
 
         final updates = <String, dynamic>{
           'vtUsed': FieldValue.increment(1),

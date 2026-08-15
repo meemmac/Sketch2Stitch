@@ -723,11 +723,15 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                       // Cart lines carry Cloudinary URLs for real products
                       // and bundled asset paths for seeded demo data.
                       final isRemote = path.startsWith('http');
-                      return ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: isRemote
-                            ? Image.network(path, fit: BoxFit.cover)
-                            : Image.asset(path, fit: BoxFit.cover),
+                      final provider = isRemote
+                          ? NetworkImage(path) as ImageProvider
+                          : AssetImage(path);
+                      return _enlargeable(
+                        provider,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image(image: provider, fit: BoxFit.cover),
+                        ),
                       );
                     }
                     return _referenceThumb(i - _prefilledAssetImages.length);
