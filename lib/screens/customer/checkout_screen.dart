@@ -42,6 +42,11 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final Set<String> _paidRetailers = {};
+
+  /// bKash transaction id per retailer, captured on a successful execute so
+  /// it can be written onto that retailer's `Payments` record.
+  final Map<String, String> _trxIds = {};
+
   String? _payingRetailerId;
   bool _isPlacingOrder = false;
 
@@ -99,7 +104,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
 
       // Step 4: execute payment — confirms the transaction.
-      await BkashService.instance.executePayment(
+      final executed = await BkashService.instance.executePayment(
         paymentID: pending.paymentID,
         idToken: pending.idToken,
       );
@@ -107,6 +112,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (!mounted) return;
       setState(() {
         _paidRetailers.add(retailerId);
+        // Kept so the Payments record written at order creation carries the
+        // real bKash transaction id rather than an empty field.
+        _trxIds[retailerId] = executed.trxID;
         _payingRetailerId = null;
       });
       ScaffoldMessenger.of(context)
