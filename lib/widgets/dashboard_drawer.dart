@@ -285,7 +285,8 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       await AuthService().updateProfile(uid, _currentRole, {
         'name': updated.name,
         if (_currentRole == UserRole.retailer) 'shopName': updated.shopName,
-        'email': updated.email,
+        // 'email' is deliberately not written — it's the login identity and
+        // is read-only in the profile editor.
         'phone': updated.phone,
         'address': updated.address,
         if (_currentRole != UserRole.customer) 'about': updated.about,
@@ -1022,12 +1023,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
 
-    final email = _emailController.text.trim();
-    if (email.isEmpty || !ValidationUtils.isValidEmail(email)) {
-      _showFeedback('Please enter a valid email address.', isError: true);
-      return;
-    }
-
     final phone = _phoneController.text.trim();
     if (phone.isEmpty || !ValidationUtils.isValidPhone(phone)) {
       _showFeedback('Please enter a valid phone number.', isError: true);
@@ -1054,7 +1049,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final updated = widget.initialProfile.copyWith(
       name: _nameController.text.trim(),
       shopName: isRetailer ? _shopNameController.text.trim() : null,
-      email: email,
       phone: phone,
       address: address,
       about: _aboutController.text.trim(),
