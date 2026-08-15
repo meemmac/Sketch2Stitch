@@ -14,10 +14,10 @@ import 'messaging/chat_screen.dart'; // adjust path to match your folder structu
 // Add `shared_preferences` to pubspec.yaml if it isn't already a dependency.
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/bkash_service.dart';
+import '../../services/tailor_service.dart';
+import '../../services/user_session.dart';
 import 'bkash_payment_screen.dart';
 
-// TODO: point this at your real Measurement model
-// (the same one used by MeasurementScreen / DashboardDrawer).
 import '../../models/measurement.dart';
 import 'measurement_screen.dart';
 import 'browsing/browse_shell.dart';
@@ -529,8 +529,8 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     String tailorName = 'Your Tailor';
     try {
       final tailor = await TailorService().getTailorProfile(tailorId);
-      if (tailor != null && tailor.shopName.isNotEmpty) {
-        tailorName = tailor.shopName;
+      if (tailor != null && tailor.name.isNotEmpty) {
+        tailorName = tailor.name;
       }
     } catch (e) {
       debugPrint('[TailoringSetup] tailor name lookup failed: $e');
