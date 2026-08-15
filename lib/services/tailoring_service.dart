@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../models/design.dart';
 import '../models/order.dart';
 import '../models/payment.dart';
+import '../models/sub_order.dart';
 import '../models/tailor_job.dart';
 import 'Cloudinary_service.dart';
 
@@ -76,13 +77,13 @@ class TailoringService {
       final orderSnap = await _db.collection(_orders).doc(orderId).get();
       if (!orderSnap.exists) return null;
 
-      final job = (await _latestJobSnap(orderId))?.data();
-      final jobId = (await _latestJobSnap(orderId))?.id;
+      final jobSnap = await _latestJobSnap(orderId);
+      final job = jobSnap?.data();
 
       return {
         'tailorSelectionDeadline':
             _toDate(orderSnap.data()?['tailorSelectionDeadline']),
-        'tailorJobId': jobId,
+        'tailorJobId': jobSnap?.id,
         'tailorId': job?['tailorId'] as String?,
         'status': job?['status'] as String?,
         'requestedAt': _toDate(job?['requestedAt']),
