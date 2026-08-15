@@ -309,12 +309,8 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   }
 
   Widget _buildNotificationItem(AppNotification n) {
-    // Customers only need Profile Pic lookup (Retailer/Tailor photos)
-    if (widget.role == UserRole.customer) {
-      return _buildCustomerCard(n);
-    }
-
-    // Professionals (Tailor/Retailer) need Customer Name & Real Order ID lookup
+    // The Notifications collection never stores orderId directly — every role needs the same
+    // subOrderId/tailorJobId -> orderId resolution, not just Tailor/Retailer.
     final cacheKey = n.subOrderId ?? n.tailorJobId ?? n.orderId;
     
     if (_profileCache.containsKey("${cacheKey}_resolved")) {

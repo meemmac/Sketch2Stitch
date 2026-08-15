@@ -74,11 +74,17 @@ class NotificationService {
   }
 
   /// Deep lookup to find a Customer's name and the actual Order ID starting from a TailorJob or Sub-Order.
+  ///
+  /// The `orderId` lookup (step 1) is the critical part callers need — it must survive even if the
+  /// secondary lookups (customer name, rejection reason) fail, e.g. due to Firestore rules blocking a
+  /// tailor from reading the `Orders`/`Customer` collections directly. Each secondary lookup is
+  /// therefore isolated in its own try/catch so a permission error there can't wipe out an already
+  /// resolved orderId.
   Future<Map<String, String?>?> getResolvedNotificationData(AppNotification n) async {
-    try {
-      String? orderId = n.orderId;
+    String? orderId = n.orderId;
 
-      // 1. Find the Order ID first if it's missing in the notification document
+    // 1. Find the Order ID first if it's missing in the notification document
+    try {
       if (orderId.isEmpty || orderId == 'N/A') {
         if (n.subOrderId != null && n.subOrderId!.isNotEmpty) {
           final doc = await _db.collection('Sub-orders').doc(n.subOrderId).get();
@@ -88,16 +94,16 @@ class NotificationService {
           orderId = doc.data()?['orderId'];
         }
       }
+    } catch (e) {
+      debugPrint('Error resolving orderId for notification: $e');
+    }
 
+    if (orderId == null || orderId.isEmpty) return null;
 
-      if (orderId == null || orderId.isEmpty) return null;
-
-
-      // 2. Find the Customer ID from the Order
+    // 2. Find the Customer's name from the Order (best-effort — orderId above is already secured)
+    String? customerName;
+    try {
       final orderDoc = await _db.collection('Orders').doc(orderId).get();
-      String? customerName;
-      String? rejectionReason;
-
       if (orderDoc.exists) {
         final customerId = orderDoc.data()?['customerId'];
         if (customerId != null) {
@@ -105,9 +111,14 @@ class NotificationService {
           customerName = customerDoc.data()?['name'] as String?;
         }
       }
+    } catch (e) {
+      debugPrint('Error resolving customer name for notification: $e');
+    }
 
-      // 3. If it's a cancellation, try to find the rejection reason from Tailor-jobs
-      if (n.type == NotificationDbType.jobRejected) {
+    // 3. If it's a cancellation, try to find the rejection reason from Tailor-jobs (also best-effort)
+    String? rejectionReason;
+    if (n.type == NotificationDbType.jobRejected) {
+      try {
         if (n.tailorJobId != null && n.tailorJobId!.isNotEmpty) {
           final jobDoc = await _db.collection('Tailor-jobs').doc(n.tailorJobId).get();
           rejectionReason = jobDoc.data()?['rejectionReason'];
@@ -121,18 +132,16 @@ class NotificationService {
             rejectionReason = jobQuery.docs.first.data()['rejectionReason'];
           }
         }
+      } catch (e) {
+        debugPrint('Error resolving rejection reason for notification: $e');
       }
-
-
-      return {
-        'orderId': orderId,
-        'customerName': customerName,
-        'rejectionReason': rejectionReason,
-      };
-    } catch (e) {
-      debugPrint('Error resolving notification data: $e');
     }
-    return null;
+
+    return {
+      'orderId': orderId,
+      'customerName': customerName,
+      'rejectionReason': rejectionReason,
+    };
   }
 
 
