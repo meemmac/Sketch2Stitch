@@ -308,9 +308,16 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   /// `Notifications` schema has no `orderId` field, so subOrderId/tailorJobId/
   /// orderId can all be blank and every such notification would otherwise share
   /// one cache entry (and show another notification's avatar and order ID).
+  ///
+  /// The type is part of the key because the lookups keyed by it branch on it:
+  /// a tailor-side and a retailer-side notification for the same order carry the
+  /// same subOrderId but resolve to different people (and only `jobRejected`
+  /// resolves a rejection reason). Keying on the linked id alone let whichever
+  /// card resolved first hand its avatar/name/reason to the other.
   String _cacheKeyFor(AppNotification n) {
     final linked = n.subOrderId ?? n.tailorJobId ?? n.orderId;
-    return (linked.isNotEmpty) ? linked : n.id;
+    final base = (linked.isNotEmpty) ? linked : n.id;
+    return '$base:${n.type.name}';
   }
 
   Widget _buildInitialsAvatar(AppNotification n, _NotificationStyle style) {
