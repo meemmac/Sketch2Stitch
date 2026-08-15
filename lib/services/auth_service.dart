@@ -130,6 +130,49 @@ class AuthService {
   }
 
 
+  /// Changes the signed-in user's password.
+  ///
+  /// Firebase requires a recent login before a password change, so the
+  /// [currentPassword] is used to re-authenticate first. That doubles as the
+  /// "confirm it's really you" check on the change-password form.
+  ///
+  /// Throws [AuthServiceException] with a user-friendly message on failure.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null || user.email == null) {
+      throw AuthServiceException(
+        'You are not signed in. Please log in again to change your password.',
+      );
+    }
+
+    try {
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+      await user.reauthenticateWithCredential(credential);
+      await user.updatePassword(newPassword);
+    } on FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case 'wrong-password':
+        case 'invalid-credential':
+									          throw AuthServiceException('Your current password is incorrect.');
+        case 'requires-recent-login':
+          throw AuthServiceException(
+            'For security, please log out and log back in before changing your password.',
+          );
+        default:
+          throw AuthServiceException(_messageForCode(e.code));
+      }
+    } catch (e) {
+      throw AuthServiceException('Failed to change password: ${e.toString()}');
+    }
+  }
+
+
   /// Handle "Forgot Password" requests.
   Future<void> sendPasswordResetEmail(String email) async {
     try {
