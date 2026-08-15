@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'cart_screen.dart';
 import 'tailoring_setup_screen.dart';
 import '../../models/measurement.dart';
-import 'order_session.dart';
 import 'tailoring_callbacks.dart';
 import '../../models/sub_order.dart';
 import '../../services/bkash_service.dart';
@@ -225,24 +224,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       // cart screen's own handler so there's one place that owns clearing.
       widget.onOrderPlaced();
 
-      // Step 3: mirror into the local session store, reusing the Firestore
-      // order id so the tailoring flow stays attached to the real document.
-      final order = OrderStore.instance.startOrder(
-        placed.subOrders,
-        orderId: placed.order.id,
-        orderDate: placed.order.orderDate,
-      );
-
+      // Step 3: hand straight off to the tailoring stage against the real
+      // Firestore documents placeOrder() just wrote — no local mirror, so
+      // the state survives a restart and the tailor can actually see the
+      // job the customer is about to create.
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => TailoringSetupScreen(
-            orderId: order.orderId,
-            orderDate: order.orderDate,
+            orderId: placed.order.id,
+            orderDate: placed.order.orderDate,
             savedMeasurements: [widget.measurement],
-            subOrders: order.subOrders,
-            callbacks: buildTailoringCallbacks(order.orderId),
+            subOrders: placed.subOrders,
+            callbacks: buildTailoringCallbacks(placed.order.id),
           ),
         ),
       );
