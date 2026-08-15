@@ -13,6 +13,7 @@ import '../screens/retailer/inventory_screen.dart';
 import '../screens/retailer/orders_screen.dart';
 import '../screens/customer/measurement_page.dart';
 import '../screens/shared/welcome_screen.dart';
+import '../screens/shared/change_password_screen.dart';
 import '../screens/shared/location_picker_screen.dart';
 import '../screens/tailor/portfolio_screen.dart';
 import '../screens/tailor/orders_screen.dart';
@@ -1355,6 +1356,49 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   maxLines: 3,
                 ),
               ],
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 8),
+              const Text(
+                "Security",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: _openChangePassword,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.black26),
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.lock_outline, color: themeColor),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Change password',
+                          style: TextStyle(fontSize: 14, color: Colors.black87),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Colors.black26,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),
