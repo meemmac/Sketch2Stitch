@@ -11,6 +11,7 @@ import 'bkash_payment_screen.dart';
 import '../../services/checkout_service.dart';
 import '../../services/user_session.dart';
 import '../../services/cart_service.dart';
+import '../../models/order.dart' show PaymentStatus;
 
 /// ─── Checkout Screen ────────────────────────────────────────────────────
 ///
@@ -42,6 +43,7 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final Set<String> _paidRetailers = {};
   String? _payingRetailerId;
+  bool _isPlacingOrder = false;
 
   final CheckoutService _checkoutService = CheckoutService();
   final CartService _cartService = CartService();
@@ -157,6 +159,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// Creates the order in Firestore, clears the cart, starts a local
   /// OrderRecord, and navigates into that order's tailoring setup.
   Future<void> _continueToTailoring() async {
+    setState(() => _isPlacingOrder = true);
     try {
       // Step 1: Create the order in Firestore.
       final fireOrder = await _checkoutService.createOrder(
@@ -233,6 +236,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       debugPrint('[Checkout] Order creation error: $e');
       if (!mounted) return;
       _showPaymentError('Could not place your order. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isPlacingOrder = false);
     }
   }
 
@@ -443,7 +448,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             const SizedBox(width: 16),
             ElevatedButton(
-              onPressed: _allPaid ? _continueToTailoring : null,
+              onPressed: (_allPaid && !_isPlacingOrder) ? _continueToTailoring : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green.shade800,
                 foregroundColor: Colors.white,
@@ -452,7 +457,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 elevation: 0,
               ),
-              child: const Text("Continue", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              child: _isPlacingOrder
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text("Continue", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             ),
           ],
         ),
