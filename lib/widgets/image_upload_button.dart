@@ -2,6 +2,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/services/cloudinary_service.dart';
+import 'package:sketch2stitch/widgets/top_feedback_banner.dart';
 
 class ImageUploadButton extends StatefulWidget {
   final Function(String imageUrl)? onUploadSuccess;
@@ -96,12 +97,6 @@ class _ImageUploadButtonState extends State<ImageUploadButton> {
 
   void _showSnackBar(String message, {required bool isError}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    AppFeedback.show(context, message, isError: isError);
   }
 }
