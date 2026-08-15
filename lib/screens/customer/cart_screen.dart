@@ -129,10 +129,17 @@ class _CartScreenState extends State<CartScreen> {
       final retailer = _retailers[retailerId];
 
       return SubOrder(
-        id: retailerId, // placeholder key until real Sub-orders docs exist
+        // Deliberately blank: no `Sub-orders` document exists yet, so there is
+        // no id to carry. CheckoutService.placeOrder mints the real ids and
+        // returns sub-orders that do carry them — nothing downstream may key
+        // off the id until then (grouping here is by retailerId).
+        id: '',
         orderId: '',
         retailerId: retailerId,
         status: SubOrderStatus.preparing,
+        // Snapshot of the coordinates the delivery charge below was computed
+        // from, persisted at checkout so the charge stays auditable.
+        deliveryPoint: _snapshot.customerLocation,
         itemsSubtotal: subtotal,
         deliveryCharge: retailer?.deliveryCharge ?? 0,
         deliveryDistanceKm: retailer?.distanceKm,
