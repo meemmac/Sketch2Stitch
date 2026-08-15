@@ -13,6 +13,7 @@ import '../screens/retailer/inventory_screen.dart';
 import '../screens/retailer/orders_screen.dart';
 import '../screens/customer/measurement_page.dart';
 import '../screens/shared/welcome_screen.dart';
+import '../screens/shared/change_password_screen.dart';
 import '../screens/shared/location_picker_screen.dart';
 import '../screens/tailor/portfolio_screen.dart';
 import '../screens/tailor/orders_screen.dart';
@@ -20,6 +21,7 @@ import '../screens/customer/cart_screen.dart';
 import '../screens/customer/orders/order_detail_screen.dart';
 import '../screens/customer/messaging/conversations_screen.dart';
 import '../utils/validation_utils.dart';
+import 'top_feedback_banner.dart';
 
 /// Placeholder avatar showing the first letter of [name] on a tinted
 /// background — used wherever no profile picture has been set yet.
@@ -38,128 +40,6 @@ Widget _initialAvatar(String name, Color themeColor, {double fontSize = 22}) {
       ),
     ),
   );
-}
-
-/// Glassmorphic feedback banner shown pinned to the top of the screen —
-/// mirrors the banner used on the registration flow so success/error
-/// messages read consistently across the app instead of a bottom SnackBar.
-class TopFeedbackBanner extends StatelessWidget {
-  final String message;
-  final bool isError;
-  final VoidCallback onClose;
-
-  const TopFeedbackBanner({
-    super.key,
-    required this.message,
-    required this.isError,
-    required this.onClose,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: SafeArea(
-          bottom: false,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: isError
-                      ? const Color(0xFFFFEBEE).withValues(alpha: 0.92)
-                      : const Color(0xFFC8E6C9).withValues(alpha: 0.92),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: isError
-                        ? const Color(0xFFFFCDD2)
-                        : const Color(0xFF9CCC9F),
-                    width: 1.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color:
-                          (isError
-                                  ? const Color(0xFFD32F2F)
-                                  : const Color(0xFF2E7D32))
-                              .withValues(alpha: 0.10),
-                      blurRadius: 20,
-                      spreadRadius: 1,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isError
-                            ? const Color(0xFFE53935)
-                            : const Color(0xFF4CAF50),
-                        border: Border.all(
-                          color: isError
-                              ? const Color(0xFFEF9A9A)
-                              : const Color(0xFFA5D6A7),
-                          width: 1,
-                        ),
-                      ),
-                      child: Icon(
-                        isError ? Icons.close_rounded : Icons.check_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        message,
-                        style: const TextStyle(
-                          color: Color(0xFF222222),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                          height: 1.35,
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: onClose,
-                      child: Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withValues(alpha: 0.35),
-                        ),
-                        child: Icon(
-                          Icons.close_rounded,
-                          color: Colors.black.withValues(alpha: 0.45),
-                          size: 18,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 /// Model class representing the profile information for the drawer.
@@ -285,23 +165,28 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
       await AuthService().updateProfile(uid, _currentRole, {
         'name': updated.name,
         if (_currentRole == UserRole.retailer) 'shopName': updated.shopName,
-        'email': updated.email,
+        // 'email' is deliberately not written — it's the login identity and
+        // is read-only in the profile editor.
         'phone': updated.phone,
         'address': updated.address,
         if (_currentRole != UserRole.customer) 'about': updated.about,
-        'profilePicture': updated.profilePicture ?? '',
+        // Only Tailor/Retailer carry a picture in the schema — the editor
+        // hides the picker for customers, so writing an always-empty
+        // `profilePicture` onto the Customer document is skipped too.
+        if (_currentRole != UserRole.customer)
+          'profilePicture': updated.profilePicture ?? '',
         if (updated.location != null) 'location': updated.location,
       });
 
       UserSession.instance.currentProfile.value = updated;
-      debugPrint("Profile updated: ${updated.name} (${_currentRole.name})");
 
       if (mounted) {
         _showFeedback('Profile updated successfully.');
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
-        _showFeedback('Failed to save profile: $e', isError: true);
+        _showFeedback("Couldn't save your profile. Please try again.",
+            isError: true);
       }
     }
   }
@@ -369,12 +254,16 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
                                 // Logout Section
                                 DrawerLogoutButton(
                                   onLogoutPressed: () async {
-                                    debugPrint("Logout pressed");
                                     await AuthService().signOut();
                                     UserSession.instance.logout();
 
                                     if (!mounted) return;
-                                    _showFeedback("Logged out successfully!");
+                                    // Overlay banner so it survives the
+                                    // navigation to the welcome screen.
+                                    AppFeedback.show(
+                                      context,
+                                      "Logged out successfully!",
+                                    );
                                     Navigator.pushAndRemoveUntil(
                                       context,
                                       MaterialPageRoute(
@@ -733,7 +622,6 @@ class DrawerNavigationSection extends StatelessWidget {
                   ),
                 );
               } else {
-                debugPrint("Navigation clicked: ${item['title']}");
                 onFeedback("Navigation trigger: ${item['title']}");
               }
             },
@@ -931,9 +819,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       text: widget.initialProfile.about ?? '',
     );
     _profilePicturePath = widget.initialProfile.profilePicture;
-    _selectedLocation =
-        widget.initialProfile.location ??
-        const GeoPoint(23.8103, 90.4125); // dummy Dhaka coordinates for now
+    // Left null when the profile has no pinned location, so the "Please pin
+    // your location before saving" check below can actually fire. Defaulting
+    // to a fixed coordinate silently saved a location the user never chose.
+    _selectedLocation = widget.initialProfile.location;
   }
 
   Future<void> _pickImage() async {
@@ -1008,6 +897,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  Future<void> _openChangePassword() async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+    );
+    if (changed == true && mounted) {
+      _showFeedback('Password updated successfully.');
+    }
+  }
+
   void _save() {
     final isRetailer = widget.role == UserRole.retailer;
     final displayName = isRetailer
@@ -1019,12 +918,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         isRetailer ? 'Please enter your shop name.' : 'Please enter your name.',
         isError: true,
       );
-      return;
-    }
-
-    final email = _emailController.text.trim();
-    if (email.isEmpty || !ValidationUtils.isValidEmail(email)) {
-      _showFeedback('Please enter a valid email address.', isError: true);
       return;
     }
 
@@ -1054,7 +947,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final updated = widget.initialProfile.copyWith(
       name: _nameController.text.trim(),
       shopName: isRetailer ? _shopNameController.text.trim() : null,
-      email: email,
       phone: phone,
       address: address,
       about: _aboutController.text.trim(),
@@ -1209,16 +1101,31 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 const SizedBox(height: 14),
               ],
+              // Email is the account's login identity — it is shown for
+              // reference but cannot be edited here.
               TextField(
                 controller: _emailController,
-                style: fieldTextStyle,
+                style: fieldTextStyle.copyWith(color: Colors.black54),
+                readOnly: true,
+                enableInteractiveSelection: false,
                 decoration: InputDecoration(
                   labelText: "Email",
                   labelStyle: fieldLabelStyle,
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.email_outlined),
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.email_outlined),
+                  suffixIcon: const Icon(
+                    Icons.lock_outline,
+                    size: 18,
+                    color: Colors.black26,
+                  ),
+                  filled: true,
+                  fillColor: Colors.black.withValues(alpha: 0.03),
+                  helperText: "Your login email can't be changed.",
+                  helperStyle: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.black45,
+                  ),
                 ),
-                keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 14),
               TextField(
@@ -1346,6 +1253,49 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   maxLines: 3,
                 ),
               ],
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 8),
+              const Text(
+                "Security",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: _openChangePassword,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.black26),
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.lock_outline, color: themeColor),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Change password',
+                          style: TextStyle(fontSize: 14, color: Colors.black87),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Colors.black26,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),

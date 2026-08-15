@@ -15,6 +15,24 @@ class CheckoutServiceException implements Exception {
   String toString() => message;
 }
 
+/// Map key identifying one purchasable variant: a product plus the colour
+/// option chosen from it. Stock lives on the option, not the product.
+class _ProductOption {
+  final String productId;
+  final int optionId;
+
+  const _ProductOption(this.productId, this.optionId);
+
+  @override
+  bool operator ==(Object other) =>
+      other is _ProductOption &&
+      other.productId == productId &&
+      other.optionId == optionId;
+
+  @override
+  int get hashCode => Object.hash(productId, optionId);
+}
+
 /// Lightweight payload used by [CheckoutService.createOrderItems].
 class OrderItemInput {
   final String productId;
@@ -26,6 +44,46 @@ class OrderItemInput {
     required this.optionId,
     required this.quantity,
   });
+}
+
+/// One retailer's slice of a checkout: the sub-order totals plus the items
+/// and the payment already collected for it. Consumed by
+/// [CheckoutService.placeOrder].
+class SubOrderInput {
+  final String retailerId;
+  final double itemsSubtotal;
+  final double deliveryCharge;
+  final double? deliveryDistanceKm;
+
+  /// The customer coordinates [deliveryCharge] was computed from, snapshotted
+  /// onto `Sub-orders.deliveryPoint`.
+  final GeoPoint? deliveryPoint;
+
+  final List<OrderItemInput> items;
+
+  /// bKash transaction id for this retailer's payment, when one was captured.
+  final String? transactionId;
+
+  const SubOrderInput({
+    required this.retailerId,
+    required this.itemsSubtotal,
+    required this.deliveryCharge,
+    this.deliveryDistanceKm,
+    this.deliveryPoint,
+    required this.items,
+    this.transactionId,
+  });
+
+  double get amount => itemsSubtotal + deliveryCharge;
+}
+
+/// What [CheckoutService.placeOrder] wrote: the parent order plus every
+/// sub-order, each already carrying its real Firestore id.
+class PlacedOrder {
+  final Order order;
+  final List<SubOrder> subOrders;
+
+  const PlacedOrder({required this.order, required this.subOrders});
 }
 
 /// Full order aggregate returned by [CheckoutService.getOrderDetails].
@@ -129,6 +187,243 @@ class CheckoutService {
       return option.stock >= quantity;
     } on CheckoutServiceException {
       rethrow;
+    }
+  }
+
+  // ── validateStock ──────────────────────────────────────────────────────────
+
+  /// Checks a whole basket of [items] in one pass and returns a human-readable
+  /// problem per line that can no longer be fulfilled (product deleted, colour
+  /// option retired, or not enough stock left). An empty list means every line
+  /// is currently fulfillable.
+  ///
+  /// This is an advisory pre-flight check — [placeOrder] re-validates inside
+  /// its transaction, which is what actually guarantees the stock.
+  Future<List<String>> validateStock(List<OrderItemInput> items) async {
+    if (items.isEmpty) return [];
+
+    try {
+      final wanted = _totalsByProductOption(items);
+      final products = await _fetchProductsByIds(
+        wanted.keys.map((k) => k.productId).toSet().toList(),
+      );
+
+      final problems = <String>[];
+      wanted.forEach((key, quantity) {
+        final product = products[key.productId];
+        if (product == null) {
+          problems.add('A product in your cart is no longer available.');
+          return;
+        }
+
+        final option = _optionOf(product, key.optionId);
+        if (option == null) {
+          problems.add(
+            '"${product.productName}" is no longer available in the colour you chose.',
+          );
+          return;
+        }
+
+        if (option.stock < quantity) {
+          problems.add(
+            option.stock == 0
+                ? '"${product.productName}" (${option.color}) just went out of stock.'
+                : 'Only ${option.stock} left of "${product.productName}" '
+                    '(${option.color}) — your cart has $quantity.',
+          );
+        }
+      });
+
+      return problems;
+    } on FirebaseException catch (e) {
+      throw CheckoutServiceException(
+        'Failed to verify stock: ${e.message ?? e.code}',
+      );
+    }
+  }
+
+  // ── placeOrder ─────────────────────────────────────────────────────────────
+
+  /// Writes an entire checkout **atomically**: re-validates stock, decrements
+  /// it, and creates the `Orders` document, one `Sub-orders` document per
+  /// retailer with its `Order-Items`, and one `Payments` record per retailer —
+  /// all inside a single Firestore transaction.
+  ///
+  /// Either every document lands or none does, so a mid-way failure can never
+  /// leave a paid-for order half-written. Stock is read and decremented in the
+  /// same transaction, so two customers cannot both buy the last unit.
+  ///
+  /// Throws [CheckoutServiceException] with a customer-facing message when a
+  /// line is no longer fulfillable; nothing is written in that case.
+  Future<PlacedOrder> placeOrder({
+    required String customerId,
+    required List<SubOrderInput> subOrders,
+  }) async {
+    if (subOrders.isEmpty) {
+      throw const CheckoutServiceException('There is nothing to order.');
+    }
+
+    final allItems = subOrders.expand((s) => s.items).toList();
+    if (allItems.isEmpty) {
+      throw const CheckoutServiceException('There is nothing to order.');
+    }
+
+    try {
+      final orderRef = _db.collection(_orders).doc();
+      final orderDate = Timestamp.now();
+
+      // Sub-order ids are minted up-front so their Order-Items can be written
+      // in the very same transaction.
+      final subOrderRefs = {
+        for (final s in subOrders) s.retailerId: _db.collection(_subOrders).doc()
+      };
+
+      final wanted = _totalsByProductOption(allItems);
+      final productRefs = {
+        for (final id in wanted.keys.map((k) => k.productId).toSet())
+          id: _db.collection(_products).doc(id)
+      };
+
+      await _db.runTransaction((tx) async {
+        // ── Reads first: Firestore forbids reading after a write. ──────────
+        final productSnaps = <String, DocumentSnapshot<Map<String, dynamic>>>{};
+        for (final entry in productRefs.entries) {
+          productSnaps[entry.key] = await tx.get(entry.value);
+        }
+
+        // ── Validate + compute the decremented colourOptions arrays. ───────
+        final updatedOptions = <String, List<Map<String, dynamic>>>{};
+
+        for (final entry in wanted.entries) {
+          final key = entry.key;
+          final quantity = entry.value;
+          final snap = productSnaps[key.productId]!;
+
+          if (!snap.exists) {
+            throw const CheckoutServiceException(
+              'A product in your cart is no longer available. '
+              'Please remove it and try again.',
+            );
+          }
+
+          final product = Product.fromJson({...snap.data()!, 'id': snap.id});
+          final option = _optionOf(product, key.optionId);
+
+          if (option == null) {
+            throw CheckoutServiceException(
+              '"${product.productName}" is no longer available in the colour '
+              'you chose. Please update your cart.',
+            );
+          }
+
+          if (option.stock < quantity) {
+            throw CheckoutServiceException(
+              option.stock == 0
+                  ? '"${product.productName}" (${option.color}) just went out '
+                      'of stock.'
+                  : 'Only ${option.stock} left of "${product.productName}" '
+                      '(${option.color}) — please reduce the quantity.',
+            );
+          }
+
+          // Rebuild the whole array with this option's stock decremented;
+          // colourOptions is an array field, so it can only be written whole.
+          // Start from any decrement already applied to this same product.
+          final current = updatedOptions[key.productId] ??
+              product.colorOptions.map((o) => o.toJson()).toList();
+
+          updatedOptions[key.productId] = [
+            for (final raw in current)
+              if ((raw['optionId'] as num?)?.toInt() == key.optionId)
+                {...raw, 'stock': ((raw['stock'] as num?)?.toInt() ?? 0) - quantity}
+              else
+                raw,
+          ];
+        }
+
+        // ── Writes ─────────────────────────────────────────────────────────
+        for (final entry in updatedOptions.entries) {
+          tx.update(productRefs[entry.key]!, {'colorOptions': entry.value});
+        }
+
+        tx.set(orderRef, {
+          'customerId': customerId,
+          'orderDate': orderDate,
+          // tailorSelectionDeadline is deliberately not set here — the
+          // customer hasn't chosen whether they want a tailor yet.
+          'status': OrderStatus.awaitingConfirmation.toValue,
+        });
+
+        for (final sub in subOrders) {
+          final subRef = subOrderRefs[sub.retailerId]!;
+
+          tx.set(subRef, {
+            'orderId': orderRef.id,
+            'retailerId': sub.retailerId,
+            'status': SubOrderStatus.preparing.name,
+            // 'pending' until tailoring setup decides whether the fabric ships
+            // to the customer or straight to the tailor.
+            'deliveryDestination': SubOrderDeliveryDestination.pending.name,
+            'deliveryPoint': sub.deliveryPoint,
+            'itemsSubtotal': sub.itemsSubtotal,
+            'deliveryCharge': sub.deliveryCharge,
+            'deliveryDistanceKm': sub.deliveryDistanceKm,
+          });
+
+          for (final item in sub.items) {
+            tx.set(_db.collection(_orderItems).doc(), {
+              'subOrderId': subRef.id,
+              'productId': item.productId,
+              'optionId': item.optionId,
+              'quantity': item.quantity,
+            });
+          }
+
+          // One Payments record per retailer — this flow charges each retailer
+          // separately through bKash, and Payments.targetType only admits
+          // 'retailer' or 'tailor'.
+          tx.set(_db.collection(_payments).doc(), {
+            'orderId': orderRef.id,
+            'method': PaymentMethod.mobileBanking.toValue,
+            'amount': sub.amount,
+            'itemsAmount': sub.itemsSubtotal,
+            'deliveryAmount': sub.deliveryCharge,
+            'targetType': PaymentTargetType.retailer.toValue,
+            'targetId': sub.retailerId,
+            'transactionId': sub.transactionId,
+            'date': orderDate,
+            'status': PaymentStatus.completed.toValue,
+          });
+        }
+      });
+
+      return PlacedOrder(
+        order: Order(
+          id: orderRef.id,
+          customerId: customerId,
+          orderDate: orderDate.toDate(),
+          status: OrderStatus.awaitingConfirmation,
+        ),
+        subOrders: [
+          for (final sub in subOrders)
+            SubOrder(
+              id: subOrderRefs[sub.retailerId]!.id,
+              orderId: orderRef.id,
+              retailerId: sub.retailerId,
+              status: SubOrderStatus.preparing,
+              deliveryPoint: sub.deliveryPoint,
+              itemsSubtotal: sub.itemsSubtotal,
+              deliveryCharge: sub.deliveryCharge,
+              deliveryDistanceKm: sub.deliveryDistanceKm,
+            ),
+        ],
+      );
+    } on CheckoutServiceException {
+      rethrow;
+    } on FirebaseException catch (e) {
+      throw CheckoutServiceException(
+        'Failed to place order: ${e.message ?? e.code}',
+      );
     }
   }
 
@@ -404,6 +699,42 @@ class CheckoutService {
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
+
+  ColorOption? _optionOf(Product product, int optionId) =>
+      product.colorOptions.cast<ColorOption?>().firstWhere(
+            (o) => o?.optionId == optionId,
+            orElse: () => null,
+          );
+
+  /// Collapses a basket into one total per (productId, optionId), so the same
+  /// option appearing on several lines is checked against stock once, as a sum.
+  Map<_ProductOption, int> _totalsByProductOption(List<OrderItemInput> items) {
+    final totals = <_ProductOption, int>{};
+    for (final item in items) {
+      final key = _ProductOption(item.productId, item.optionId);
+      totals[key] = (totals[key] ?? 0) + item.quantity;
+    }
+    return totals;
+  }
+
+  Future<Map<String, Product>> _fetchProductsByIds(List<String> ids) async {
+    final products = <String, Product>{};
+
+    // Firestore 'whereIn' supports up to 30 values per query.
+    for (var i = 0; i < ids.length; i += 30) {
+      final chunk = ids.sublist(i, i + 30 > ids.length ? ids.length : i + 30);
+      final snap = await _db
+          .collection(_products)
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
+
+      for (final doc in snap.docs) {
+        products[doc.id] = Product.fromJson({...doc.data(), 'id': doc.id});
+      }
+    }
+
+    return products;
+  }
 
   Order _orderFromSnap(DocumentSnapshot<Map<String, dynamic>> snap) {
     final data = snap.data()!;

@@ -353,8 +353,13 @@ class _RegisterScreenState extends State<RegisterScreen>
 
       if (!mounted) return;
 
+      // The account itself is created either way — only the welcome email is
+      // best-effort, so say so rather than silently dropping the result.
       _showFeedback(
-        'Registration successful! You can now log in.',
+        result.emailSent
+            ? 'Registration successful! You can now log in.'
+            : 'Registration successful! You can now log in. '
+                "(We couldn't send the welcome email.)",
         isError: false,
       );
 

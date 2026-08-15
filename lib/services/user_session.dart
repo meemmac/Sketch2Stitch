@@ -27,7 +27,6 @@ class UserSession {
     _role = role;
     _uid = uid ?? AuthService().currentUser?.uid;
     currentProfile.value = profile;
-    debugPrint('[UserSession] Session started for ${profile.email} as $role (uid: $_uid)');
   }
 
   /// Clears the session.
@@ -35,7 +34,6 @@ class UserSession {
     _role = null;
     _uid = null;
     currentProfile.value = null;
-    debugPrint('[UserSession] Session cleared');
   }
 
   bool get customerHasLocation => currentProfile.value?.location != null;

@@ -7,6 +7,7 @@ import '../../services/auth_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/user_role.dart';
 import '../../models/retailer.dart';
+import '../../widgets/top_feedback_banner.dart';
 
 class OrderItem {
   final String name;
@@ -385,20 +386,11 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
   }
 
   void _showBanner(String message, {bool isError = true}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red.shade700 : Colors.green.shade700,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
+    AppFeedback.show(context, message, isError: isError);
   }
 
   void _updateOrderStatus(RetailerOrder order, String newStatus) async {
     try {
-      debugPrint("RetailerOrdersScreen: Changing status for sub-order ${order.id} (Parent: ${order.orderId}) to $newStatus");
       await _orderService.updateOrderStatus(order.id, newStatus, parentOrderId: order.orderId);
       if (!mounted) return;
       setState(() {

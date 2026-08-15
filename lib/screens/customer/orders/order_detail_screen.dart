@@ -3,6 +3,7 @@ import '../../../models/measurement.dart';
 import '../browsing/browse_shell.dart';
 import 'reviews_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../widgets/top_feedback_banner.dart';
 
 enum OrderDeliveryDestination { retailer, tailor }
 
@@ -1275,7 +1276,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           onRatingChanged: (r) => setModalState(() => tempRetailerRatings[retailer] = r),
                           onSubmit: () {
                             if (tempRetailerRatings[retailer] == 0) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Please select a rating for $retailer")));
+                              AppFeedback.show(context, "Please select a rating for $retailer", isError: true);
                               return;
                             }
                             setState(() {
@@ -1307,7 +1308,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               }
                             });
                             Navigator.pop(modalContext);
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Review for $retailer submitted!")));
+                            AppFeedback.show(context, "Review for $retailer submitted!");
                           },
                         ),
                       )),
@@ -1321,7 +1322,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           onRatingChanged: (r) => setModalState(() => tempTailorRating = r),
                           onSubmit: () {
                             if (tempTailorRating == 0) {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a rating")));
+                              AppFeedback.show(context, "Please select a rating", isError: true);
                               return;
                             }
                             setState(() {
@@ -1348,7 +1349,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               }
                             });
                             Navigator.pop(modalContext);
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Tailor review submitted!")));
+                            AppFeedback.show(context, "Tailor review submitted!");
                           },
                         ),
                     ],
@@ -1666,9 +1667,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               child: IconButton(
                 icon: const Icon(Icons.download, color: Colors.white, size: 30),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Reference image download started...")),
-                  );
+                  AppFeedback.show(context, "Reference image download started...");
                 },
               ),
             ),

@@ -1,42 +1,62 @@
 import 'package:flutter/material.dart';
 import '../../models/measurement.dart';
-import 'order_session.dart';
+import '../../models/order.dart';
+import '../../services/measurement_service.dart';
+import '../../services/order_service.dart';
+import '../../services/user_session.dart';
 import 'tailoring_setup_screen.dart';
 import 'tailoring_callbacks.dart';
 
 /// ─── Running Orders Screen ──────────────────────────────────────────────
 ///
 /// Lists every order still needing a customer decision — i.e.
-/// `OrderRecord.isActive == true` (awaiting_confirmation,
-/// awaiting_tailor_search, tailor_pending). Orders that were skipped,
-/// expired-to-direct-delivery, or fully paid are TERMINAL and intentionally
-/// do NOT appear here — see OrderRecord.isActive for why.
+/// an `Orders.status` in `OrderService.activeOrderStatuses`
+/// (awaiting_confirmation, awaiting_tailor_search, tailor_pending). Orders
+/// that were skipped or expired-to-direct-delivery ('processing') and fully
+/// paid ones ('completed') are TERMINAL and intentionally do NOT appear
+/// here — there is nothing left for the customer to decide.
 ///
 /// This screen never blocks or is blocked by CartScreen — it's a pure
 /// navigation shortcut into an existing TailoringSetupScreen instance.
-class RunningOrdersScreen extends StatelessWidget {
+///
+/// Both the order list and the customer's saved measurement come from
+/// Firestore (`Orders` + `Sub-orders` via OrderService, `Measurement` via
+/// MeasurementService). The list is a live stream, so a tailor's quote or
+/// an order going terminal on another device updates this screen without
+/// a manual refresh.
+class RunningOrdersScreen extends StatefulWidget {
   const RunningOrdersScreen({super.key});
 
-  // TODO: replace with the real saved measurement fetch (same source used
-  // by CartScreen/CheckoutScreen) once the backend is connected.
-  static final Measurement _measurement = Measurement(
-    id: "MEAS001",
-    customerId: "CUST001",
-    upperBustCircumference: 34,
-    roundShoulderCircumference: 40,
-    hipsCircumference: 38,
-    underBustCircumference: 30,
-    bustCircumference: 36,
-    waist: 28,
-    shoulderToKnee: 38,
-    shoulderToUnderBust: 15,
-    shoulderToBust: 10,
-    thigh: 22,
-    knee: 15,
-    ankle: 9,
-    waistToAnkle: 40,
-    shoulderToAnkle: 58,
-  );
+  @override
+  State<RunningOrdersScreen> createState() => _RunningOrdersScreenState();
+}
+
+class _RunningOrdersScreenState extends State<RunningOrdersScreen> {
+  final OrderService _orderService = OrderService();
+  final MeasurementService _measurementService = MeasurementService();
+
+  late final String? _customerId = UserSession.instance.uid;
+  late final Stream<List<Order>> _ordersStream = _customerId == null
+      ? Stream.value(const <Order>[])
+      : _orderService.streamActiveCustomerOrders(_customerId);
+
+  // Fetched once per visit rather than per card — the same measurement is
+  // handed to whichever order the customer continues into, and it can't
+  // change while this screen is on top. Null until it loads, and stays
+  // null for a customer who hasn't saved measurements yet; the Continue
+  // button waits on the load and TailoringSetupScreen already handles the
+  // empty case (it prompts the customer to enter measurements).
+  Measurement? _measurement;
+  late final Future<void> _measurementLoad = _loadMeasurement();
+
+  Future<void> _loadMeasurement() async {
+    if (_customerId == null) return;
+    try {
+      _measurement = await _measurementService.getMeasurement(_customerId);
+    } catch (e) {
+      debugPrint('[RunningOrders] measurement fetch failed: $e');
+    }
+  }
 
   String _statusLabel(String status) {
     switch (status) {
@@ -64,16 +84,22 @@ class RunningOrdersScreen extends StatelessWidget {
     }
   }
 
-  void _continueOrder(BuildContext context, OrderRecord order) {
+  Future<void> _continueOrder(BuildContext context, Order order) async {
+    // The measurement load starts in initState, so this normally resolves
+    // immediately; awaiting it guards the rare case where the customer taps
+    // Continue before the first read comes back.
+    await _measurementLoad;
+    if (!context.mounted) return;
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => TailoringSetupScreen(
-          orderId: order.orderId,
+          orderId: order.id,
           orderDate: order.orderDate,
-          savedMeasurements: [_measurement],
-          subOrders: order.subOrders,
-          callbacks: buildTailoringCallbacks(order.orderId),
+          savedMeasurements: _measurement == null ? const [] : [_measurement!],
+          subOrders: order.subOrders ?? const [],
+          callbacks: buildTailoringCallbacks(order.id),
         ),
       ),
     );
@@ -81,8 +107,6 @@ class RunningOrdersScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final orders = OrderStore.instance.activeOrders;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF9FBF9),
       appBar: AppBar(
@@ -92,7 +116,50 @@ class RunningOrdersScreen extends StatelessWidget {
         elevation: 0,
         foregroundColor: Colors.black,
       ),
-      body: orders.isEmpty ? _buildEmptyState() : _buildList(context, orders),
+      body: StreamBuilder<List<Order>>(
+        stream: _ordersStream,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return _buildErrorState(snapshot.error);
+          }
+          // Only the very first frame shows a spinner — later snapshots
+          // keep the current list on screen while the new one arrives.
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final orders = snapshot.data!;
+          return orders.isEmpty
+              ? _buildEmptyState()
+              : _buildList(context, orders);
+        },
+      ),
+    );
+  }
+
+  Widget _buildErrorState(Object? error) {
+    debugPrint('[RunningOrders] order stream failed: $error');
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off_rounded, size: 56, color: Colors.grey.shade300),
+            const SizedBox(height: 12),
+            const Text(
+              "Couldn't load your running orders",
+              style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              "Check your connection and try again.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -118,7 +185,7 @@ class RunningOrdersScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildList(BuildContext context, List<OrderRecord> orders) {
+  Widget _buildList(BuildContext context, List<Order> orders) {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: orders.length,
@@ -127,9 +194,10 @@ class RunningOrdersScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildOrderCard(BuildContext context, OrderRecord order) {
-    final subOrderCount = order.subOrders.length;
-    final total = order.subOrders.fold<double>(
+  Widget _buildOrderCard(BuildContext context, Order order) {
+    final subOrders = order.subOrders ?? const [];
+    final subOrderCount = subOrders.length;
+    final total = subOrders.fold<double>(
       0,
       (sum, s) => sum + s.itemsSubtotal + s.deliveryCharge,
     );
@@ -166,7 +234,7 @@ class RunningOrdersScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Order #${order.orderId}",
+                    Text("Order #${order.id}",
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                     Text(
                       "$subOrderCount ${subOrderCount == 1 ? 'retailer' : 'retailers'} · Tk ${total.toStringAsFixed(0)}",
@@ -181,15 +249,15 @@ class RunningOrdersScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: _statusColor(order.orderStatus).withValues(alpha: 0.1),
+              color: _statusColor(order.status.toValue).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              _statusLabel(order.orderStatus),
+              _statusLabel(order.status.toValue),
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: _statusColor(order.orderStatus),
+                color: _statusColor(order.status.toValue),
               ),
             ),
           ),

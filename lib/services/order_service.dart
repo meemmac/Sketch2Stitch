@@ -44,6 +44,90 @@ class OrderService {
     }
   }
 
+  // ─── streamActiveCustomerOrders ────────────────────────────────────────────
+
+  /// The `Orders.status` values that still need a decision from the customer
+  /// — the same set as `OrderRecord.isActive`. 'processing' (tailoring
+  /// skipped / search window expired) and 'completed' are terminal and must
+  /// stay out of this list.
+  static const List<String> activeOrderStatuses = [
+    'awaiting_confirmation',
+    'awaiting_tailor_search',
+    'tailor_pending',
+  ];
+
+  /// Real-time stream of the customer's still-actionable orders, each with
+  /// its `Sub-orders` attached (the Running Orders screen shows a per-order
+  /// retailer count and total, so the sub-orders have to come along).
+  ///
+  /// Order items are deliberately NOT fetched — the card only needs
+  /// itemsSubtotal/deliveryCharge, and pulling `Order-Items` for every
+  /// sub-order on every snapshot would be a large read amplification for
+  /// data nothing on this screen renders.
+  ///
+  /// Sorted newest-first client-side: combining `whereIn` on status with an
+  /// `orderBy` would require a composite index for no real benefit at this
+  /// list's size.
+  Stream<List<Order>> streamActiveCustomerOrders(String customerId) {
+    return _db
+        .collection(_ordersCollection)
+        .where('customerId', isEqualTo: customerId)
+        .where('status', whereIn: activeOrderStatuses)
+        .snapshots()
+        .asyncMap((snap) async {
+      final orders = await Future.wait(snap.docs.map((doc) async {
+        final order = _orderFromSnap(doc);
+        final subSnap = await _db
+            .collection(_subOrdersCollection)
+            .where('orderId', isEqualTo: doc.id)
+            .get();
+        return order.copyWith(
+          subOrders: subSnap.docs.map(_subOrderFromSnap).toList(),
+        );
+      }));
+
+      orders.sort((a, b) => b.orderDate.compareTo(a.orderDate));
+      return orders;
+    });
+  }
+
+  /// Count of the customer's active orders, for the Running Orders badge.
+  /// Kept separate from [streamActiveCustomerOrders] so the badge doesn't
+  /// pay for a sub-order fetch per order just to render a number.
+  Stream<int> streamActiveOrderCount(String customerId) {
+    return _db
+        .collection(_ordersCollection)
+        .where('customerId', isEqualTo: customerId)
+        .where('status', whereIn: activeOrderStatuses)
+        .snapshots()
+        .map((snap) => snap.docs.length);
+  }
+
+  /// Firestore writes `orderDate` / `tailorSelectionDeadline` as Timestamps
+  /// (see CheckoutService), but [Order.fromJson] parses ISO strings, so they
+  /// have to be normalised before handing the map over.
+  Order _orderFromSnap(DocumentSnapshot<Map<String, dynamic>> snap) {
+    final data = Map<String, dynamic>.from(snap.data()!);
+    for (final key in ['orderDate', 'tailorSelectionDeadline']) {
+      final value = data[key];
+      if (value is Timestamp) {
+        data[key] = value.toDate().toIso8601String();
+      }
+    }
+    return Order.fromJson({...data, 'id': snap.id});
+  }
+
+  SubOrder _subOrderFromSnap(DocumentSnapshot<Map<String, dynamic>> snap) {
+    final data = Map<String, dynamic>.from(snap.data()!);
+    for (final key in ['deliveryDate', 'autoReleaseAt']) {
+      final value = data[key];
+      if (value is Timestamp) {
+        data[key] = value.toDate().toIso8601String();
+      }
+    }
+    return SubOrder.fromJson({...data, 'id': snap.id});
+  }
+
   // ─── fetchOrderDetails ─────────────────────────────────────────────────────
 
   /// Fetches full order details including sub-orders and their items.
@@ -457,7 +541,6 @@ class OrderService {
   Future<void> updateOrderStatus(String subOrderId, String newStatus, {String? parentOrderId}) async {
     try {
       final statusLower = newStatus.toLowerCase();
-      debugPrint("OrderService: Updating sub-order $subOrderId to status: $statusLower");
       
       // Fetch sub-order metadata to check destination
       final subOrderDoc = await _db.collection(_subOrdersCollection).doc(subOrderId).get();
@@ -482,19 +565,16 @@ class OrderService {
       // "order status will only change when ONLY customer is involved and retailer press delivered"
       // Otherwise, it stays 'processing'.
       if (destination == 'customer' && statusLower == 'delivered') {
-        debugPrint("OrderService: Direct-to-Customer delivery detected. Marking parent order $orderId as completed.");
         batch.update(_db.collection(_ordersCollection).doc(orderId), {
           'status': 'completed',
         });
       } else {
-        debugPrint("OrderService: Tailor-bound or partial step detected. Keeping parent order $orderId as processing.");
         batch.update(_db.collection(_ordersCollection).doc(orderId), {
           'status': 'processing',
         });
       }
 
       await batch.commit();
-      debugPrint("OrderService: Update successful for $subOrderId and parent $orderId");
     } catch (e) {
       debugPrint('Error updating order status for $subOrderId: $e');
       rethrow;
@@ -620,19 +700,24 @@ class OrderService {
 
       final batch = _db.batch();
       
-      // 1. Update Tailor Job
+      // 1. Update Tailor Job — the tailor is QUOTING, not confirming. The
+      // job only reaches 'confirmed' once the customer accepts the quote and
+      // pays, in TailoringService.confirmTailorJob(). Writing 'confirmed'
+      // here used to skip the customer's confirm-and-pay step entirely, so
+      // the tailor was never actually paid.
       batch.update(_db.collection(_tailorJobsCollection).doc(tailorJobId), {
-        'status': TailorJobStatus.confirmed.toValue,
+        'status': TailorJobStatus.quoted.toValue,
+        'quoteStatus': QuoteStatus.sent.toValue,
         'quoteAmount': servicePrice,
         if (deliveryCharge != null) 'deliveryCharge': deliveryCharge,
         'estimatedDeliveryDate': estimatedDate.toIso8601String(),
-        'confirmedAt': FieldValue.serverTimestamp(),
       });
 
-      // 2. Update parent Order
+      // 2. Parent Order stays 'tailor_pending' — the customer still has a
+      // decision to make, so it must keep showing up as an active order.
       if (orderId != null) {
         batch.update(_db.collection(_ordersCollection).doc(orderId), {
-          'status': OrderStatus.processing.toValue,
+          'status': OrderStatus.tailorPending.toValue,
         });
       }
 
@@ -943,13 +1028,11 @@ class OrderService {
 
   /// Streams detailed jobs for a specific tailor.
   Stream<List<Map<String, dynamic>>> streamDetailedTailorOrders(String tailorId) {
-    debugPrint("OrderService: Starting streamDetailedTailorOrders for tailor: $tailorId");
     return _db
         .collection(_tailorJobsCollection)
         .where('tailorId', isEqualTo: tailorId)
         .snapshots()
         .asyncMap((jobsSnap) async {
-      debugPrint("OrderService: Found ${jobsSnap.docs.length} jobs for tailor $tailorId");
       final Map<String, Map<String, dynamic>> orderCache = {};
       final Map<String, Map<String, dynamic>> customerCache = {};
       final Map<String, Map<String, dynamic>> productCache = {};
@@ -1053,7 +1136,6 @@ class OrderService {
             }
 
             if (allItemsList.isEmpty) {
-              debugPrint("OrderService: Skipping tailor job ${jobDoc.id} because no items were found.");
               return null;
             }
 

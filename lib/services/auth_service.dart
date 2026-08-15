@@ -130,6 +130,49 @@ class AuthService {
   }
 
 
+  /// Changes the signed-in user's password.
+  ///
+  /// Firebase requires a recent login before a password change, so the
+  /// [currentPassword] is used to re-authenticate first. That doubles as the
+  /// "confirm it's really you" check on the change-password form.
+  ///
+  /// Throws [AuthServiceException] with a user-friendly message on failure.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null || user.email == null) {
+      throw AuthServiceException(
+        'You are not signed in. Please log in again to change your password.',
+      );
+    }
+
+    try {
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+      await user.reauthenticateWithCredential(credential);
+      await user.updatePassword(newPassword);
+    } on FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case 'wrong-password':
+        case 'invalid-credential':
+          throw AuthServiceException('Your current password is incorrect.');
+        case 'requires-recent-login':
+          throw AuthServiceException(
+            'For security, please log out and log back in before changing your password.',
+          );
+        default:
+          throw AuthServiceException(_messageForCode(e.code));
+      }
+    } catch (e) {
+      throw AuthServiceException('Failed to change password: ${e.toString()}');
+    }
+  }
+
+
   /// Handle "Forgot Password" requests.
   Future<void> sendPasswordResetEmail(String email) async {
     try {
@@ -189,22 +232,13 @@ class AuthService {
   Future<dynamic> getUserProfile(String uid, UserRole role) async {
     try {
       final collection = _getCollectionForRole(role);
-      debugPrint('[AuthService] Fetching profile from $collection for UID: $uid');
       final doc = await _firestore.collection(collection).doc(uid).get();
 
-
-
-
       if (!doc.exists || doc.data() == null) {
-        debugPrint('[AuthService] No document found in $collection for UID: $uid');
         return null;
       }
 
-
-
-
       final data = doc.data()!;
-      debugPrint('[AuthService] Data found: $data');
       switch (role) {
         case UserRole.customer:
           return Customer.fromJson(data, id: uid);

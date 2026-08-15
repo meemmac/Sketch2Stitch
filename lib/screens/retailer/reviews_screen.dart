@@ -73,9 +73,7 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
 
   void _loadData() {
     final retailerId = _authService.currentUser?.uid;
-    debugPrint("ReviewScreen: Loading data for Retailer ID: $retailerId");
     if (retailerId == null) {
-      debugPrint("ReviewScreen: No logged in user found.");
       return;
     }
 
@@ -91,7 +89,6 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
 
     // Listen to reviews
     _reviewsSubscription = _reviewService.streamDetailedShopReviews(retailerId).listen((data) {
-      debugPrint("ReviewScreen: Received ${data.length} reviews from stream.");
       if (!mounted) return;
       setState(() {
         _allReviews = data.map((item) {
@@ -191,7 +188,7 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87, size: 20),
+          icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Column(

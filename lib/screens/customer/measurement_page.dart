@@ -62,7 +62,7 @@ class _MeasurementPageState extends State<MeasurementPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('Could not load measurements.\n${snapshot.error}',
+                    const Text('Could not load measurements.',
                         textAlign: TextAlign.center),
                     const SizedBox(height: 16),
                     ElevatedButton(

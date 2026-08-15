@@ -19,10 +19,8 @@ class NotificationService {
   /// Streams real-time notifications for a specific user.
   Stream<List<AppNotification>> streamNotifications(String uid) {
     final cleanUid = uid.trim();
-    debugPrint('[NotificationService] Streaming for UID: "$cleanUid"');
     
     if (cleanUid.isEmpty) {
-      debugPrint('[NotificationService] Warning: Empty UID provided');
       return Stream.value([]);
     }
 
@@ -33,7 +31,6 @@ class NotificationService {
         .where('userId', isEqualTo: cleanUid)
         .snapshots()
         .map((snapshot) {
-      debugPrint('[NotificationService] Snapshot received with ${snapshot.docs.length} docs');
       final items = snapshot.docs.map((doc) {
         return AppNotification.fromJson(doc.data(), doc.id);
       }).toList();
@@ -60,7 +57,16 @@ class NotificationService {
       switch (viewerRole) {
         case UserRole.customer:
           // A customer's counterparty is the Retailer handling the sub-order,
-          // or the Tailor handling the tailor job.
+          // or the Tailor handling the tailor job. Which one depends on the
+          // notification *type* — a tailor-related notification can also carry
+          // a subOrderId, so preferring subOrderId blindly would show the
+          // retailer's picture on a tailor notification.
+          if (_isAboutTailor(n.type)) {
+            if (n.tailorJobId != null && n.tailorJobId!.isNotEmpty) {
+              return await _tailorPictureFromJob(n.tailorJobId!);
+            }
+            return null;
+          }
           if (n.subOrderId != null && n.subOrderId!.isNotEmpty) {
             return await _retailerPictureFromSubOrder(n.subOrderId!);
           }
@@ -99,6 +105,60 @@ class NotificationService {
       }
     } catch (e) {
       debugPrint('Error fetching counterparty profile picture: $e');
+    }
+    return null;
+  }
+
+  /// Customer-facing notification types raised by the Tailor side of an order.
+  /// Everything else a customer receives is about the Retailer / the order.
+  static bool _isAboutTailor(NotificationDbType type) {
+    switch (type) {
+      case NotificationDbType.jobRejected:
+      case NotificationDbType.jobConfirmed:
+      case NotificationDbType.quoteReceived:
+      case NotificationDbType.quoteExpired:
+      case NotificationDbType.garmentCompleted:
+      case NotificationDbType.tailorSearchPrompt:
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  /// The counterparty's display name, used for the initials avatar when no
+  /// profile picture exists. Mirrors [getCounterpartyProfilePicture]: for a
+  /// Customer viewer this is the Retailer/Tailor, for the other roles it is
+  /// the Customer (resolved in [getResolvedNotificationData]).
+  Future<String?> getCounterpartyName(
+    AppNotification n,
+    UserRole viewerRole,
+  ) async {
+    if (viewerRole != UserRole.customer) return null;
+    try {
+      if (_isAboutTailor(n.type)) {
+        if (n.tailorJobId != null && n.tailorJobId!.isNotEmpty) {
+          final jobDoc =
+              await _db.collection('Tailor-jobs').doc(n.tailorJobId).get();
+          final tailorId = jobDoc.data()?['tailorId'];
+          if (tailorId is String && tailorId.isNotEmpty) {
+            final doc = await _db.collection('Tailor').doc(tailorId).get();
+            return _nonEmpty(doc.data()?['name']);
+          }
+        }
+        return null;
+      }
+      if (n.subOrderId != null && n.subOrderId!.isNotEmpty) {
+        final subOrderDoc =
+            await _db.collection('Sub-orders').doc(n.subOrderId).get();
+        final retailerId = subOrderDoc.data()?['retailerId'];
+        if (retailerId is String && retailerId.isNotEmpty) {
+          final doc = await _db.collection('Retailer').doc(retailerId).get();
+          return _nonEmpty(doc.data()?['shopName']) ??
+              _nonEmpty(doc.data()?['name']);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching counterparty name: $e');
     }
     return null;
   }
@@ -240,7 +300,6 @@ class NotificationService {
       final cleanUserId = userId.trim();
 
       if (cleanUserId.isEmpty) {
-        debugPrint('[NotificationService] Warning: Empty UID provided for getNotifications');
         return [];
       }
 
@@ -277,7 +336,6 @@ class NotificationService {
       final cleanUserId = userId.trim();
 
       if (cleanUserId.isEmpty) {
-        debugPrint('[NotificationService] Warning: Empty UID provided for markAllNotificationsRead');
         return;
       }
 
@@ -305,7 +363,6 @@ class NotificationService {
       final cleanUserId = userId.trim();
 
       if (cleanUserId.isEmpty) {
-        debugPrint('[NotificationService] Warning: Empty UID provided for deleteAllNotifications');
         return;
       }
 
@@ -320,7 +377,6 @@ class NotificationService {
         batch.delete(doc.reference);
       }
       await batch.commit();
-      debugPrint('[NotificationService] All notifications deleted for UID: $cleanUserId');
     } catch (e) {
       debugPrint('Error deleting notifications: $e');
     }
@@ -330,10 +386,8 @@ class NotificationService {
   /// Returns the count of unread notifications for a user.
   Stream<int> getUnreadNotificationCount(String userId) {
     final cleanUserId = userId.trim();
-    debugPrint('[NotificationService] Getting unread count for UID: "$cleanUserId"');
 
     if (cleanUserId.isEmpty) {
-      debugPrint('[NotificationService] Warning: Empty UID provided for notification count');
       return Stream.value(0);
     }
 

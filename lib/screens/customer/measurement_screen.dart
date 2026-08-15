@@ -314,9 +314,10 @@ class _MeasurementScreenState extends State<MeasurementScreen>
       if (mounted) {
         showFeedback('Measurements saved successfully.');
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
-        showFeedback('Failed to save measurements: $e', isError: true);
+        showFeedback("Couldn't save your measurements. Please try again.",
+            isError: true);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -462,7 +463,7 @@ class _MeasurementScreenState extends State<MeasurementScreen>
       scrolledUnderElevation: 0,
       leading: IconButton(
         icon: const Icon(
-          Icons.arrow_back_ios_new,
+          Icons.arrow_back,
           color: _MeasurementColors.labelText,
           size: 20,
         ),

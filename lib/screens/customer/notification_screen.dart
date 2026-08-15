@@ -34,11 +34,9 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     
     if (uid == null) {
-      debugPrint('[NotificationScreen] Waiting for valid Firebase UID...');
       return Stream.value([]);
     }
 
-    debugPrint('[NotificationScreen] Connecting to live backend for UID: "$uid"');
     return NotificationService().streamNotifications(uid);
   }
 
@@ -83,14 +81,15 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
 
   Widget _buildBody(AsyncSnapshot<List<AppNotification>> snapshot) {
     if (snapshot.hasError) {
-      debugPrint('[NotificationScreen] Stream Error: ${snapshot.error}');
-      return Center(
+      // The raw Firestore error can carry document paths and query details,
+      // so the user gets a plain message instead.
+      return const Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(24),
           child: Text(
-            'Error loading notifications:\n${snapshot.error}',
+            "Couldn't load your notifications. Please try again.",
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.red),
+            style: TextStyle(color: Colors.red),
           ),
         ),
       );
@@ -112,7 +111,6 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
 
 
     final notifications = snapshot.data ?? [];
-    debugPrint('[NotificationScreen] Loaded ${notifications.length} notifications');
     if (notifications.isEmpty) {
       return _buildEmptyState();
     }
@@ -252,7 +250,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     // A cached null means "already looked up, this one has no picture" — don't
     // re-issue the Firestore reads on every rebuild.
     if (_profileCache.containsKey(cacheKey)) {
-      return _buildInitialsAvatar(n, style);
+      return _buildCounterpartyInitials(n, style);
     }
 
     return FutureBuilder<String?>(
@@ -269,8 +267,39 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
           );
         }
 
-        // While loading or if no picture found, show initials
-        return _buildInitialsAvatar(n, style);
+        // While loading or if no picture found, show initials for the
+        // actual counterparty (Retailer/Tailor), not a generic person icon.
+        return _buildCounterpartyInitials(n, style);
+      },
+    );
+  }
+
+  /// For a Customer viewer the counterparty is the Retailer/Tailor, whose name
+  /// isn't part of the resolved order data — look it up so the initials avatar
+  /// shows *them* rather than a generic person icon.
+  Widget _buildCounterpartyInitials(
+    AppNotification n,
+    _NotificationStyle style,
+  ) {
+    final cacheKey = '${_cacheKeyFor(n)}_name';
+
+    if (_profileCache.containsKey(cacheKey)) {
+      return _buildInitialsAvatar(
+        n.copyWith(senderName: _profileCache[cacheKey] as String?),
+        style,
+      );
+    }
+
+    return FutureBuilder<String?>(
+      future: NotificationService().getCounterpartyName(n, widget.role),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done) {
+          _profileCache[cacheKey] = snapshot.data;
+        }
+        return _buildInitialsAvatar(
+          n.copyWith(senderName: snapshot.data),
+          style,
+        );
       },
     );
   }
@@ -279,9 +308,16 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   /// `Notifications` schema has no `orderId` field, so subOrderId/tailorJobId/
   /// orderId can all be blank and every such notification would otherwise share
   /// one cache entry (and show another notification's avatar and order ID).
+  ///
+  /// The type is part of the key because the lookups keyed by it branch on it:
+  /// a tailor-side and a retailer-side notification for the same order carry the
+  /// same subOrderId but resolve to different people (and only `jobRejected`
+  /// resolves a rejection reason). Keying on the linked id alone let whichever
+  /// card resolved first hand its avatar/name/reason to the other.
   String _cacheKeyFor(AppNotification n) {
     final linked = n.subOrderId ?? n.tailorJobId ?? n.orderId;
-    return (linked.isNotEmpty) ? linked : n.id;
+    final base = (linked.isNotEmpty) ? linked : n.id;
+    return '$base:${n.type.name}';
   }
 
   Widget _buildInitialsAvatar(AppNotification n, _NotificationStyle style) {

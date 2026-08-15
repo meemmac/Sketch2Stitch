@@ -127,12 +127,16 @@ class TopFeedbackBanner extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
+                      // Inherits the app's text theme so the banner reads in
+                      // the same font as the rest of the app.
                       child: Text(
                         message,
-                        style: const TextStyle(
-                          color: Color(0xFF222222),
+                        style: (Theme.of(context).textTheme.bodyMedium ??
+                                const TextStyle())
+                            .copyWith(
+                          color: const Color(0xFF222222),
                           fontWeight: FontWeight.w600,
-                          fontSize: 12,
+                          fontSize: 13,
                           height: 1.35,
                           decoration: TextDecoration.none,
                         ),
@@ -160,6 +164,117 @@ class TopFeedbackBanner extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// App-wide entry point for transient messages that have no buttons.
+/// Shows the exact same banner as [TopFeedbackBanner] (same look, same font)
+/// in the root overlay, so any screen can call it without Stack plumbing and
+/// the message never slides up from the bottom like a SnackBar.
+///
+/// ```dart
+/// AppFeedback.show(context, 'Logged out successfully!');
+/// AppFeedback.show(context, 'Something went wrong', isError: true);
+/// ```
+class AppFeedback {
+  AppFeedback._();
+
+  static OverlayEntry? _entry;
+  static Timer? _timer;
+
+  static void show(
+    BuildContext context,
+    String message, {
+    bool isError = false,
+    Duration duration = const Duration(seconds: 3),
+  }) {
+    final overlay = Overlay.maybeOf(context, rootOverlay: true);
+    if (overlay == null) return;
+    showInOverlay(overlay, message, isError: isError, duration: duration);
+  }
+
+  /// Same banner, for callers that captured the overlay before an await
+  /// (e.g. a sheet that pops itself before showing the confirmation).
+  static void showInOverlay(
+    OverlayState overlay,
+    String message, {
+    bool isError = false,
+    Duration duration = const Duration(seconds: 3),
+  }) {
+    if (!overlay.mounted) return;
+
+    dismiss();
+
+    final entry = OverlayEntry(
+      builder: (_) => _AnimatedBanner(
+        message: message,
+        isError: isError,
+        onClose: dismiss,
+      ),
+    );
+    _entry = entry;
+    overlay.insert(entry);
+    _timer = Timer(duration, dismiss);
+  }
+
+  static void dismiss() {
+    _timer?.cancel();
+    _timer = null;
+    _entry?.remove();
+    _entry = null;
+  }
+}
+
+/// Fades/slides the banner down from the top edge (never up from the bottom).
+class _AnimatedBanner extends StatefulWidget {
+  final String message;
+  final bool isError;
+  final VoidCallback onClose;
+
+  const _AnimatedBanner({
+    required this.message,
+    required this.isError,
+    required this.onClose,
+  });
+
+  @override
+  State<_AnimatedBanner> createState() => _AnimatedBannerState();
+}
+
+class _AnimatedBannerState extends State<_AnimatedBanner>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 250),
+  )..forward();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final curve = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    return FadeTransition(
+      opacity: curve,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, -0.35),
+          end: Offset.zero,
+        ).animate(curve),
+        child: Stack(
+          children: [
+            TopFeedbackBanner(
+              message: widget.message,
+              isError: widget.isError,
+              onClose: widget.onClose,
+            ),
+          ],
         ),
       ),
     );

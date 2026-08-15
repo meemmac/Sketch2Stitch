@@ -63,9 +63,7 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
 
   void _loadData() async {
     final tailorId = _authService.currentUser?.uid;
-    debugPrint("TailorReviewsScreen: Loading data for Tailor ID: $tailorId");
     if (tailorId == null) {
-      debugPrint("TailorReviewsScreen: No logged in user found.");
       return;
     }
 
@@ -79,7 +77,6 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
 
     // Listen to stats
     _statsSubscription = _reviewService.streamTailorReviewStats(tailorId).listen((stats) {
-      debugPrint("TailorReviewsScreen: Received stats: $stats");
       if (!mounted) return;
       setState(() {
         _averageRating = stats['average'] ?? 0.0;
@@ -90,7 +87,6 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
 
     // Listen to reviews
     _reviewsSubscription = _reviewService.streamDetailedTailorReviews(tailorId).listen((data) {
-      debugPrint("TailorReviewsScreen: Received ${data.length} reviews from stream.");
       if (!mounted) return;
       setState(() {
         _allReviews = data.map((item) {
@@ -158,7 +154,7 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87, size: 20),
+          icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Column(

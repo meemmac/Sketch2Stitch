@@ -85,8 +85,6 @@ class CloudinaryImage extends StatelessWidget {
         return _buildLoadingIndicator(context);
       },
       errorBuilder: (context, error, stackTrace) {
-        print('❌ Image load error: $error');
-        print('🔗 URL: $finalUrl');
         return _buildErrorWidget(context);
       },
     );
