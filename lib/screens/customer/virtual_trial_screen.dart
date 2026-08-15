@@ -160,15 +160,29 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     // In future dev, bind these passed values to selection controllers:
     debugPrint('Autofill parts loaded: ${_prefilledGarmentParts.length}');
 
-    // TODO(backend): replace this mock initialisation with a real fetch,
-    // e.g. `final customer = await VtUsageService.loadAndResetIfNeeded(uid);`
-    // then setState _vtUsed = customer.vtUsed, _vtResetDate = customer.vtResetDate.
     if (widget.prefillAssetImages != null) {
       _prefilledAssetImages.addAll(widget.prefillAssetImages!);
     }
-    final now = DateTime.now();
-    _vtUsed = 5; // mock: change this to preview the "low" / "reached" states
-    _vtResetDate = DateTime(now.year, now.month + 1, 1);
+
+    _loadQuota();
+  }
+
+  /// Pulls the real quota off the Customer document, rolling the monthly
+  /// window over first if it has elapsed.
+  Future<void> _loadQuota() async {
+    if (_customerId.isEmpty) return;
+    try {
+      final customer = await _vtService.resetVTUsageIfExpired(_customerId);
+      if (!mounted) return;
+      setState(() {
+        _vtUsed = customer.vtUsed;
+        _vtResetDate = customer.vtResetDate;
+      });
+    } on VirtualTrialServiceException catch (e) {
+      // A quota we couldn't read shouldn't block the screen; generation
+      // re-checks server-side before it spends anything.
+      debugPrint('[VirtualTrial] Could not load quota: ${e.message}');
+    }
   }
 
   // ── Generation state ────────────────────────────────────────────────────────
@@ -271,13 +285,34 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   // ── Generation ─────────────────────────────────────────────────────────────
   Future<void> _generate() async {
     // ── Quota guard ────────────────────────────────────────────────────────
-    // TODO(backend): re-check the real quota server-side too (don't trust
-    // client state alone), e.g. via a callable function or security rule.
+    // Checked against the cached value first (instant feedback), then against
+    // Firestore, since the cache can be stale if a trial ran on another device.
     if (_vtLimitReached) {
       _showSnack(
         'You\'ve used all $kVirtualTrialMonthlyLimit trials this month. '
         'Your limit resets on ${_formatDate(_vtResetDate)}.',
       );
+      return;
+    }
+
+    if (_customerId.isEmpty) {
+      _showSnack('Please sign in again to run a virtual trial.');
+      return;
+    }
+
+    try {
+      final eligibility = await _vtService.checkVTEligibility(_customerId);
+      if (!mounted) return;
+      if (!eligibility.eligible) {
+        setState(() => _vtUsed = eligibility.used);
+        _showSnack(
+          'You\'ve used all ${eligibility.limit} trials this month. '
+          'Your limit resets on ${_formatDate(_vtResetDate)}.',
+        );
+        return;
+      }
+    } on VirtualTrialServiceException catch (e) {
+      _showSnack(e.message);
       return;
     }
 
@@ -366,13 +401,23 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         _usedProfile = profileSnapshot;
         _isLoading = false;
         _statusMessage = '';
-
-        // ── Consume one trial on success ─────────────────────────────────
-        // TODO(backend): move this increment to after a confirmed successful
-        // server-side write, e.g. `await VtUsageService.incrementUsage(uid);`
-        _vtUsed += 1;
       });
       _resultAnim.forward();
+
+      // ── Consume one trial on success ─────────────────────────────────────
+      // Persisted first, then mirrored locally from what the server actually
+      // stored — so the counter can never drift from the Customer document.
+      try {
+        final customer = await _vtService.incrementVTUsage(_customerId);
+        if (mounted) {
+          setState(() {
+            _vtUsed = customer.vtUsed;
+            _vtResetDate = customer.vtResetDate;
+          });
+        }
+      } on VirtualTrialServiceException catch (e) {
+        debugPrint('[VirtualTrial] Could not record usage: ${e.message}');
+      }
 
       // Scroll down to results
       await Future.delayed(const Duration(milliseconds: 100));
