@@ -79,13 +79,20 @@ class AuthWrapper extends StatelessWidget {
 
       if (role == UserRole.customer) {
         name = profile.name ?? '';
+        location = profile.location;
       } else if (role == UserRole.tailor) {
         name = profile.name ?? '';
-        rating = profile.rating ?? 0.0;
+        rating = (profile.rating ?? 0.0).toDouble();
+        profilePicture = profile.profilePicture;
+        about = profile.about ?? '';
+        location = profile.location;
       } else if (role == UserRole.retailer) {
         shopName = profile.shopName ?? '';
-        name = shopName; // Default name to shopName for retailers
-        rating = profile.rating ?? 0.0;
+        name = shopName;
+        rating = (profile.rating ?? 0.0).toDouble();
+        profilePicture = profile.profilePicture;
+        about = profile.about ?? '';
+        location = profile.location;
       }
 
       final drawerData = DrawerProfileData(
@@ -97,7 +104,7 @@ class AuthWrapper extends StatelessWidget {
         rating: rating,
         location: location,
         profilePicture: profilePicture,
-        about: about,
+        about: about ?? '',
       );
 
       // Save to global session

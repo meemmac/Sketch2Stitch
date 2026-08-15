@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:flutter/material.dart';
 import 'sub_order.dart';
 import 'payment.dart';
@@ -135,21 +136,40 @@ class Order {
   Map<String, dynamic> toJson() => {
     'id': id,
     'customerId': customerId,
-    'orderDate': orderDate.toIso8601String(),
+    'orderDate': Timestamp.fromDate(orderDate),
     'status': status.toValue,
-    'tailorSelectionDeadline': tailorSelectionDeadline?.toIso8601String(),
+    'tailorSelectionDeadline': tailorSelectionDeadline != null 
+        ? Timestamp.fromDate(tailorSelectionDeadline!) 
+        : null,
   };
 
   factory Order.fromJson(Map<String, dynamic> json) {
+    DateTime parseDate(dynamic value) {
+      if (value == null) return DateTime.now();
+      if (value is Timestamp) return value.toDate();
+      if (value is String) {
+        try {
+          return DateTime.parse(value);
+        } catch (_) {
+          return DateTime.now();
+        }
+      }
+      return DateTime.now();
+    }
+
+
+    // 🧠 Flexible field detection
+    // Try to find the customer ID even if the user named it slightly differently
+    final customerId = json['customerId'] ?? json['userId'] ?? json['uid'] ?? '';
+
+
     return Order(
       id: json['id'] ?? '',
-      customerId: json['customerId'] ?? '',
-      orderDate: json['orderDate'] != null
-          ? DateTime.parse(json['orderDate'])
-          : DateTime.now(),
+      customerId: customerId,
+      orderDate: parseDate(json['orderDate'] ?? json['date']),
       status: OrderStatus.fromValue(json['status'] ?? 'awaiting_confirmation'),
       tailorSelectionDeadline: json['tailorSelectionDeadline'] != null
-          ? DateTime.parse(json['tailorSelectionDeadline'])
+          ? parseDate(json['tailorSelectionDeadline'])
           : null,
     );
   }

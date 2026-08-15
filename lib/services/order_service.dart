@@ -5,6 +5,7 @@ import '../models/order.dart';
 import '../models/sub_order.dart';
 import '../models/order_item.dart';
 import '../models/tailor_job.dart';
+import '../models/customer.dart';
 import '../models/review.dart';
 import 'Cloudinary_service.dart';
 
@@ -86,10 +87,35 @@ class OrderService {
 
   // ─── getCustomerOrders ─────────────────────────────────────────────────────
 
+
   /// Alias for fetching customer orders list by UID.
   Future<List<Order>> getCustomerOrders(String uid) => fetchCustomerOrders(uid);
 
+
+  /// Streams real-time orders for a specific customer.
+  Stream<List<Order>> streamCustomerOrders(String customerId) {
+    final cleanId = customerId.trim();
+    debugPrint('[OrderService] 🛰️ STARTING STREAM for customerId: "$cleanId"');
+
+
+    return _db
+        .collection(_ordersCollection)
+        .where('customerId', whereIn: [cleanId, '$cleanId '])
+        .snapshots()
+        .map((snapshot) {
+      debugPrint('[OrderService] 📥 snapshot received! Total docs found: ${snapshot.docs.length}');
+      for (var doc in snapshot.docs) {
+        debugPrint('[OrderService]  - Found Order ID: ${doc.id} for Customer: ${doc.data()['customerId']}');
+      }
+      return snapshot.docs
+          .map((doc) => Order.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
+          .toList();
+    });
+  }
+
+
   // ─── streamOrderTimeline ───────────────────────────────────────────────────
+
 
   /// Provides a real-time stream of the order lifecycle status for tracking.
   Stream<Map<String, dynamic>> streamOrderTimeline(String orderId) {
@@ -97,15 +123,61 @@ class OrderService {
     return _db.collection(_ordersCollection).doc(orderId).snapshots().asyncMap((orderSnap) async {
       if (!orderSnap.exists) return {};
 
-      final orderData = orderSnap.data()!;
+
+      final order = Order.fromJson({...orderSnap.data()!, 'id': orderSnap.id});
       
+      // Fetch customer profile
+      final customerDoc = await _db.collection('Customer').doc(order.customerId).get();
+      final customerProfile = customerDoc.exists 
+          ? Customer.fromJson({...customerDoc.data()!, 'id': customerDoc.id}) 
+          : null;
+
+
       // Fetch sub-orders
       final subOrdersSnap = await _db
           .collection(_subOrdersCollection)
           .where('orderId', isEqualTo: orderId)
           .get();
       
-      final subOrders = subOrdersSnap.docs.map((d) => d.data()).toList();
+      final List<SubOrder> subOrders = [];
+      final Map<String, String> productNames = {};
+      final Map<String, String> partyNames = {};
+
+
+      for (var doc in subOrdersSnap.docs) {
+        final so = SubOrder.fromJson({...doc.data(), 'id': doc.id});
+        
+        // Fetch order items for this sub-order to get product names
+        final itemsSnap = await _db
+            .collection(_orderItemsCollection)
+            .where('subOrderId', isEqualTo: so.id)
+            .get();
+        
+        final List<OrderItem> items = [];
+        for (var itemDoc in itemsSnap.docs) {
+          final item = OrderItem.fromJson({...itemDoc.data(), 'id': itemDoc.id});
+          items.add(item);
+          
+          if (!productNames.containsKey(item.productId)) {
+            final pDoc = await _db.collection('Products').doc(item.productId).get();
+            if (pDoc.exists) {
+              productNames[item.productId] = pDoc.data()?['productName'] ?? 'Product';
+            }
+          }
+        }
+        so.items = items;
+        subOrders.add(so);
+
+
+        // Fetch retailer name
+        if (!partyNames.containsKey(so.retailerId)) {
+          final rDoc = await _db.collection('Retailer').doc(so.retailerId).get();
+          if (rDoc.exists) {
+            partyNames[so.retailerId] = rDoc.data()?['shopName'] ?? 'Retailer';
+          }
+        }
+      }
+
 
       // Fetch tailor job
       final tailorJobSnap = await _db
@@ -114,12 +186,28 @@ class OrderService {
           .limit(1)
           .get();
       
-      final tailorJob = tailorJobSnap.docs.isNotEmpty ? tailorJobSnap.docs.first.data() : null;
+      final tailorJob = tailorJobSnap.docs.isNotEmpty 
+          ? TailorJob.fromJson({...tailorJobSnap.docs.first.data(), 'id': tailorJobSnap.docs.first.id}) 
+          : null;
+
+
+      if (tailorJob != null) {
+        if (!partyNames.containsKey(tailorJob.tailorId)) {
+          final tDoc = await _db.collection('Tailor').doc(tailorJob.tailorId).get();
+          if (tDoc.exists) {
+            partyNames[tailorJob.tailorId] = tDoc.data()?['name'] ?? 'Tailor';
+          }
+        }
+      }
+
 
       return {
-        'order': orderData,
+        'order': order,
         'subOrders': subOrders,
         'tailorJob': tailorJob,
+        'partyNames': partyNames,
+        'productNames': productNames,
+        'customer': customerProfile,
       };
     });
   }
