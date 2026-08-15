@@ -28,6 +28,46 @@ class OrderItemInput {
   });
 }
 
+/// One retailer's slice of a checkout: the sub-order totals plus the items
+/// and the payment already collected for it. Consumed by
+/// [CheckoutService.placeOrder].
+class SubOrderInput {
+  final String retailerId;
+  final double itemsSubtotal;
+  final double deliveryCharge;
+  final double? deliveryDistanceKm;
+
+  /// The customer coordinates [deliveryCharge] was computed from, snapshotted
+  /// onto `Sub-orders.deliveryPoint`.
+  final GeoPoint? deliveryPoint;
+
+  final List<OrderItemInput> items;
+
+  /// bKash transaction id for this retailer's payment, when one was captured.
+  final String? transactionId;
+
+  const SubOrderInput({
+    required this.retailerId,
+    required this.itemsSubtotal,
+    required this.deliveryCharge,
+    this.deliveryDistanceKm,
+    this.deliveryPoint,
+    required this.items,
+    this.transactionId,
+  });
+
+  double get amount => itemsSubtotal + deliveryCharge;
+}
+
+/// What [CheckoutService.placeOrder] wrote: the parent order plus every
+/// sub-order, each already carrying its real Firestore id.
+class PlacedOrder {
+  final Order order;
+  final List<SubOrder> subOrders;
+
+  const PlacedOrder({required this.order, required this.subOrders});
+}
+
 /// Full order aggregate returned by [CheckoutService.getOrderDetails].
 class OrderDetails {
   final Order order;

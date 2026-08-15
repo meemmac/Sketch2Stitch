@@ -291,20 +291,26 @@ class CartService {
         productName: product.productName,
         colorName: option.color,
         image: image,
-        isAsset: _isAssetPath(image),
+        fullImage: fullImage,
+        isAsset: _isAssetPath(fullImage),
         price: option.price,
         stock: option.stock,
       ));
     }
 
+    final customer = await _fetchCustomer(customerId);
     final retailerIds = lines.map((l) => l.retailerId).toSet().toList();
-    final retailers = await _fetchRetailerInfo(customerId, retailerIds);
+    final retailers = await _fetchRetailerInfo(customer, retailerIds);
 
-    return CartSnapshot(lines: lines, retailers: retailers);
+    return CartSnapshot(
+      lines: lines,
+      retailers: retailers,
+      customerLocation: customer?.location,
+    );
   }
 
   /// Picks the image for the **chosen** colour option and turns it into a
-  /// fully-qualified, size-optimised Cloudinary URL.
+  /// fully-qualified Cloudinary URL at its **original** size.
   ///
   /// `ColorOption.image` holds either full Cloudinary secure URLs (as written
   /// by [CloudinaryService.uploadImage]), bare Cloudinary public IDs, or —
@@ -317,10 +323,13 @@ class CartService {
 
     if (raw.isEmpty || _isAssetPath(raw)) return raw;
 
-    final url = raw.contains('cloudinary.com') ? raw : _cdnUrl(raw);
+    return raw.contains('cloudinary.com') ? raw : _cdnUrl(raw);
+  }
 
-    // Cart rows render at 64pt; request a square thumbnail rather than the
-    // full-size original.
+  /// Cart rows render at 64pt, so they ask Cloudinary for a square thumbnail
+  /// rather than the full-size original. Asset paths pass through untouched.
+  String _thumbnail(String url) {
+    if (url.isEmpty || _isAssetPath(url)) return url;
     return _cloudinary.getOptimizedImageUrl(url, width: 200, height: 200);
   }
 
@@ -349,19 +358,18 @@ class CartService {
     return products;
   }
 
+  Future<Customer?> _fetchCustomer(String customerId) async {
+    final snap = await _db.collection(_customers).doc(customerId).get();
+    return snap.exists ? Customer.fromJson(snap.data()!, id: snap.id) : null;
+  }
+
   /// Loads each retailer's shop name and computes its delivery charge from
   /// the distance to the customer's saved location.
   Future<Map<String, RetailerInfo>> _fetchRetailerInfo(
-    String customerId,
+    Customer? customer,
     List<String> retailerIds,
   ) async {
     if (retailerIds.isEmpty) return {};
-
-    final customerSnap =
-        await _db.collection(_customers).doc(customerId).get();
-    final customer = customerSnap.exists
-        ? Customer.fromJson(customerSnap.data()!, id: customerSnap.id)
-        : null;
 
     final info = <String, RetailerInfo>{};
 
