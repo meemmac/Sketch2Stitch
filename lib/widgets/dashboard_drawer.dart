@@ -1010,6 +1010,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  Future<void> _openChangePassword() async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+    );
+    if (changed == true && mounted) {
+      _showFeedback('Password updated successfully.');
+    }
+  }
+
   void _save() {
     final isRetailer = widget.role == UserRole.retailer;
     final displayName = isRetailer
