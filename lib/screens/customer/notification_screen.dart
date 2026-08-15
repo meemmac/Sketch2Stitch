@@ -688,7 +688,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              _buildFooterRow(n),
+              if (n.type == NotificationDbType.jobRejected) _buildCustomerCancelRow(n) else _buildFooterRow(n),
             ],
           ),
         ),
