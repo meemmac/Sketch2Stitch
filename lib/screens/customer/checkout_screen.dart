@@ -10,8 +10,6 @@ import '../../services/bkash_service.dart';
 import 'bkash_payment_screen.dart';
 import '../../services/checkout_service.dart';
 import '../../services/user_session.dart';
-import '../../models/order.dart' show PaymentStatus;
-import '../../models/payment.dart' show PaymentMethod, PaymentTargetType;
 
 /// ─── Checkout Screen ────────────────────────────────────────────────────
 ///
@@ -195,71 +193,44 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     setState(() => _isPlacingOrder = true);
     try {
-      // Step 1: the parent Orders document. createOrder() stamps
-      // customerId, orderDate and status (awaiting_confirmation) itself.
-      // tailorSelectionDeadline is deliberately NOT set here — the customer
-      // hasn't decided whether they even want a tailor yet; that deadline is
-      // written later by onContinueToTailoring in TailoringSetupScreen.
-      final fireOrder = await _checkoutService.createOrder(_customerId, {});
+      // Step 1: write the whole order in ONE transaction — Orders, one
+      // Sub-order per retailer with its Order-Items, one Payments record per
+      // retailer, and the matching stock decrements. Stock is re-validated
+      // inside that transaction, so the last unit can't be sold twice and a
+      // failure part-way can't leave a paid-for order half-written.
+      final placed = await _checkoutService.placeOrder(
+        customerId: _customerId,
+        subOrders: [
+          for (final subOrder in widget.subOrders)
+            SubOrderInput(
+              retailerId: subOrder.retailerId,
+              itemsSubtotal: subOrder.itemsSubtotal,
+              deliveryCharge: subOrder.deliveryCharge,
+              deliveryDistanceKm: subOrder.deliveryDistanceKm,
+              deliveryPoint: subOrder.deliveryPoint,
+              transactionId: _trxIds[subOrder.retailerId],
+              items: widget.cartLines
+                  .where((l) => l.retailerId == subOrder.retailerId)
+                  .map((l) => OrderItemInput(
+                        productId: l.productId,
+                        optionId: l.optionId,
+                        quantity: l.quantity,
+                      ))
+                  .toList(),
+            ),
+        ],
+      );
 
-      // Step 2: one Sub-order per retailer, plus its Order-Items.
-      final fireSubOrders = <SubOrder>[];
-      for (final subOrder in widget.subOrders) {
-        final fireSubOrder = await _checkoutService.createSubOrder(
-          fireOrder.id,
-          subOrder.retailerId,
-          {
-            'itemsSubtotal': subOrder.itemsSubtotal,
-            'deliveryCharge': subOrder.deliveryCharge,
-            'deliveryDistanceKm': subOrder.deliveryDistanceKm,
-            // 'pending' until tailoring setup decides whether the fabric
-            // ships to the customer or straight to the tailor.
-            'deliveryDestination': SubOrderDeliveryDestination.pending.name,
-          },
-        );
-
-        final items = widget.cartLines
-            .where((l) => l.retailerId == subOrder.retailerId)
-            .map((l) => OrderItemInput(
-                  productId: l.productId,
-                  optionId: l.optionId,
-                  quantity: l.quantity,
-                ))
-            .toList();
-
-        if (items.isNotEmpty) {
-          await _checkoutService.createOrderItems(fireSubOrder.id, items);
-        }
-
-        fireSubOrders.add(fireSubOrder);
-      }
-
-      // Step 3: one Payments record per retailer — this screen charges each
-      // retailer separately through bKash, and Payments.targetType only
-      // admits 'retailer' or 'tailor'.
-      for (final subOrder in widget.subOrders) {
-        await _checkoutService.recordPayment(fireOrder.id, {
-          'method': PaymentMethod.mobileBanking.toValue,
-          'amount': subOrder.itemsSubtotal + subOrder.deliveryCharge,
-          'itemsAmount': subOrder.itemsSubtotal,
-          'deliveryAmount': subOrder.deliveryCharge,
-          'targetType': PaymentTargetType.retailer.toValue,
-          'targetId': subOrder.retailerId,
-          'transactionId': _trxIds[subOrder.retailerId],
-          'status': PaymentStatus.completed.toValue,
-        });
-      }
-
-      // Step 4: the cart has become an order — clear it. Delegated to the
+      // Step 2: the cart has become an order — clear it. Delegated to the
       // cart screen's own handler so there's one place that owns clearing.
       widget.onOrderPlaced();
 
-      // Step 5: mirror into the local session store, reusing the Firestore
+      // Step 3: mirror into the local session store, reusing the Firestore
       // order id so the tailoring flow stays attached to the real document.
       final order = OrderStore.instance.startOrder(
-        fireSubOrders,
-        orderId: fireOrder.id,
-        orderDate: fireOrder.orderDate,
+        placed.subOrders,
+        orderId: placed.order.id,
+        orderDate: placed.order.orderDate,
       );
 
       if (!mounted) return;
@@ -277,7 +248,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
     } on CheckoutServiceException catch (e) {
       if (!mounted) return;
-      _showPaymentError('Order creation failed: ${e.message}');
+      // Nothing was written — the transaction rolled back in full — so the
+      // customer can fix their cart and retry without a duplicate order.
+      _showPaymentError(e.message);
     } catch (e) {
       debugPrint('[Checkout] Order creation error: $e');
       if (!mounted) return;
