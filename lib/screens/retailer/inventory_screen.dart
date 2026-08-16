@@ -552,43 +552,45 @@ class _InventoryScreenState extends State<InventoryScreen>
     _loadInventory();
   }
 
-  InventoryItem _mapProductToItem(Product p) {
-    return InventoryItem(
-      id: p.id,
-      name: p.productName,
-      category: p.category,
-      materialType: p.materialType.isNotEmpty ? p.materialType.first.type : 'N/A',
-      sku: p.productCode,
-      description: p.description,
-      variants: p.colorOptions.map((v) {
-        final images = v.image.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
-        final videos = v.video.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
-        
-        // We don't really need a global isAsset flag if we check per-path.
-        // But to keep your model same, we set it if ANY path is a local asset.
-        final isAsset = [...images, ...videos].any((path) => path.startsWith('assets/'));
-        
-        return ProductColorVariant(
-          colorName: v.color,
-          imagePaths: images,
-          videoPaths: videos,
-          isAsset: isAsset,
-          price: v.price,
-          stock: v.stock,
-        );
-      }).toList(),
-      materialBlends: p.materialType.map((m) => FabricMaterialBlend(
-        material: m.type,
-        blend: "${m.blend.toInt()}%",
-      )).toList(),
-      canWash: p.careSymbol.contains('Washable'),
-      canBleach: p.careSymbol.contains('Bleach Allowed'),
-      canDryClean: p.careSymbol.contains('Dry Clean Only'),
-      canTumbleDry: p.careSymbol.contains('Tumble Dry'),
-      ironLevel: p.careSymbol.firstWhere((s) => s.startsWith('Iron: '), orElse: () => 'Iron: Medium').replaceFirst('Iron: ', ''),
-    );
-  }
+  // In inventory_screen.dart, find the _mapProductToItem method and update:
 
+InventoryItem _mapProductToItem(Product p) {
+  return InventoryItem(
+    id: p.id,
+    name: p.productName,
+    category: p.category,
+    materialType: p.materialType.isNotEmpty ? p.materialType.first.type : 'N/A',
+    sku: p.productCode ?? '',  // ← Fix: add null fallback
+    description: p.description,
+    variants: p.colorOptions.map((v) {
+      final images = v.image.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+      final videos = v.video.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+      
+      final isAsset = [...images, ...videos].any((path) => path.startsWith('assets/'));
+      
+      return ProductColorVariant(
+        colorName: v.color,
+        imagePaths: images,
+        videoPaths: videos,
+        isAsset: isAsset,
+        price: v.price,
+        stock: v.stock,
+      );
+    }).toList(),
+    materialBlends: p.materialType.map((m) => FabricMaterialBlend(
+      material: m.type,
+      blend: "${m.blend.toInt()}%",
+    )).toList(),
+    canWash: p.careSymbol.contains('Washable'),
+    canBleach: p.careSymbol.contains('Bleach Allowed'),
+    canDryClean: p.careSymbol.contains('Dry Clean Only'),
+    canTumbleDry: p.careSymbol.contains('Tumble Dry'),
+    ironLevel: p.careSymbol.firstWhere(
+      (s) => s.startsWith('Iron: '), 
+      orElse: () => 'Iron: Medium'
+    ).replaceFirst('Iron: ', ''),
+  );
+}
   Future<void> _loadInventory() async {
     if (_retailerId == null) return;
 

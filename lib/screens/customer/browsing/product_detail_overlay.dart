@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
-import 'package:sketch2stitch/models/favorite.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/services/cart_service.dart';
 import 'package:sketch2stitch/services/user_session.dart';
+import 'package:sketch2stitch/services/favorite_service.dart';
 import '../../../widgets/video_preview_player.dart';
 import '../../../widgets/care_info_tooltip.dart';
 import '../../../widgets/top_feedback_banner.dart';

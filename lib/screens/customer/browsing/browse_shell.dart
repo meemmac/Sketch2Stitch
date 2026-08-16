@@ -1,12 +1,244 @@
+// lib/screens/customer/browsing/browse_shell.dart
 import 'dart:ui' show lerpDouble;
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_fabrics_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_tailors_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
-import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
-import 'package:sketch2stitch/widgets/cart_icon_button.dart';
+import 'package:sketch2stitch/screens/customer/cart_screen.dart';
 import 'package:sketch2stitch/models/user_role.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared sage-green palette (matches VirtualTrialScreen) used across all
+// "Browse" screens — Fabrics, Tailors, Retailers — so they feel like one
+// consistent design language rather than three separately-styled pages.
+// ─────────────────────────────────────────────────────────────────────────────
+const kSage = Color(0xFF4E8B6F);
+const kSageDark = Color(0xFF2C5C44);
+const kSagePale = Color(0xFFEEF6F0);
+const kInk = Color(0xFF1A2C22);
+const kCardBg = Color(0xFFFBFDF9);
+const kBorder = Color(0xFFDDEBE3);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Filter Data Classes
+// ─────────────────────────────────────────────────────────────────────────────
+
+abstract class ProductFilterData {
+  final double minPrice;
+  final double maxPrice;
+  final List<String> colors;
+  final List<String> materialTypes;
+  final String sortBy;
+
+  ProductFilterData({
+    required this.minPrice,
+    required this.maxPrice,
+    required this.colors,
+    required this.materialTypes,
+    this.sortBy = 'default',
+  });
+
+  bool get hasFilters {
+    return minPrice > 0 ||
+        maxPrice < 5000 ||
+        (colors.isNotEmpty && !colors.contains('All')) ||
+        (materialTypes.isNotEmpty && !materialTypes.contains('All')) ||
+        sortBy != 'default';
+  }
+
+  bool matchesColor(List<String>? productColors) {
+    if (colors.isEmpty || colors.contains('All')) {
+      return true;
+    }
+
+    if (productColors == null || productColors.isEmpty) {
+      return false;
+    }
+
+    for (final productColor in productColors) {
+      for (final selectedColor in colors) {
+        if (productColor.toLowerCase().contains(selectedColor.toLowerCase())) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  bool matchesMaterial(String? productMaterialType, List<String>? productMaterialBlends) {
+    if (materialTypes.isEmpty || materialTypes.contains('All')) {
+      return true;
+    }
+
+    if (productMaterialBlends != null && productMaterialBlends.isNotEmpty) {
+      for (final blend in productMaterialBlends) {
+        for (final selectedType in materialTypes) {
+          if (blend.toLowerCase().contains(selectedType.toLowerCase())) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    if (productMaterialType == null || productMaterialType.isEmpty) {
+      return false;
+    }
+
+    for (final selectedType in materialTypes) {
+      if (productMaterialType.toLowerCase().contains(selectedType.toLowerCase())) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
+class FabricsFilterData extends ProductFilterData {
+  FabricsFilterData({
+    required super.minPrice,
+    required super.maxPrice,
+    required super.colors,
+    required super.materialTypes,
+    super.sortBy = 'default',
+  });
+}
+
+class ElementsFilterData extends ProductFilterData {
+  ElementsFilterData({
+    required super.minPrice,
+    required super.maxPrice,
+    required super.colors,
+    required super.materialTypes,
+    super.sortBy = 'default',
+  });
+}
+
+class TailorsFilterData {
+  final double minRating;
+  final String location;
+  final String sortBy;
+
+  TailorsFilterData({
+    required this.minRating,
+    required this.location,
+    this.sortBy = 'default',
+  });
+
+  bool get hasFilters {
+    return minRating > 0 || location != 'All' || sortBy != 'default';
+  }
+}
+
+class RetailersFilterData {
+  final double minRating;
+  final String location;
+  final String sortBy;
+
+  RetailersFilterData({
+    required this.minRating,
+    required this.location,
+    this.sortBy = 'default',
+  });
+
+  bool get hasFilters {
+    return minRating > 0 || location != 'All' || sortBy != 'default';
+  }
+}
+
+class MaterialFilterOptions {
+  static const List<String> allMaterials = [
+    'All',
+    'Cotton',
+    'Silk',
+    'Wool',
+    'Linen',
+    'Polyester',
+    'Viscose',
+    'Nylon',
+    'Cashmere',
+    'Spandex',
+    'Khadi',
+    'Muslin',
+    'Jamdani',
+    'Embroidery',
+  ];
+
+  static List<String> extractFromBlends(List<String> blends) {
+    final Set<String> materials = {};
+    for (final blend in blends) {
+      final parts = blend.split(',').map((s) => s.trim()).toList();
+      for (final part in parts) {
+        String cleanPart = part.replaceAll(RegExp(r'^\d+%'), '').trim();
+        for (final material in allMaterials) {
+          if (material != 'All' && cleanPart.toLowerCase().contains(material.toLowerCase())) {
+            materials.add(material);
+            break;
+          }
+        }
+      }
+    }
+    return materials.toList();
+  }
+
+  static List<String> getMaterialOptions() {
+    return allMaterials;
+  }
+}
+
+class ColorFilterOptions {
+  static const List<String> allColors = [
+    'All',
+    'White',
+    'Black',
+    'Red',
+    'Blue',
+    'Green',
+    'Gold',
+    'Silver',
+    'Pink',
+    'Beige',
+    'Brown',
+    'Purple',
+  ];
+
+  static List<String> extractFromProductColors(List<String> productColors) {
+    final Set<String> colors = {};
+    for (final color in productColors) {
+      final cleanColor = color.trim();
+      for (final availableColor in allColors) {
+        if (availableColor != 'All' && 
+            cleanColor.toLowerCase().contains(availableColor.toLowerCase())) {
+          colors.add(availableColor);
+          break;
+        }
+      }
+    }
+    return colors.toList();
+  }
+
+  static List<String> getColorOptions() {
+    return allColors;
+  }
+
+  static bool matchesSelectedColors(String colorName, List<String> selectedColors) {
+    if (selectedColors.isEmpty || selectedColors.contains('All')) {
+      return true;
+    }
+    
+    final cleanColorName = colorName.toLowerCase();
+    for (final selected in selectedColors) {
+      if (cleanColorName.contains(selected.toLowerCase())) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BrowseShell Widget
+// ─────────────────────────────────────────────────────────────────────────────
 
 /// Shared shell for the four "Browse" tabs (Fabrics, Elements, Tailors, Retailers)
 class BrowseShell extends StatefulWidget {
@@ -402,10 +634,20 @@ class _BrowseShellState extends State<BrowseShell> {
           ),
           if (isCustomer) ...[
             const SizedBox(width: 8),
-            const CartIconButton(
-              iconSize: 24,
+            IconButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CartScreen()),
+                );
+              },
+              icon: const Icon(
+                Icons.shopping_cart_outlined,
+                color: Colors.black87,
+                size: 24,
+              ),
               padding: EdgeInsets.zero,
-              constraints: BoxConstraints(),
+              constraints: const BoxConstraints(),
             ),
           ],
         ],

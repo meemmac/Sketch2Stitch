@@ -5,16 +5,18 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:math';
 import '../models/user_role.dart';
 import '../models/customer.dart';
 import '../models/tailor.dart';
 import '../models/retailer.dart';
 
-/// EmailJS Credentials retrieved from environment variables
+/// EmailJS Credentials
 final String _emailjsServiceId = dotenv.get('EMAILJS_SERVICE_ID', fallback: '');
-final String _emailjsTemplateId = dotenv.get('EMAILJS_TEMPLATE_ID', fallback: '');
 final String _emailjsPublicKey = dotenv.get('EMAILJS_PUBLIC_KEY', fallback: '');
 final String _emailjsAccessToken = dotenv.get('EMAILJS_ACCESS_TOKEN', fallback: '');
+final String _emailjsWelcomeTemplateId = dotenv.get('EMAILJS_WELCOME_TEMPLATE_ID', fallback: '');
+final String _emailjsOtpTemplateId = dotenv.get('EMAILJS_OTP_TEMPLATE_ID', fallback: '');
 
 /// Thrown by [AuthService] with an already user-friendly message.
 class AuthServiceException implements Exception {
@@ -25,8 +27,7 @@ class AuthServiceException implements Exception {
   String toString() => message;
 }
 
-/// Wraps all Firebase Auth calls. This service handles user authentication
-/// and fetching user profile data from Firestore.
+/// Wraps all Firebase Auth calls.
 class AuthService {
   AuthService({FirebaseAuth? firebaseAuth, FirebaseFirestore? firestore})
       : _auth = firebaseAuth ?? FirebaseAuth.instance,
@@ -35,15 +36,21 @@ class AuthService {
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
 
-  /// Current authenticated user.
-  User? get currentUser => _auth.currentUser;
+  static final Map<String, _OTPData> _otpStore = {};
 
-  /// Stream of authentication state changes.
+  User? get currentUser => _auth.currentUser;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  Future<void> signOut() async {
+    try {
+      await _auth.signOut();
+    } catch (e) {
+      throw AuthServiceException('Failed to sign out: ${e.toString()}');
+    }
+  }
 
   // ==================== AUTHENTICATION METHODS ====================
 
-  /// Authenticate user via Firebase Auth.
   Future<UserCredential> signInWithEmailAndPassword(
     String email,
     String password,
@@ -60,8 +67,6 @@ class AuthService {
     }
   }
 
-  /// Create new account and save profile data.
-  /// Returns a record with the [UserCredential] and a [bool] indicating if the welcome email was sent.
   Future<({UserCredential credential, bool emailSent})> signUpWithEmailAndPassword(
     String email,
     String password,
@@ -82,7 +87,6 @@ class AuthService {
             .doc(credential.user!.uid)
             .set(profileData);
 
-        // Send Welcome Email securely via EmailJS
         final name = profileData['name'] ?? profileData['shopName'] ?? 'Member';
         emailSent = await _sendWelcomeEmailViaEmailJS(email: email, name: name, role: role);
       }
@@ -95,36 +99,161 @@ class AuthService {
     }
   }
 
-  /// Merges [data] into the existing profile document for [uid] in the
-  /// collection matching [role]. Only the supplied keys are overwritten —
-  /// everything else in the document is left untouched.
-  ///
-  /// Use this from any profile-edit screen (customer/tailor/retailer) to
-  /// persist changes. Throws [AuthServiceException] on failure.
+  Future<UserRole?> findUserRole(String uid) async {
+    try {
+      final customerDoc = await _firestore.collection('Customer').doc(uid).get();
+      if (customerDoc.exists) return UserRole.customer;
+
+      final tailorDoc = await _firestore.collection('Tailor').doc(uid).get();
+      if (tailorDoc.exists) return UserRole.tailor;
+
+      final retailerDoc = await _firestore.collection('Retailer').doc(uid).get();
+      if (retailerDoc.exists) return UserRole.retailer;
+
+      return null;
+    } catch (e) {
+      debugPrint('Error finding user role: $e');
+      return null;
+    }
+  }
+
+  Future<dynamic> getUserProfile(String uid, UserRole role) async {
+    try {
+      final collection = _getCollectionForRole(role);
+      final doc = await _firestore.collection(collection).doc(uid).get();
+      
+      if (!doc.exists) return null;
+
+      final data = doc.data()!;
+      
+      switch (role) {
+        case UserRole.customer:
+          return Customer.fromJson(data);
+        case UserRole.tailor:
+          return Tailor.fromJson(data);
+        case UserRole.retailer:
+          return Retailer.fromJson(data);
+      }
+    } catch (e) {
+      debugPrint('Error getting user profile: $e');
+      return null;
+    }
+  }
+
+  /// Find email by phone number - HANDLES BOTH STRING AND MAP (credential)
+  Future<String?> findEmailByPhone(dynamic identifier, UserRole role) async {
+    try {
+      String? phoneNumber;
+      
+      // Handle different types of input
+      if (identifier is String) {
+        phoneNumber = identifier;
+      } else if (identifier is Map<String, dynamic>) {
+        // Try to extract phone number from credential map
+        phoneNumber = identifier['phone'] as String? ?? 
+                      identifier['phoneNumber'] as String? ??
+                      identifier['credential'] as String?;
+        
+        // If phone number is not found, check if email field contains a phone number
+        if (phoneNumber == null || phoneNumber.isEmpty) {
+          final email = identifier['email'] as String?;
+          if (email != null && !email.contains('@')) {
+            phoneNumber = email;
+          }
+        }
+      } else {
+        debugPrint('⚠️ findEmailByPhone: Unknown identifier type: ${identifier.runtimeType}');
+        return null;
+      }
+
+      if (phoneNumber == null || phoneNumber.trim().isEmpty) {
+        debugPrint('⚠️ findEmailByPhone: Phone number is empty');
+        return null;
+      }
+
+      debugPrint('📞 Searching for email with phone: $phoneNumber, role: $role');
+
+      final collection = _getCollectionForRole(role);
+      final querySnapshot = await _firestore
+          .collection(collection)
+          .where('phone', isEqualTo: phoneNumber.trim())
+          .limit(1)
+          .get();
+      
+      if (querySnapshot.docs.isNotEmpty) {
+        final data = querySnapshot.docs.first.data();
+        final email = data['email'] as String?;
+        debugPrint('✅ Found email: $email for phone: $phoneNumber');
+        return email;
+      }
+      
+      // If not found, check all collections
+      final allCollections = ['Customer', 'Tailor', 'Retailer'];
+      for (final coll in allCollections) {
+        if (coll == collection) continue;
+        final query = await _firestore
+            .collection(coll)
+            .where('phone', isEqualTo: phoneNumber.trim())
+            .limit(1)
+            .get();
+        if (query.docs.isNotEmpty) {
+          final data = query.docs.first.data();
+          final email = data['email'] as String?;
+          debugPrint('✅ Found email: $email in collection: $coll');
+          return email;
+        }
+      }
+      
+      debugPrint('❌ No email found for phone: $phoneNumber');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error finding email by phone: $e');
+      return null;
+    }
+  }
+
+  /// Find email by phone number without role
+  Future<String?> findEmailByPhoneNumber(String phoneNumber) async {
+    try {
+      if (phoneNumber.trim().isEmpty) return null;
+
+      debugPrint('📞 Searching for email with phone: $phoneNumber (no role)');
+
+      final allCollections = ['Customer', 'Tailor', 'Retailer'];
+      for (final coll in allCollections) {
+        final query = await _firestore
+            .collection(coll)
+            .where('phone', isEqualTo: phoneNumber.trim())
+            .limit(1)
+            .get();
+        if (query.docs.isNotEmpty) {
+          final data = query.docs.first.data();
+          final email = data['email'] as String?;
+          debugPrint('✅ Found email: $email in collection: $coll');
+          return email;
+        }
+      }
+      debugPrint('❌ No email found for phone: $phoneNumber');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error finding email by phone: $e');
+      return null;
+    }
+  }
+
   Future<void> updateProfile(
     String uid,
     UserRole role,
-    Map<String, dynamic> data,
+    Map<String, dynamic> updates,
   ) async {
     try {
       final collection = _getCollectionForRole(role);
-      await _firestore.collection(collection).doc(uid).update(data);
-    } on FirebaseException catch (e) {
-      throw AuthServiceException(
-        'Failed to update profile: ${e.message ?? e.code}',
-      );
+      await _firestore.collection(collection).doc(uid).update(updates);
     } catch (e) {
       throw AuthServiceException('Failed to update profile: ${e.toString()}');
     }
   }
 
-  /// Changes the signed-in user's password.
-  ///
-  /// Firebase requires a recent login before a password change, so the
-  /// [currentPassword] is used to re-authenticate first. That doubles as the
-  /// "confirm it's really you" check on the change-password form.
-  ///
-  /// Throws [AuthServiceException] with a user-friendly message on failure.
   Future<void> changePassword({
     required String currentPassword,
     required String newPassword,
@@ -160,93 +289,88 @@ class AuthService {
     }
   }
 
-  /// Handle "Forgot Password" requests using Firebase's built-in method.
-  /// Firebase sends a password reset email to the user's registered email address
-  /// with a link to reset their password. This is completely FREE.
-  Future<void> sendPasswordResetEmail(String email) async {
-    try {
-      await _auth.sendPasswordResetEmail(
-        email: email.trim(),
-        // Optional: You can customize the redirect URL if needed
-        // actionCodeSettings: ActionCodeSettings(
-        //   url: 'https://your-app.com/reset-password',
-        //   handleCodeInApp: true,
-        //   androidPackageName: 'com.your.app',
-        //   androidInstallIfNotAvailable: true,
-        //   androidMinimumVersion: '1',
-        // ),
-      );
-    } on FirebaseAuthException catch (e) {
-      throw AuthServiceException(_messageForCode(e.code));
-    } catch (_) {
+  // ==================== OTP BASED PASSWORD RESET ====================
+
+Future<void> sendPasswordResetOTP(String email) async {
+  try {
+    final emailExists = await _checkEmailExists(email);
+    if (!emailExists) {
       throw AuthServiceException(
-        'Something went wrong sending the reset email. Please try again.',
+        'No account found with this email address.',
       );
     }
-  }
 
-  /// Logout user.
-  Future<void> signOut() async {
-    await _auth.signOut();
-  }
+    final otp = _generateOTP();
+    final expiresAt = DateTime.now().add(const Duration(minutes: 10));
 
-  // ==================== USER PROFILE METHODS ====================
+    _otpStore[email] = _OTPData(
+      otp: otp,
+      expiresAt: expiresAt,
+      attempts: 0,
+    );
 
-  /// Probes Firestore to find which role collection the user belongs to.
-  Future<UserRole?> findUserRole(String uid) async {
-    // We check in order of expected frequency
-    final customer = await _firestore.collection('Customer').doc(uid).get();
-    if (customer.exists) return UserRole.customer;
-
-    final tailor = await _firestore.collection('Tailor').doc(uid).get();
-    if (tailor.exists) return UserRole.tailor;
-
-    final retailer = await _firestore.collection('Retailer').doc(uid).get();
-    if (retailer.exists) return UserRole.retailer;
-
-    return null;
-  }
-
-  /// Attempts to find the email associated with a phone number in a specific role collection.
-  Future<String?> findEmailByPhone(String phone, UserRole role) async {
-    final collection = _getCollectionForRole(role);
-    final query = await _firestore
-        .collection(collection)
-        .where('phone', isEqualTo: phone.trim())
-        .limit(1)
-        .get();
-
-    if (query.docs.isNotEmpty) {
-      return query.docs.first.data()['email'] as String?;
+    // Send OTP via EmailJS - DON'T fallback to Firebase
+    final sent = await _sendOTPEmail(email, otp);
+    if (!sent) {
+      debugPrint('❌ Failed to send OTP via EmailJS');
+      throw AuthServiceException(
+        'Failed to send OTP. Please check your internet connection and try again.',
+      );
     }
-    return null;
+    
+    debugPrint('✅ OTP sent successfully to $email');
+    
+  } on AuthServiceException {
+    rethrow;
+  } catch (e) {
+    debugPrint('❌ Error in sendPasswordResetOTP: $e');
+    throw AuthServiceException('Something went wrong: ${e.toString()}');
   }
-
-  /// Fetch user profile data from the respective Firestore collection.
-  /// Returns [Customer], [Tailor], or [Retailer] if found, otherwise null.
-  Future<dynamic> getUserProfile(String uid, UserRole role) async {
+}
+  Future<void> verifyOTPAndResetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
     try {
-      final collection = _getCollectionForRole(role);
-      final doc = await _firestore.collection(collection).doc(uid).get();
-
-      if (!doc.exists || doc.data() == null) {
-        return null;
+      if (newPassword.length < 6) {
+        throw AuthServiceException('Password must be at least 6 characters.');
       }
 
-      final data = doc.data()!;
-      switch (role) {
-        case UserRole.customer:
-          return Customer.fromJson(data, id: uid);
-        case UserRole.tailor:
-          return Tailor.fromJson(data, id: uid);
-        case UserRole.retailer:
-          return Retailer.fromJson(data, id: uid);
+      final otpData = _otpStore[email.trim()];
+      if (otpData == null) {
+        throw AuthServiceException('No OTP found. Please request a new one.');
       }
+
+      if (DateTime.now().isAfter(otpData.expiresAt)) {
+        _otpStore.remove(email);
+        throw AuthServiceException('OTP has expired. Please request a new one.');
+      }
+
+      if (otpData.attempts >= 3) {
+        _otpStore.remove(email);
+        throw AuthServiceException('Too many failed attempts. Please request a new OTP.');
+      }
+
+      if (otpData.otp != otp.trim()) {
+        otpData.attempts++;
+        throw AuthServiceException('Invalid OTP. ${3 - otpData.attempts} attempts remaining.');
+      }
+
+      // Send Firebase password reset email
+      await _auth.sendPasswordResetEmail(email: email.trim());
+
+      _otpStore.remove(email);
+
+    } on AuthServiceException {
+      rethrow;
     } catch (e) {
-      debugPrint('Error fetching user profile: $e');
-      return null;
+      debugPrint('❌ Error verifying OTP: $e');
+      throw AuthServiceException('Failed to reset password: ${e.toString()}');
     }
   }
+
+  // ==================== HELPER METHODS ====================
 
   String _getCollectionForRole(UserRole role) {
     switch (role) {
@@ -259,17 +383,166 @@ class AuthService {
     }
   }
 
-  // ==================== EMAIL METHODS ====================
+  Future<bool> _checkEmailExists(String email) async {
+    try {
+      final customerQuery = await _firestore
+          .collection('Customer')
+          .where('email', isEqualTo: email.trim())
+          .limit(1)
+          .get();
 
-  /// Sends a welcome email securely using the EmailJS API.
-  /// The app only uses a Public Key, keeping your SMTP/API credentials safe.
+      if (customerQuery.docs.isNotEmpty) return true;
+
+      final tailorQuery = await _firestore
+          .collection('Tailor')
+          .where('email', isEqualTo: email.trim())
+          .limit(1)
+          .get();
+
+      if (tailorQuery.docs.isNotEmpty) return true;
+
+      final retailerQuery = await _firestore
+          .collection('Retailer')
+          .where('email', isEqualTo: email.trim())
+          .limit(1)
+          .get();
+
+      return retailerQuery.docs.isNotEmpty;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  String _generateOTP() {
+    final random = Random();
+    final otp = List.generate(6, (_) => random.nextInt(10)).join();
+    return otp;
+  }
+
+// services/auth_service.dart
+
+/// Send OTP via EmailJS - NO FIREBASE FALLBACK
+Future<bool> _sendOTPEmail(String email, String otp) async {
+  debugPrint('📧 === SENDING OTP VIA EMAILJS ===');
+  debugPrint('📧 Service ID: $_emailjsServiceId');
+  debugPrint('📧 Template ID: $_emailjsOtpTemplateId');
+  debugPrint('📧 To: $email');
+  debugPrint('📧 OTP: $otp');
+  
+  // Check if keys are configured
+  if (_emailjsServiceId.isEmpty || _emailjsOtpTemplateId.isEmpty) {
+    debugPrint('❌ EmailJS keys are empty!');
+    return false;
+  }
+
+  try {
+    final url = Uri.parse('https://api.emailjs.com/api/v1.0/email/send');
+    
+    String userName = 'User';
+    try {
+      final customerQuery = await _firestore
+          .collection('Customer')
+          .where('email', isEqualTo: email.trim())
+          .limit(1)
+          .get();
+      
+      if (customerQuery.docs.isNotEmpty) {
+        userName = customerQuery.docs.first.data()['name'] ?? 'User';
+      }
+    } catch (e) {
+      debugPrint('⚠️ Could not fetch user name: $e');
+    }
+
+    final payload = {
+      'service_id': _emailjsServiceId,
+      'template_id': _emailjsOtpTemplateId,
+      'user_id': _emailjsPublicKey,
+      'accessToken': _emailjsAccessToken,
+      'template_params': {
+        'user_name': userName,
+        'user_email': email,
+        'otp_code': otp,
+      },
+    };
+
+    debugPrint('📧 Payload: ${jsonEncode(payload)}');
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Origin': 'http://localhost',
+      },
+      body: jsonEncode(payload),
+    );
+
+    debugPrint('📧 Response Status: ${response.statusCode}');
+    debugPrint('📧 Response Body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      debugPrint('✅ OTP email sent successfully via EmailJS!');
+      return true;
+    } else {
+      debugPrint('❌ EmailJS error: ${response.statusCode} - ${response.body}');
+      return false; // DON'T fallback to Firebase
+    }
+  } catch (e) {
+    debugPrint('❌ Error sending OTP email: $e');
+    return false; // DON'T fallback to Firebase
+  }
+}
+
+/// Send OTP to user's email for password reset
+Future<void> sendPasswordResetOTP(String email) async {
+  try {
+    // First, check if the email exists in our system
+    final emailExists = await _checkEmailExists(email);
+    if (!emailExists) {
+      throw AuthServiceException(
+        'No account found with this email address.',
+      );
+    }
+
+    // Generate a 6-digit OTP
+    final otp = _generateOTP();
+    final expiresAt = DateTime.now().add(const Duration(minutes: 10));
+
+    // Store OTP in memory
+    _otpStore[email] = _OTPData(
+      otp: otp,
+      expiresAt: expiresAt,
+      attempts: 0,
+    );
+
+    // Send OTP via EmailJS
+    final sent = await _sendOTPEmail(email, otp);
+    
+    if (!sent) {
+      // Clear the stored OTP since sending failed
+      _otpStore.remove(email);
+      throw AuthServiceException(
+        'Failed to send OTP. Please check your internet connection and try again.',
+      );
+    }
+    
+    debugPrint('✅ OTP sent successfully to $email');
+    
+  } on AuthServiceException {
+    rethrow;
+  } catch (e) {
+    debugPrint('❌ Error in sendPasswordResetOTP: $e');
+    throw AuthServiceException('Something went wrong: ${e.toString()}');
+  }
+}
   Future<bool> _sendWelcomeEmailViaEmailJS({
     required String email,
     required String name,
     required UserRole role,
   }) async {
-    // If keys aren't configured yet, skip silently
-    if (_emailjsPublicKey == 'YOUR_PUBLIC_KEY' || _emailjsPublicKey.isEmpty) {
+    debugPrint('📧 Sending Welcome email...');
+    
+    if (_emailjsServiceId.isEmpty || _emailjsWelcomeTemplateId.isEmpty) {
+      debugPrint('⚠️ EmailJS keys not configured. Skipping welcome email.');
       return false;
     }
 
@@ -288,9 +561,9 @@ class AuthService {
       final minute = now.minute.toString().padLeft(2, '0');
       final formattedTime = "$hour:$minute $period";
 
-      final payload = jsonEncode({
+      final payload = {
         'service_id': _emailjsServiceId,
-        'template_id': _emailjsTemplateId,
+        'template_id': _emailjsWelcomeTemplateId,
         'user_id': _emailjsPublicKey,
         'accessToken': _emailjsAccessToken,
         'template_params': {
@@ -301,7 +574,7 @@ class AuthService {
           'join_time': formattedTime,
           'welcome_message': _getWelcomeMessageForRole(role),
         },
-      });
+      };
 
       final response = await http.post(
         url,
@@ -309,7 +582,7 @@ class AuthService {
           'Content-Type': 'application/json',
           'Origin': 'http://localhost',
         },
-        body: payload,
+        body: jsonEncode(payload),
       );
 
       return response.statusCode == 200;
@@ -329,8 +602,6 @@ class AuthService {
         return 'Welcome to Sketch2Stitch! Showcase your quality fabrics and elements, connect with customers and build meaningful connections through our creative marketplace.';
     }
   }
-
-  // ==================== ERROR HANDLING ====================
 
   String _messageForCode(String code) {
     switch (code) {
@@ -356,4 +627,17 @@ class AuthService {
         return 'Something went wrong. Please try again in a moment.';
     }
   }
+}
+
+/// OTP Data Class
+class _OTPData {
+  final String otp;
+  final DateTime expiresAt;
+  int attempts;
+
+  _OTPData({
+    required this.otp,
+    required this.expiresAt,
+    this.attempts = 0,
+  });
 }
