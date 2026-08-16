@@ -92,6 +92,12 @@ class Order {
       if (hasTailor) {
         final tj = tailorJobs!.first;
 
+        if (tj.status == TailorJobStatus.jobCompleted) {
+          return "Stitching Completed";
+        }
+        if (tj.status == TailorJobStatus.inProgress) {
+          return "Tailor Confirmed — Stitching Started";
+        }
         if (tj.status == TailorJobStatus.confirmed) {
           return "Tailor Confirmed — Stitching Started";
         }

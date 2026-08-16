@@ -19,6 +19,7 @@ enum TrackEventType {
   tailorConfirmed,
   tailorCompleted,
   tailorExpired,
+  tailorCancelled,
   shippingToTailor,
   shippingToCustomer,
   orderCompleted,
@@ -113,8 +114,10 @@ class OrderTrackScreen extends StatelessWidget {
             : (order.tailorSelectionDeadline != null
             ? DateFormat('dd MMM yyyy').format(order.tailorSelectionDeadline!)
             : 'Pending');
+        // events are sorted earliest-first (see _buildTrackEvents), so the
+        // most recent update is the last item, not the first.
         final lastUpdated = events.isNotEmpty
-            ? DateFormat('dd MMM yyyy').format(events.first.date)
+            ? DateFormat('dd MMM yyyy').format(events.last.date)
             : DateFormat('dd MMM yyyy').format(order.orderDate);
         final deliveryAddress = customer?.address ?? 'No address provided';
 
@@ -131,7 +134,13 @@ class OrderTrackScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Tracking Order for Order ID: ${order.id}',
+                          'Tracking Order for',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
+                        ),
+                        Text(
+                          'Order ID: ${order.id}',
+                          softWrap: true,
+                          overflow: TextOverflow.visible,
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
                         ),
                         const SizedBox(height: 16),
@@ -249,8 +258,6 @@ class OrderTrackScreen extends StatelessWidget {
 
       // Find the materials linked to this order to provide context
       final String allMaterials = subOrders.expand((so) => so.items ?? []).map((i) => productNames[i.productId] ?? 'Material').toSet().join(', ');
-      final List<String> allRetailers = subOrders.map((so) => partyNames[so.retailerId] ?? 'Retailer').toSet().toList();
-      final String combinedRetailers = allRetailers.join(' & ');
 
 
       if (tailorJob.status == TailorJobStatus.pending) {
@@ -258,7 +265,6 @@ class OrderTrackScreen extends StatelessWidget {
             type: TrackEventType.tailorRequested,
             material: allMaterials,
             partyName: tailorName,
-            note: combinedRetailers.isNotEmpty ? 'Using fabric from $combinedRetailers' : null,
             date: baseDate
         ));
       } else if (tailorJob.status == TailorJobStatus.rejected || tailorJob.status == TailorJobStatus.tailorDeclined) {
@@ -279,7 +285,10 @@ class OrderTrackScreen extends StatelessWidget {
           date: tailorJob.createdAt ?? baseDate.add(const Duration(minutes: 1)),
           note: tailorJob.quoteAmount != null ? 'Quote Received: ৳${tailorJob.quoteAmount}' : null,
         ));
-      } else if (tailorJob.status == TailorJobStatus.confirmed || tailorJob.confirmedAt != null) {
+      } else if (tailorJob.status == TailorJobStatus.confirmed ||
+          tailorJob.status == TailorJobStatus.inProgress ||
+          tailorJob.status == TailorJobStatus.jobCompleted ||
+          tailorJob.confirmedAt != null) {
         events.add(TrackEvent(type: TrackEventType.tailorRequested, material: allMaterials, partyName: tailorName, date: baseDate));
         events.add(TrackEvent(
           type: TrackEventType.tailorQuoted,
@@ -301,6 +310,15 @@ class OrderTrackScreen extends StatelessWidget {
           partyName: tailorName,
           date: baseDate.add(const Duration(minutes: 1)),
           note: 'The quote response deadline has passed.',
+        ));
+      } else if (tailorJob.status == TailorJobStatus.cancelled) {
+        events.add(TrackEvent(type: TrackEventType.tailorRequested, material: allMaterials, partyName: tailorName, date: baseDate));
+        events.add(TrackEvent(
+          type: TrackEventType.tailorCancelled,
+          material: '',
+          partyName: tailorName,
+          date: baseDate.add(const Duration(minutes: 1)),
+          note: tailorJob.rejectionReason,
         ));
       }
     }
@@ -634,6 +652,12 @@ class OrderTrackScreen extends StatelessWidget {
           color: Colors.red.shade400,
           icon: Icons.timer_off_rounded,
           verb: 'Quote Expired',
+        );
+      case TrackEventType.tailorCancelled:
+        return _TrackEventStyle(
+          color: Colors.red.shade600,
+          icon: Icons.block_rounded,
+          verb: 'Tailor Job Cancelled',
         );
       case TrackEventType.shippingToTailor:
         return _TrackEventStyle(

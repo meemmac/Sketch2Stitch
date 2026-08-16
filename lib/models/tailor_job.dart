@@ -7,6 +7,8 @@ enum TailorJobStatus {
   rejected,
   quoted,
   confirmed,
+  inProgress,
+  jobCompleted,
   expired,
   cancelled,
   tailorDeclined;
@@ -16,6 +18,8 @@ enum TailorJobStatus {
     TailorJobStatus.rejected: 'rejected',
     TailorJobStatus.quoted: 'quoted',
     TailorJobStatus.confirmed: 'confirmed',
+    TailorJobStatus.inProgress: 'in_progress',
+    TailorJobStatus.jobCompleted: 'completed',
     TailorJobStatus.expired: 'expired',
     TailorJobStatus.cancelled: 'cancelled',
     TailorJobStatus.tailorDeclined: 'tailor_declined',
@@ -26,6 +30,8 @@ enum TailorJobStatus {
     'rejected': TailorJobStatus.rejected,
     'quoted': TailorJobStatus.quoted,
     'confirmed': TailorJobStatus.confirmed,
+    'in_progress': TailorJobStatus.inProgress,
+    'completed': TailorJobStatus.jobCompleted,
     'expired': TailorJobStatus.expired,
     'cancelled': TailorJobStatus.cancelled,
     'tailor_declined': TailorJobStatus.tailorDeclined,
@@ -137,6 +143,10 @@ class TailorJob {
         return 'Quoted';
       case TailorJobStatus.confirmed:
         return 'Confirmed';
+      case TailorJobStatus.inProgress:
+        return 'Stitching In Progress';
+      case TailorJobStatus.jobCompleted:
+        return 'Stitching Completed';
       case TailorJobStatus.expired:
         return 'Expired';
       case TailorJobStatus.cancelled:

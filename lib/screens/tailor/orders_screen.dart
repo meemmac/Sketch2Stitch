@@ -902,14 +902,13 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   "Accept Request",
                   Icons.check_circle_outline,
                   primaryGreen,
-                  () async {
-                    try {
-                      await _orderService.updateTailorJobStatus(order.id, TailorJobStatus.confirmed);
-                      Navigator.pop(context);
-                      _showBanner("Request accepted", isError: false);
-                    } catch (e) {
-                      _showBanner("Something went wrong. Please try again.");
-                    }
+                  () {
+                    // Accepting requires a service price + delivery date per
+                    // item, so route through the order-detail sheet (which
+                    // calls acceptTailorJob) instead of jumping straight to
+                    // 'confirmed' here — that used to skip quoting/payment.
+                    Navigator.pop(context);
+                    _showOrderDetail(order);
                   },
                 ),
                 _statusOptionTile(
@@ -928,7 +927,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   Colors.purple,
                   () async {
                     try {
-                      await _orderService.updateWorkProgress(order.id, "in_progress");
+                      await _orderService.updateWorkProgress(order.id, TailorJobStatus.inProgress);
                       Navigator.pop(context);
                       _showBanner("Stitching started", isError: false);
                     } catch (e) {
@@ -943,7 +942,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   primaryGreen,
                   () async {
                     try {
-                      await _orderService.updateWorkProgress(order.id, "completed");
+                      await _orderService.updateWorkProgress(order.id, TailorJobStatus.jobCompleted);
                       Navigator.pop(context);
                       _showBanner("Work marked as completed", isError: false);
                     } catch (e) {

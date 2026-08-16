@@ -891,25 +891,27 @@ class OrderService {
   }
 
   /// Updates work progress for a tailor job.
-  Future<void> updateWorkProgress(String tailorJobId, String status) async {
+  Future<void> updateWorkProgress(String tailorJobId, TailorJobStatus status) async {
     try {
-      final statusLower = status.toLowerCase();
       final jobDoc = await _db.collection(_tailorJobsCollection).doc(tailorJobId).get();
       if (!jobDoc.exists) throw Exception('Tailor job not found');
       final orderId = jobDoc.data()?['orderId'];
 
       final batch = _db.batch();
 
-      // 1. Update Tailor Job
+      // 1. Update Tailor Job — written through the enum so the value
+      // round-trips via TailorJobStatus.fromValue everywhere else (e.g. the
+      // customer's order-tracking screen), instead of a raw string that
+      // isn't recognized there and silently falls back to 'pending'.
       batch.update(_db.collection(_tailorJobsCollection).doc(tailorJobId), {
-        'status': statusLower,
+        'status': status.toValue,
       });
 
       // 2. Update parent Order
       if (orderId != null) {
         batch.update(_db.collection(_ordersCollection).doc(orderId), {
-          'status': (statusLower == 'completed') 
-              ? OrderStatus.completed.toValue 
+          'status': status == TailorJobStatus.jobCompleted
+              ? OrderStatus.completed.toValue
               : OrderStatus.processing.toValue,
         });
       }
