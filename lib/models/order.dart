@@ -60,6 +60,9 @@ class Order {
   List<Conversation>? conversations;
   List<Review>? reviews;
 
+  // In-memory only (not in Firestore document)
+  String? tailorName;
+
   Order({
     required this.id,
     required this.customerId,
@@ -71,6 +74,7 @@ class Order {
     this.tailorJobs = const [],
     this.conversations = const [],
     this.reviews = const [],
+    this.tailorName,
   });
 
   String get statusText {
@@ -87,11 +91,13 @@ class Order {
       bool hasTailor = tailorJobs != null && tailorJobs!.isNotEmpty;
       if (hasTailor) {
         final tj = tailorJobs!.first;
+        final name = tailorName ?? 'Tailor';
+
         if (tj.status == TailorJobStatus.confirmed) {
           return "Tailor Confirmed — Stitching Started";
         }
-        if (tj.status == TailorJobStatus.quoted) return "Quote Received from Tailor";
-        if (tj.status == TailorJobStatus.pending) return "Requested Master Tailor";
+        if (tj.status == TailorJobStatus.quoted) return "Quote Received from $name";
+        if (tj.status == TailorJobStatus.pending) return "Requested $name";
       }
 
 
@@ -157,6 +163,7 @@ class Order {
     List<TailorJob>? tailorJobs,
     List<Conversation>? conversations,
     List<Review>? reviews,
+    String? tailorName,
   }) {
     return Order(
       id: id ?? this.id,
@@ -169,6 +176,7 @@ class Order {
       tailorJobs: tailorJobs ?? this.tailorJobs,
       conversations: conversations ?? this.conversations,
       reviews: reviews ?? this.reviews,
+      tailorName: tailorName ?? this.tailorName,
     );
   }
 

@@ -240,10 +240,23 @@ class OrderTrackScreen extends StatelessWidget {
       final tailorName = partyNames[tailorJob.tailorId] ?? 'Tailor';
       final baseDate = tailorJob.requestedAt ?? tailorJob.createdAt ?? order.orderDate;
 
+
+      // Find the materials linked to this order to provide context
+      final String allMaterials = subOrders.expand((so) => so.items ?? []).map((i) => productNames[i.productId] ?? 'Material').toSet().join(', ');
+      final List<String> allRetailers = subOrders.map((so) => partyNames[so.retailerId] ?? 'Retailer').toSet().toList();
+      final String combinedRetailers = allRetailers.join(' & ');
+
+
       if (tailorJob.status == TailorJobStatus.pending) {
-        events.add(TrackEvent(type: TrackEventType.tailorRequested, material: '', partyName: tailorName, date: baseDate));
+        events.add(TrackEvent(
+          type: TrackEventType.tailorRequested, 
+          material: allMaterials, 
+          partyName: tailorName, 
+          note: combinedRetailers.isNotEmpty ? 'Using fabric from $combinedRetailers' : null,
+          date: baseDate
+        ));
       } else if (tailorJob.status == TailorJobStatus.rejected || tailorJob.status == TailorJobStatus.tailorDeclined) {
-        events.add(TrackEvent(type: TrackEventType.tailorRequested, material: '', partyName: tailorName, date: baseDate));
+        events.add(TrackEvent(type: TrackEventType.tailorRequested, material: allMaterials, partyName: tailorName, date: baseDate));
         events.add(TrackEvent(
           type: TrackEventType.tailorRejected,
           material: '',
@@ -252,7 +265,7 @@ class OrderTrackScreen extends StatelessWidget {
           note: tailorJob.rejectionReason,
         ));
       } else if (tailorJob.status == TailorJobStatus.quoted) {
-        events.add(TrackEvent(type: TrackEventType.tailorRequested, material: '', partyName: tailorName, date: baseDate));
+        events.add(TrackEvent(type: TrackEventType.tailorRequested, material: allMaterials, partyName: tailorName, date: baseDate));
         events.add(TrackEvent(
           type: TrackEventType.tailorQuoted,
           material: '',
@@ -261,7 +274,7 @@ class OrderTrackScreen extends StatelessWidget {
           note: tailorJob.quoteAmount != null ? 'Quote Received: ৳${tailorJob.quoteAmount}' : null,
         ));
       } else if (tailorJob.status == TailorJobStatus.confirmed || tailorJob.confirmedAt != null) {
-        events.add(TrackEvent(type: TrackEventType.tailorRequested, material: '', partyName: tailorName, date: baseDate));
+        events.add(TrackEvent(type: TrackEventType.tailorRequested, material: allMaterials, partyName: tailorName, date: baseDate));
         events.add(TrackEvent(
           type: TrackEventType.tailorQuoted,
           material: '',
@@ -473,11 +486,24 @@ class OrderTrackScreen extends StatelessWidget {
     if (event.type == TrackEventType.tailorCompleted) {
       return [
         const TextSpan(text: 'Delivered to '),
-        TextSpan(text: event.destination ?? 'Customer Address', style: const TextStyle(fontWeight: FontWeight.bold)),
+        TextSpan(text: event.destination ?? 'Your Address', style: const TextStyle(fontWeight: FontWeight.bold)),
         const TextSpan(text: ' from '),
         TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
       ];
     }
+
+
+    if (event.type == TrackEventType.shippingToTailor) {
+      return [
+        TextSpan(text: 'Fabric for '),
+        TextSpan(text: event.material, style: const TextStyle(fontWeight: FontWeight.bold)),
+        const TextSpan(text: ' from '),
+        TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+        const TextSpan(text: ' has arrived at '),
+        TextSpan(text: event.destination ?? 'the Tailor', style: const TextStyle(fontWeight: FontWeight.bold)),
+      ];
+    }
+
 
     if (event.type == TrackEventType.subOrderDelivered && event.destination != null) {
       return [
@@ -490,11 +516,15 @@ class OrderTrackScreen extends StatelessWidget {
       ];
     }
 
-    if (event.type == TrackEventType.tailorConfirmed) {
+
+    if (event.type == TrackEventType.tailorRequested) {
       return [
-        TextSpan(text: style.verb), // "Tailor Confirmed — Stitching Started"
-        const TextSpan(text: ' from '),
+        const TextSpan(text: 'Stitching request sent to '),
         TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+        if (event.material.isNotEmpty) ...[
+          const TextSpan(text: ' for '),
+          TextSpan(text: event.material, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ]
       ];
     }
 

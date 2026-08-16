@@ -134,7 +134,20 @@ class OrderService {
               .toList();
 
 
-          orders.add(order.copyWith(subOrders: subOrders, tailorJobs: tailorJobs));
+          String? tailorName;
+          if (tailorJobs.isNotEmpty) {
+            final tDoc = await _db.collection('Tailor').doc(tailorJobs.first.tailorId).get();
+            if (tDoc.exists) {
+              tailorName = tDoc.data()?['name'] as String?;
+            }
+          }
+
+
+          orders.add(order.copyWith(
+            subOrders: subOrders, 
+            tailorJobs: tailorJobs,
+            tailorName: tailorName,
+          ));
         } catch (e) {
           debugPrint('[OrderService] ❌ Error parsing ${doc.id}: $e');
         }
