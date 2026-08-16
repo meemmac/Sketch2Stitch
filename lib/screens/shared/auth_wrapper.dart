@@ -6,6 +6,9 @@ import 'package:sketch2stitch/services/auth_service.dart';
 import 'package:sketch2stitch/services/user_session.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
+import '../../models/customer.dart';
+import '../../models/tailor.dart';
+import '../../models/retailer.dart';
 
 /// Gatekeeper widget that decides whether to show the Welcome screen
 /// or the Dashboard based on Firebase Auth state.
@@ -72,35 +75,48 @@ class AuthWrapper extends StatelessWidget {
       // Robust mapping from Models to DrawerProfileData
       String name = '';
       String shopName = '';
+      String email = '';
+      String phone = '';
+      String address = '';
       double rating = 0.0;
-      String? profilePicture = profile.profilePicture;
-      String? about = profile.about ?? '';
-      GeoPoint? location = profile.location;
+      String? profilePicture;
+      String? about;
+      GeoPoint? location;
 
-      if (role == UserRole.customer) {
-        name = profile.name ?? '';
+      if (profile is Customer) {
+        name = profile.name;
+        email = profile.email;
+        phone = profile.phone;
+        address = profile.address;
         location = profile.location;
-      } else if (role == UserRole.tailor) {
-        name = profile.name ?? '';
-        rating = (profile.rating ?? 0.0).toDouble();
+        // Customers have no rating/about/picture in model
+      } else if (profile is Tailor) {
+        name = profile.name;
+        email = profile.email;
+        phone = profile.phone;
+        address = profile.address;
+        rating = profile.rating;
         profilePicture = profile.profilePicture;
-        about = profile.about ?? '';
+        about = profile.about;
         location = profile.location;
-      } else if (role == UserRole.retailer) {
-        shopName = profile.shopName ?? '';
-        name = shopName;
-        rating = (profile.rating ?? 0.0).toDouble();
+      } else if (profile is Retailer) {
+        shopName = profile.shopName;
+        name = profile.shopName; 
+        email = profile.email;
+        phone = profile.phone;
+        address = profile.address;
+        rating = profile.rating;
         profilePicture = profile.profilePicture;
-        about = profile.about ?? '';
+        about = profile.about;
         location = profile.location;
       }
 
       final drawerData = DrawerProfileData(
         name: name,
         shopName: shopName,
-        email: profile.email ?? '',
-        phone: profile.phone ?? '',
-        address: profile.address ?? '',
+        email: email,
+        phone: phone,
+        address: address,
         rating: rating,
         location: location,
         profilePicture: profilePicture,

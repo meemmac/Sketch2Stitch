@@ -21,11 +21,7 @@ class OrderListScreen extends StatefulWidget {
 class _OrderListScreenState extends State<OrderListScreen> {
   Stream<List<Order>> _getOrdersStream() {
     return FirebaseAuth.instance.authStateChanges().asyncExpand((user) {
-      if (user == null) {
-        debugPrint('[OrderListScreen] 👤 AUTH STATE: Logged Out');
-        return Stream.value([]);
-      }
-      debugPrint('[OrderListScreen] 👤 AUTH STATE: Logged In (UID: ${user.uid})');
+      if (user == null) return Stream.value([]);
       return OrderService().streamCustomerOrders(user.uid);
     });
   }
@@ -33,7 +29,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('[OrderListScreen] 🏗️ Building OrderListScreen');
     return Scaffold(
       backgroundColor: const Color(0xFFF6FAF6),
       appBar: AppBar(
@@ -62,29 +57,12 @@ class _OrderListScreenState extends State<OrderListScreen> {
       body: StreamBuilder<List<Order>>(
         stream: _getOrdersStream(),
         builder: (context, snapshot) {
-          debugPrint('[OrderListScreen] 🔄 StreamBuilder update: connectionState=${snapshot.connectionState}, hasData=${snapshot.hasData}, hasError=${snapshot.hasError}');
-          
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircularProgressIndicator(color: Color(0xFF2E7D32)),
-                  SizedBox(height: 16),
-                  Text('Syncing with database...', style: TextStyle(color: Colors.grey, fontSize: 13)),
-                ],
-              ),
-            );
-          }
-
-
-          if (snapshot.hasError) {
-            debugPrint('[OrderListScreen] ❌ Snapshot error: ${snapshot.error}');
+            return const Center(child: CircularProgressIndicator(color: Color(0xFF2E7D32)));
           }
 
 
           final orders = snapshot.data ?? [];
-          debugPrint('[OrderListScreen] 📋 Rendering ${orders.length} orders');
           
           if (orders.isEmpty) {
             return _buildEmptyState();

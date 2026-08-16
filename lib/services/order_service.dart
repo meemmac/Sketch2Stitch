@@ -95,7 +95,6 @@ class OrderService {
   /// Streams real-time orders for a specific customer.
   Stream<List<Order>> streamCustomerOrders(String customerId) {
     final cleanId = customerId.trim();
-    debugPrint('[OrderService] 🛰️ STARTING ORDER STREAM for UID: "$cleanId"');
 
 
     return _db
@@ -104,8 +103,6 @@ class OrderService {
         // 🧠 Removed orderBy to bypass index requirement for manual testing
         .snapshots()
         .asyncMap((snapshot) async {
-      debugPrint('[OrderService] 📥 Snapshot received! Docs count: ${snapshot.docs.length}');
-      
       final List<Order> orders = [];
       
       for (var doc in snapshot.docs) {
@@ -149,7 +146,7 @@ class OrderService {
             tailorName: tailorName,
           ));
         } catch (e) {
-          debugPrint('[OrderService] ❌ Error parsing ${doc.id}: $e');
+          debugPrint('Error parsing order ${doc.id}: $e');
         }
       }
 
@@ -157,7 +154,6 @@ class OrderService {
       // Sort in memory instead of database to avoid index errors
       orders.sort((a, b) => b.orderDate.compareTo(a.orderDate));
       
-      debugPrint('[OrderService] ✅ Successfully returning ${orders.length} orders');
       return orders;
     });
   }
