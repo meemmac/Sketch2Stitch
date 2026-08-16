@@ -3,7 +3,6 @@ import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/models/user_role.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_fabrics_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_tailors_screen.dart';
