@@ -75,6 +75,9 @@ class AuthWrapper extends StatelessWidget {
       // Robust mapping from Models to DrawerProfileData
       String name = '';
       String shopName = '';
+      String email = '';
+      String phone = '';
+      String address = '';
       double rating = 0.0;
       String? profilePicture;
       String? about;
@@ -82,10 +85,16 @@ class AuthWrapper extends StatelessWidget {
 
       if (profile is Customer) {
         name = profile.name;
+        email = profile.email;
+        phone = profile.phone;
+        address = profile.address;
         location = profile.location;
-        // Customers have no rating/about/picture in current schema
+        // Customers have no rating/about/picture in model
       } else if (profile is Tailor) {
         name = profile.name;
+        email = profile.email;
+        phone = profile.phone;
+        address = profile.address;
         rating = profile.rating;
         profilePicture = profile.profilePicture;
         about = profile.about;
@@ -93,6 +102,9 @@ class AuthWrapper extends StatelessWidget {
       } else if (profile is Retailer) {
         shopName = profile.shopName;
         name = profile.shopName;
+        email = profile.email;
+        phone = profile.phone;
+        address = profile.address;
         rating = profile.rating;
         profilePicture = profile.profilePicture;
         about = profile.about;
@@ -102,9 +114,9 @@ class AuthWrapper extends StatelessWidget {
       final drawerData = DrawerProfileData(
         name: name,
         shopName: shopName,
-        email: profile.email ?? '',
-        phone: profile.phone ?? '',
-        address: profile.address ?? '',
+        email: email,
+        phone: phone,
+        address: address,
         rating: rating,
         location: location,
         profilePicture: profilePicture,

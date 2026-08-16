@@ -5,6 +5,7 @@ import '../models/order.dart';
 import '../models/sub_order.dart';
 import '../models/order_item.dart';
 import '../models/tailor_job.dart';
+import '../models/customer.dart';
 import '../models/review.dart';
 import 'Cloudinary_service.dart';
 
@@ -170,10 +171,80 @@ class OrderService {
 
   // ─── getCustomerOrders ─────────────────────────────────────────────────────
 
+
   /// Alias for fetching customer orders list by UID.
   Future<List<Order>> getCustomerOrders(String uid) => fetchCustomerOrders(uid);
 
+
+  /// Streams real-time orders for a specific customer.
+  Stream<List<Order>> streamCustomerOrders(String customerId) {
+    final cleanId = customerId.trim();
+
+
+    return _db
+        .collection(_ordersCollection)
+        .where('customerId', whereIn: [cleanId, '$cleanId '])
+        // 🧠 Removed orderBy to bypass index requirement for manual testing
+        .snapshots()
+        .asyncMap((snapshot) async {
+      final List<Order> orders = [];
+      
+      for (var doc in snapshot.docs) {
+        try {
+          final data = doc.data() as Map<String, dynamic>;
+          Order order = Order.fromJson({...data, 'id': doc.id});
+          
+          // Deep fetch details...
+          final subOrdersSnap = await _db
+              .collection(_subOrdersCollection)
+              .where('orderId', isEqualTo: order.id)
+              .get();
+          
+          List<SubOrder> subOrders = subOrdersSnap.docs
+              .map((d) => SubOrder.fromJson({...d.data(), 'id': d.id}))
+              .toList();
+
+
+          final tailorJobSnap = await _db
+              .collection(_tailorJobsCollection)
+              .where('orderId', isEqualTo: order.id)
+              .get();
+          
+          List<TailorJob> tailorJobs = tailorJobSnap.docs
+              .map((d) => TailorJob.fromJson({...d.data(), 'id': d.id}))
+              .toList();
+
+
+          String? tailorName;
+          if (tailorJobs.isNotEmpty) {
+            final tDoc = await _db.collection('Tailor').doc(tailorJobs.first.tailorId).get();
+            if (tDoc.exists) {
+              tailorName = tDoc.data()?['name'] as String?;
+            }
+          }
+
+
+          orders.add(order.copyWith(
+            subOrders: subOrders, 
+            tailorJobs: tailorJobs,
+            tailorName: tailorName,
+          ));
+        } catch (e) {
+          debugPrint('Error parsing order ${doc.id}: $e');
+        }
+      }
+
+
+      // Sort in memory instead of database to avoid index errors
+      orders.sort((a, b) => b.orderDate.compareTo(a.orderDate));
+      
+      return orders;
+    });
+  }
+
+
   // ─── streamOrderTimeline ───────────────────────────────────────────────────
+
 
   /// Provides a real-time stream of the order lifecycle status for tracking.
   Stream<Map<String, dynamic>> streamOrderTimeline(String orderId) {
@@ -181,15 +252,61 @@ class OrderService {
     return _db.collection(_ordersCollection).doc(orderId).snapshots().asyncMap((orderSnap) async {
       if (!orderSnap.exists) return {};
 
-      final orderData = orderSnap.data()!;
+
+      final order = Order.fromJson({...orderSnap.data()!, 'id': orderSnap.id});
       
+      // Fetch customer profile
+      final customerDoc = await _db.collection('Customer').doc(order.customerId).get();
+      final customerProfile = customerDoc.exists 
+          ? Customer.fromJson({...customerDoc.data()!, 'id': customerDoc.id}) 
+          : null;
+
+
       // Fetch sub-orders
       final subOrdersSnap = await _db
           .collection(_subOrdersCollection)
           .where('orderId', isEqualTo: orderId)
           .get();
       
-      final subOrders = subOrdersSnap.docs.map((d) => d.data()).toList();
+      final List<SubOrder> subOrders = [];
+      final Map<String, String> productNames = {};
+      final Map<String, String> partyNames = {};
+
+
+      for (var doc in subOrdersSnap.docs) {
+        final so = SubOrder.fromJson({...doc.data(), 'id': doc.id});
+        
+        // Fetch order items for this sub-order to get product names
+        final itemsSnap = await _db
+            .collection(_orderItemsCollection)
+            .where('subOrderId', isEqualTo: so.id)
+            .get();
+        
+        final List<OrderItem> items = [];
+        for (var itemDoc in itemsSnap.docs) {
+          final item = OrderItem.fromJson({...itemDoc.data(), 'id': itemDoc.id});
+          items.add(item);
+          
+          if (!productNames.containsKey(item.productId)) {
+            final pDoc = await _db.collection('Products').doc(item.productId).get();
+            if (pDoc.exists) {
+              productNames[item.productId] = pDoc.data()?['productName'] ?? 'Product';
+            }
+          }
+        }
+        so.items = items;
+        subOrders.add(so);
+
+
+        // Fetch retailer name
+        if (!partyNames.containsKey(so.retailerId)) {
+          final rDoc = await _db.collection('Retailer').doc(so.retailerId).get();
+          if (rDoc.exists) {
+            partyNames[so.retailerId] = rDoc.data()?['shopName'] ?? 'Retailer';
+          }
+        }
+      }
+
 
       // Fetch tailor job
       final tailorJobSnap = await _db
@@ -198,12 +315,28 @@ class OrderService {
           .limit(1)
           .get();
       
-      final tailorJob = tailorJobSnap.docs.isNotEmpty ? tailorJobSnap.docs.first.data() : null;
+      final tailorJob = tailorJobSnap.docs.isNotEmpty 
+          ? TailorJob.fromJson({...tailorJobSnap.docs.first.data(), 'id': tailorJobSnap.docs.first.id}) 
+          : null;
+
+
+      if (tailorJob != null) {
+        if (!partyNames.containsKey(tailorJob.tailorId)) {
+          final tDoc = await _db.collection('Tailor').doc(tailorJob.tailorId).get();
+          if (tDoc.exists) {
+            partyNames[tailorJob.tailorId] = tDoc.data()?['name'] ?? 'Tailor';
+          }
+        }
+      }
+
 
       return {
-        'order': orderData,
+        'order': order,
         'subOrders': subOrders,
         'tailorJob': tailorJob,
+        'partyNames': partyNames,
+        'productNames': productNames,
+        'customer': customerProfile,
       };
     });
   }
@@ -758,25 +891,27 @@ class OrderService {
   }
 
   /// Updates work progress for a tailor job.
-  Future<void> updateWorkProgress(String tailorJobId, String status) async {
+  Future<void> updateWorkProgress(String tailorJobId, TailorJobStatus status) async {
     try {
-      final statusLower = status.toLowerCase();
       final jobDoc = await _db.collection(_tailorJobsCollection).doc(tailorJobId).get();
       if (!jobDoc.exists) throw Exception('Tailor job not found');
       final orderId = jobDoc.data()?['orderId'];
 
       final batch = _db.batch();
 
-      // 1. Update Tailor Job
+      // 1. Update Tailor Job — written through the enum so the value
+      // round-trips via TailorJobStatus.fromValue everywhere else (e.g. the
+      // customer's order-tracking screen), instead of a raw string that
+      // isn't recognized there and silently falls back to 'pending'.
       batch.update(_db.collection(_tailorJobsCollection).doc(tailorJobId), {
-        'status': statusLower,
+        'status': status.toValue,
       });
 
       // 2. Update parent Order
       if (orderId != null) {
         batch.update(_db.collection(_ordersCollection).doc(orderId), {
-          'status': (statusLower == 'completed') 
-              ? OrderStatus.completed.toValue 
+          'status': status == TailorJobStatus.jobCompleted
+              ? OrderStatus.completed.toValue
               : OrderStatus.processing.toValue,
         });
       }
