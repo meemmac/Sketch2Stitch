@@ -287,6 +287,15 @@ class OrderTrackScreen extends StatelessWidget {
           partyName: tailorName,
           date: tailorJob.confirmedAt ?? DateTime.now(),
         ));
+      } else if (tailorJob.status == TailorJobStatus.expired) {
+        events.add(TrackEvent(type: TrackEventType.tailorRequested, material: allMaterials, partyName: tailorName, date: baseDate));
+        events.add(TrackEvent(
+          type: TrackEventType.tailorExpired,
+          material: '',
+          partyName: tailorName,
+          date: DateTime.now(),
+          note: 'The quote response deadline has passed.',
+        ));
       }
     }
 

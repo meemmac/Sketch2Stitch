@@ -91,13 +91,12 @@ class Order {
       bool hasTailor = tailorJobs != null && tailorJobs!.isNotEmpty;
       if (hasTailor) {
         final tj = tailorJobs!.first;
-        final name = tailorName ?? 'Tailor';
 
         if (tj.status == TailorJobStatus.confirmed) {
           return "Tailor Confirmed — Stitching Started";
         }
-        if (tj.status == TailorJobStatus.quoted) return "Quote Received from $name";
-        if (tj.status == TailorJobStatus.pending) return "Requested $name";
+        if (tj.status == TailorJobStatus.quoted) return "Quote Received from Tailor";
+        if (tj.status == TailorJobStatus.pending) return "Requested Tailor";
       }
 
 
