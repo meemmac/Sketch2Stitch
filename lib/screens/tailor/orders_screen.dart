@@ -903,10 +903,6 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   Icons.check_circle_outline,
                   primaryGreen,
                   () {
-                    // Accepting requires a service price + delivery date per
-                    // item, so route through the order-detail sheet (which
-                    // calls acceptTailorJob) instead of jumping straight to
-                    // 'confirmed' here — that used to skip quoting/payment.
                     Navigator.pop(context);
                     _showOrderDetail(order);
                   },
