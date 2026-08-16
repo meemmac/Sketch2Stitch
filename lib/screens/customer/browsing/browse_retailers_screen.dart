@@ -3,8 +3,7 @@ import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/services/browse_service.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
-import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
 import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -492,8 +491,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                         ),
                       ],
                     ),
-                    // ❌ REMOVED: About section from grid (only shown in detail page)
-                    // ❌ REMOVED: Products count from grid (optional)
                   ],
                 ),
               ),

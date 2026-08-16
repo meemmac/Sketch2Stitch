@@ -5,16 +5,16 @@ import 'order_item.dart';
 class ColorOption {
   final int optionId;
   final String color;
-  final String? image;
-  final String? video;
+  final List<String> image; // Matches "image" array in Firestore schema
+  final List<String> video; // Matches "video" array in Firestore schema
   final double price;
   final int stock;
 
   ColorOption({
     required this.optionId,
     required this.color,
-    this.image,
-    this.video,
+    required this.image,
+    required this.video,
     required this.price,
     this.stock = 0,
   });
@@ -22,8 +22,8 @@ class ColorOption {
   ColorOption copyWith({
     int? optionId,
     String? color,
-    String? image,
-    String? video,
+    List<String>? image,
+    List<String>? video,
     double? price,
     int? stock,
   }) {
@@ -40,50 +40,63 @@ class ColorOption {
   Map<String, dynamic> toJson() => {
     'optionId': optionId,
     'color': color,
-    if (image != null) 'image': image,
-    if (video != null && video!.isNotEmpty) 'video': video,
+    'image': image, // Schema field: image
+    'video': video, // Schema field: video
     'price': price,
     'stock': stock,
   };
 
   factory ColorOption.fromJson(Map<String, dynamic> json) {
+    // Schema field names are singular: 'image' and 'video'
+    List<String> imageList = [];
+    if (json['image'] is List) {
+      imageList = List<String>.from(json['image']);
+    } else if (json['images'] is List) {
+      // Compatibility with previous plural format
+      imageList = List<String>.from(json['images']);
+    } else if (json['image'] != null) {
+      // Handle legacy single string if any
+      imageList = [json['image'].toString()];
+    }
+
+    List<String> videoList = [];
+    if (json['video'] is List) {
+      videoList = List<String>.from(json['video']);
+    } else if (json['videos'] is List) {
+      // Compatibility with previous plural format
+      videoList = List<String>.from(json['videos']);
+    } else if (json['video'] != null) {
+      // Handle legacy single string if any
+      videoList = [json['video'].toString()];
+    }
+
     return ColorOption(
       optionId: json['optionId'] ?? 0,
       color: json['color'] ?? '',
-      image: json['image'],
-      video: json['video'],
+      image: imageList,
+      video: videoList,
       price: (json['price'] ?? 0).toDouble(),
       stock: json['stock'] ?? 0,
     );
   }
 }
 
-/// Represents a material type with blend percentage
-class MaterialType {
+/// Represents a material component of a fabric
+class MaterialBlend {
   final String type;
-  final double? blend;
+  final double blend;
 
-  MaterialType({
-    required this.type,
-    this.blend,
-  });
-
-  String get displayText {
-    if (blend != null && blend! > 0) {
-      return '${blend!.toInt()}% $type';
-    }
-    return type;
-  }
+  MaterialBlend({required this.type, required this.blend});
 
   Map<String, dynamic> toJson() => {
     'type': type,
-    if (blend != null) 'blend': blend,
+    'blend': blend,
   };
 
-  factory MaterialType.fromJson(Map<String, dynamic> json) {
-    return MaterialType(
+  factory MaterialBlend.fromJson(Map<String, dynamic> json) {
+    return MaterialBlend(
       type: json['type'] ?? '',
-      blend: json['blend']?.toDouble(),
+      blend: (json['blend'] ?? 0).toDouble(),
     );
   }
 }
@@ -94,7 +107,7 @@ class Product {
   final String productName;
   final String? productCode; // Added productCode
   final String category;
-  final List<MaterialType> materialTypes; // Array of material types
+  final List<MaterialBlend> materialType;
   final List<ColorOption> colorOptions;
   final String description;
   final List<String> careSymbol;
@@ -108,20 +121,14 @@ class Product {
     required this.productName,
     this.productCode,
     required this.category,
-    required this.materialTypes,
+    required this.materialType,
     required this.colorOptions,
     required this.description,
     required this.careSymbol,
     this.orderItems = const [],
   });
 
-  /// Get material type as string for display
-  String get materialType {
-    if (materialTypes.isEmpty) return 'N/A';
-    return materialTypes.map((m) => m.displayText).join(', ');
-  }
-
-  /// Get all available colors as strings (for backward compatibility)
+  /// Get all available colors as strings
   List<String> get colorNames => colorOptions.map((c) => c.color).toList();
   
   /// Get the minimum price across all color options
@@ -136,7 +143,7 @@ class Product {
     return colorOptions.map((c) => c.price).reduce((a, b) => a > b ? a : b);
   }
   
-  /// Get price range as string (e.g., "Tk 650 - 700")
+  /// Get price range as string
   String get priceRange {
     if (colorOptions.isEmpty) return 'Tk 0';
     if (minPrice == maxPrice) return 'Tk ${minPrice.toStringAsFixed(0)}';
@@ -149,7 +156,7 @@ class Product {
     String? productName,
     String? productCode,
     String? category,
-    List<MaterialType>? materialTypes,
+    List<MaterialBlend>? materialType,
     List<ColorOption>? colorOptions,
     String? description,
     List<String>? careSymbol,
@@ -161,7 +168,7 @@ class Product {
       productName: productName ?? this.productName,
       productCode: productCode ?? this.productCode,
       category: category ?? this.category,
-      materialTypes: materialTypes ?? this.materialTypes,
+      materialType: materialType ?? this.materialType,
       colorOptions: colorOptions ?? this.colorOptions,
       description: description ?? this.description,
       careSymbol: careSymbol ?? this.careSymbol,
@@ -170,20 +177,17 @@ class Product {
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'retailerId': retailerId,
     'productName': productName,
-    if (productCode != null) 'productCode': productCode,
+    'retailerId': retailerId,
     'category': category,
-    'materialTypes': materialTypes.map((m) => m.toJson()).toList(),
+    'productCode': productCode,
+    'materialType': materialType.map((m) => m.toJson()).toList(),
     'colorOptions': colorOptions.map((c) => c.toJson()).toList(),
     'description': description,
     'careSymbol': careSymbol,
   };
 
-  factory Product.fromJson(Map<String, dynamic> json) {
-    print('📦 Parsing product: ${json['productName'] ?? json['id']}');
-    
+  factory Product.fromJson(Map<String, dynamic> json, {String? id}) {
     // Parse colorOptions
     List<ColorOption> colorOptionsList = [];
     final rawColorOptions = json['colorOptions'];
@@ -191,73 +195,25 @@ class Product {
       colorOptionsList = rawColorOptions.map((item) {
         if (item is Map<String, dynamic>) {
           return ColorOption.fromJson(item);
-        } else if (item is String) {
-          return ColorOption(
-            optionId: colorOptionsList.length + 1,
-            color: item,
-            price: 0.0,
-            stock: 0,
-          );
         }
         return ColorOption(
           optionId: 0,
           color: item.toString(),
+          image: [],
+          video: [],
           price: 0.0,
           stock: 0,
         );
       }).toList();
     }
 
-    // Parse materialTypes - handles BOTH array and string formats
-    List<MaterialType> materialTypes = [];
-    
-    // Check for materialType (array format from your schema)
+    // Parse materialType
+    List<MaterialBlend> materialTypeItems = [];
     final rawMaterialType = json['materialType'];
     if (rawMaterialType != null && rawMaterialType is List) {
-      print('📦 Found materialType array with ${rawMaterialType.length} items');
-      materialTypes = rawMaterialType.map((item) {
-        if (item is Map<String, dynamic>) {
-          return MaterialType.fromJson(item);
-        } else if (item is String) {
-          return MaterialType(type: item);
-        }
-        return MaterialType(type: item.toString());
-      }).toList();
-    } 
-    // Check for materialTypes (plural array format)
-    else {
-      final rawMaterialTypes = json['materialTypes'];
-      if (rawMaterialTypes != null && rawMaterialTypes is List) {
-        print('📦 Found materialTypes array with ${rawMaterialTypes.length} items');
-        materialTypes = rawMaterialTypes.map((item) {
-          if (item is Map<String, dynamic>) {
-            return MaterialType.fromJson(item);
-          } else if (item is String) {
-            return MaterialType(type: item);
-          }
-          return MaterialType(type: item.toString());
-        }).toList();
-      }
-      // Fallback for old string format
-      else if (rawMaterialType != null && rawMaterialType is String) {
-        print('📦 Found materialType string: $rawMaterialType');
-        final parts = rawMaterialType.split(',').map((s) => s.trim()).toList();
-        for (final part in parts) {
-          if (part.contains('%')) {
-            final match = RegExp(r'(\d+)%\s*(.+)').firstMatch(part);
-            if (match != null) {
-              materialTypes.add(MaterialType(
-                type: match.group(2)?.trim() ?? part,
-                blend: double.tryParse(match.group(1) ?? '0'),
-              ));
-            } else {
-              materialTypes.add(MaterialType(type: part));
-            }
-          } else {
-            materialTypes.add(MaterialType(type: part));
-          }
-        }
-      }
+      materialTypeItems = rawMaterialType
+          .map((item) => MaterialBlend.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
     }
 
     // Parse careSymbol from Firestore array safely
@@ -276,15 +232,13 @@ class Product {
       }
     }
 
-    print('✅ Product parsed: ${json['productName']}, materialTypes: ${materialTypes.length}');
-    
     return Product(
-      id: json['id'] ?? '',
+      id: id ?? json['id'] ?? '',
       retailerId: json['retailerId'] ?? '',
       productName: json['productName'] ?? '',
       productCode: json['productCode'],
       category: json['category'] ?? '',
-      materialTypes: materialTypes,
+      materialType: materialTypeItems,
       colorOptions: colorOptionsList,
       description: json['description'] ?? '',
       careSymbol: careSymbols,

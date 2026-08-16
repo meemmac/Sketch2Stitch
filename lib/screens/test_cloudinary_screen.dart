@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/widgets/cloudinary_image.dart';
 import 'package:sketch2stitch/widgets/image_upload_button.dart';
+import 'package:sketch2stitch/widgets/top_feedback_banner.dart';
 
 class TestCloudinaryScreen extends StatefulWidget {
   const TestCloudinaryScreen({super.key});
@@ -85,10 +86,8 @@ class _TestCloudinaryScreenState extends State<TestCloudinaryScreen> {
                 setState(() {
                   _uploadedImageUrl = url;
                 });
-                print('✅ Uploaded: $url');
               },
               onUploadError: (error) {
-                print('❌ Error: $error');
                 _showSnackBar('Upload failed: $error', isError: true);
               },
             ),
@@ -452,20 +451,13 @@ class _TestCloudinaryScreenState extends State<TestCloudinaryScreen> {
 
   void _showSnackBar(String message, {required bool isError}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    AppFeedback.show(context, message, isError: isError);
   }
 
   void _copyToClipboard(String text) {
     // Simple copy without clipboard package
     // You can add clipboard functionality later if needed
     _showSnackBar('URL copied to clipboard!', isError: false);
-    print('📋 Copied: $text');
   }
 
   void _clearMultipleImages() {

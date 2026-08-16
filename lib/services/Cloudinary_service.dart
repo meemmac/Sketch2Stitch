@@ -11,14 +11,14 @@ class CloudinaryService {
   static const String uploadPreset = 'sketch2stitch'; // Your preset name from the image
   
   static String get uploadUrl => 
-      'https://api.cloudinary.com/v1_1/$cloudName/image/upload';
+      'https://api.cloudinary.com/v1_1/$cloudName/auto/upload';
   
   final ImagePicker _picker = ImagePicker();
 
-  Future<String?> uploadImage(File imageFile, {String? folder}) async {
+  Future<String?> uploadImage(File file, {String? folder}) async {
     try {
-      if (!await imageFile.exists()) {
-        throw Exception('Image file does not exist');
+      if (!await file.exists()) {
+        throw Exception('File does not exist');
       }
 
       var request = http.MultipartRequest('POST', Uri.parse(uploadUrl));
@@ -26,41 +26,31 @@ class CloudinaryService {
       request.files.add(
         await http.MultipartFile.fromPath(
           'file',
-          imageFile.path,
-          filename: path.basename(imageFile.path),
+          file.path,
+          filename: path.basename(file.path),
         ),
       );
 
       // Using your preset: sketch2stitch
       request.fields['upload_preset'] = uploadPreset;
+      request.fields['resource_type'] = 'auto'; // Explicitly set to auto
       if (folder != null && folder.isNotEmpty) {
         request.fields['folder'] = folder;
       }
 
-      print('📤 Uploading image to Cloudinary...');
-      print('📁 Folder: ${folder ?? 'root'}');
-      print('📎 File: ${path.basename(imageFile.path)}');
-      print('🌐 URL: $uploadUrl');
-      print('🔑 Preset: $uploadPreset');
-
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
 
-      print('📥 Response status: ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(responseBody);
-        final secureUrl = jsonResponse['secure_url'] as String?;
-        print('✅ Upload successful!');
-        print('🔗 URL: $secureUrl');
-        return secureUrl;
+        return jsonResponse['secure_url'] as String?;
       } else {
-        print('❌ Upload failed with status: ${response.statusCode}');
-        print('📄 Response: $responseBody');
-        throw Exception('Upload failed (${response.statusCode}): $responseBody');
+        // The status code is enough to diagnose an upload failure; the raw
+        // response body can carry the signed request details, so it is not
+        // surfaced.
+        throw Exception('Upload failed (${response.statusCode})');
       }
     } catch (e) {
-      print('❌ Upload error: $e');
       return null;
     }
   }
@@ -81,8 +71,7 @@ class CloudinaryService {
         return File(pickedFile.path);
       }
       return null;
-    } catch (e) {
-      print('❌ Error picking image from gallery: $e');
+    } catch (_) {
       return null;
     }
   }
@@ -103,8 +92,7 @@ class CloudinaryService {
         return File(pickedFile.path);
       }
       return null;
-    } catch (e) {
-      print('❌ Error taking photo from camera: $e');
+    } catch (_) {
       return null;
     }
   }
@@ -138,8 +126,7 @@ class CloudinaryService {
       final newUri = uri.replace(path: newPath.join('/'));
       
       return newUri.toString();
-    } catch (e) {
-      print('❌ Error optimizing image URL: $e');
+    } catch (_) {
       return imageUrl;
     }
   }

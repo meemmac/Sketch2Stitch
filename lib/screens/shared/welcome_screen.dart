@@ -408,7 +408,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
     return Column(
       children: [
         SpecularButton(
-          text: "Signup",
+          text: "Sign Up",
           baseColor: const Color(0xFF2D6A4F),
           lineColor: Colors.white,
           textColor: Colors.white,
@@ -417,7 +417,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
         ),
         const SizedBox(height: 14),
         SpecularButton(
-          text: "Login",
+          text: "Sign In",
           baseColor: Colors.white.withAlpha(40), // More transparent glass
           lineColor: Colors.white.withAlpha(180),
           textColor: const Color(0xFF1B4332),

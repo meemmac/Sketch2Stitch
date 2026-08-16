@@ -1,52 +1,19 @@
-import 'dart:convert';
 import 'dart:io';
+import '../../services/cloudinary_service.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-/// ─── Model ───────────────────────────────────────────────────────────────
-///
-/// Mirrors the backend `Portfolio` model (id, tailorId, image, description).
-/// `image` will eventually hold a backend URL; for now, while the frontend
-/// is built ahead of the API, it holds a local path (asset or file) and
-/// `isAsset` (a frontend-only, non-persisted-to-backend flag) tells the UI
-/// how to render it. Swapping to network images later just means changing
-/// `_buildItemImage`/`_buildItemImageLarge` to use `Image.network(image)`.
-class Portfolio {
-  final String id;
-  final String tailorId;
-  String? image;
-  String? description;
-  bool isAsset;
-
-  Portfolio({
-    required this.id,
-    required this.tailorId,
-    this.image,
-    this.description,
-    this.isAsset = false,
-  });
-
-  Map<String, dynamic> toMap() => {
-    'id': id,
-    'tailorId': tailorId,
-    'image': image,
-    'description': description,
-    'isAsset': isAsset,
-  };
-
-  factory Portfolio.fromMap(Map<String, dynamic> map) {
-    return Portfolio(
-      id: map['id'] as String? ?? '',
-      tailorId: map['tailorId'] as String? ?? '',
-      image: map['image'] as String?,
-      description: map['description'] as String?,
-      isAsset: map['isAsset'] as bool? ?? false,
-    );
-  }
-}
+import '../../models/portfolio.dart';
+import '../../services/portfolio_service.dart';
+import '../../services/user_session.dart';
+import '../../widgets/top_feedback_banner.dart';
 
 /// ─── Portfolio Screen ───────────────────────────────────────────────────
+///
+/// Backed by [PortfolioService] (Firestore) + Firebase Storage for images.
+/// `image` on [Portfolio] is now always a network URL — the picker still
+/// lets the tailor choose a local file, but it's uploaded to Storage before
+/// the item is written to Firestore.
 
 class TailorPortfolioScreen extends StatefulWidget {
   const TailorPortfolioScreen({super.key});
@@ -59,46 +26,19 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  static const String _cacheKey = 'tailor_portfolio_cache_v1';
+  final PortfolioService _service = PortfolioService();
+  final CloudinaryService _cloudinaryService = CloudinaryService();
 
   String _searchQuery = "";
   int _gridAnimationSeed = 0;
   final List<Portfolio> items = <Portfolio>[];
 
-  // TODO: replace with the signed-in tailor's real id once auth is wired up.
-  static const String _currentTailorId = "tailor_demo";
+  bool _isLoading = true;
+  String? _loadError;
 
-  String _generateId() =>
-      "port_${DateTime.now().millisecondsSinceEpoch}_${items.length}";
-
-  List<Portfolio> _seedItems() {
-    return <Portfolio>[
-      Portfolio(
-        id: "port_seed_1",
-        tailorId: _currentTailorId,
-        description:
-            "Custom bridal gown crafted from imported silk with hand-embroidered detailing along the bodice and train.",
-        image: 'assets/images/saree.jpg',
-        isAsset: true,
-      ),
-      Portfolio(
-        id: "port_seed_2",
-        tailorId: _currentTailorId,
-        description:
-            "Modern fitted denim jacket with reinforced stitching and a relaxed collar, made to measure for everyday wear.",
-        image: 'assets/images/fab.jpg',
-        isAsset: true,
-      ),
-      Portfolio(
-        id: "port_seed_3",
-        tailorId: _currentTailorId,
-        description:
-            "Lightweight linen two-piece suit designed for warm-weather formal occasions, fully lined for a clean drape.",
-        image: 'assets/images/fab2.jpg',
-        isAsset: true,
-      ),
-    ];
-  }
+  // Falls back to '' if somehow no session is active; every call site below
+  // guards against an empty tailorId before hitting Firestore.
+  String get _currentTailorId => UserSession.instance.uid ?? '';
 
   List<Portfolio> get _filteredItems {
     final query = _searchQuery.toLowerCase();
@@ -121,43 +61,39 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
   }
 
   Future<void> _loadPortfolio() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_cacheKey);
-    if (raw == null || raw.isEmpty) {
+    final tailorId = _currentTailorId;
+    if (tailorId.isEmpty) {
+      setState(() {
+        _isLoading = false;
+        _loadError = "No signed-in tailor found.";
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+
+    try {
+      // Large-ish page size keeps this simple (no "load more" UI) — bump
+      // PortfolioService.defaultPageSize or add pagination here later if a
+      // tailor's portfolio regularly exceeds this.
+      final result = await _service.getTailorPortfolio(tailorId, pageSize: 100);
       if (!mounted) return;
       setState(() {
         items
           ..clear()
-          ..addAll(_seedItems());
+          ..addAll(result.items);
+        _isLoading = false;
       });
-      await _savePortfolio();
-      return;
+    } on PortfolioServiceException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadError = e.message;
+      });
     }
-
-    final decoded = jsonDecode(raw);
-    final loaded = decoded is List
-        ? decoded
-              .whereType<Map>()
-              .map(
-                (entry) => Portfolio.fromMap(Map<String, dynamic>.from(entry)),
-              )
-              .toList()
-        : _seedItems();
-
-    if (!mounted) return;
-    setState(() {
-      items
-        ..clear()
-        ..addAll(loaded);
-    });
-  }
-
-  Future<void> _savePortfolio() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _cacheKey,
-      jsonEncode(items.map((item) => item.toMap()).toList()),
-    );
   }
 
   void _animateToNewestItem() {
@@ -176,11 +112,33 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
     );
   }
 
+  /// Uploads a locally-picked image to `portfolio/{tailorId}/{filename}` and
+  /// returns its download URL.
+  /// Uploads a locally-picked image to Cloudinary under `portfolio/{tailorId}`
+/// and returns its secure URL. Throws if the upload fails so callers can
+/// surface an error instead of silently saving a blank image.
+Future<String> _uploadImage(String tailorId, File file) async {
+  final url = await _cloudinaryService.uploadImage(
+    file,
+    folder: 'portfolio/$tailorId',
+  );
+  if (url == null) {
+    throw Exception("Couldn't upload image. Try again.");
+  }
+  return url;
+}
+
   Future<void> _showPortfolioForm({Portfolio? item}) async {
+    final tailorId = _currentTailorId;
+    if (tailorId.isEmpty) return;
+
     final desc = TextEditingController(text: item?.description ?? "");
-    String imagePath = item?.image ?? "";
-    bool isAsset = item?.isAsset ?? false;
+    // Local-only until saved: either an existing network URL (editing, not
+    // replaced) or a path to a freshly-picked file awaiting upload.
+    String? existingImageUrl = item?.image;
+    File? pickedFile;
     bool showValidationError = false;
+    bool isSaving = false;
 
     await showModalBottomSheet(
       context: context,
@@ -189,6 +147,8 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => StatefulBuilder(
         builder: (c, setM) {
+          final hasImage = pickedFile != null || (existingImageUrl?.isNotEmpty ?? false);
+
           return DraggableScrollableSheet(
             expand: false,
             initialChildSize: 0.7,
@@ -240,8 +200,7 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
                           );
                           if (image != null) {
                             setM(() {
-                              imagePath = image.path;
-                              isAsset = false;
+                              pickedFile = File(image.path);
                               showValidationError = false;
                             });
                           }
@@ -253,12 +212,12 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
                             color: Colors.grey.shade50,
                             borderRadius: BorderRadius.circular(15),
                             border: Border.all(
-                              color: showValidationError && imagePath.isEmpty
+                              color: showValidationError && !hasImage
                                   ? Colors.red
                                   : Colors.green.shade100,
                             ),
                           ),
-                          child: imagePath.isEmpty
+                          child: !hasImage
                               ? Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
@@ -279,13 +238,10 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
                                 )
                               : ClipRRect(
                                   borderRadius: BorderRadius.circular(15),
-                                  child: isAsset
-                                      ? Image.asset(
-                                          imagePath,
-                                          fit: BoxFit.cover,
-                                        )
-                                      : Image.file(
-                                          File(imagePath),
+                                  child: pickedFile != null
+                                      ? Image.file(pickedFile!, fit: BoxFit.cover)
+                                      : Image.network(
+                                          existingImageUrl!,
                                           fit: BoxFit.cover,
                                         ),
                                 ),
@@ -319,46 +275,83 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
                             borderRadius: BorderRadius.circular(15),
                           ),
                         ),
-                        onPressed: () async {
-                          if (imagePath.isEmpty || desc.text.trim().isEmpty) {
-                            setM(() => showValidationError = true);
-                            return;
-                          }
+                        onPressed: isSaving
+                            ? null
+                            : () async {
+                                if (!hasImage || desc.text.trim().isEmpty) {
+                                  setM(() => showValidationError = true);
+                                  return;
+                                }
 
-                          setState(() {
-                            if (item == null) {
-                              items.add(
-                                Portfolio(
-                                  id: _generateId(),
-                                  tailorId: _currentTailorId,
-                                  description: desc.text.trim(),
-                                  image: imagePath,
-                                  isAsset: isAsset,
+                                setM(() => isSaving = true);
+                                try {
+                                  String imageUrl = existingImageUrl ?? '';
+                                  if (pickedFile != null) {
+                                    imageUrl = await _uploadImage(
+                                      tailorId,
+                                      pickedFile!,
+                                    );
+                                  }
+
+                                  if (item == null) {
+                                    final created = await _service.addPortfolioItem(
+                                      tailorId,
+                                      imageUrl,
+                                      description: desc.text.trim(),
+                                    );
+                                    setState(() {
+                                      items.add(created);
+                                      _gridAnimationSeed++;
+                                    });
+                                    WidgetsBinding.instance.addPostFrameCallback(
+                                      (_) => _animateToNewestItem(),
+                                    );
+                                  } else {
+                                    final updated = await _service.updatePortfolioItem(
+                                      item.id,
+                                      {
+                                        'image': imageUrl,
+                                        'description': desc.text.trim(),
+                                      },
+                                    );
+                                    setState(() {
+                                      final idx = items.indexWhere((i) => i.id == item.id);
+                                      if (idx != -1) items[idx] = updated;
+                                      _gridAnimationSeed++;
+                                    });
+                                  }
+
+                                  if (!mounted) return;
+                                  Navigator.of(context).pop();
+                                } on PortfolioServiceException catch (e) {
+                                  setM(() => isSaving = false);
+                                  if (!mounted) return;
+                                  AppFeedback.show(context, e.message,
+                                      isError: true);
+                                } catch (_) {
+                                  setM(() => isSaving = false);
+                                  if (!mounted) return;
+                                  AppFeedback.show(context,
+                                      "Couldn't upload image. Try again.",
+                                      isError: true);
+                                }
+                              },
+                        child: isSaving
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  valueColor: AlwaysStoppedAnimation(Colors.white),
                                 ),
-                              );
-                            } else {
-                              item.description = desc.text.trim();
-                              item.image = imagePath;
-                              item.isAsset = isAsset;
-                            }
-                            _gridAnimationSeed++;
-                          });
-                          await _savePortfolio(); // ← this writes items to SharedPreferences
-                          if (item == null) {
-                            WidgetsBinding.instance.addPostFrameCallback(
-                              (_) => _animateToNewestItem(),
-                            );
-                          }
-                          if (!mounted) return;
-                          Navigator.of(context).pop();
-                        },
-                        child: Text(
-                          item == null ? "Add" : "Save Changes",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                          ),
-                        ),
+                              )
+                            : Text(
+                                item == null ? "Add" : "Save Changes",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                ),
+                              ),
                       ),
                     ),
                   ],
@@ -372,11 +365,21 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
   }
 
   Future<void> _deleteItem(Portfolio item) async {
+    // Optimistic delete with rollback so the UI doesn't wait on the network.
+    final index = items.indexOf(item);
     setState(() {
       items.remove(item);
       _gridAnimationSeed++;
     });
-    await _savePortfolio();
+    try {
+      await _service.deletePortfolioItem(item.id);
+    } on PortfolioServiceException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        items.insert(index.clamp(0, items.length), item);
+      });
+      AppFeedback.show(context, e.message, isError: true);
+    }
   }
 
   @override
@@ -428,37 +431,52 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            Expanded(
-              child: filteredItems.isEmpty
-                  ? Center(
-                      child: Text(
-                        _searchQuery.isEmpty
-                            ? "No items yet"
-                            : "No items match your search",
-                        style: const TextStyle(
-                          color: Colors.black54,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    )
-                  : GridView.builder(
-                      controller: _scrollController,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 0.72,
-                            mainAxisSpacing: 15,
-                            crossAxisSpacing: 15,
-                          ),
-                      itemCount: filteredItems.length,
-                      itemBuilder: (c, i) {
-                        return _buildAnimatedGridCard(filteredItems[i], i);
-                      },
-                    ),
-            ),
+            Expanded(child: _buildBody(filteredItems)),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildBody(List<Portfolio> filteredItems) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_loadError != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_loadError!, style: const TextStyle(color: Colors.black54)),
+            const SizedBox(height: 12),
+            OutlinedButton(onPressed: _loadPortfolio, child: const Text("Retry")),
+          ],
+        ),
+      );
+    }
+    if (filteredItems.isEmpty) {
+      return Center(
+        child: Text(
+          _searchQuery.isEmpty ? "No items yet" : "No items match your search",
+          style: const TextStyle(
+            color: Colors.black54,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+    return GridView.builder(
+      controller: _scrollController,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.72,
+        mainAxisSpacing: 15,
+        crossAxisSpacing: 15,
+      ),
+      itemCount: filteredItems.length,
+      itemBuilder: (c, i) {
+        return _buildAnimatedGridCard(filteredItems[i], i);
+      },
     );
   }
 
@@ -559,8 +577,8 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
   }
 
   Widget _buildItemImage(Portfolio item) {
-    final path = item.image ?? '';
-    if (path.isEmpty) {
+    final url = item.image ?? '';
+    if (url.isEmpty) {
       return Container(
         color: Colors.green.shade50,
         child: Icon(
@@ -569,11 +587,26 @@ class _TailorPortfolioScreenState extends State<TailorPortfolioScreen> {
         ),
       );
     }
-    // NOTE: once the backend is wired up, `image` will hold a URL and this
-    // should switch to Image.network(path, fit: BoxFit.cover).
-    return item.isAsset
-        ? Image.asset(path, fit: BoxFit.cover)
-        : Image.file(File(path), fit: BoxFit.cover);
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return Container(
+          color: Colors.green.shade50,
+          child: const Center(
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) => Container(
+        color: Colors.green.shade50,
+        child: Icon(
+          Icons.image_not_supported_outlined,
+          color: Colors.green.shade200,
+        ),
+      ),
+    );
   }
 
   Widget _actionBtn(IconData icon, Color color, VoidCallback onTap) {
@@ -641,7 +674,7 @@ class PortfolioDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imagePath = item.image ?? '';
+    final imageUrl = item.image ?? '';
     return Scaffold(
       backgroundColor: const Color(0xFFF9FBF9),
       appBar: AppBar(
@@ -664,7 +697,7 @@ class PortfolioDetailsScreen extends StatelessWidget {
               child: SizedBox(
                 width: double.infinity,
                 height: 320,
-                child: imagePath.isEmpty
+                child: imageUrl.isEmpty
                     ? Container(
                         color: Colors.green.shade50,
                         child: Icon(
@@ -673,11 +706,27 @@ class PortfolioDetailsScreen extends StatelessWidget {
                           size: 48,
                         ),
                       )
-                    // NOTE: swap to Image.network(imagePath, fit: BoxFit.cover)
-                    // once the backend serves real image URLs.
-                    : (item.isAsset
-                          ? Image.asset(imagePath, fit: BoxFit.cover)
-                          : Image.file(File(imagePath), fit: BoxFit.cover)),
+                    : Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return Container(
+                            color: Colors.green.shade50,
+                            child: const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: Colors.green.shade50,
+                          child: Icon(
+                            Icons.image_not_supported_outlined,
+                            color: Colors.green.shade200,
+                            size: 48,
+                          ),
+                        ),
+                      ),
               ),
             ),
             const SizedBox(height: 20),

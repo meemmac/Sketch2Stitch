@@ -67,7 +67,7 @@ class AboutUsScreen extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         _glassButton(
-                          icon: Icons.arrow_back_ios_new_rounded,
+                          icon: Icons.arrow_back_rounded,
                           onTap: () => Navigator.pop(context),
                         ),
                         const Text(

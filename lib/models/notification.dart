@@ -1,4 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_role.dart';
+
 
 enum NotificationDbType {
   // customer
@@ -9,10 +11,11 @@ enum NotificationDbType {
   suborderPlaced, paymentConfirmed, deliveryReminder,
   // tailor
   jobRequested, selectionDeadlineReminder, jobConfirmed,
-  materialsArrived, paymentReleased,
+  materialsArrived, paymentReleased, jobDeliveryDeadline,
   // shared
   newMessage, reviewReceived,
 }
+
 
 class AppNotification {
   final String id;
@@ -24,6 +27,14 @@ class AppNotification {
   final DateTime createdAt;
   final String orderId;
   final String? subOrderId;
+  final String? tailorJobId;
+  
+  // These fields are for UI display only (In-Memory)
+  // They are NOT saved to the Firebase "Notifications" collection
+  final String? senderName;
+  final String? senderProfilePicture;
+  final String? cancelReason;
+
 
   AppNotification({
     required this.id,
@@ -35,7 +46,12 @@ class AppNotification {
     required this.createdAt,
     required this.orderId,
     this.subOrderId,
+    this.tailorJobId,
+    this.senderName,
+    this.senderProfilePicture,
+    this.cancelReason,
   });
+
 
   AppNotification copyWith({
     String? id,
@@ -47,6 +63,10 @@ class AppNotification {
     DateTime? createdAt,
     String? orderId,
     String? subOrderId,
+    String? tailorJobId,
+    String? senderName,
+    String? senderProfilePicture,
+    String? cancelReason,
   }) {
     return AppNotification(
       id: id ?? this.id,
@@ -58,37 +78,47 @@ class AppNotification {
       createdAt: createdAt ?? this.createdAt,
       orderId: orderId ?? this.orderId,
       subOrderId: subOrderId ?? this.subOrderId,
+      tailorJobId: tailorJobId ?? this.tailorJobId,
+      senderName: senderName ?? this.senderName,
+      senderProfilePicture: senderProfilePicture ?? this.senderProfilePicture,
+      cancelReason: cancelReason ?? this.cancelReason,
     );
   }
 
+  // ⚠️ Important: toJson() only contains your original Firebase fields
   Map<String, dynamic> toJson() => {
-    'id': id,
     'userId': userId,
-    'userRole': userRole.name,
+    'userRole': userRole.name[0].toUpperCase() + userRole.name.substring(1),
     'type': type.name,
     'message': message,
     'isRead': isRead,
-    'createdAt': createdAt.toIso8601String(),
+    'createdAt': Timestamp.fromDate(createdAt),
     'orderId': orderId,
     'subOrderId': subOrderId,
+    'tailorJobId': tailorJobId,
   };
 
-  factory AppNotification.fromJson(Map<String, dynamic> json) {
+  factory AppNotification.fromJson(Map<String, dynamic> json, [String? id]) {
     return AppNotification(
-      id: json['id'] ?? '',
+      id: id ?? json['id'] ?? '',
       userId: json['userId'] ?? '',
-      userRole: UserRole.values.byName(json['userRole'] ?? 'customer'),
+      userRole: UserRole.values.firstWhere(
+            (e) => e.name.toLowerCase() == (json['userRole'] as String?)?.toLowerCase(),
+        orElse: () => UserRole.customer,
+      ),
       type: NotificationDbType.values.firstWhere(
-        (t) => t.name == json['type'],
+            (t) => t.name == json['type'],
         orElse: () => NotificationDbType.newMessage,
       ),
       message: json['message'] ?? '',
       isRead: json['isRead'] ?? false,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
+      createdAt: json['createdAt'] is Timestamp
+          ? (json['createdAt'] as Timestamp).toDate()
           : DateTime.now(),
       orderId: json['orderId'] ?? '',
       subOrderId: json['subOrderId'],
+      tailorJobId: json['tailorJobId'],
+      // Note: We don't read senderName from Firebase JSON as it's fetched separately
     );
   }
 }

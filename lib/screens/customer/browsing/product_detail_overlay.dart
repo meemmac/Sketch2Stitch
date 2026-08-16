@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
-import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/models/favorite.dart';
-import 'package:sketch2stitch/services/favorite_service.dart';
+import 'package:sketch2stitch/models/user_role.dart';
+import 'package:sketch2stitch/services/cart_service.dart';
+import 'package:sketch2stitch/services/user_session.dart';
 import '../../../widgets/video_preview_player.dart';
 import '../../../widgets/care_info_tooltip.dart';
+import '../../../widgets/top_feedback_banner.dart';
 
 class ProductDetailOverlay extends StatefulWidget {
   final Product product;
@@ -31,10 +33,13 @@ class ProductDetailOverlay extends StatefulWidget {
 }
 
 class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
+  final CartService _cartService = CartService();
+
   int _quantity = 1;
   late ColorOption? _selectedOption;
   bool _isFavorite = false;
   bool _isLoadingFavorite = true;
+  bool _isAddingToCart = false;
 
   @override
   void initState() {
@@ -112,25 +117,18 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
       return widget.materialBlends!.join(", ");
     }
 
-    final material = widget.product.materialType.trim();
-    if (material.isEmpty || material == "N/A") {
-      return "N/A";
+    // Use materialType list from Product model
+    if (widget.product.materialType.isNotEmpty) {
+      final parts = widget.product.materialType.map((m) {
+        if (m.blend > 0) {
+          return '${m.blend.toInt()}% ${m.type}';
+        }
+        return m.type;
+      }).toList();
+      return parts.join(", ");
     }
     
-    if (material.contains('%')) {
-      return material;
-    }
-    
-    if (material.contains(',')) {
-      final parts = material.split(',').map((s) => s.trim()).toList();
-      final hasPercentages = parts.any((p) => p.contains('%'));
-      if (hasPercentages) {
-        return material;
-      }
-      return "100% $material";
-    }
-    
-    return "100% $material";
+    return "N/A";
   }
 
   void _selectOption(ColorOption option) {
@@ -138,6 +136,55 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
       _selectedOption = option;
       _quantity = 1;
     });
+  }
+
+  /// Persists the chosen colour option + quantity to the customer's
+  /// `Cart-Items`. The service merges with an existing line for the same
+  /// product/option and rejects anything beyond available stock.
+  Future<void> _addToCart() async {
+    final option = _selectedOption;
+    if (option == null) return;
+
+    final customerId = UserSession.instance.uid;
+    if (customerId == null || customerId.isEmpty) {
+      _showSnack('Please sign in to add items to your cart.', isError: true);
+      return;
+    }
+
+    // Captured up front: the confirmation banner is shown after this
+    // sheet has been popped, so `context` is no longer usable by then.
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final navigator = Navigator.of(context);
+
+    setState(() => _isAddingToCart = true);
+    try {
+      await _cartService.addToCart(
+        customerId,
+        widget.product.id,
+        option.optionId,
+        _quantity,
+      );
+      navigator.pop();
+      _showSnack('Added to cart!', overlay: overlay);
+    } catch (e) {
+      _showSnack(
+        e is CartServiceException ? e.message : 'Could not add to cart.',
+        isError: true,
+        overlay: overlay,
+      );
+    } finally {
+      if (mounted) setState(() => _isAddingToCart = false);
+    }
+  }
+
+  void _showSnack(
+    String message, {
+    bool isError = false,
+    OverlayState? overlay,
+  }) {
+    final target = overlay ?? Overlay.maybeOf(context, rootOverlay: true);
+    if (target == null) return;
+    AppFeedback.showInOverlay(target, message, isError: isError);
   }
 
   @override
@@ -179,6 +226,21 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
               constraints: const BoxConstraints(),
             ),
           ),
+          if (widget.product.colorOptions.every((o) => o.stock <= 0))
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              color: Colors.red.shade800,
+              child: const Text(
+                "Sorry, currently unavailable",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
@@ -593,18 +655,8 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: !_inStock
-                            ? null
-                            : () {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Added to cart!'),
-                              backgroundColor: Color(0xFF4E8B6F),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        },
+                        onPressed:
+                            !_inStock || _isAddingToCart ? null : _addToCart,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2C5C44),
                           foregroundColor: Colors.white,
@@ -614,14 +666,23 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                           ),
                           elevation: 2,
                         ),
-                        child: const Text(
-                          'Add to Cart',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
+                        child: _isAddingToCart
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Add to Cart',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
                       ),
                     ),
                   const SizedBox(height: 30),
@@ -635,47 +696,58 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
   }
 
   Widget _buildProductImage() {
-    final imageUrl = _selectedOption?.image;
-    final videoUrl = _selectedOption?.video;
+    final imageUrl = _selectedOption != null && _selectedOption!.image.isNotEmpty ? _selectedOption!.image.first : null;
+    final videoUrl = _selectedOption != null && _selectedOption!.video.isNotEmpty ? _selectedOption!.video.first : null;
     final screenWidth = MediaQuery.of(context).size.width;
     final imageWidth = screenWidth * 0.75;
     final imageHeight = 250.0;
 
-    if (imageUrl != null && imageUrl.isNotEmpty && videoUrl != null && videoUrl.isNotEmpty) {
+    if (_selectedOption != null && _selectedOption!.image.isNotEmpty && _selectedOption!.video.isNotEmpty) {
       return SizedBox(
         height: imageHeight,
         child: ListView(
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                height: imageHeight,
-                width: imageWidth,
-                color: Colors.grey[200],
-                child: imageUrl.startsWith('http')
-                    ? Image.network(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => _imageFallback(),
-                      )
-                    : Image.asset(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => _imageFallback(),
-                      ),
+            ..._selectedOption!.image.map((img) => Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  height: imageHeight,
+                  width: imageWidth,
+                  color: Colors.grey[200],
+                  child: img.startsWith('http')
+                      ? Image.network(
+                          img,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => _imageFallback(),
+                        )
+                      : Image.asset(
+                          img,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => _imageFallback(),
+                        ),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: VideoPreviewPlayer(
-                videoPath: videoUrl,
-                height: imageHeight,
-                width: imageWidth,
-              ),
-            ),
+            )),
+            ..._selectedOption!.video.map((vid) {
+              final cleanPath = vid.trim().replaceAll("'", "").replaceAll('"', "");
+              if (cleanPath.isEmpty) return const SizedBox.shrink();
+              
+              return Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: VideoPreviewPlayer(
+                    videoPath: cleanPath,
+                    isAsset: cleanPath.toLowerCase().startsWith('assets/'),
+                    height: imageHeight,
+                    width: imageWidth,
+                  ),
+                ),
+              );
+            }),
           ],
         ),
       );
@@ -703,11 +775,13 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
       );
     }
     
-    if (videoUrl != null && videoUrl.isNotEmpty) {
+    if (videoUrl != null && videoUrl.trim().isNotEmpty) {
+      final cleanVideoUrl = videoUrl.trim().replaceAll("'", "").replaceAll('"', "");
       return ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: VideoPreviewPlayer(
-          videoPath: videoUrl,
+          videoPath: cleanVideoUrl,
+          isAsset: cleanVideoUrl.toLowerCase().startsWith('assets/'),
           height: imageHeight,
           width: double.infinity,
         ),

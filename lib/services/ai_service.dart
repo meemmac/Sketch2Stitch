@@ -238,8 +238,6 @@ class AIService {
         imageBytes: visualContext,
       );
 
-      debugPrint('[VirtualTrial] Gemini raw response: $geminiText');
-
       // Strip any markdown code fences Gemini might wrap around JSON
       String cleaned = geminiText
           .replaceAll(RegExp(r'```json\s*'), '')

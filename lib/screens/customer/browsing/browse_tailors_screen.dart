@@ -3,8 +3,7 @@ import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/services/browse_service.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
-import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
 import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -292,6 +291,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
 
   Widget _buildTailorCard(Tailor tailor, bool isSmall) {
     final bool isTopRated = tailor.rating >= 4.8;
+    final bool isFull = tailor.maxOrder == 0;
     String imageUrl = tailor.profilePicture ?? 'assets/images/fab.jpg';
 
     return GestureDetector(
@@ -311,194 +311,234 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
           );
         }
       },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE8ECF0), width: 0.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+      child: Opacity(
+        opacity: isFull ? 0.65 : 1.0,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isFull ? Colors.grey.shade300 : const Color(0xFFE8ECF0), 
+              width: 0.5,
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              flex: 5,
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isFull ? 0.02 : 0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                flex: 5,
+                child: Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(14),
+                      ),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: double.infinity,
+                        child: ColorFiltered(
+                          colorFilter: ColorFilter.mode(
+                            isFull ? Colors.black.withOpacity(0.2) : Colors.transparent,
+                            BlendMode.darken,
+                          ),
+                          child: imageUrl.startsWith('http')
+                              ? Image.network(
+                                  imageUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Container(
+                                    color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                    child: Icon(
+                                      Icons.person,
+                                      size: isSmall ? 36 : 40,
+                                      color: const Color(0xFF4A7C59),
+                                    ),
+                                  ),
+                                )
+                              : Image.asset(
+                                  imageUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Container(
+                                    color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                    child: Icon(
+                                      Icons.person,
+                                      size: isSmall ? 36 : 40,
+                                      color: const Color(0xFF4A7C59),
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ),
                     ),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: double.infinity,
-                      child: imageUrl.startsWith('http')
-                          ? Image.network(
-                              imageUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                color: const Color(0xFF6B8F71).withOpacity(0.12),
-                                child: Icon(
-                                  Icons.person,
-                                  size: isSmall ? 36 : 40,
-                                  color: const Color(0xFF4A7C59),
-                                ),
-                              ),
-                            )
-                          : Image.asset(
-                              imageUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                color: const Color(0xFF6B8F71).withOpacity(0.12),
-                                child: Icon(
-                                  Icons.person,
-                                  size: isSmall ? 36 : 40,
-                                  color: const Color(0xFF4A7C59),
-                                ),
-                              ),
+                    if (isTopRated && !isFull)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isSmall ? 8 : 10,
+                            vertical: isSmall ? 4 : 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6B8F71),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.2),
+                              width: 0.3,
                             ),
-                    ),
-                  ),
-                  if (isTopRated)
+                          ),
+                          child: Text(
+                            '⭐ Top Rated',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
                     Positioned(
-                      top: 8,
+                      bottom: 8,
                       right: 8,
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isSmall ? 8 : 10,
-                          vertical: isSmall ? 4 : 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF6B8F71),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
-                            width: 0.3,
-                          ),
-                        ),
-                        child: Text(
-                          '⭐ Top Rated',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  Positioned(
-                    bottom: 8,
-                    right: 8,
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isSmall ? 6 : 8,
-                        vertical: isSmall ? 3 : 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.7),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Icons.star,
-                            color: Colors.amber,
-                            size: isSmall ? 10 : 12,
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            tailor.rating.toStringAsFixed(1),
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
+                          if (isFull)
+                            Container(
+                              margin: const EdgeInsets.only(right: 6),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isSmall ? 6 : 8,
+                                vertical: isSmall ? 3 : 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.8),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                "Fully Booked",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: isSmall ? 9 : 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isSmall ? 6 : 8,
+                              vertical: isSmall ? 3 : 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.7),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.star,
+                                  color: Colors.amber,
+                                  size: isSmall ? 10 : 12,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  tailor.rating.toStringAsFixed(1),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            Flexible(
-              flex: 4,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  isSmall ? 10 : 12,
-                  isSmall ? 8 : 10,
-                  isSmall ? 10 : 12,
-                  isSmall ? 10 : 12,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      tailor.name,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        height: 1.2,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    SizedBox(height: isSmall ? 4 : 6),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on,
-                          size: isSmall ? 12 : 14,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            tailor.generalArea,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[600],
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 1,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '1.8 km',
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: Colors.green.shade800,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    // ❌ REMOVED: About section from grid (only shown in detail page)
                   ],
                 ),
               ),
-            ),
-          ],
+              Flexible(
+                flex: 4,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    isSmall ? 10 : 12,
+                    isSmall ? 8 : 10,
+                    isSmall ? 10 : 12,
+                    isSmall ? 10 : 12,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        tailor.name,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          height: 1.2,
+                          color: isFull ? Colors.grey.shade700 : Colors.black,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      SizedBox(height: isSmall ? 4 : 6),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on,
+                            size: isSmall ? 12 : 14,
+                            color: isFull ? Colors.grey.shade400 : Colors.grey[600],
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              tailor.generalArea,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isFull ? Colors.grey.shade400 : Colors.grey[600],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.directions_bike_outlined,
+                            size: isSmall ? 12 : 14,
+                            color: isFull ? Colors.grey.shade400 : Colors.grey[600],
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              "1.8 km",
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isFull ? Colors.grey.shade400 : Colors.grey[600],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -14,12 +14,14 @@ import 'messaging/chat_screen.dart'; // adjust path to match your folder structu
 // Add `shared_preferences` to pubspec.yaml if it isn't already a dependency.
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/bkash_service.dart';
+import '../../widgets/top_feedback_banner.dart';
+import '../../services/measurement_service.dart';
+import '../../services/tailor_service.dart';
+import '../../services/user_session.dart';
 import 'bkash_payment_screen.dart';
 
-// TODO: point this at your real Measurement model
-// (the same one used by MeasurementScreen / DashboardDrawer).
 import '../../models/measurement.dart';
-import 'measurement_screen.dart';
+import 'measurement_page.dart';
 import 'browsing/browse_shell.dart';
 import 'track_order.dart';
 
@@ -182,6 +184,13 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   bool _loading = false;
   bool _resuming = true;
   Measurement? _selectedMeasurement;
+
+  /// Local copy of `widget.savedMeasurements`, so a profile saved from
+  /// within this flow is reflected here without rebuilding the screen from
+  /// its caller (Cart/Checkout or Running Orders).
+  late List<Measurement> _savedMeasurements =
+      List<Measurement>.of(widget.savedMeasurements);
+
   final List<DesignItem> _designs = [];
 
   DateTime? _tailorSelectionDeadline;
@@ -332,8 +341,8 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.savedMeasurements.isNotEmpty) {
-      _selectedMeasurement = widget.savedMeasurements.first;
+    if (_savedMeasurements.isNotEmpty) {
+      _selectedMeasurement = _savedMeasurements.first;
     }
     _initMeasurementControllers();
     _resumeFromBackend();
@@ -425,18 +434,50 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
 
   // ─── Step 2 actions ────────────────────────────────────────────────
 
-  void _goToMeasurementScreen() {
-    Navigator.push(
+  /// Opens the measurements editor through `MeasurementPage`, which owns
+  /// the fetch-or-create and the save against `MeasurementService`. Pushing
+  /// `MeasurementScreen` directly from here used to mean edits made inside
+  /// the tailoring flow were never persisted.
+  ///
+  /// On return the profile is re-read, so `measurementId` sent with the
+  /// tailor job is the real document id — including the first-time case
+  /// where the customer had no profile when this screen was opened.
+  Future<void> _goToMeasurementScreen() async {
+    final customerId = UserSession.instance.uid;
+    if (customerId == null || customerId.isEmpty) {
+      AppFeedback.show(
+        context,
+        'Please sign in again to edit your measurements.',
+        isError: true,
+      );
+      return;
+    }
+
+    await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => MeasurementScreen(
-          measurement: widget.savedMeasurements.isNotEmpty
-              ? widget.savedMeasurements.first
-              : Measurement(id: '', customerId: ''),
-          onSave: (_) async {},
-        ),
+        builder: (_) => MeasurementPage(customerId: customerId),
       ),
     );
+
+    if (!mounted) return;
+
+    try {
+      final updated = await MeasurementService().getMeasurement(customerId);
+      if (!mounted || updated == null) return;
+      setState(() {
+        _savedMeasurements = [updated];
+        _selectedMeasurement = updated;
+        // Step 2's fields read from these controllers, so they have to be
+        // rebuilt against the saved values rather than the stale ones.
+        for (final c in _measurementControllers.values) {
+          c.dispose();
+        }
+        _initMeasurementControllers();
+      });
+    } catch (e) {
+      debugPrint('[TailoringSetup] measurement reload failed: $e');
+    }
   }
 
   // ─── Step 3 actions ────────────────────────────────────────────────
@@ -520,16 +561,35 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   /// screen) — the customer is only accepting what's already on the job,
   /// so this is a plain confirm dialog with no input fields.
   ///
-  void _openChatWithTailor(String tailorId) {
+  Future<void> _openChatWithTailor(String tailorId) async {
+    final customerId = UserSession.instance.uid ?? '';
+
+    // The tailor's display name lives on their Tailor document — falling
+    // back to a generic label only if the lookup fails, so a slow or
+    // offline profile fetch never blocks the chat from opening.
+    String tailorName = 'Your Tailor';
+    try {
+      final tailor = await TailorService().getTailorProfile(tailorId);
+      if (tailor != null && tailor.name.isNotEmpty) {
+        tailorName = tailor.name;
+      }
+    } catch (e) {
+      debugPrint('[TailoringSetup] tailor name lookup failed: $e');
+    }
+
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ChatScreen(
-          conversationId:
-              '${widget.orderId}_$tailorId', // TODO: use real conversation id if you generate one elsewhere
-          customerId: '', // TODO: current logged-in customer's id
+          // Deterministic per (order, tailor) pair so reopening the chat
+          // lands on the same thread. NOTE: messaging itself is still
+          // running on local sample data — see MessagingService, which no
+          // screen is wired to yet.
+          conversationId: '${widget.orderId}_$tailorId',
+          customerId: customerId,
           otherUserId: tailorId,
-          otherUserName: 'Your Tailor', // TODO: look up tailor's real name
+          otherUserName: tailorName,
           otherUserRole: UserRole.tailor,
           orderId: widget.orderId,
         ),
@@ -1098,7 +1158,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   // ─── Step 2 ────────────────────────────────────────────────────────
 
   Widget _buildMeasurementsStep() {
-    if (widget.savedMeasurements.isEmpty) {
+    if (_savedMeasurements.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -2043,9 +2103,8 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
     final path = await _exportImage();
     if (!mounted) return;
     if (path == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Couldn't save the sketch. Try again.")),
-      );
+      AppFeedback.show(context, "Couldn't save the sketch. Try again.",
+          isError: true);
       return;
     }
     Navigator.pop(context, path);

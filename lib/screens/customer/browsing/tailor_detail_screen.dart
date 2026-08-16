@@ -44,14 +44,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   bool _isLoadingPortfolio = true;
 
   bool get _isCustomer => widget.userRole == UserRole.customer;
-
-  // Map of tailor names to hardcoded IDs
-  final Map<String, String> _hardcodedIds = {
-    'Rahul Ahmed': 'tailor1',
-    'Sadia Rahman': 'tailor2',
-    'Kamal Hossain': 'tailor3',
-    'Fatima Noor': 'tailor4',
-  };
+  bool get isUnavailable => widget.tailor.maxOrder == 0;
 
   @override
   void initState() {
@@ -60,11 +53,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     _loadReviews();
     _loadPortfolio();
     _checkFavoriteStatus();
-    
-    // Debug: Check if onTailorSelected is passed
-    print('🔍 TailorDetailScreen - onTailorSelected: ${widget.onTailorSelected != null}');
-    print('🔍 TailorDetailScreen - userRole: ${widget.userRole}');
-    print('🔍 TailorDetailScreen - isCustomer: $_isCustomer');
   }
 
   void _getCurrentUser() {
@@ -77,26 +65,9 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   Future<void> _checkFavoriteStatus() async {
     if (_currentUserId != null) {
       try {
-        String tailorId = widget.tailor.id;
-        bool isFav = false;
-        
-        try {
-          isFav = await _favoriteService
-              .isFavoriteTailor(_currentUserId!, tailorId)
-              .first;
-        } catch (e) {
-          final hardcodedId = _hardcodedIds[widget.tailor.name];
-          if (hardcodedId != null) {
-            try {
-              isFav = await _favoriteService
-                  .isFavoriteTailor(_currentUserId!, hardcodedId)
-                  .first;
-            } catch (e2) {
-              // Ignore
-            }
-          }
-        }
-        
+        final isFav = await _favoriteService
+            .isFavoriteTailor(_currentUserId!, widget.tailor.id)
+            .first;
         setState(() {
           _isFavorite = isFav;
         });
@@ -118,17 +89,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     }
 
     try {
-      String tailorId = widget.tailor.id;
-      
-      try {
-        await _favoriteService.toggleFavoriteTailor(_currentUserId!, tailorId);
-      } catch (e) {
-        final hardcodedId = _hardcodedIds[widget.tailor.name];
-        if (hardcodedId != null) {
-          await _favoriteService.toggleFavoriteTailor(_currentUserId!, hardcodedId);
-        }
-      }
-      
+      await _favoriteService.toggleFavoriteTailor(_currentUserId!, widget.tailor.id);
       setState(() {
         _isFavorite = !_isFavorite;
       });
@@ -145,29 +106,11 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   Future<void> _loadReviews() async {
     setState(() => _isLoading = true);
     try {
-      String tailorId = widget.tailor.id;
-      List<Review> reviews = [];
-      
-      try {
-        reviews = await _reviewService.getReviewsByTargetId(
-          tailorId,
-          ReviewTargetRole.tailor,
-          limit: 20,
-        );
-      } catch (e) {
-        final hardcodedId = _hardcodedIds[widget.tailor.name];
-        if (hardcodedId != null) {
-          try {
-            reviews = await _reviewService.getReviewsByTargetId(
-              hardcodedId,
-              ReviewTargetRole.tailor,
-              limit: 20,
-            );
-          } catch (e2) {
-            // Ignore
-          }
-        }
-      }
+      final reviews = await _reviewService.getReviewsByTargetId(
+        widget.tailor.id,
+        ReviewTargetRole.tailor,
+        limit: 20,
+      );
       
       setState(() {
         _reviews = reviews;
@@ -185,77 +128,23 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   Future<void> _loadPortfolio() async {
     setState(() => _isLoadingPortfolio = true);
     try {
-      String tailorId = widget.tailor.id;
-      List<Portfolio> portfolio = [];
-      
       // First check if tailor has portfolio in the object
       if (widget.tailor.portfolio != null && widget.tailor.portfolio!.isNotEmpty) {
         setState(() {
           _portfolioItems = widget.tailor.portfolio!;
           _isLoadingPortfolio = false;
         });
-        print('✅ Loaded ${_portfolioItems.length} portfolio items from tailor object');
         return;
       }
       
-      // Try with the actual ID
-      try {
-        final result = await _portfolioService.getTailorPortfolio(
-          tailorId,
-          pageSize: 20,
-        );
-        portfolio = result.items;
-        print('✅ Loaded ${portfolio.length} portfolio items for ID: $tailorId');
-      } catch (e) {
-        print('⚠️ Error loading portfolio with ID: $tailorId');
-        
-        // Try with hardcoded ID
-        final hardcodedId = _hardcodedIds[widget.tailor.name];
-        if (hardcodedId != null) {
-          try {
-            final result = await _portfolioService.getTailorPortfolio(
-              hardcodedId,
-              pageSize: 20,
-            );
-            portfolio = result.items;
-            print('✅ Loaded ${portfolio.length} portfolio items for hardcoded ID: $hardcodedId');
-          } catch (e2) {
-            print('❌ Error loading portfolio with hardcoded ID: $e2');
-          }
-        }
-        
-        // If still no portfolio, try to find tailor by name in Firestore
-        if (portfolio.isEmpty) {
-          print('🔍 Trying to find tailor by name: ${widget.tailor.name}');
-          try {
-            final tailorSnapshot = await FirebaseFirestore.instance
-                .collection('Tailor')
-                .where('name', isEqualTo: widget.tailor.name)
-                .limit(1)
-                .get();
-            
-            if (tailorSnapshot.docs.isNotEmpty) {
-              final foundId = tailorSnapshot.docs.first.id;
-              print('✅ Found tailor by name with ID: $foundId');
-              try {
-                final result = await _portfolioService.getTailorPortfolio(
-                  foundId,
-                  pageSize: 20,
-                );
-                portfolio = result.items;
-                print('✅ Loaded ${portfolio.length} portfolio items for found tailor ID: $foundId');
-              } catch (e3) {
-                print('❌ Error loading portfolio for found ID: $e3');
-              }
-            }
-          } catch (e3) {
-            print('❌ Error finding tailor by name: $e3');
-          }
-        }
-      }
+      // Load from Firestore using PortfolioService
+      final result = await _portfolioService.getTailorPortfolio(
+        widget.tailor.id,
+        pageSize: 20,
+      );
       
       setState(() {
-        _portfolioItems = portfolio;
+        _portfolioItems = result.items;
         _isLoadingPortfolio = false;
       });
     } catch (e) {
@@ -400,33 +289,50 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 380;
-    final isMediumScreen = screenWidth >= 380 && screenWidth < 600;
-
-    // Debug: Check book button visibility
-    print('🔍 Building TailorDetailScreen');
-    print('🔍 _isCustomer: $_isCustomer');
-    print('🔍 onTailorSelected: ${widget.onTailorSelected != null}');
-    print('🔍 Should show book button: ${_isCustomer && widget.onTailorSelected != null}');
 
     return Scaffold(
-      bottomNavigationBar: (_isCustomer && widget.onTailorSelected != null)
+      bottomNavigationBar: (_isCustomer && widget.onTailorSelected != null && !isUnavailable)
           ? _buildBookButton()
           : null,
-      body: CustomScrollView(
-        slivers: [
-          _buildAppBar(isSmallScreen),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildAboutSection(isSmallScreen),
-                  const SizedBox(height: 24),
-                  _buildPortfolioSection(isSmallScreen, isMediumScreen),
-                  const SizedBox(height: 80),
-                ],
+      body: Column(
+        children: [
+          if (isUnavailable)
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 10,
+                bottom: 10,
               ),
+              color: Colors.red.shade800,
+              child: const Text(
+                "Sorry, currently unavailable",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          Expanded(
+            child: CustomScrollView(
+              slivers: [
+                _buildAppBar(isSmallScreen),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildAboutSection(isSmallScreen),
+                        const SizedBox(height: 24),
+                        _buildPortfolioSection(isSmallScreen),
+                        const SizedBox(height: 80),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -448,7 +354,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         icon: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.5),
+            color: Colors.black.withOpacity(0.5),
             shape: BoxShape.circle,
           ),
           child: Icon(
@@ -471,7 +377,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.transparent,
-                    Colors.black.withValues(alpha: 0.8),
+                    Colors.black.withOpacity(0.8),
                   ],
                 ),
               ),
@@ -532,10 +438,10 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                             vertical: isSmallScreen ? 6.0 : 8.0,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
+                            color: Colors.white.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.3),
+                              color: Colors.white.withOpacity(0.3),
                               width: 1.0,
                             ),
                           ),
@@ -593,7 +499,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.green.withValues(alpha: 0.3),
+                                  color: Colors.green.withOpacity(0.3),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Row(
@@ -710,7 +616,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   }
 
   Widget _buildBookButton() {
-    print('🔍 Building Book Button');
     return Container(
       padding: EdgeInsets.fromLTRB(
         20,
@@ -722,7 +627,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             blurRadius: 12,
             offset: const Offset(0, -3),
           ),
@@ -731,20 +636,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton(
-          onPressed: () {
-            print('📚 Book button pressed for tailor: ${widget.tailor.id}');
-            if (widget.onTailorSelected != null) {
-              widget.onTailorSelected!(widget.tailor.id);
-            } else {
-              print('❌ onTailorSelected is null!');
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Booking feature coming soon!'),
-                  backgroundColor: Colors.orange,
-                ),
-              );
-            }
-          },
+          onPressed: () => widget.onTailorSelected!(widget.tailor.id),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.green.shade800,
             foregroundColor: Colors.white,
@@ -765,13 +657,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   Widget _buildAboutSection(bool isSmallScreen) {
     String description = widget.tailor.about ?? 
         'Professional tailoring services with years of experience.';
-    
-    if (_portfolioItems.isNotEmpty) {
-      final desc = _portfolioItems.first.description;
-      if (desc != null && desc.isNotEmpty) {
-        description = desc;
-      }
-    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -796,9 +681,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     );
   }
 
-  Widget _buildPortfolioSection(bool isSmallScreen, bool isMediumScreen) {
-    print('🔍 Building Portfolio Section - isLoading: $_isLoadingPortfolio, items: ${_portfolioItems.length}');
-    
+  Widget _buildPortfolioSection(bool isSmallScreen) {
     if (_isLoadingPortfolio) {
       return const Center(
         child: Padding(
@@ -809,11 +692,8 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     }
 
     if (_portfolioItems.isEmpty) {
-      print('⚠️ No portfolio items found');
       return const SizedBox.shrink();
     }
-
-    print('✅ Showing ${_portfolioItems.length} portfolio items');
 
     final displayItems = _showAllPortfolio
         ? _portfolioItems
@@ -875,7 +755,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                   border: Border.all(color: Colors.grey[200]!),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
+                      color: Colors.black.withOpacity(0.03),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     ),
@@ -958,7 +838,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     );
   }
 
-  // ... rest of review methods remain the same
   void _showReviewsOverlay(BuildContext context) {
     Navigator.push(
       context,
@@ -976,7 +855,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(
-            Icons.arrow_back_ios_new,
+            Icons.arrow_back,
             color: Colors.black87,
             size: 20,
           ),

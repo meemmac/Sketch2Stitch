@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 // The Measurement model, repository, and Firebase logic are assumed to
 // already exist in the project and are NOT created here.
 import '../../models/measurement.dart';
+import '../../widgets/top_feedback_banner.dart';
 
 /// Supported measurement input units.
 enum MeasurementUnit { inch, cm, mm, meter }
@@ -55,10 +56,7 @@ extension MeasurementUnitX on MeasurementUnit {
 /// Local, non-Firebase guide content for a single measurement field.
 /// Images are bundled app assets; no network or database call is made.
 class MeasurementGuideContent {
-  const MeasurementGuideContent({
-    required this.text,
-    required this.assetPath,
-  });
+  const MeasurementGuideContent({required this.text, required this.assetPath});
 
   final String text;
   final String assetPath;
@@ -138,8 +136,7 @@ const Map<String, MeasurementGuideContent> kMeasurementGuides = {
     assetPath: 'assets/images/guides/ankle.png',
   ),
   'waistToAnkle': MeasurementGuideContent(
-    text:
-        'Measure vertically from your natural waist down to the ankle bone.',
+    text: 'Measure vertically from your natural waist down to the ankle bone.',
     assetPath: 'assets/images/guides/waistToAnkle.png',
   ),
   'shoulderToAnkle': MeasurementGuideContent(
@@ -185,7 +182,8 @@ class MeasurementScreen extends StatefulWidget {
   State<MeasurementScreen> createState() => _MeasurementScreenState();
 }
 
-class _MeasurementScreenState extends State<MeasurementScreen> {
+class _MeasurementScreenState extends State<MeasurementScreen>
+    with FeedbackBannerMixin {
   late final List<_MeasurementEntry> _entries;
   bool _isSaving = false;
 
@@ -233,7 +231,7 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
         fieldKey: 'shoulderToAnkle',
         initialInches: widget.measurement.shoulderToAnkle,
       ),
-      
+
       _MeasurementEntry(
         label: 'Waist to Ankle',
         fieldKey: 'waistToAnkle',
@@ -259,7 +257,7 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
         fieldKey: 'ankle',
         initialInches: widget.measurement.ankle,
       ),
-       _MeasurementEntry(
+      _MeasurementEntry(
         label: 'Hips Circumference',
         fieldKey: 'hipsCircumference',
         initialInches: widget.measurement.hipsCircumference,
@@ -276,21 +274,18 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
   }
 
   Future<void> _handleSave() async {
-    // Validate every field before saving.
     bool allValid = true;
     for (final entry in _entries) {
       if (!entry.validate()) {
         allValid = false;
       }
     }
-    setState(() {}); // refresh error text on all fields
+    setState(() {});
 
     if (!allValid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fix the highlighted fields before saving.'),
-          backgroundColor: _MeasurementColors.errorRed,
-        ),
+      showFeedback(
+        'Please fix the highlighted fields before saving.',
+        isError: true,
       );
       return;
     }
@@ -317,21 +312,12 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
     try {
       await widget.onSave(updated);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Measurements saved successfully.'),
-            backgroundColor: _MeasurementColors.primaryGreen,
-          ),
-        );
+        showFeedback('Measurements saved successfully.');
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save measurements: $e'),
-            backgroundColor: _MeasurementColors.errorRed,
-          ),
-        );
+        showFeedback("Couldn't save your measurements. Please try again.",
+            isError: true);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -429,38 +415,41 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
   double _valueFor(String label) {
     final entry = _entries.firstWhere(
       (e) => e.label == label,
-      orElse: () => _MeasurementEntry(label: label, fieldKey: '', initialInches: 0),
+      orElse: () =>
+          _MeasurementEntry(label: label, fieldKey: '', initialInches: 0),
     );
     return entry.currentInches;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _MeasurementColors.background,
-      appBar: _buildAppBar(context),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Keep your measurements up to date for the most accurate fit.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: _MeasurementColors.subtleText,
+    return buildWithFeedbackBanner(
+      Scaffold(
+        backgroundColor: _MeasurementColors.background,
+        appBar: _buildAppBar(context),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Keep your measurements up to date for the most accurate fit.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: _MeasurementColors.subtleText,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              for (final entry in _entries) ...[
-                MeasurementField(
-                  entry: entry,
-                  onGuideTap: () => _showGuideSheet(entry),
-                ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
+                for (final entry in _entries) ...[
+                  MeasurementField(
+                    entry: entry,
+                    onGuideTap: () => _showGuideSheet(entry),
+                  ),
+                  const SizedBox(height: 12),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -473,8 +462,11 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
       elevation: 0,
       scrolledUnderElevation: 0,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new,
-            color: _MeasurementColors.labelText, size: 20),
+        icon: const Icon(
+          Icons.arrow_back,
+          color: _MeasurementColors.labelText,
+          size: 20,
+        ),
         onPressed: () => Navigator.of(context).maybePop(),
       ),
       title: const Text(
@@ -496,8 +488,10 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
                 backgroundColor: _MeasurementColors.primaryGreen,
                 foregroundColor: Colors.white,
                 elevation: 0,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 10,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(24),
                 ),
@@ -508,8 +502,7 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Colors.white),
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
                   : const Text(
@@ -534,11 +527,9 @@ class _MeasurementEntry {
     required this.label,
     required this.fieldKey,
     required double initialInches,
-  })  : storedInches = initialInches,
-        unit = MeasurementUnit.inch,
-        controller = TextEditingController(
-          text: _formatNumber(initialInches),
-        );
+  }) : storedInches = initialInches,
+       unit = MeasurementUnit.inch,
+       controller = TextEditingController(text: _formatNumber(initialInches));
 
   final String label;
 
@@ -654,8 +645,9 @@ class _MeasurementFieldState extends State<MeasurementField> {
     // Preserve the physical measurement: convert the current displayed
     // value into the newly selected unit.
     final parsed = double.tryParse(entry.controller.text.trim());
-    final currentInches =
-        parsed != null ? entry.unit.toInches(parsed) : entry.storedInches;
+    final currentInches = parsed != null
+        ? entry.unit.toInches(parsed)
+        : entry.storedInches;
 
     setState(() {
       entry.unit = newUnit;
@@ -724,13 +716,15 @@ class _MeasurementFieldState extends State<MeasurementField> {
                     fillColor: _MeasurementColors.background,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide:
-                          const BorderSide(color: _MeasurementColors.borderColor),
+                      borderSide: const BorderSide(
+                        color: _MeasurementColors.borderColor,
+                      ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide:
-                          const BorderSide(color: _MeasurementColors.borderColor),
+                      borderSide: const BorderSide(
+                        color: _MeasurementColors.borderColor,
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -741,8 +735,9 @@ class _MeasurementFieldState extends State<MeasurementField> {
                     ),
                     errorBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide:
-                          const BorderSide(color: _MeasurementColors.errorRed),
+                      borderSide: const BorderSide(
+                        color: _MeasurementColors.errorRed,
+                      ),
                     ),
                     errorText: entry.errorText,
                     errorStyle: const TextStyle(fontSize: 11),
@@ -758,8 +753,7 @@ class _MeasurementFieldState extends State<MeasurementField> {
                   decoration: BoxDecoration(
                     color: _MeasurementColors.background,
                     borderRadius: BorderRadius.circular(10),
-                    border:
-                        Border.all(color: _MeasurementColors.borderColor),
+                    border: Border.all(color: _MeasurementColors.borderColor),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<MeasurementUnit>(

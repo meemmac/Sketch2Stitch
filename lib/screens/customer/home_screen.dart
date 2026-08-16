@@ -3,22 +3,20 @@ import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/models/user_role.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
-import 'package:sketch2stitch/screens/customer/cart_screen.dart';
-import 'package:sketch2stitch/services/browse_service.dart';
-import 'package:sketch2stitch/services/favorite_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:sketch2stitch/widgets/cart_icon_button.dart';
 import '../../widgets/dashboard_drawer.dart';
 import 'virtual_trial_screen.dart';
 import 'notification_screen.dart';
 import 'package:sketch2stitch/screens/retailer/inventory_screen.dart';
 import 'package:sketch2stitch/screens/tailor/orders_screen.dart';
 import 'order_list_screen.dart';
+
+import 'package:sketch2stitch/services/auth_service.dart';
+import 'package:sketch2stitch/services/notification_service.dart';
 
 class UnifiedHomeScreen extends StatefulWidget {
   final UserRole initialRole;
@@ -45,12 +43,6 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   final GlobalKey _exploreRetailersKey = GlobalKey();
 
   String _favoritesFilter = 'Fabric and elements';
-  bool _hasUnreadNotifications = true;
-
-  // ─── Services ──────────────────────────────────────────────────────────
-  final BrowseService _browseService = BrowseService();
-  final FavoriteService _favoriteService = FavoriteService();
-  String? _currentUserId;
 
   // ─── Data State ──────────────────────────────────────────────────────
   List<Product> _allProducts = [];
@@ -108,173 +100,47 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   void initState() {
     super.initState();
     _currentRole = widget.initialRole;
-    _getCurrentUser();
     _loadData();
   }
 
-  void _getCurrentUser() {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        _currentUserId = user.uid;
-      }
-    } catch (e) {
-      print('Error getting current user: $e');
-    }
-  }
-
   Future<void> _loadData() async {
-  setState(() {
-    _isLoading = true;
-    _hasError = false;
-    _errorMessage = '';
-  });
-  
-  try {
-    print('🔄 Loading data from Firestore...');
-    
-    // Direct test - check if we can read products
-    try {
-      final testSnapshot = await FirebaseFirestore.instance
-          .collection('Products')
-          .limit(2)
-          .get();
-      
-      print('📊 Found ${testSnapshot.docs.length} products in Firestore');
-      
-      if (testSnapshot.docs.isNotEmpty) {
-        final firstDoc = testSnapshot.docs.first;
-        final data = firstDoc.data();
-        print('📄 First product ID: ${firstDoc.id}');
-        print('📄 First product name: ${data['productName']}');
-        print('📄 Data keys: ${data.keys}');
-        print('📄 materialType: ${data['materialType']}');
-        print('📄 materialType type: ${data['materialType'].runtimeType}');
-      } else {
-        print('⚠️ Products collection is EMPTY!');
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-          _errorMessage = 'Products collection is empty. Please add products.';
-        });
-        return;
-      }
-    } catch (e) {
-      print('❌ Error reading Products: $e');
-      setState(() {
-        _isLoading = false;
-        _hasError = true;
-        _errorMessage = 'Error reading Firestore: $e';
-      });
-      return;
-    }
-    
-    // Load products with detailed logging
-    print('📦 Calling getProductsByFilter...');
-    List<Product> products = [];
-    try {
-      products = await _browseService.getProductsByFilter().first;
-      print('✅ Loaded ${products.length} products');
-      if (products.isNotEmpty) {
-        print('📄 First product name: ${products.first.productName}');
-        print('📄 First product materialTypes: ${products.first.materialTypes.length}');
-        print('📄 First product materialType: ${products.first.materialType}');
-      }
-    } catch (e) {
-      print('❌ Error loading products: $e');
-      print('❌ Stack trace: ${StackTrace.current}');
-      products = [];
-    }
-    
-    // Load tailors
-    print('👤 Loading tailors...');
-    List<Tailor> tailors = [];
-    try {
-      tailors = await _browseService.getTailorsByFilter().first;
-      print('✅ Loaded ${tailors.length} tailors');
-    } catch (e) {
-      print('❌ Error loading tailors: $e');
-      tailors = [];
-    }
-    
-    // Load retailers
-    print('🏪 Loading retailers...');
-    List<Retailer> retailers = [];
-    try {
-      retailers = await _browseService.getRetailersByFilter().first;
-      print('✅ Loaded ${retailers.length} retailers');
-    } catch (e) {
-      print('❌ Error loading retailers: $e');
-      retailers = [];
-    }
-    
-    // Load retailer names
-    print('📋 Loading retailer names...');
-    Map<String, String> names = {};
-    try {
-      final retailerSnapshot = await FirebaseFirestore.instance
-          .collection('Retailer')
-          .get();
-      
-      for (final doc in retailerSnapshot.docs) {
-        final data = doc.data();
-        names[doc.id] = data['shopName'] as String? ?? 'Unknown Retailer';
-      }
-      print('✅ Loaded ${names.length} retailer names');
-    } catch (e) {
-      print('❌ Error loading retailer names: $e');
-    }
-
-    // Check if we got any data
-    if (products.isEmpty && tailors.isEmpty && retailers.isEmpty) {
-      print('⚠️ ALL DATA IS EMPTY!');
-      setState(() {
-        _allProducts = [];
-        _allTailors = [];
-        _allRetailers = [];
-        _retailerNames = names;
-        _isLoading = false;
-        _hasError = true;
-        _errorMessage = 'No data found. Please seed your database.';
-      });
-      return;
-    }
-
-    print('✅ Setting state with ${products.length} products, ${tailors.length} tailors, ${retailers.length} retailers');
     setState(() {
-      _allProducts = products;
-      _allTailors = tailors;
-      _allRetailers = retailers;
-      _retailerNames = names;
-      _isLoading = false;
+      _isLoading = true;
       _hasError = false;
+      _errorMessage = '';
     });
     
-  } catch (e) {
-    print('❌ Error loading data: $e');
-    print('❌ Stack trace: ${StackTrace.current}');
-    setState(() {
-      _isLoading = false;
-      _hasError = true;
-      _errorMessage = 'Failed to load data: ${e.toString()}';
-    });
+    try {
+      print('🔄 Loading data...');
+      
+      // TODO: Load your data from Firestore here
+      // For now, let's use sample data
+      
+      // Simulate loading delay
+      await Future.delayed(const Duration(seconds: 1));
+      
+      setState(() {
+        _isLoading = false;
+        _hasError = false;
+      });
+      
+    } catch (e) {
+      print('❌ Error loading data: $e');
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+        _errorMessage = 'Failed to load data: ${e.toString()}';
+      });
+    }
   }
-}
-
 
   void _openNotifications() async {
-    final result = await Navigator.push<bool>(
+    Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => UnifiedNotificationScreen(role: _currentRole),
       ),
     );
-
-    if (result == true && mounted) {
-      setState(() {
-        _hasUnreadNotifications = false;
-      });
-    }
   }
 
   void _openOrderList() {
@@ -317,8 +183,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         retailerName: _getRetailerName(product.retailerId),
         materialBlends: materialBlends,
         userRole: _currentRole,
-        customerId: _currentUserId,
-        favoriteService: _favoriteService,
+        customerId: null,
+        favoriteService: null,
       ),
     );
   }
@@ -544,35 +410,43 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
             ),
           ),
           const Spacer(),
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              IconButton(
-                icon: const Icon(
-                  Icons.notifications_none_rounded,
-                  color: Colors.black87,
-                ),
-                iconSize: 28,
-                onPressed: _openNotifications,
-              ),
-              if (_hasUnreadNotifications)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    width: 9,
-                    height: 9,
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFFF4F9F1),
-                        width: 1.5,
+          StreamBuilder<int>(
+            stream: NotificationService().getUnreadNotificationCount(
+              AuthService().currentUser?.uid ?? '',
+            ),
+            builder: (context, snapshot) {
+              final unreadCount = snapshot.data ?? 0;
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.notifications_none_rounded,
+                      color: Colors.black87,
+                    ),
+                    iconSize: 28,
+                    onPressed: _openNotifications,
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        width: 9,
+                        height: 9,
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFFF4F9F1),
+                            width: 1.5,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-            ],
+                ],
+              );
+            },
           ),
           if (_currentRole == UserRole.customer)
             IconButton(
@@ -584,20 +458,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
               onPressed: _openOrderList,
               tooltip: 'My Orders',
             ),
-          if (_currentRole == UserRole.customer)
-            IconButton(
-              icon: const Icon(
-                Icons.shopping_cart_outlined,
-                color: Colors.black87,
-              ),
-              iconSize: 28,
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CartScreen()),
-                );
-              },
-            ),
+          if (_currentRole == UserRole.customer) const CartIconButton(),
         ],
       ),
     );
@@ -616,7 +477,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         ),
         const SizedBox(width: 10),
         _navPill(
-          'Favorites',
+          'Wishlist',
           Icons.favorite_border_rounded,
           () => _scrollToSection(_favoritesKey),
         ),
@@ -1026,7 +887,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader('Favorites'),
+        _buildSectionHeader('Wishlist'),
         const SizedBox(height: 12),
         _buildFavoritesTabBar(),
         const SizedBox(height: 14),
@@ -1044,7 +905,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           children: [
             _buildRetailerRow(items),
             _buildSeeAllButton(
-              () => _openSeeAllRetailers('Favorite Retailers', items),
+              () => _openSeeAllRetailers('Wish-listed Retailers', items),
             ),
           ],
         );
@@ -1055,7 +916,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           children: [
             _buildTailorRow(items),
             _buildSeeAllButton(
-              () => _openSeeAllTailors('Favorite Tailors', items),
+              () => _openSeeAllTailors('Wish-listed Tailors', items),
             ),
           ],
         );
@@ -1066,7 +927,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           children: [
             _buildFabricRow(items),
             _buildSeeAllButton(
-              () => _openSeeAllProducts('Favorite Fabrics & Elements', items),
+              () => _openSeeAllProducts('Wish-listed Fabrics & Elements', items),
             ),
           ],
         );
@@ -1201,7 +1062,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  ' Inventory Management',
+                  'Inventory Management',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -1322,8 +1183,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   }
 
   Widget _buildFabricCard(Product product) {
-    final coverImage = product.colorOptions.isNotEmpty
-        ? product.colorOptions.first.image
+    final coverImage = product.colorOptions.isNotEmpty && product.colorOptions.first.image.isNotEmpty
+        ? product.colorOptions.first.image.first
         : null;
     final bool outOfStock = product.colorOptions.every((c) => c.stock <= 0);
 

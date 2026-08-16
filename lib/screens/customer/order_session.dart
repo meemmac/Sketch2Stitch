@@ -123,10 +123,21 @@ class OrderStore {
 
   /// Starts a brand-new order from the given sub-orders (captured at
   /// checkout time, before the cart gets cleared).
-  OrderRecord startOrder(List<SubOrder> subOrders) {
+  ///
+  /// [orderId] / [orderDate] should be passed once the order has been
+  /// written to Firestore, so this local record shares the real `Orders`
+  /// document id. Everything downstream (tailor jobs, notifications, the
+  /// Running Orders screen) keys off this id, so a locally-generated one
+  /// would leave the Firestore order orphaned. They fall back to a
+  /// generated id for the seeded demo orders below.
+  OrderRecord startOrder(
+    List<SubOrder> subOrders, {
+    String? orderId,
+    DateTime? orderDate,
+  }) {
     final order = OrderRecord(
-      orderId: _nextId('ORDER'),
-      orderDate: DateTime.now(),
+      orderId: orderId ?? _nextId('ORDER'),
+      orderDate: orderDate ?? DateTime.now(),
     );
     order.subOrders =
         subOrders.map((s) => s.copyWith(orderId: order.orderId)).toList();

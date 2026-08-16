@@ -1,14 +1,22 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import '../../models/appearance_profile.dart';
 import '../../models/user_role.dart';
 import '../../services/ai_service.dart';
+import '../../services/measurement_service.dart';
+import '../../services/user_session.dart';
+import '../../services/virtual_trial_service.dart';
+import '../../models/customer.dart' show kVirtualTrialMonthlyLimit;
+import '../../widgets/top_feedback_banner.dart';
 import '../../utils/api_config.dart';
 import '../../widgets/dashboard_drawer.dart';
 import 'home_screen.dart';
 import 'package:gal/gal.dart';
+import '../../widgets/color_picker_row.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Colour palette & tokens
@@ -20,12 +28,9 @@ const _ink = Color(0xFF1A2C22);
 const _cardBg = Color(0xFFFBFDF9);
 const _border = Color(0xFFDDEBE3);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Virtual Trial quota (frontend-only placeholder for now)
-// TODO(backend): replace with real value pulled from Customer doc (Firestore).
-// Flat limit, no tiers — see kVirtualTrialMonthlyLimit.
-// ─────────────────────────────────────────────────────────────────────────────
-const int kVirtualTrialMonthlyLimit = 20;
+// The monthly quota itself lives with the Customer model (`vtUsed` /
+// `vtResetDate` are fields on that document) and is imported above — flat
+// limit, no tiers.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Style-preference chip data
@@ -121,21 +126,21 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
 
   final Set<String> _selectedStyles = {};
   final _customInstructionsController = TextEditingController();
-  final _customHairColorController = TextEditingController();
+  Color _hairBaseColor = _hairSwatches.first.$1;
+  double _hairAdjustDelta = 0;
+  Color _skinBaseColor =
+      _skinSwatches[2].$1; // matches AppearanceProfile's default (medium)
+  double _skinAdjustDelta = 0;
   final _customAccessoriesController = TextEditingController();
 
-  // =========================================================================
-  // FUTURE INTEGRATION PLACEHOLDER:
-  // When linking Virtual Trial to Cart / Order details, these variables
-  // will hold passed garment item parts, sketches, or measurements.
-  // Example call: VirtualTrialScreen(prefillGarments: ['Kameez', 'Salwar'], measurements: ...)
-  // =========================================================================
-  final List<String> _prefilledGarmentParts = [];
+  // ── Virtual Trial quota state ──────────────────────────────────────────────
+  // Mirrors the signed-in customer's `vtUsed` / `vtResetDate` fields. Loaded
+  // in initState and re-read from the server after every increment, so this is
+  // a cache of Firestore rather than the source of truth.
+  final VirtualTrialService _vtService = VirtualTrialService();
 
-  // ── Virtual Trial quota state (frontend placeholder) ───────────────────────
-  // TODO(backend): load these three from the Customer doc on init, and
-  // persist `_vtUsed` + `_vtResetDate` server-side after each successful
-  // generation instead of mutating them locally.
+  String get _customerId => UserSession.instance.uid ?? '';
+
   int _vtUsed = 0;
   DateTime? _vtResetDate;
 
@@ -146,18 +151,72 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   @override
   void initState() {
     super.initState();
-    // In future dev, bind these passed values to selection controllers:
-    debugPrint('Autofill parts loaded: ${_prefilledGarmentParts.length}');
-
-    // TODO(backend): replace this mock initialisation with a real fetch,
-    // e.g. `final customer = await VtUsageService.loadAndResetIfNeeded(uid);`
-    // then setState _vtUsed = customer.vtUsed, _vtResetDate = customer.vtResetDate.
     if (widget.prefillAssetImages != null) {
       _prefilledAssetImages.addAll(widget.prefillAssetImages!);
     }
-    final now = DateTime.now();
-    _vtUsed = 5; // mock: change this to preview the "low" / "reached" states
-    _vtResetDate = DateTime(now.year, now.month + 1, 1);
+
+    _loadQuota();
+    _loadSavedMeasurements();
+  }
+
+  /// Pre-fills the Advanced Measurements fields with the customer's own saved
+  /// measurements. Without this the section showed generic standard sizes, so
+  /// the generated trial ignored the measurements the customer had entered.
+  Future<void> _loadSavedMeasurements() async {
+    if (_customerId.isEmpty) return;
+    try {
+      final saved = await MeasurementService().getMeasurement(_customerId);
+      if (saved == null || !mounted) return;
+
+      // Keyed by the same labels used to build `_measurements`.
+      final values = <String, double>{
+        'Upper Bust / Over Bust': saved.upperBustCircumference,
+        'Round Shoulder': saved.roundShoulderCircumference,
+        'Hips': saved.hipsCircumference,
+        'Under Bust': saved.underBustCircumference,
+        'Bust': saved.bustCircumference,
+        'Waist': saved.waist,
+        'Shoulder to Knee': saved.shoulderToKnee,
+        'Shoulder to Under Bust': saved.shoulderToUnderBust,
+        'Shoulder to Bust': saved.shoulderToBust,
+        'Thigh': saved.thigh,
+        'Knee': saved.knee,
+        'Ankle': saved.ankle,
+        'Waist to Ankle': saved.waistToAnkle,
+        'Shoulder to Ankle': saved.shoulderToAnkle,
+      };
+
+      setState(() {
+        values.forEach((label, value) {
+          // A zero means the customer never filled that field in — keep the
+          // standard default rather than sending 0" to the generator.
+          if (value <= 0) return;
+          final formatted =
+              value == value.roundToDouble() ? value.toStringAsFixed(0) : '$value';
+          _measurements[label]?.text = '$formatted"';
+        });
+      });
+    } catch (_) {
+      // Non-fatal: the standard defaults stay in place.
+    }
+  }
+
+  /// Pulls the real quota off the Customer document, rolling the monthly
+  /// window over first if it has elapsed.
+  Future<void> _loadQuota() async {
+    if (_customerId.isEmpty) return;
+    try {
+      final customer = await _vtService.resetVTUsageIfExpired(_customerId);
+      if (!mounted) return;
+      setState(() {
+        _vtUsed = customer.vtUsed;
+        _vtResetDate = customer.vtResetDate;
+      });
+    } on VirtualTrialServiceException catch (e) {
+      // A quota we couldn't read shouldn't block the screen; generation
+      // re-checks server-side before it spends anything.
+      debugPrint('[VirtualTrial] Could not load quota: ${e.message}');
+    }
   }
 
   // ── Generation state ────────────────────────────────────────────────────────
@@ -169,10 +228,14 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
 
   // ── Progress tracking ──────────────────────────────────────────
   /// True once the user has tapped any appearance-profile control.
+  // ignore: unused_field
   bool _profileConfigured = false;
 
   /// True once the user has expanded the Advanced Measurements tile.
   bool _measurementsReviewed = false;
+  // ── Appearance mode toggle ──────────────────────────────────────
+  // true = "Custom" tab (full picker shown), false = "Default" tab (collapsed)
+  bool _isCustomAppearance = false;
 
   // ── Scroll & Animations ──────────────────────────────────────────────────────
   final _scrollController = ScrollController();
@@ -230,9 +293,9 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   void _removeReference(int index) =>
       setState(() => _referenceImages.removeAt(index));
 
-  void _showSnack(String msg) {
+  void _showSnack(String msg, {bool isError = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    AppFeedback.show(context, msg, isError: isError);
   }
 
   String _formatDate(DateTime? d) {
@@ -255,10 +318,45 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   }
 
   // ── Generation ─────────────────────────────────────────────────────────────
+  /// Reads every reference image into bytes for the Gemini call, in the order
+  /// they're shown: the cart's chosen colour options (Cloudinary URLs, or
+  /// bundled asset paths for seeded demo products) followed by the customer's
+  /// own uploads. Any single image that fails to load is skipped rather than
+  /// failing the whole generation.
+  Future<List<Uint8List>> _loadReferenceBytes() async {
+    final bytes = <Uint8List>[];
+
+    for (final path in _prefilledAssetImages) {
+      try {
+        if (path.startsWith('http')) {
+          final response = await http
+              .get(Uri.parse(path))
+              .timeout(const Duration(seconds: 20));
+          if (response.statusCode == 200) bytes.add(response.bodyBytes);
+        } else {
+          final data = await rootBundle.load(path);
+          bytes.add(data.buffer.asUint8List());
+        }
+      } catch (e) {
+        debugPrint('[VirtualTrial] Skipped reference "$path": $e');
+      }
+    }
+
+    for (final file in _referenceImages) {
+      try {
+        bytes.add(await file.readAsBytes());
+      } catch (e) {
+        debugPrint('[VirtualTrial] Skipped upload "${file.path}": $e');
+      }
+    }
+
+    return bytes;
+  }
+
   Future<void> _generate() async {
     // ── Quota guard ────────────────────────────────────────────────────────
-    // TODO(backend): re-check the real quota server-side too (don't trust
-    // client state alone), e.g. via a callable function or security rule.
+    // Checked against the cached value first (instant feedback), then against
+    // Firestore, since the cache can be stale if a trial ran on another device.
     if (_vtLimitReached) {
       _showSnack(
         'You\'ve used all $kVirtualTrialMonthlyLimit trials this month. '
@@ -267,8 +365,28 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       return;
     }
 
+    if (_customerId.isEmpty) {
+      _showSnack('Please sign in again to run a virtual trial.');
+      return;
+    }
+
+    try {
+      final eligibility = await _vtService.checkVTEligibility(_customerId);
+      if (!mounted) return;
+      if (!eligibility.eligible) {
+        setState(() => _vtUsed = eligibility.used);
+        _showSnack(
+          'You\'ve used all ${eligibility.limit} trials this month. '
+          'Your limit resets on ${_formatDate(_vtResetDate)}.',
+        );
+        return;
+      }
+    } on VirtualTrialServiceException catch (e) {
+      _showSnack(e.message);
+      return;
+    }
+
     const geminiKey = APIConfig.geminiApiKey;
-    const hfToken = APIConfig.hfToken;
 
     if (geminiKey.isEmpty || geminiKey == 'YOUR_GEMINI_API_KEY_HERE') {
       _showSnack('Please set your Gemini API key in lib/utils/api_config.dart');
@@ -297,51 +415,38 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       pose: _profile.pose,
       expression: _profile.expression,
       accessories: Set.from(_profile.accessories),
-      customHairColor: _customHairColorController.text.trim(),
       customAccessories: _customAccessoriesController.text.trim(),
+      customHairColor: _profile.customHairColor,
+      customHairColorValue: _profile.customHairColorValue,
+      customSkinColor: _profile.customSkinColor,
+      customSkinColorValue: _profile.customSkinColorValue,
     );
 
     try {
-      // 1. Call Gemini for fabric estimation
+      // 1. Load the reference images the result must actually be based on:
+      //    the garments the customer picked in the cart (their chosen colour
+      //    option) first, then any references they uploaded here.
       setState(() {
-        _statusMessage = 'Estimating fabric requirements with Gemini...';
+        _statusMessage = 'Loading your selected designs...';
       });
+      final referenceBytes = await _loadReferenceBytes();
 
-      final fabric = await AIService.estimateFabricWithGemini(
+      // 2. One call: Gemini estimates the fabric AND generates the try-on
+      //    image from those same references, so the preview shows the garment
+      //    the customer chose rather than an unrelated stock photo.
+      final (imageBytes, fabric) =
+          await AIService.generateVirtualTrialFromProfile(
         geminiApiKey: geminiKey,
+        hfToken: APIConfig.hfToken,
+        profile: profileSnapshot,
+        referenceImageBytes: referenceBytes,
         measurements: _measurements,
         stylePreferences: _selectedStyles.toList(),
         customInstructions: _customInstructionsController.text.trim(),
+        onStatus: (status) {
+          if (mounted) setState(() => _statusMessage = status);
+        },
       );
-
-      // 2. Local mock delay for image loading
-      setState(() {
-        _statusMessage = 'Loading virtual trial preview...';
-      });
-      await Future.delayed(const Duration(seconds: 1));
-
-      // 3. Load random mock image from assets (image generation is disconnected from API)
-      final List<String> mockImages = [
-        'crochet.jpg',
-        'embroidery.jpg',
-        'fab.jpg',
-        'fab2.jpg',
-        'fabric_waves.jpg',
-        'gorgeous.jpg',
-        'lace.jpg',
-        'saree.jpg',
-        'silk.jpg',
-        'tassel.jpg',
-        'textile.jpg',
-      ];
-      mockImages.shuffle();
-      final selectedAssetName = 'assets/images/${mockImages.first}';
-
-      // Load image bytes from Flutter asset bundle
-      final assetData = await DefaultAssetBundle.of(
-        context,
-      ).load(selectedAssetName);
-      final imageBytes = assetData.buffer.asUint8List();
 
       if (!mounted) return;
       setState(() {
@@ -350,13 +455,23 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         _usedProfile = profileSnapshot;
         _isLoading = false;
         _statusMessage = '';
-
-        // ── Consume one trial on success ─────────────────────────────────
-        // TODO(backend): move this increment to after a confirmed successful
-        // server-side write, e.g. `await VtUsageService.incrementUsage(uid);`
-        _vtUsed += 1;
       });
       _resultAnim.forward();
+
+      // ── Consume one trial on success ─────────────────────────────────────
+      // Persisted first, then mirrored locally from what the server actually
+      // stored — so the counter can never drift from the Customer document.
+      try {
+        final customer = await _vtService.incrementVTUsage(_customerId);
+        if (mounted) {
+          setState(() {
+            _vtUsed = customer.vtUsed;
+            _vtResetDate = customer.vtResetDate;
+          });
+        }
+      } on VirtualTrialServiceException catch (e) {
+        debugPrint('[VirtualTrial] Could not record usage: ${e.message}');
+      }
 
       // Scroll down to results
       await Future.delayed(const Duration(milliseconds: 100));
@@ -407,7 +522,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       c.dispose();
     }
     _customInstructionsController.dispose();
-    _customHairColorController.dispose();
     _customAccessoriesController.dispose();
     _resultAnim.dispose();
     _scrollController.dispose();
@@ -470,7 +584,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         },
       ),
       automaticallyImplyLeading: false,
-      backgroundColor: _sagePale,
+      backgroundColor: Colors.white,
       elevation: 0,
       scrolledUnderElevation: 0,
       title: const Text(
@@ -659,11 +773,18 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                   itemCount: totalCount,
                   itemBuilder: (_, i) {
                     if (i < _prefilledAssetImages.length) {
-                      return ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.asset(
-                          _prefilledAssetImages[i],
-                          fit: BoxFit.cover,
+                      final path = _prefilledAssetImages[i];
+                      // Cart lines carry Cloudinary URLs for real products
+                      // and bundled asset paths for seeded demo data.
+                      final isRemote = path.startsWith('http');
+                      final provider = isRemote
+                          ? NetworkImage(path) as ImageProvider
+                          : AssetImage(path);
+                      return _enlargeable(
+                        provider,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image(image: provider, fit: BoxFit.cover),
                         ),
                       );
                     }
@@ -713,15 +834,77 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     );
   }
 
+  /// Wraps a thumbnail so tapping it opens the image full-screen, with a small
+  /// corner badge so the affordance is visible. Grid thumbs are ~100pt wide,
+  /// which is too small to judge a fabric or a print by.
+  Widget _enlargeable(ImageProvider image, {required Widget child}) {
+    return GestureDetector(
+      onTap: () => _openImageViewer(image),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          child,
+          Positioned(
+            bottom: 4,
+            left: 4,
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.black54,
+                shape: BoxShape.circle,
+              ),
+              padding: const EdgeInsets.all(3),
+              child: const Icon(
+                Icons.zoom_out_map,
+                size: 13,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Full-screen, pinch-zoomable view of a single reference image.
+  void _openImageViewer(ImageProvider image) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (dialogContext) => Stack(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.of(dialogContext).pop(),
+            child: InteractiveViewer(
+              minScale: 1,
+              maxScale: 4,
+              child: Center(
+                child: Image(image: image, fit: BoxFit.contain),
+              ),
+            ),
+          ),
+          Positioned(
+            top: MediaQuery.of(dialogContext).padding.top + 8,
+            right: 12,
+            child: IconButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              icon: const Icon(Icons.close, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _referenceThumb(int index) {
+    final image = FileImage(File(_referenceImages[index].path));
     return Stack(
       fit: StackFit.expand,
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.file(
-            File(_referenceImages[index].path),
-            fit: BoxFit.cover,
+        _enlargeable(
+          image,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image(image: image, fit: BoxFit.cover),
           ),
         ),
         Positioned(
@@ -752,203 +935,298 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Age Group
-          _profileRow(
-            label: 'Age Group',
-            child: _chipRow(
-              values: AgeGroup.values,
-              labels: (v) => v.label,
-              selected: (v) => _profile.ageGroup == v,
-              onTap: (v) => setState(() {
-                _profile.ageGroup = v;
-                _profileConfigured = true;
-              }),
+          _buildAppearanceTabs(),
+          if (_isCustomAppearance) ...[
+            const SizedBox(height: 16),
+            // Age Group
+            _profileRow(
+              label: 'Age Group',
+              child: _chipRow(
+                values: AgeGroup.values,
+                labels: (v) => v.label,
+                selected: (v) => _profile.ageGroup == v,
+                onTap: (v) => setState(() {
+                  _profile.ageGroup = v;
+                  _profileConfigured = true;
+                }),
+              ),
             ),
-          ),
 
-          // Gender Presentation
-          _profileRow(
-            label: 'Gender Presentation',
-            child: _chipRow(
-              values: GenderPresentation.values,
-              labels: (v) => v.label,
-              selected: (v) => _profile.gender == v,
-              onTap: (v) => setState(() {
-                _profile.gender = v;
-                _profileConfigured = true;
-              }),
+            // Gender Presentation
+            _profileRow(
+              label: 'Gender Presentation',
+              child: _chipRow(
+                values: GenderPresentation.values,
+                labels: (v) => v.label,
+                selected: (v) => _profile.gender == v,
+                onTap: (v) => setState(() {
+                  _profile.gender = v;
+                  _profileConfigured = true;
+                }),
+              ),
             ),
-          ),
 
-          // Body Shape
-          _profileRow(
-            label: 'Body Shape',
-            child: _chipRow(
-              values: BodyShape.values,
-              labels: (v) => v.label,
-              selected: (v) => _profile.bodyShape == v,
-              onTap: (v) => setState(() {
-                _profile.bodyShape = v;
-                _profileConfigured = true;
-              }),
+            // Body Shape
+            _profileRow(
+              label: 'Body Shape',
+              child: _chipRow(
+                values: BodyShape.values,
+                labels: (v) => v.label,
+                selected: (v) => _profile.bodyShape == v,
+                onTap: (v) => setState(() {
+                  _profile.bodyShape = v;
+                  _profileConfigured = true;
+                }),
+              ),
             ),
-          ),
 
-          // Height
-          _profileRow(
-            label: 'Height',
-            child: _chipRow(
-              values: ModelHeight.values,
-              labels: (v) => v.label,
-              selected: (v) => _profile.height == v,
-              onTap: (v) => setState(() {
-                _profile.height = v;
-                _profileConfigured = true;
-              }),
+            // Height
+            _profileRow(
+              label: 'Height',
+              child: _chipRow(
+                values: ModelHeight.values,
+                labels: (v) => v.label,
+                selected: (v) => _profile.height == v,
+                onTap: (v) => setState(() {
+                  _profile.height = v;
+                  _profileConfigured = true;
+                }),
+              ),
             ),
-          ),
 
-          // Skin Tone
-          _profileRow(
-            label: 'Skin Tone',
-            child: _swatchRow(
-              items: _skinSwatches
-                  .map(
-                    (s) => (
-                      s.$1,
-                      s.$2 == _profile.skinTone,
-                      () => setState(() {
-                        _profile.skinTone = s.$2;
-                        _profileConfigured = true;
-                      }),
-                    ),
-                  )
-                  .toList(),
-              tooltip: (i) => _skinSwatches[i].$2.label,
-              bordered: (i) => _skinSwatches[i].$2 == SkinTone.fair,
+            // Skin Tone
+            _profileRow(
+              label: 'Skin Tone',
+              child: ColorPickerRow(
+                swatches: _skinSwatches.map((s) => s.$1).toList(),
+                baseColor: _skinBaseColor,
+                adjustDelta: _skinAdjustDelta,
+                wheelPalette: _skinSwatches.map((s) => s.$1).toList(),
+                wheelDialogTitle: 'Pick a Skin Tone',
+                accent: _sage,
+                pale: Colors.white,
+                border: _border,
+                onBaseChanged: (c) => setState(() {
+                  _skinBaseColor = c;
+                  final nearest = _skinSwatches.reduce(
+                    (a, b) =>
+                        (a.$1.value - c.value).abs() <
+                            (b.$1.value - c.value).abs()
+                        ? a
+                        : b,
+                  );
+                  _profile.skinTone = nearest.$2;
+                  _profileConfigured = true;
+                }),
+                onAdjustChanged: (d) => setState(() {
+                  _skinAdjustDelta = d;
+                  final hsl = HSLColor.fromColor(_skinBaseColor);
+                  final adjusted = hsl
+                      .withLightness((hsl.lightness + d).clamp(0.0, 1.0))
+                      .toColor();
+                  _profile.customSkinColorValue = adjusted;
+                  _profile.customSkinColor = AppearanceProfile.colorToHex(
+                    adjusted,
+                  );
+                  _profileConfigured = true;
+                }),
+              ),
             ),
-          ),
-
-          // Hair Length
-          _profileRow(
-            label: 'Hair Length',
-            child: _chipRow(
-              values: HairLength.values,
-              labels: (v) => v.label,
-              selected: (v) => _profile.hairLength == v,
-              onTap: (v) => setState(() {
-                _profile.hairLength = v;
-                _profileConfigured = true;
-              }),
+            // Hair Length
+            _profileRow(
+              label: 'Hair Length',
+              child: _chipRow(
+                values: HairLength.values,
+                labels: (v) => v.label,
+                selected: (v) => _profile.hairLength == v,
+                onTap: (v) => setState(() {
+                  _profile.hairLength = v;
+                  _profileConfigured = true;
+                }),
+              ),
             ),
-          ),
 
-          // Hair Style (Disabled if Bald is selected)
-          _profileRow(
-            label: 'Hair Style',
-            child: IgnorePointer(
-              ignoring: _profile.hairLength == HairLength.bald,
-              child: Opacity(
-                opacity: _profile.hairLength == HairLength.bald ? 0.4 : 1.0,
-                child: _chipRow(
-                  values: HairStyle.values,
-                  labels: (v) => v.label,
-                  selected: (v) =>
-                      _profile.hairLength != HairLength.bald &&
-                      _profile.hairStyle == v,
-                  onTap: (v) => setState(() {
-                    _profile.hairStyle = v;
-                    _profileConfigured = true;
-                  }),
+            // Hair Style (Disabled if Bald is selected)
+            _profileRow(
+              label: 'Hair Style',
+              child: IgnorePointer(
+                ignoring: _profile.hairLength == HairLength.bald,
+                child: Opacity(
+                  opacity: _profile.hairLength == HairLength.bald ? 0.4 : 1.0,
+                  child: _chipRow(
+                    values: HairStyle.values,
+                    labels: (v) => v.label,
+                    selected: (v) =>
+                        _profile.hairLength != HairLength.bald &&
+                        _profile.hairStyle == v,
+                    onTap: (v) => setState(() {
+                      _profile.hairStyle = v;
+                      _profileConfigured = true;
+                    }),
+                  ),
                 ),
               ),
             ),
-          ),
 
-          // Hair Color (Only first 3 options as color swatches, otherwise text input)
-          _profileRow(
-            label: 'Hair Color',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _swatchRow(
-                  items: _hairSwatches
-                      .take(3)
-                      .map(
-                        (s) => (
-                          s.$1,
-                          _profile.hairColor == s.$2,
-                          () => setState(() {
-                            _profile.hairColor = s.$2;
-                            _profileConfigured = true;
-                          }),
-                        ),
-                      )
-                      .toList(),
-                  tooltip: (i) => _hairSwatches[i].$2.label,
-                  bordered: (i) => false,
-                ),
-                const SizedBox(height: 8),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _profile.hairColor = HairColor.colorful;
-                      _profileConfigured = true;
-                    });
-                  },
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: _profile.hairColor == HairColor.colorful
-                                ? _sage
-                                : _border,
-                            width: _profile.hairColor == HairColor.colorful
-                                ? 2
-                                : 1,
+            // Hair Color
+            _profileRow(
+              label: 'Hair Color',
+              child: ColorPickerRow(
+                swatches: _hairSwatches.map((s) => s.$1).toList(),
+                baseColor: _hairBaseColor,
+                adjustDelta: _hairAdjustDelta,
+                wheelPalette: null, // full hue wheel for hair
+                wheelDialogTitle: 'Pick a Hair Color',
+                accent: _sage,
+                pale: Colors.white,
+                border: _border,
+                onBaseChanged: (c) => setState(() {
+                  _hairBaseColor = c;
+                  final match = _hairSwatches.where(
+                    (s) => s.$1.value == c.value,
+                  );
+                  _profile.hairColor = match.isNotEmpty
+                      ? match.first.$2
+                      : HairColor.colorful;
+                  _profileConfigured = true;
+                }),
+                onAdjustChanged: (d) => setState(() {
+                  _hairAdjustDelta = d;
+                  final hsl = HSLColor.fromColor(_hairBaseColor);
+                  final adjusted = hsl
+                      .withLightness((hsl.lightness + d).clamp(0.0, 1.0))
+                      .toColor();
+                  _profile.customHairColorValue = adjusted;
+                  _profile.customHairColor = AppearanceProfile.colorToHex(
+                    adjusted,
+                  );
+                  _profileConfigured = true;
+                }),
+              ),
+            ),
+
+            // Pose
+            _profileRow(
+              label: 'Pose',
+              child: Row(
+                children: _poseIcons.map((pi) {
+                  final selected = _profile.pose == pi.$2;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Tooltip(
+                      message: pi.$2.displayName,
+                      child: GestureDetector(
+                        onTap: () => setState(() {
+                          _profile.pose = pi.$2;
+                          _profileConfigured = true;
+                        }),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: selected ? _sage : _sagePale,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: selected ? _sage : _border,
+                            ),
                           ),
-                          gradient: const SweepGradient(
-                            colors: [
-                              Colors.red,
-                              Colors.yellow,
-                              Colors.blue,
-                              Colors.red,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                pi.$1,
+                                size: 20,
+                                color: selected ? Colors.white : _sage,
+                              ),
+                              Text(
+                                pi.$2.displayName,
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: selected
+                                      ? Colors.white
+                                      : Colors.black54,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ],
                           ),
                         ),
-                        child: _profile.hairColor == HairColor.colorful
-                            ? const Icon(
-                                Icons.check,
-                                size: 12,
-                                color: Colors.white,
-                              )
-                            : null,
                       ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Other Custom Color',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black54,
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+
+            // Facial Expression
+            _profileRow(
+              label: 'Expression',
+              child: _chipRow(
+                values: FacialExpression.values,
+                labels: (v) =>
+                    v == FacialExpression.neutral ? '😐 Neutral' : '😊 Smile',
+                selected: (v) => _profile.expression == v,
+                onTap: (v) => setState(() {
+                  _profile.expression = v;
+                  _profileConfigured = true;
+                }),
+              ),
+            ),
+
+            // Accessories (multi-select + custom accessory text input)
+            _profileRow(
+              label: 'Accessories',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: ModelAccessory.values.map((acc) {
+                      final selected = _profile.accessories.contains(acc);
+                      return GestureDetector(
+                        onTap: () => setState(() {
+                          if (selected) {
+                            _profile.accessories.remove(acc);
+                          } else {
+                            _profile.accessories.add(acc);
+                          }
+                          _profileConfigured = true;
+                        }),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: selected ? _sage : _sagePale,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: selected ? _sage : _border,
+                            ),
+                          ),
+                          child: Text(
+                            acc.label,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: selected ? Colors.white : Colors.black54,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      );
+                    }).toList(),
                   ),
-                ),
-                if (_profile.hairColor == HairColor.colorful) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   SizedBox(
                     height: 40,
                     child: TextField(
-                      controller: _customHairColorController,
+                      controller: _customAccessoriesController,
                       decoration: InputDecoration(
                         hintText:
-                            'Enter hair color (e.g. Auburn, Silver, Pink)...',
+                            'Other custom accessories (e.g. Earrings, Bracelet, Tiara)...',
                         hintStyle: const TextStyle(
                           fontSize: 12,
                           color: Colors.black38,
@@ -975,154 +1253,9 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                     ),
                   ),
                 ],
-              ],
+              ),
             ),
-          ),
-
-          // Pose
-          _profileRow(
-            label: 'Pose',
-            child: Row(
-              children: _poseIcons.map((pi) {
-                final selected = _profile.pose == pi.$2;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Tooltip(
-                    message: pi.$2.displayName,
-                    child: GestureDetector(
-                      onTap: () => setState(() {
-                        _profile.pose = pi.$2;
-                        _profileConfigured = true;
-                      }),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: selected ? _sage : _sagePale,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: selected ? _sage : _border),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              pi.$1,
-                              size: 20,
-                              color: selected ? Colors.white : _sage,
-                            ),
-                            Text(
-                              pi.$2.displayName,
-                              style: TextStyle(
-                                fontSize: 8,
-                                color: selected ? Colors.white : Colors.black54,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-
-          // Facial Expression
-          _profileRow(
-            label: 'Expression',
-            child: _chipRow(
-              values: FacialExpression.values,
-              labels: (v) =>
-                  v == FacialExpression.neutral ? '😐 Neutral' : '😊 Smile',
-              selected: (v) => _profile.expression == v,
-              onTap: (v) => setState(() {
-                _profile.expression = v;
-                _profileConfigured = true;
-              }),
-            ),
-          ),
-
-          // Accessories (multi-select + custom accessory text input)
-          _profileRow(
-            label: 'Accessories',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: ModelAccessory.values.map((acc) {
-                    final selected = _profile.accessories.contains(acc);
-                    return GestureDetector(
-                      onTap: () => setState(() {
-                        if (selected) {
-                          _profile.accessories.remove(acc);
-                        } else {
-                          _profile.accessories.add(acc);
-                        }
-                        _profileConfigured = true;
-                      }),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: selected ? _sage : _sagePale,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: selected ? _sage : _border),
-                        ),
-                        child: Text(
-                          acc.label,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: selected ? Colors.white : Colors.black54,
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 40,
-                  child: TextField(
-                    controller: _customAccessoriesController,
-                    decoration: InputDecoration(
-                      hintText:
-                          'Other custom accessories (e.g. Earrings, Bracelet, Tiara)...',
-                      hintStyle: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.black38,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: _border),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: _sage),
-                      ),
-                    ),
-                    style: const TextStyle(fontSize: 12),
-                    onChanged: (val) {
-                      setState(() {
-                        _profileConfigured = true;
-                      });
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
+          ],
         ],
       ),
     );
@@ -1140,7 +1273,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           leading: Container(
             padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
@@ -1176,27 +1309,50 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                   runSpacing: 10,
                   children: List.generate(keys.length, (i) {
                     final key = keys[i];
+                    // The name sits above the field rather than as a floating
+                    // label, so long names ('Upper Bust / Over Bust') wrap
+                    // instead of being clipped by the field's border.
                     return SizedBox(
                       width: cellWidth,
-                      height: 72,
-                      child: TextField(
-                        controller: _measurements[key],
-                        decoration: InputDecoration(
-                          labelText: key,
-                          labelStyle: const TextStyle(fontSize: 10),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
+                      height: 78,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            height: 28,
+                            child: Text(
+                              key,
+                              maxLines: 2,
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                height: 1.2,
+                                color: Colors.black54,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 14,
+                          const SizedBox(height: 4),
+                          Expanded(
+                            child: TextField(
+                              controller: _measurements[key],
+                              decoration: InputDecoration(
+                                isDense: true,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 12,
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(color: _sage),
+                                ),
+                              ),
+                              style: const TextStyle(fontSize: 13),
+                            ),
                           ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: _sage),
-                          ),
-                        ),
-                        style: const TextStyle(fontSize: 13),
+                        ],
                       ),
                     );
                   }),
@@ -1433,10 +1589,15 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       ('Gender', p.gender.label),
       ('Body Shape', p.bodyShape.label),
       ('Height', p.height.label),
-      ('Skin Tone', p.skinTone.label),
+      (
+        'Skin Tone',
+        p.customSkinColorValue != null ? 'Custom shade' : p.skinTone.label,
+      ),
       (
         'Hair',
-        '${p.hairLength.label} ${p.hairStyle.label} ${p.hairColor.label}',
+        p.customHairColorValue != null
+            ? '${p.hairLength.label} ${p.hairStyle.label} custom shade'
+            : '${p.hairLength.label} ${p.hairStyle.label} ${p.hairColor.label}',
       ),
       ('Pose', p.pose.displayName),
       ('Expression', p.expression.label),
@@ -1781,54 +1942,69 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     );
   }
 
-  Widget _swatchRow({
-    required List<(Color, bool, VoidCallback)> items,
-    required String Function(int) tooltip,
-    bool Function(int)? bordered,
-  }) {
-    return Row(
-      children: items.asMap().entries.map((e) {
-        final i = e.key;
-        final (color, selected, onTap) = e.value;
-        return Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: Tooltip(
-            message: tooltip(i),
-            child: GestureDetector(
-              onTap: onTap,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: selected
-                        ? _sage
-                        : (bordered?.call(i) ?? false)
-                        ? Colors.grey.shade300
-                        : Colors.transparent,
-                    width: selected ? 3 : 1.5,
-                  ),
-                  boxShadow: selected
-                      ? [
-                          BoxShadow(
-                            color: _sage.withAlpha(100),
-                            blurRadius: 8,
-                            spreadRadius: 1,
-                          ),
-                        ]
-                      : null,
-                ),
-                child: selected
-                    ? const Icon(Icons.check, size: 15, color: Colors.white)
-                    : null,
+  Widget _buildAppearanceTabs() {
+    Widget tab(String label, bool selected, VoidCallback onTap) {
+      return Expanded(
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: selected ? _sage : _sagePale,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: selected ? _sage : _border),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: selected ? Colors.white : Colors.black54,
               ),
             ),
           ),
-        );
-      }).toList(),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        tab('Any', !_isCustomAppearance, () {
+          setState(() {
+            _isCustomAppearance = false;
+            // reset profile back to defaults when leaving Custom
+            _profile.ageGroup = AgeGroup.adult;
+            _profile.gender = GenderPresentation.feminine;
+            _profile.bodyShape = BodyShape.regular;
+            _profile.height = ModelHeight.average;
+            _profile.skinTone = SkinTone.medium;
+            _profile.hairLength = HairLength.medium;
+            _profile.hairStyle = HairStyle.straight;
+            _profile.hairColor = HairColor.black;
+            _profile.pose = ModelPose.standingFront;
+            _profile.expression = FacialExpression.neutral;
+            _profile.accessories.clear();
+            _profile.customHairColorValue = null;
+            _profile.customSkinColorValue = null;
+            _profile.customHairColor = '';
+            _profile.customSkinColor = '';
+            _skinBaseColor = _skinSwatches[2].$1;
+            _hairBaseColor = _hairSwatches.first.$1;
+            _skinAdjustDelta = 0;
+            _hairAdjustDelta = 0;
+            _customAccessoriesController.clear();
+          });
+        }),
+        const SizedBox(width: 8),
+        tab('Custom', _isCustomAppearance, () {
+          setState(() {
+            _isCustomAppearance = true;
+            _profileConfigured = true;
+          });
+        }),
+      ],
     );
   }
 

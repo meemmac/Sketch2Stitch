@@ -737,8 +737,8 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         DateTime.now().toIso8601String(),
       );
       await prefs.setInt('unread_count_$conversationId', 0);
-    } catch (e) {
-      print('Error updating read status: $e');
+    } catch (_) {
+      // Non-fatal: the unread badge just stays until the next open.
     }
   }
 
@@ -763,8 +763,8 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         }
         _applyFilter();
       });
-    } catch (e) {
-      print('Error refreshing conversation status: $e');
+    } catch (_) {
+      // Non-fatal: the list still renders with the last known status.
     }
   }
 

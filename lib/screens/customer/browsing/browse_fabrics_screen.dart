@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
-import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
 import 'package:sketch2stitch/services/browse_service.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -66,7 +65,7 @@ class FabricProductData {
     if (cleanBlends.isNotEmpty) {
       return cleanBlends.join(", ");
     }
-    return product.materialType.trim().isNotEmpty ? product.materialType : "N/A";
+    return product.materialType.isNotEmpty ? product.materialType.first.type : "N/A";
   }
 
   List<String> get materialBlendList {
@@ -80,13 +79,13 @@ class FabricProductData {
   factory FabricProductData.fromProduct(Product product) {
     List<FabricMaterialBlend> blends = [];
     
-    // Extract material blends from product's materialTypes
-    if (product.materialTypes.isNotEmpty) {
-      for (final materialType in product.materialTypes) {
+    // Extract material blends from product's materialType list
+    if (product.materialType.isNotEmpty) {
+      for (final materialType in product.materialType) {
         blends.add(FabricMaterialBlend(
           material: materialType.type,
-          blend: materialType.blend != null && materialType.blend! > 0 
-              ? '${materialType.blend!.toInt()}%' 
+          blend: materialType.blend > 0 
+              ? '${materialType.blend.toInt()}%' 
               : '',
         ));
       }
@@ -460,8 +459,8 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       itemBuilder: (context, index) {
         final fabricData = fabrics[index];
         final product = fabricData.product;
-        final coverImage = product.colorOptions.isNotEmpty
-            ? product.colorOptions.first.image
+        final coverImage = product.colorOptions.isNotEmpty && product.colorOptions.first.image.isNotEmpty
+            ? product.colorOptions.first.image.first
             : null;
         final bool outOfStock =
             product.colorOptions.every((c) => c.stock <= 0);
@@ -502,36 +501,14 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                                   ? Image.network(
                                       coverImage,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) => Container(
-                                        color: const Color(0xFF6B8F71).withOpacity(0.12),
-                                        child: Icon(
-                                          Icons.texture,
-                                          size: isSmallScreen ? 36 : 40,
-                                          color: const Color(0xFF4A7C59),
-                                        ),
-                                      ),
+                                      errorBuilder: (context, error, stackTrace) => _imageFallback(isSmallScreen),
                                     )
                                   : Image.asset(
                                       coverImage,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) => Container(
-                                        color: const Color(0xFF6B8F71).withOpacity(0.12),
-                                        child: Icon(
-                                          Icons.texture,
-                                          size: isSmallScreen ? 36 : 40,
-                                          color: const Color(0xFF4A7C59),
-                                        ),
-                                      ),
-                                    )
-                                )
-                              : Container(
-                                  color: const Color(0xFF6B8F71).withOpacity(0.12),
-                                  child: Icon(
-                                    widget.showFabrics ? Icons.texture : Icons.category,
-                                    size: isSmallScreen ? 36 : 40,
-                                    color: const Color(0xFF4A7C59),
-                                  ),
-                                ),
+                                      errorBuilder: (context, error, stackTrace) => _imageFallback(isSmallScreen),
+                                    ))
+                              : _imageFallback(isSmallScreen),
                         ),
                       ),
                       if (widget.showFabrics && materialDisplay != "N/A")
@@ -726,6 +703,17 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       default:
         return Colors.grey[300]!;
     }
+  }
+
+  Widget _imageFallback(bool isSmall) {
+    return Container(
+      color: const Color(0xFF6B8F71).withOpacity(0.12),
+      child: Icon(
+        Icons.texture,
+        size: isSmall ? 36 : 40,
+        color: const Color(0xFF4A7C59),
+      ),
+    );
   }
 
   void _showFabricDetailOverlay(BuildContext context, FabricProductData fabricData) {

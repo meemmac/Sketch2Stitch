@@ -610,8 +610,8 @@ Future<void> _loadReviews() async {
       final firstProduct = _products.first;
       if (firstProduct.colorOptions.isNotEmpty) {
         final firstColor = firstProduct.colorOptions.first;
-        if (firstColor.image != null && firstColor.image!.isNotEmpty) {
-          imageUrl = firstColor.image!;
+        if (firstColor.image.isNotEmpty) {
+          imageUrl = firstColor.image.first;
         }
       }
     }
@@ -842,7 +842,7 @@ Future<void> _loadReviews() async {
       itemBuilder: (context, index) {
         final product = displayProducts[index];
         final coverImage = product.colorOptions.isNotEmpty
-            ? product.colorOptions.first.image
+            ? (product.colorOptions.first.image.isNotEmpty ? product.colorOptions.first.image.first : null)
             : null;
         final bool outOfStock = product.colorOptions.every((c) => c.stock <= 0);
         final bool isElement = _isElement(product);
@@ -1072,7 +1072,7 @@ Future<void> _loadReviews() async {
   }
 
   String _materialBadgeText(Product product) {
-    final material = product.materialType.trim();
+    final material = product.materialType.isNotEmpty ? product.materialType.first.type : "";
     if (material.isEmpty || material == "N/A") {
       return "N/A";
     }
@@ -1107,7 +1107,7 @@ Future<void> _loadReviews() async {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(
-            Icons.arrow_back_ios_new,
+            Icons.arrow_back,
             color: Colors.black87,
             size: 20,
           ),

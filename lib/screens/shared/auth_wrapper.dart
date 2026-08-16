@@ -1,3 +1,5 @@
+// screens/auth_wrapper.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/models/customer.dart';
@@ -8,6 +10,9 @@ import 'package:sketch2stitch/screens/shared/welcome_screen.dart';
 import 'package:sketch2stitch/services/auth_service.dart';
 import 'package:sketch2stitch/services/user_session.dart';
 import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
+import '../../models/customer.dart';
+import '../../models/tailor.dart';
+import '../../models/retailer.dart';
 
 /// Gatekeeper widget that decides whether to show the Welcome screen
 /// or the Dashboard based on Firebase Auth state.
@@ -71,11 +76,11 @@ class AuthWrapper extends StatelessWidget {
       final profile = await authService.getUserProfile(uid, role);
       if (profile == null) return null;
 
-      // FIX: Build DrawerProfileData based on role type
+      // Build DrawerProfileData based on role type
       final drawerData = _buildDrawerProfileData(profile, role);
       
       // Save to global session using UserSession
-      UserSession.instance.setSession(drawerData, role);
+      UserSession.instance.setSession(drawerData, role, uid: uid);
       
       return role;
     } catch (e) {

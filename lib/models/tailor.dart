@@ -13,7 +13,7 @@ class Tailor {
   final String? profilePicture;
   final String? about;
   final GeoPoint? location;
-
+  final int? maxOrder;
   // Relationships
   List<Portfolio>? portfolio;
   List<AppNotification>? notifications;
@@ -29,6 +29,7 @@ class Tailor {
     this.location,
     this.profilePicture,
     this.about,
+    this.maxOrder,
     this.portfolio = const [],
     this.notifications = const [],
     this.jobs = const [],
@@ -55,6 +56,7 @@ class Tailor {
     GeoPoint? location,
     String? profilePicture,
     String? about,
+    int? maxOrder,
     List<Portfolio>? portfolio,
     List<AppNotification>? notifications,
     List<TailorJob>? jobs,
@@ -69,6 +71,7 @@ class Tailor {
       location: location ?? this.location,
       profilePicture: profilePicture ?? this.profilePicture,
       about: about ?? this.about,
+      maxOrder: maxOrder ?? this.maxOrder,
       portfolio: portfolio ?? this.portfolio,
       notifications: notifications ?? this.notifications,
       jobs: jobs ?? this.jobs,
@@ -84,6 +87,7 @@ class Tailor {
     'location': location,
     'profilePicture': profilePicture,
     'about': about,
+    'maxOrder': maxOrder,
   };
 
   factory Tailor.fromJson(Map<String, dynamic> json, {String? id}) {
@@ -97,6 +101,7 @@ class Tailor {
       location: json['location'] is GeoPoint ? json['location'] as GeoPoint : null,
       profilePicture: json['profilePicture'],
       about: json['about'],
+      maxOrder: json['maxOrder'] is int ? json['maxOrder'] as int : null,
     );
   }
 }

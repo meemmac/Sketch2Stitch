@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../../../models/measurement.dart';
+import '../../../models/tailor.dart';
 import 'reviews_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../services/tailor_service.dart';
+import '../../../services/user_session.dart';
+import '../../../services/order_service.dart';
+import '../../../models/tailor_job.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../widgets/top_feedback_banner.dart';
 
 enum TailorOrderStatus { pending, confirmed, inProgress, ready, completed, cancelled }
 
@@ -38,7 +46,8 @@ class TailorOrderItem {
 }
 
 class TailorOrder {
-  final String id;
+  final String id; // This is the Tailor-job document ID
+  final String orderId; // This is the parent Orders document ID
   final String customerName;
   final String customerPhone;
   final List<TailorOrderItem> items;
@@ -50,9 +59,11 @@ class TailorOrder {
   final String? customerReview;
   final double? customerRating;
   final String deliveryAddress;
+  final Measurement? measurement;
 
   TailorOrder({
     required this.id,
+    required this.orderId,
     required this.customerName,
     required this.customerPhone,
     required this.items,
@@ -64,17 +75,20 @@ class TailorOrder {
     this.completionDate,
     this.customerReview,
     this.customerRating,
+    this.measurement,
   });
 
-  int get totalQuantity => items.fold(0, (sum, item) => sum + item.quantity);
-  double get totalServicePrice => items.fold(0, (sum, item) => sum + item.servicePrice);
-  double get totalProductPrice => items.fold(0, (sum, item) => sum + item.productPrice);
+  int get totalQuantity => items.fold(0, (sumValue, item) => sumValue + item.quantity);
+  double get totalServicePrice => items.fold(0, (sumValue, item) => sumValue + item.servicePrice);
+  double get totalProductPrice => items.fold(0, (sumValue, item) => sumValue + item.productPrice);
 }
 
 enum OrderFilterPreset { last3Months, last6Months, custom }
 
 class TailorOrdersScreen extends StatefulWidget {
-  const TailorOrdersScreen({super.key});
+  final Tailor? tailor; 
+
+  const TailorOrdersScreen({super.key, this.tailor});
 
   @override
   State<TailorOrdersScreen> createState() => _TailorOrdersScreenState();
@@ -88,15 +102,147 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
   DateTime? _customEndDate;
   int _selectedTabIndex = 1; // 0: Pending, 1: Current, 2: Completed
   String _selectedStatus = "All";
+  late Tailor _tailor; 
+  final TailorService _tailorService = TailorService();
+  final OrderService _orderService = OrderService();
+  StreamSubscription? _ordersSubscription;
+  bool _isLoading = true;
+
+  // Top feedback state (matching RegisterScreen)
 
   final Color primaryGreen = const Color(0xFF4F7942);
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.tailor != null) {
+      _tailor = widget.tailor!;
+    } else {
+      _tailor = Tailor(
+        id: "T-123",
+        name: "Loading...",
+        email: "",
+        phone: "",
+        address: "",
+        rating: 5.0,
+        maxOrder: null, // Defaults to Not Set (unlimited)
+      );
+      _fetchTailorProfile();
+    }
+    _listenToOrders();
+  }
+
+  void _listenToOrders() {
+    final tailorId = UserSession.instance.uid;
+    if (tailorId == null) {
+      return;
+    }
+
+    _ordersSubscription = _orderService.streamDetailedTailorOrders(tailorId).listen((data) {
+      if (!mounted) return;
+      setState(() {
+        _orders.clear();
+        for (var map in data) {
+          final job = map['job'];
+          final order = map['order'];
+          final customer = map['customer'];
+          final items = map['items'] as List<dynamic>;
+          final measurementMap = map['measurement'];
+
+
+          _orders.add(TailorOrder(
+            id: job['id'],
+            orderId: order['id'],
+            customerName: customer['name'] ?? 'N/A',
+            customerPhone: customer['phone'] ?? 'N/A',
+            totalAmount: (job['quoteAmount'] ?? 0).toDouble() + (job['deliveryCharge'] ?? 0).toDouble(),
+            orderDate: _parseDateTime(job['createdAt'] ?? order['orderDate']) ?? DateTime.now(),
+            status: _mapStatus(job['status']),
+            isCompleted: job['status'] == 'completed',
+            completionDate: job['status'] == 'completed' ? _parseDateTime(job['confirmedAt']) : null, 
+            deliveryAddress: customer['address'] ?? 'N/A',
+            measurement: measurementMap != null ? Measurement.fromJson({...measurementMap, 'id': job['measurementId']}) : null,
+            items: items.map((i) {
+              final careSymbols = List<String>.from(i['careSymbol'] ?? []);
+              return TailorOrderItem(
+                name: i['name'],
+                quantity: i['quantity'],
+                imagePath: i['imagePath'],
+                color: i['color'],
+                productPrice: i['price'],
+                servicePrice: (job['quoteAmount'] ?? 0).toDouble(),
+                tailorInstructions: job['specialInstructions'] ?? i['instructions'],
+                estimatedDeliveryDate: _parseDateTime(job['estimatedDeliveryDate']),
+                measurementRefImages: job['designIds'] != null ? List<String>.from(job['designIds']) : [],
+                canWash: careSymbols.contains('wash'),
+                canBleach: careSymbols.contains('bleach'),
+                canDryClean: careSymbols.contains('dryClean'),
+                ironLevel: careSymbols.firstWhere((s) => s.startsWith('iron'), orElse: () => "Medium"),
+              );
+            }).toList(),
+          ));
+        }
+        _isLoading = false;
+      });
+    }, onError: (e) {
+      debugPrint("TailorOrdersScreen: Error in stream: $e");
+      if (mounted) setState(() => _isLoading = false);
+    });
+  }
+
+  DateTime? _parseDateTime(dynamic v) {
+    if (v == null) return null;
+    if (v is Timestamp) return v.toDate();
+    if (v is String) return DateTime.tryParse(v);
+    return null;
+  }
+
+  TailorOrderStatus _mapStatus(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'pending': return TailorOrderStatus.pending;
+      // Quote sent — the tailor is done, it's the customer's move now. Groups
+      // with 'confirmed' so a quoted job doesn't fall back into the Pending
+      // bucket and look like it still needs a response.
+      case 'quoted':
+      case 'confirmed': return TailorOrderStatus.confirmed;
+      case 'in_progress': return TailorOrderStatus.inProgress;
+      case 'ready': return TailorOrderStatus.ready;
+      case 'completed': return TailorOrderStatus.completed;
+      case 'cancelled':
+      case 'tailor_declined':
+      case 'rejected':
+        return TailorOrderStatus.cancelled;
+      default: return TailorOrderStatus.pending;
+    }
+  }
+
+  Future<void> _fetchTailorProfile() async {
+    final uid = UserSession.instance.uid;
+    if (uid != null) {
+      final t = await _tailorService.getTailorProfile(uid);
+      if (t != null && mounted) {
+        setState(() {
+          _tailor = t;
+        });
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
+    _ordersSubscription?.cancel();
     super.dispose();
   }
 
+  void _showBanner(String message, {bool isError = true}) {
+    // Single app-wide top banner; also visible over bottom sheets.
+    AppFeedback.show(context, message, isError: isError);
+  }
+
+  final List<TailorOrder> _orders = [];
+
+  /*
   final Measurement _mockMeasurement = Measurement(
     id: "meas_123",
     customerId: "cust_456",
@@ -116,7 +262,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     shoulderToAnkle: 55.0,
   );
 
-  late final List<TailorOrder> _orders = [
+  late final List<TailorOrder> _dummyOrders = [
     TailorOrder(
       id: "T-ORD-1122",
       customerName: "Maria Doe",
@@ -242,6 +388,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
       ],
     ),
   ];
+  */
 
   DateTime get _startDate {
     final today = DateTime.now();
@@ -280,7 +427,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
   }
 
   List<TailorOrder> get _pendingOrders => _filteredOrders.where((o) => o.status == TailorOrderStatus.pending || o.status == TailorOrderStatus.confirmed).toList();
-  List<TailorOrder> get _currentWorkOrders => _filteredOrders.where((o) => o.status == TailorOrderStatus.inProgress).toList();
+  List<TailorOrder> get _currentWorkOrders => _filteredOrders.where((o) => o.status == TailorOrderStatus.inProgress || o.status == TailorOrderStatus.ready).toList();
   List<TailorOrder> get _completedOrders => _filteredOrders.where((o) => o.isCompleted || o.status == TailorOrderStatus.completed).toList();
 
   @override
@@ -291,98 +438,107 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF9FBF9),
       body: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(horizontalPadding, 18, horizontalPadding, 24),
+        child: Stack(
           children: [
-            Row(
-              children: [
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back, color: Colors.black87),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    "Tailoring Orders",
-                    style: TextStyle(
-                      fontSize: screenWidth > 400 ? 30 : 24,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: _showFilterSheet,
-                  icon: Icon(Icons.filter_list, color: primaryGreen),
-                  tooltip: "Filter orders",
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildSearchAndFilter(),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: _sectionToggle(
-                    label: "Pending",
-                    isSelected: _selectedTabIndex == 0,
-                    count: _pendingOrders.length,
-                    onTap: () => setState(() {
-                      _selectedTabIndex = 0;
-                      _selectedStatus = "All";
-                    }),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _sectionToggle(
-                    label: "Ongoing",
-                    isSelected: _selectedTabIndex == 1,
-                    count: _currentWorkOrders.length,
-                    onTap: () => setState(() {
-                      _selectedTabIndex = 1;
-                      _selectedStatus = "All";
-                    }),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _sectionToggle(
-                    label: "Completed",
-                    isSelected: _selectedTabIndex == 2,
-                    count: _completedOrders.length,
-                    onTap: () => setState(() {
-                      _selectedTabIndex = 2;
-                      _selectedStatus = "All";
-                    }),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            if (_selectedTabIndex == 0)
-              _ordersSection(
-                title: "New Requests",
-                icon: Icons.pending_actions,
-                orders: _pendingOrders,
-                emptyText: "No pending requests",
-              )
-            else if (_selectedTabIndex == 1)
-              _ordersSection(
-                title: "Active Orders",
-                icon: Icons.assignment_outlined,
-                orders: _currentWorkOrders,
-                emptyText: "No active tailoring requests",
-              )
+            if (_isLoading)
+              const Center(child: CircularProgressIndicator())
             else
-              _ordersSection(
-                title: "Finished Work",
-                icon: Icons.task_alt,
-                orders: _completedOrders,
-                emptyText: "No completed orders found",
+              ListView(
+                padding: EdgeInsets.fromLTRB(horizontalPadding, 18, horizontalPadding, 24),
+                children: [
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "Tailoring Orders",
+                          style: TextStyle(
+                            fontSize: screenWidth > 400 ? 30 : 24,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: _showFilterSheet,
+                        icon: Icon(Icons.filter_list, color: primaryGreen),
+                        tooltip: "Filter orders",
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSearchAndFilter(),
+                  const SizedBox(height: 20),
+                  _buildMaxOrderButton(),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _sectionToggle(
+                          label: "Pending",
+                          isSelected: _selectedTabIndex == 0,
+                          count: _pendingOrders.length,
+                          onTap: () => setState(() {
+                            _selectedTabIndex = 0;
+                            _selectedStatus = "All";
+                          }),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _sectionToggle(
+                          label: "Ongoing",
+                          isSelected: _selectedTabIndex == 1,
+                          count: _currentWorkOrders.length,
+                          onTap: () => setState(() {
+                            _selectedTabIndex = 1;
+                            _selectedStatus = "All";
+                          }),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _sectionToggle(
+                          label: "Completed",
+                          isSelected: _selectedTabIndex == 2,
+                          count: _completedOrders.length,
+                          onTap: () => setState(() {
+                            _selectedTabIndex = 2;
+                            _selectedStatus = "All";
+                          }),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  if (_selectedTabIndex == 0)
+                    _ordersSection(
+                      title: "New Requests",
+                      icon: Icons.pending_actions,
+                      orders: _pendingOrders,
+                      emptyText: "No pending requests",
+                    )
+                  else if (_selectedTabIndex == 1)
+                    _ordersSection(
+                      title: "Active Orders",
+                      icon: Icons.assignment_outlined,
+                      orders: _currentWorkOrders,
+                      emptyText: "No active tailoring requests",
+                    )
+                  else
+                    _ordersSection(
+                      title: "Finished Work",
+                      icon: Icons.task_alt,
+                      orders: _completedOrders,
+                      emptyText: "No completed orders found",
+                    ),
+                ],
               ),
           ],
         ),
@@ -605,7 +761,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const TailorReviewsScreen()),
+                    MaterialPageRoute(builder: (_) => TailorReviewsScreen(tailorName: _tailor.name)),
                   );
                 },
                 icon: const Icon(Icons.star_outline, size: 16),
@@ -638,6 +794,9 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
   }
 
   Widget _orderCard(TailorOrder order) {
+    if (order.items.isEmpty) {
+      return const SizedBox.shrink(); // Hide corrupted or empty orders
+    }
     final statusColor = _getStatusColor(order.status);
     final firstItem = order.items.first;
 
@@ -648,7 +807,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5))],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -657,17 +816,17 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(14),
-                  child: Image.asset(
-                    firstItem.imagePath, width: 52, height: 52, fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(width: 52, height: 52, color: Colors.green.shade50, child: Icon(Icons.content_cut, color: primaryGreen)),
-                  ),
+                  child: _buildProductImage(firstItem.imagePath, 52, 52),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(order.id, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+                      Text(
+                        order.orderId.startsWith('ORD-') ? order.orderId : "ORD-${order.orderId}",
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+                      ),
                       Text("Customer: ${order.customerName}", style: const TextStyle(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.w600)),
                       Text("Phone: ${order.customerPhone}", style: const TextStyle(color: Colors.black54, fontSize: 11, fontWeight: FontWeight.w600)),
                     ],
@@ -678,7 +837,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                      decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(999)),
+                      decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(999)),
                       child: Text(_getStatusText(order.status), style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w900)),
                     ),
                     if (order.status == TailorOrderStatus.inProgress)
@@ -743,9 +902,14 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   "Accept Request",
                   Icons.check_circle_outline,
                   primaryGreen,
-                  () {
-                    setState(() => order.status = TailorOrderStatus.confirmed);
-                    Navigator.pop(context);
+                  () async {
+                    try {
+                      await _orderService.updateTailorJobStatus(order.id, TailorJobStatus.confirmed);
+                      Navigator.pop(context);
+                      _showBanner("Request accepted", isError: false);
+                    } catch (e) {
+                      _showBanner("Something went wrong. Please try again.");
+                    }
                   },
                 ),
                 _statusOptionTile(
@@ -762,9 +926,14 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   "Start Stitching",
                   Icons.play_arrow_outlined,
                   Colors.purple,
-                  () {
-                    setState(() => order.status = TailorOrderStatus.inProgress);
-                    Navigator.pop(context);
+                  () async {
+                    try {
+                      await _orderService.updateWorkProgress(order.id, "in_progress");
+                      Navigator.pop(context);
+                      _showBanner("Stitching started", isError: false);
+                    } catch (e) {
+                      _showBanner("Something went wrong. Please try again.");
+                    }
                   },
                 ),
               if (order.status == TailorOrderStatus.inProgress)
@@ -772,13 +941,14 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   "Mark as Finished",
                   Icons.check_circle_outline,
                   primaryGreen,
-                  () {
-                    setState(() {
-                      order.status = TailorOrderStatus.completed;
-                      order.isCompleted = true;
-                      order.completionDate = DateTime.now();
-                    });
-                    Navigator.pop(context);
+                  () async {
+                    try {
+                      await _orderService.updateWorkProgress(order.id, "completed");
+                      Navigator.pop(context);
+                      _showBanner("Work marked as completed", isError: false);
+                    } catch (e) {
+                      _showBanner("Something went wrong. Please try again.");
+                    }
                   },
                 ),
               const SizedBox(height: 8),
@@ -845,12 +1015,15 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text("Stitching Details", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                        Text("ID: ${order.id}", style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+                        Text(
+                          "ID: ${order.orderId.startsWith('ORD-') ? order.orderId : "ORD-${order.orderId}"}",
+                          style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600),
+                        ),
                       ],
                     ),
                     _infoBadge(
                       _getStatusText(order.status),
-                      _getStatusColor(order.status).withOpacity(0.1),
+                      _getStatusColor(order.status).withValues(alpha: 0.1),
                       _getStatusColor(order.status),
                     ),
                   ],
@@ -945,10 +1118,19 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
       children: [
         Expanded(
           child: ElevatedButton(
-            onPressed: canAccept ? () {
-              setState(() => order.status = TailorOrderStatus.confirmed);
-              Navigator.pop(modalContext);
-              ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text("Job Accepted Successfully!")));
+            onPressed: canAccept ? () async {
+              try {
+                final firstItem = order.items.first;
+                await _orderService.acceptTailorJob(
+                  order.id, 
+                  firstItem.servicePrice, 
+                  firstItem.estimatedDeliveryDate!,
+                );
+                Navigator.pop(modalContext);
+                _showBanner("Job Accepted Successfully!", isError: false);
+              } catch (e) {
+                _showBanner("Something went wrong. Please try again.");
+              }
             } : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryGreen,
@@ -989,10 +1171,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.asset(
-                  item.imagePath, width: 60, height: 60, fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(width: 60, height: 60, color: Colors.green.shade50, child: Icon(Icons.content_cut, color: primaryGreen)),
-                ),
+                child: _buildProductImage(item.imagePath, 60, 60),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1112,7 +1291,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                         if (order.status == TailorOrderStatus.inProgress || order.status == TailorOrderStatus.confirmed) ...[
                           const SizedBox(width: 8),
                           GestureDetector(
-                            onTap: () => _showPriceEditDialog(item, setModalState),
+                            onTap: () => _showPriceEditDialog(order, item, setModalState),
                             child: Icon(Icons.edit, size: 14, color: primaryGreen),
                           ),
                         ],
@@ -1186,14 +1365,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   onTap: () => _showFullScreenImage(imgPath),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.asset(
-                      imgPath,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: Colors.grey.shade200,
-                        child: const Icon(Icons.image_not_supported, color: Colors.grey),
-                      ),
-                    ),
+                    child: _buildProductImage(imgPath, 100, 100),
                   ),
                 );
               },
@@ -1208,7 +1380,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
               Text(item.tailorInstructions ?? "No specific instructions provided.", style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.4)),
               const SizedBox(height: 8),
               TextButton.icon(
-                onPressed: _showMeasurements,
+                onPressed: () => _showMeasurements(order.measurement),
                 icon: const Icon(Icons.straighten, size: 14),
                 label: const Text("View Customer Measurements", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                 style: TextButton.styleFrom(padding: EdgeInsets.zero, foregroundColor: primaryGreen, minimumSize: const Size(0, 0), tapTargetSize: MaterialTapTargetSize.shrinkWrap),
@@ -1227,28 +1399,60 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text("Reason for Cancellation", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text("Please tell us why you're declining this request. This feedback helps customers understand.", style: TextStyle(color: Colors.black54, fontSize: 12)),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              maxLines: 3,
-              style: const TextStyle(fontSize: 14),
-              decoration: InputDecoration(
-                hintText: "Write reason here...",
-                hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-                filled: true,
-                fillColor: Colors.grey.shade50,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.red.shade200)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Please tell us why you're declining this request. This feedback helps customers understand.", style: TextStyle(color: Colors.black54, fontSize: 12)),
+              const SizedBox(height: 20),
+              const Text("Quick Reasons:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  "Unable to work with selected material",
+                  "Order requirements are unclear",
+                  "Delivery location issue"
+                ].map((reason) => GestureDetector(
+                  onTap: () {
+                    controller.text = reason;
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Text(
+                      reason,
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87),
+                    ),
+                  ),
+                )).toList(),
               ),
-            ),
-          ],
+              const SizedBox(height: 18),
+              TextField(
+                controller: controller,
+                maxLines: 3,
+                style: const TextStyle(fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: "Write reason here...",
+                  hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.red.shade200)),
+                ),
+              ),
+            ],
+          ),
         ),
+
+
         actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
           Row(
@@ -1265,14 +1469,20 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 child: ElevatedButton(
                   onPressed: () {
                     if (controller.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please provide a reason")));
+                      _showBanner("Please provide a reason", isError: true);
                       return;
                     }
                     setState(() {
                       order.status = TailorOrderStatus.cancelled;
                     });
-                    Navigator.pop(context);
-                    if (onDone != null) onDone();
+                    _orderService.declineTailorJob(order.id, controller.text.trim()).then((_) {
+                      if (!mounted) return;
+                      Navigator.pop(context);
+                      _showBanner("Request declined successfully.", isError: false);
+                      if (onDone != null) onDone();
+                    }).catchError((e) {
+                      _showBanner("Something went wrong. Please try again.");
+                    });
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFCC3333),
@@ -1294,7 +1504,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     );
   }
 
-  void _showPriceEditDialog(TailorOrderItem item, StateSetter setModalState) {
+  void _showPriceEditDialog(TailorOrder order, TailorOrderItem item, StateSetter setModalState) {
     final controller = TextEditingController(text: item.servicePrice > 0 ? item.servicePrice.toInt().toString() : "");
     showDialog(
       context: context,
@@ -1312,12 +1522,25 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
           ElevatedButton(
-            onPressed: () {
-              setModalState(() {
-                item.servicePrice = double.tryParse(controller.text) ?? item.servicePrice;
-              });
-              setState(() {});
-              Navigator.pop(context);
+            onPressed: () async {
+              final newPrice = double.tryParse(controller.text) ?? item.servicePrice;
+              try {
+                if (order.status != TailorOrderStatus.pending) {
+                  await _orderService.editStitchingTerms(
+                    order.id,
+                    newPrice, 
+                    item.estimatedDeliveryDate ?? DateTime.now(),
+                  );
+                }
+                setModalState(() {
+                  item.servicePrice = newPrice;
+                });
+                setState(() {});
+                Navigator.pop(context);
+                _showBanner("Price updated", isError: false);
+              } catch (e) {
+                _showBanner("Something went wrong. Please try again.");
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: primaryGreen),
             child: const Text("Save", style: TextStyle(color: Colors.white)),
@@ -1327,45 +1550,11 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     );
   }
 
-  void _showFullScreenImage(String imagePath) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog.fullscreen(
-        backgroundColor: Colors.black,
-        child: Stack(
-          children: [
-            Center(
-              child: InteractiveViewer(
-                child: Image.asset(imagePath, fit: BoxFit.contain),
-              ),
-            ),
-            Positioned(
-              top: 40,
-              left: 20,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 30),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-            Positioned(
-              top: 40,
-              right: 20,
-              child: IconButton(
-                icon: const Icon(Icons.download, color: Colors.white, size: 30),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Reference image download started...")),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showMeasurements() {
+  void _showMeasurements(Measurement? measurement) {
+    if (measurement == null) {
+      _showBanner("No measurement data available for this customer.");
+      return;
+    }
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1385,12 +1574,20 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
             Expanded(
               child: ListView(
                 children: [
-                  _measurementTile("Upper Bust", _mockMeasurement.upperBustCircumference),
-                  _measurementTile("Bust", _mockMeasurement.bustCircumference),
-                  _measurementTile("Under Bust", _mockMeasurement.underBustCircumference),
-                  _measurementTile("Round Shoulder", _mockMeasurement.roundShoulderCircumference),
-                  _measurementTile("Waist", _mockMeasurement.waist),
-                  _measurementTile("Hips", _mockMeasurement.hipsCircumference),
+                  _measurementTile("Upper Bust", measurement.upperBustCircumference),
+                  _measurementTile("Bust", measurement.bustCircumference),
+                  _measurementTile("Under Bust", measurement.underBustCircumference),
+                  _measurementTile("Round Shoulder", measurement.roundShoulderCircumference),
+                  _measurementTile("Waist", measurement.waist),
+                  _measurementTile("Hips", measurement.hipsCircumference),
+                  _measurementTile("Shoulder to Knee", measurement.shoulderToKnee),
+                  _measurementTile("Shoulder to Under Bust", measurement.shoulderToUnderBust),
+                  _measurementTile("Shoulder to Bust", measurement.shoulderToBust),
+                  _measurementTile("Thigh", measurement.thigh),
+                  _measurementTile("Knee", measurement.knee),
+                  _measurementTile("Ankle", measurement.ankle),
+                  _measurementTile("Waist to Ankle", measurement.waistToAnkle),
+                  _measurementTile("Shoulder to Ankle", measurement.shoulderToAnkle),
                 ],
               ),
             ),
@@ -1477,7 +1674,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     switch (status) {
       case TailorOrderStatus.pending: return "New Request";
       case TailorOrderStatus.confirmed: return "Pending Customer";
-      case TailorOrderStatus.inProgress: return "Stitching";
+      case TailorOrderStatus.inProgress: return "In Progress";
       case TailorOrderStatus.ready: return "Ready";
       case TailorOrderStatus.completed: return "Finished";
       case TailorOrderStatus.cancelled: return "Declined";
@@ -1498,5 +1695,228 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
   String _formatDate(DateTime date) {
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     return "${date.day} ${months[date.month - 1]} ${date.year}";
+  }
+
+  Widget _buildProductImage(String path, double width, double height) {
+    if (path.startsWith('http')) {
+      return Image.network(
+        path,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _imagePlaceholder(width, height),
+      );
+    } else if (path.isNotEmpty) {
+      return Image.asset(
+        path,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _imagePlaceholder(width, height),
+      );
+    } else {
+      return _imagePlaceholder(width, height);
+    }
+  }
+
+  Widget _imagePlaceholder(double width, double height) {
+    return Container(
+      width: width,
+      height: height,
+      color: Colors.green.shade50,
+      child: Icon(Icons.content_cut, color: primaryGreen),
+    );
+  }
+
+  // Added Max Order Info and Update Button
+  Widget _buildMaxOrderButton() {
+    final int? maxOrder = _tailor.maxOrder;
+    final String value = maxOrder == null ? "Not Set" : "$maxOrder";
+    
+    return InkWell(
+      onTap: _showMaxOrderDialog,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.green.shade100, width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: primaryGreen.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.bolt_rounded, size: 20, color: primaryGreen),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              "Maximum Order Capacity:",
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: Colors.black54,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              value,
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+                color: primaryGreen,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              maxOrder == null ? "Set" : "Update",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: primaryGreen,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right_rounded, size: 16, color: primaryGreen),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showFullScreenImage(String imagePath) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog.fullscreen(
+        backgroundColor: Colors.black,
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                child: _buildProductImage(imagePath, double.infinity, double.infinity),
+              ),
+            ),
+            Positioned(
+              top: 40,
+              left: 20,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            Positioned(
+              top: 40,
+              right: 20,
+              child: IconButton(
+                icon: const Icon(Icons.download, color: Colors.white, size: 30),
+                onPressed: () {
+                  _showBanner("Reference image download started...", isError: false);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showMaxOrderDialog() {
+    final controller = TextEditingController(
+      text: _tailor.maxOrder?.toString() ?? "",
+    );
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          "Set Maximum Orders",
+          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Set the maximum number of orders you can handle. Leave empty for unlimited orders.",
+                style: TextStyle(color: Colors.black54, fontSize: 12),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  hintText: "Enter amount (e.g. 10)",
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final val = controller.text.trim();
+              final newMaxOrder = val.isEmpty ? null : int.tryParse(val);
+              
+              if (newMaxOrder == _tailor.maxOrder) {
+                Navigator.pop(context);
+                return;
+              }
+
+              Navigator.pop(context);
+
+              setState(() {
+                _tailor = _tailor.copyWith(maxOrder: newMaxOrder);
+              });
+
+              final uid = UserSession.instance.uid;
+              if (uid != null) {
+                try {
+                  await _tailorService.updateTailorProfile(uid, {'maxOrder': newMaxOrder});
+                  _showBanner("Capacity updated successfully!", isError: false);
+                } catch (e) {
+                  debugPrint("Error updating maximum order: $e");
+                  _showBanner("Couldn't save the change. Please try again.", isError: true);
+                }
+              } else {
+                _showBanner("Local capacity updated (Not logged in)", isError: false);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryGreen,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              "Save",
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

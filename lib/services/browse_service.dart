@@ -6,7 +6,7 @@ import '../models/order.dart';
 
 class BrowseService {
   BrowseService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
@@ -52,7 +52,7 @@ class BrowseService {
       var products = snapshot.docs.map((doc) {
         try {
           final data = doc.data() as Map<String, dynamic>;
-          return Product.fromJson(data);
+          return Product.fromJson(data, id: doc.id);
         } catch (e) {
           print('❌ Error parsing product ${doc.id}: $e');
           return Product(
@@ -61,7 +61,7 @@ class BrowseService {
             productName: 'Error: ${doc.id}',
             productCode: '',
             category: '',
-            materialTypes: [],
+            materialType: [],
             colorOptions: [],
             description: '',
             careSymbol: [],
@@ -71,11 +71,13 @@ class BrowseService {
 
       // Client-side filtering for more complex logic
       
-      // Filter by material type
+      // Filter by material type - updated for MaterialBlend
       if (materialType != null && materialType != 'All') {
         products = products.where((p) {
-          final material = p.materialType.toLowerCase();
-          return material.contains(materialType.toLowerCase());
+          // Check if any material type contains the filter string
+          return p.materialType.any(
+            (m) => m.type.toLowerCase().contains(materialType.toLowerCase())
+          );
         }).toList();
         print('📊 After material filter: ${products.length} products');
       }
@@ -93,7 +95,9 @@ class BrowseService {
       // Filter by colors
       if (colors != null && colors.isNotEmpty && !colors.contains('All')) {
         products = products.where((p) {
-          final productColors = p.colorOptions.map((c) => c.color.toLowerCase()).toList();
+          final productColors = p.colorOptions
+              .map((c) => c.color.toLowerCase())
+              .toList();
           return colors.any((c) => productColors.contains(c.toLowerCase()));
         }).toList();
         print('📊 After color filter: ${products.length} products');
@@ -128,7 +132,7 @@ class BrowseService {
 
       return snapshot.docs.map((doc) {
         try {
-          return Product.fromJson(doc.data());
+          return Product.fromJson(doc.data(), id: doc.id);
         } catch (e) {
           print('❌ Error parsing product in search: $e');
           return Product(
@@ -136,7 +140,7 @@ class BrowseService {
             retailerId: '',
             productName: 'Error',
             category: '',
-            materialTypes: [],
+            materialType: [],
             colorOptions: [],
             description: '',
             careSymbol: [],
@@ -172,7 +176,11 @@ class BrowseService {
       var tailors = snapshot.docs.map((doc) => Tailor.fromJson(doc.data() as Map<String, dynamic>)).toList();
 
       if (location != null && location != 'All') {
-        tailors = tailors.where((t) => t.address.toLowerCase().contains(location.toLowerCase())).toList();
+        tailors = tailors
+            .where(
+              (t) => t.address.toLowerCase().contains(location.toLowerCase()),
+            )
+            .toList();
       }
 
       if (search != null && search.isNotEmpty) {
@@ -226,7 +234,11 @@ class BrowseService {
       var retailers = snapshot.docs.map((doc) => Retailer.fromJson(doc.data() as Map<String, dynamic>)).toList();
 
       if (location != null && location != 'All') {
-        retailers = retailers.where((r) => r.address.toLowerCase().contains(location.toLowerCase())).toList();
+        retailers = retailers
+            .where(
+              (r) => r.address.toLowerCase().contains(location.toLowerCase()),
+            )
+            .toList();
       }
 
       if (search != null && search.isNotEmpty) {
@@ -261,21 +273,22 @@ class BrowseService {
 
   /// Searches through a customer's orders.
   Stream<List<Order>> searchOrders(String customerId, String query) {
-    return _db.collection('Orders')
+    return _db
+        .collection('Orders')
         .where('customerId', isEqualTo: customerId)
         .snapshots()
         .map((snapshot) {
-      final orders = snapshot.docs
-          .map((doc) => Order.fromJson(doc.data()))
-          .toList();
+          final orders = snapshot.docs
+              .map((doc) => Order.fromJson(doc.data()))
+              .toList();
 
-      if (query.isEmpty) return orders;
+          if (query.isEmpty) return orders;
 
-      final lowerQuery = query.toLowerCase();
-      return orders.where((o) {
-        return o.id.toLowerCase().contains(lowerQuery) ||
-            o.status.name.toLowerCase().contains(lowerQuery);
-      }).toList();
-    });
+          final lowerQuery = query.toLowerCase();
+          return orders.where((o) {
+            return o.id.toLowerCase().contains(lowerQuery) ||
+                o.status.name.toLowerCase().contains(lowerQuery);
+          }).toList();
+        });
   }
 }

@@ -1,22 +1,46 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/services/auth_service.dart';
 import 'package:sketch2stitch/services/user_session.dart';
+import 'package:sketch2stitch/services/cloudinary_service.dart';
+import 'package:sketch2stitch/widgets/cloudinary_image.dart';
 import '../screens/customer/virtual_trial_screen.dart';
 import '../screens/retailer/inventory_screen.dart';
 import '../screens/retailer/orders_screen.dart';
-import '../screens/customer/measurement_screen.dart';
-import '../models/measurement.dart';
+import '../screens/customer/measurement_page.dart';
 import '../screens/shared/welcome_screen.dart';
+import '../screens/shared/change_password_screen.dart';
 import '../screens/shared/location_picker_screen.dart';
 import '../screens/tailor/portfolio_screen.dart';
 import '../screens/tailor/orders_screen.dart';
 import '../screens/customer/cart_screen.dart';
 import '../screens/customer/orders/order_detail_screen.dart';
 import '../screens/customer/messaging/conversations_screen.dart';
+import '../utils/validation_utils.dart';
+import 'top_feedback_banner.dart';
+
+/// Placeholder avatar showing the first letter of [name] on a tinted
+/// background — used wherever no profile picture has been set yet.
+Widget _initialAvatar(String name, Color themeColor, {double fontSize = 22}) {
+  final trimmed = name.trim();
+  final letter = trimmed.isNotEmpty ? trimmed[0].toUpperCase() : '?';
+  return Container(
+    color: themeColor.withValues(alpha: 0.15),
+    alignment: Alignment.center,
+    child: Text(
+      letter,
+      style: TextStyle(
+        color: themeColor,
+        fontWeight: FontWeight.bold,
+        fontSize: fontSize,
+      ),
+    ),
+  );
+}
 
 /// Model class representing the profile information for the drawer.
 class DrawerProfileData {
@@ -54,6 +78,7 @@ class DrawerProfileData {
     String? address,
     double? rating,
     String? profilePicture,
+    bool removeProfilePicture = false, // NEW
     String? about,
     GeoPoint? location,
   }) {
@@ -64,7 +89,9 @@ class DrawerProfileData {
       phone: phone ?? this.phone,
       address: address ?? this.address,
       rating: rating ?? this.rating,
-      profilePicture: profilePicture ?? this.profilePicture,
+      profilePicture: removeProfilePicture
+          ? null
+          : (profilePicture ?? this.profilePicture),
       about: about ?? this.about,
       location: location ?? this.location,
     );
@@ -83,36 +110,85 @@ class DashboardDrawer extends StatefulWidget {
 
 class _DashboardDrawerState extends State<DashboardDrawer> {
   late UserRole _currentRole;
-  late Measurement _customerMeasurement;
+
+  // Top feedback banner state — replaces bottom SnackBars so messages read
+  // consistently with the registration flow.
+  String? _feedbackMessage;
+  bool _feedbackIsError = false;
+  Timer? _feedbackTimer;
 
   @override
   void initState() {
     super.initState();
     _currentRole = widget.initialRole;
-
-    _customerMeasurement = Measurement(
-      id: "meas_1",
-      customerId: "maria_doe",
-      upperBustCircumference: 34.0,
-      roundShoulderCircumference: 38.0,
-      hipsCircumference: 36.0,
-      underBustCircumference: 32.0,
-      bustCircumference: 35.0,
-      waist: 28.0,
-      shoulderToKnee: 38.0,
-      shoulderToUnderBust: 12.5,
-      shoulderToBust: 10.0,
-      thigh: 21.0,
-      knee: 14.0,
-      ankle: 9.0,
-      waistToAnkle: 40.0,
-      shoulderToAnkle: 57.0,
-    );
   }
 
+  @override
+  void dispose() {
+    _feedbackTimer?.cancel();
+    super.dispose();
+  }
+
+  void _showFeedback(String message, {bool isError = false}) {
+    _feedbackTimer?.cancel();
+    setState(() {
+      _feedbackMessage = message;
+      _feedbackIsError = isError;
+    });
+    _feedbackTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _feedbackMessage = null);
+    });
+  }
+
+  // Reads from UserSession first (captured once, right when the session
+  // started) — falls back to AuthService directly just in case.
+  String? get _customerId =>
+      UserSession.instance.uid ?? AuthService().currentUser?.uid;
+
   void _updateProfile(DrawerProfileData updated) {
-    UserSession.instance.currentProfile.value = updated;
-    debugPrint("Profile updated: ${updated.name} (${_currentRole.name})");
+    // Persist to Firestore first; only reflect it in the UI once the
+    // write actually succeeds. Previously this just set the ValueNotifier
+    // with no backend call at all, so edits were lost on app restart.
+    unawaited(_saveProfile(updated));
+  }
+
+  Future<void> _saveProfile(DrawerProfileData updated) async {
+    final uid = UserSession.instance.uid ?? AuthService().currentUser?.uid;
+    if (uid == null) {
+      if (mounted) {
+        _showFeedback('Could not save — please sign in again.', isError: true);
+      }
+      return;
+    }
+
+    try {
+      await AuthService().updateProfile(uid, _currentRole, {
+        'name': updated.name,
+        if (_currentRole == UserRole.retailer) 'shopName': updated.shopName,
+        // 'email' is deliberately not written — it's the login identity and
+        // is read-only in the profile editor.
+        'phone': updated.phone,
+        'address': updated.address,
+        if (_currentRole != UserRole.customer) 'about': updated.about,
+        // Only Tailor/Retailer carry a picture in the schema — the editor
+        // hides the picker for customers, so writing an always-empty
+        // `profilePicture` onto the Customer document is skipped too.
+        if (_currentRole != UserRole.customer)
+          'profilePicture': updated.profilePicture ?? '',
+        if (updated.location != null) 'location': updated.location,
+      });
+
+      UserSession.instance.currentProfile.value = updated;
+
+      if (mounted) {
+        _showFeedback('Profile updated successfully.');
+      }
+    } catch (_) {
+      if (mounted) {
+        _showFeedback("Couldn't save your profile. Please try again.",
+            isError: true);
+      }
+    }
   }
 
   @override
@@ -122,98 +198,107 @@ class _DashboardDrawerState extends State<DashboardDrawer> {
     return ValueListenableBuilder<DrawerProfileData?>(
       valueListenable: UserSession.instance.currentProfile,
       builder: (context, profile, _) {
-        if (profile == null) return const Drawer(child: Center(child: CircularProgressIndicator()));
+        if (profile == null)
+          return const Drawer(
+            child: Center(child: CircularProgressIndicator()),
+          );
 
-        return Drawer(
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.only(
-              topRight: Radius.circular(24),
-              bottomRight: Radius.circular(24),
-            ),
-          ),
-          child: SafeArea(
-            child: Column(
-              children: [
-                // Profile Section
-                Expanded(
-                  child: CustomScrollView(
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: DrawerProfileSection(
-                          role: _currentRole,
-                          profile: profile,
-                          themeColor: themeColor,
-                          onEditPressed: () => _openEditScreen(context, profile),
-                        ),
-                      ),
-                      const SliverToBoxAdapter(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16.0),
-                          child: Divider(),
-                        ),
-                      ),
-
-                      // Navigation Section
-                      SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              child: DrawerNavigationSection(
-                                role: _currentRole,
-                                themeColor: themeColor,
-                                measurement: _customerMeasurement,
-                                onSave: (updated) async {
-                                  await Future.delayed(
-                                    const Duration(milliseconds: 500),
-                                  );
-                                  if (!mounted) return;
-                                  setState(() {
-                                    _customerMeasurement = updated;
-                                  });
-                                },
-                              ),
-                            ),
-                            const Divider(height: 1),
-
-                            // Logout Section
-                            DrawerLogoutButton(
-                              onLogoutPressed: () async {
-                                debugPrint("Logout pressed");
-                                await AuthService().signOut();
-                                UserSession.instance.logout();
-                                
-                                if (!mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text("Logged out successfully!"),
-                                  ),
-                                );
-                                Navigator.pushAndRemoveUntil(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const WelcomeScreen(),
-                                  ),
-                                  (route) => false,
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+        return Stack(
+          children: [
+            Drawer(
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.only(
+                  topRight: Radius.circular(24),
+                  bottomRight: Radius.circular(24),
                 ),
-              ],
+              ),
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    // Profile Section
+                    Expanded(
+                      child: CustomScrollView(
+                        slivers: [
+                          SliverToBoxAdapter(
+                            child: DrawerProfileSection(
+                              role: _currentRole,
+                              profile: profile,
+                              themeColor: themeColor,
+                              onEditPressed: () =>
+                                  _openEditScreen(context, profile),
+                            ),
+                          ),
+                          const SliverToBoxAdapter(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16.0),
+                              child: Divider(),
+                            ),
+                          ),
+
+                          // Navigation Section
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  child: DrawerNavigationSection(
+                                    role: _currentRole,
+                                    themeColor: themeColor,
+                                    customerId: _customerId,
+                                    onFeedback: _showFeedback,
+                                  ),
+                                ),
+                                const Divider(height: 1),
+
+                                // Logout Section
+                                DrawerLogoutButton(
+                                  onLogoutPressed: () async {
+                                    await AuthService().signOut();
+                                    UserSession.instance.logout();
+
+                                    if (!mounted) return;
+                                    // Overlay banner so it survives the
+                                    // navigation to the welcome screen.
+                                    AppFeedback.show(
+                                      context,
+                                      "Logged out successfully!",
+                                    );
+                                    Navigator.pushAndRemoveUntil(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const WelcomeScreen(),
+                                      ),
+                                      (route) => false,
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
+            if (_feedbackMessage != null)
+              TopFeedbackBanner(
+                message: _feedbackMessage!,
+                isError: _feedbackIsError,
+                onClose: () => setState(() => _feedbackMessage = null),
+              ),
+          ],
         );
       },
     );
   }
 
-  Future<void> _openEditScreen(BuildContext context, DrawerProfileData currentProfile) async {
+  Future<void> _openEditScreen(
+    BuildContext context,
+    DrawerProfileData currentProfile,
+  ) async {
     // Close the drawer first
     Navigator.pop(context);
 
@@ -264,22 +349,13 @@ class DrawerProfileSection extends StatelessWidget {
               CircleAvatar(
                 radius: 28,
                 backgroundColor: themeColor.withValues(alpha: 0.15),
-                backgroundImage: isCustomer
-                    ? (profile.profilePicture != null &&
-                              profile.profilePicture!.isNotEmpty
-                          ? FileImage(File(profile.profilePicture!))
-                          : null)
-                    : (profile.profilePicture != null &&
-                              profile.profilePicture!.isNotEmpty
-                          ? FileImage(File(profile.profilePicture!))
-                                as ImageProvider
-                          : const AssetImage('assets/images/fab.jpg')),
-                child:
-                    isCustomer &&
-                        (profile.profilePicture == null ||
-                            profile.profilePicture!.isEmpty)
-                    ? Icon(Icons.person_rounded, color: themeColor, size: 32)
-                    : null,
+                child: ClipOval(
+                  child: SizedBox(
+                    width: 56,
+                    height: 56,
+                    child: _buildDrawerAvatar(themeColor),
+                  ),
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -404,6 +480,28 @@ class DrawerProfileSection extends StatelessWidget {
     );
   }
 
+  /// Renders the drawer avatar: a Cloudinary-hosted image if `profilePicture`
+  /// is a URL, a local file if it's a not-yet-uploaded path, or the first
+  /// letter of the user's (or shop's) name if there's no picture at all.
+  Widget _buildDrawerAvatar(Color themeColor) {
+    final pic = profile.profilePicture;
+    if (pic == null || pic.isEmpty) {
+      final displayName = role == UserRole.retailer
+          ? profile.shopName
+          : profile.name;
+      return _initialAvatar(displayName, themeColor);
+    }
+    if (pic.startsWith('http')) {
+      return CloudinaryImage(
+        imageUrl: pic,
+        fit: BoxFit.cover,
+        widthParam: 112,
+        heightParam: 112,
+      );
+    }
+    return Image.file(File(pic), fit: BoxFit.cover);
+  }
+
   Widget _buildInfoRow(IconData icon, String text) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -429,15 +527,15 @@ class DrawerProfileSection extends StatelessWidget {
 class DrawerNavigationSection extends StatelessWidget {
   final UserRole role;
   final Color themeColor;
-  final Measurement? measurement;
-  final Future<void> Function(Measurement)? onSave;
+  final String? customerId;
+  final void Function(String message, {bool isError}) onFeedback;
 
   const DrawerNavigationSection({
     super.key,
     required this.role,
     required this.themeColor,
-    this.measurement,
-    this.onSave,
+    required this.onFeedback,
+    this.customerId,
   });
 
   @override
@@ -483,15 +581,17 @@ class DrawerNavigationSection extends StatelessWidget {
                   );
                 }
               } else if (item['title'] == 'Measurements') {
-                if (measurement != null && onSave != null) {
+                if (customerId != null) {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => MeasurementScreen(
-                        measurement: measurement!,
-                        onSave: onSave!,
-                      ),
+                      builder: (_) => MeasurementPage(customerId: customerId!),
                     ),
+                  );
+                } else {
+                  onFeedback(
+                    'Please sign in to view measurements.',
+                    isError: true,
                   );
                 }
               } else if (item['title'] == 'Cart') {
@@ -522,13 +622,7 @@ class DrawerNavigationSection extends StatelessWidget {
                   ),
                 );
               } else {
-                debugPrint("Navigation clicked: ${item['title']}");
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text("Navigation trigger: ${item['title']}"),
-                    duration: const Duration(seconds: 1),
-                  ),
-                );
+                onFeedback("Navigation trigger: ${item['title']}");
               }
             },
           );
@@ -681,6 +775,33 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   GeoPoint? _selectedLocation;
   bool _locationError =
       false; // true once the user has tried to save without pinning
+  bool _isUploadingPhoto = false;
+
+  // Top feedback banner state — replaces bottom SnackBars so messages read
+  // consistently with the registration flow.
+  String? _feedbackMessage;
+  bool _feedbackIsError = false;
+  Timer? _feedbackTimer;
+
+  bool _pictureRemoved = false;
+
+  void _removePicture() {
+    setState(() {
+      _profilePicturePath = null;
+      _pictureRemoved = true;
+    });
+  }
+
+  void _showFeedback(String message, {bool isError = false}) {
+    _feedbackTimer?.cancel();
+    setState(() {
+      _feedbackMessage = message;
+      _feedbackIsError = isError;
+    });
+    _feedbackTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _feedbackMessage = null);
+    });
+  }
 
   @override
   void initState() {
@@ -698,23 +819,66 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       text: widget.initialProfile.about ?? '',
     );
     _profilePicturePath = widget.initialProfile.profilePicture;
-    _selectedLocation =
-        widget.initialProfile.location ??
-        const GeoPoint(23.8103, 90.4125); // dummy Dhaka coordinates for now
+    // Left null when the profile has no pinned location, so the "Please pin
+    // your location before saving" check below can actually fire. Defaulting
+    // to a fixed coordinate silently saved a location the user never chose.
+    _selectedLocation = widget.initialProfile.location;
   }
 
   Future<void> _pickImage() async {
-    try {
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(source: ImageSource.gallery);
-      if (picked != null) {
-        setState(() {
-          _profilePicturePath = picked.path;
-        });
+    final cloudinary = CloudinaryService();
+    final file = await cloudinary.pickImageFromGallery();
+    if (file == null) return;
+
+    setState(() {
+      _profilePicturePath = file.path; // local preview while it uploads
+      _isUploadingPhoto = true;
+    });
+
+    final url = await cloudinary.uploadImage(
+      file,
+      folder: 'profiles/${widget.role.name}',
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _isUploadingPhoto = false;
+      if (url != null) {
+        _profilePicturePath = url;
+        _pictureRemoved = false;
+      } else {
+        _showFeedback(
+          'Failed to upload photo. Please try again.',
+          isError: true,
+        );
       }
-    } catch (e) {
-      debugPrint("Error picking profile image: $e");
+    });
+  }
+
+  /// Renders the current avatar selection: a Cloudinary-hosted image once
+  /// uploaded, a local file preview while the upload is in flight, or the
+  /// first letter of the user's (or shop's) name if nothing has been
+  /// picked yet.
+  Widget _buildAvatarPreview() {
+    final pic = _profilePicturePath;
+    if (pic == null || pic.isEmpty) {
+      final displayName = widget.role == UserRole.retailer
+          ? _shopNameController.text
+          : _nameController.text;
+      return _initialAvatar(displayName, const Color(0xFF6C9985), fontSize: 36);
     }
+    if (pic.startsWith('http')) {
+      return CloudinaryImage(
+        imageUrl: pic,
+        fit: BoxFit.cover,
+        widthParam: 200,
+        heightParam: 200,
+      );
+    }
+    return Image.file(
+      File(pic),
+      fit: BoxFit.cover,
+    ); // not-yet-uploaded local pick
   }
 
   Future<void> _pickLocation() async {
@@ -733,27 +897,61 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  Future<void> _openChangePassword() async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+    );
+    if (changed == true && mounted) {
+      _showFeedback('Password updated successfully.');
+    }
+  }
+
   void _save() {
-    if (_selectedLocation == null) {
-      setState(() => _locationError = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please pin your location before saving.'),
-        ),
+    final isRetailer = widget.role == UserRole.retailer;
+    final displayName = isRetailer
+        ? _shopNameController.text.trim()
+        : _nameController.text.trim();
+
+    if (displayName.isEmpty) {
+      _showFeedback(
+        isRetailer ? 'Please enter your shop name.' : 'Please enter your name.',
+        isError: true,
       );
       return;
     }
 
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty || !ValidationUtils.isValidPhone(phone)) {
+      _showFeedback('Please enter a valid phone number.', isError: true);
+      return;
+    }
+
+    final address = _addressController.text.trim();
+    if (address.isEmpty) {
+      _showFeedback(
+        isRetailer
+            ? 'Please enter your shop address.'
+            : 'Please enter your address.',
+        isError: true,
+      );
+      return;
+    }
+
+    if (_selectedLocation == null) {
+      setState(() => _locationError = true);
+      _showFeedback('Please pin your location before saving.', isError: true);
+      return;
+    }
+
     final updated = widget.initialProfile.copyWith(
-      name: _nameController.text,
-      shopName: widget.role == UserRole.retailer
-          ? _shopNameController.text
-          : null,
-      email: _emailController.text,
-      phone: _phoneController.text,
-      address: _addressController.text,
-      about: _aboutController.text,
+      name: _nameController.text.trim(),
+      shopName: isRetailer ? _shopNameController.text.trim() : null,
+      phone: phone,
+      address: address,
+      about: _aboutController.text.trim(),
       profilePicture: _profilePicturePath,
+      removeProfilePicture: _pictureRemoved, // NEW
       location: _selectedLocation,
     );
     Navigator.pop(context, updated);
@@ -761,6 +959,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   void dispose() {
+    _feedbackTimer?.cancel();
     _nameController.dispose();
     _shopNameController.dispose();
     _emailController.dispose();
@@ -776,6 +975,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final bool isCustomer = widget.role == UserRole.customer;
     const themeColor = Color(0xFF6C9985);
 
+    return Stack(
+      children: [
+        _buildScaffold(isRetailer, isCustomer, themeColor),
+        if (_feedbackMessage != null)
+          TopFeedbackBanner(
+            message: _feedbackMessage!,
+            isError: _feedbackIsError,
+            onClose: () => setState(() => _feedbackMessage = null),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildScaffold(bool isRetailer, bool isCustomer, Color themeColor) {
     const fieldTextStyle = TextStyle(fontSize: 14);
     const fieldLabelStyle = TextStyle(fontSize: 14);
 
@@ -801,34 +1014,63 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             children: [
               if (!isCustomer) ...[
                 Center(
-                  child: Stack(
+                  child: Column(
                     children: [
-                      CircleAvatar(
-                        radius: 48,
-                        backgroundColor: Colors.grey.shade200,
-                        backgroundImage:
-                            _profilePicturePath != null &&
-                                _profilePicturePath!.isNotEmpty
-                            ? FileImage(File(_profilePicturePath!))
-                                  as ImageProvider
-                            : const AssetImage('assets/images/fab.jpg'),
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: GestureDetector(
-                          onTap: _pickImage,
-                          child: const CircleAvatar(
-                            radius: 16,
-                            backgroundColor: themeColor,
-                            child: Icon(
-                              Icons.camera_alt,
-                              size: 16,
-                              color: Colors.white,
+                      Stack(
+                        children: [
+                          GestureDetector(
+                            // NEW — whole avatar tappable
+                            onTap: _isUploadingPhoto ? null : _pickImage,
+                            child: ClipOval(
+                              child: SizedBox(
+                                width: 96,
+                                height: 96,
+                                child: _buildAvatarPreview(),
+                              ),
                             ),
                           ),
-                        ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: GestureDetector(
+                              onTap: _isUploadingPhoto ? null : _pickImage,
+                              child: CircleAvatar(
+                                radius: 16,
+                                backgroundColor: themeColor,
+                                child: _isUploadingPhoto
+                                    ? const SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.camera_alt,
+                                        size: 16,
+                                        color: Colors.white,
+                                      ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
+                      if (_profilePicturePath != null &&
+                          _profilePicturePath!.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          onPressed: _isUploadingPhoto ? null : _removePicture,
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.red.shade400,
+                          ),
+                          icon: const Icon(Icons.delete_outline, size: 16),
+                          label: const Text(
+                            'Remove photo',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -838,7 +1080,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 TextField(
                   controller: _shopNameController,
                   style: fieldTextStyle,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: "Shop Name",
                     labelStyle: fieldLabelStyle,
                     border: OutlineInputBorder(),
@@ -850,7 +1092,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 TextField(
                   controller: _nameController,
                   style: fieldTextStyle,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: "Name",
                     labelStyle: fieldLabelStyle,
                     border: OutlineInputBorder(),
@@ -859,22 +1101,37 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 const SizedBox(height: 14),
               ],
+              // Email is the account's login identity — it is shown for
+              // reference but cannot be edited here.
               TextField(
                 controller: _emailController,
-                style: fieldTextStyle,
-                decoration: const InputDecoration(
+                style: fieldTextStyle.copyWith(color: Colors.black54),
+                readOnly: true,
+                enableInteractiveSelection: false,
+                decoration: InputDecoration(
                   labelText: "Email",
                   labelStyle: fieldLabelStyle,
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.email_outlined),
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.email_outlined),
+                  suffixIcon: const Icon(
+                    Icons.lock_outline,
+                    size: 18,
+                    color: Colors.black26,
+                  ),
+                  filled: true,
+                  fillColor: Colors.black.withValues(alpha: 0.03),
+                  helperText: "Your login email can't be changed.",
+                  helperStyle: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.black45,
+                  ),
                 ),
-                keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 14),
               TextField(
                 controller: _phoneController,
                 style: fieldTextStyle,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: "Phone",
                   labelStyle: fieldLabelStyle,
                   border: OutlineInputBorder(),
@@ -886,7 +1143,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               TextField(
                 controller: _addressController,
                 style: fieldTextStyle,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: "Address",
                   labelStyle: fieldLabelStyle,
                   border: OutlineInputBorder(),
@@ -987,7 +1244,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 TextField(
                   controller: _aboutController,
                   style: fieldTextStyle,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: "About / Biography",
                     labelStyle: fieldLabelStyle,
                     border: OutlineInputBorder(),
@@ -996,6 +1253,49 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   maxLines: 3,
                 ),
               ],
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 8),
+              const Text(
+                "Security",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: _openChangePassword,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.black26),
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.lock_outline, color: themeColor),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Change password',
+                          style: TextStyle(fontSize: 14, color: Colors.black87),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Colors.black26,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),
