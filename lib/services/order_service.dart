@@ -95,17 +95,26 @@ class OrderService {
   /// Streams real-time orders for a specific customer.
   Stream<List<Order>> streamCustomerOrders(String customerId) {
     final cleanId = customerId.trim();
+    debugPrint('[OrderService] 🛰️ STARTING ORDER STREAM for UID: "$cleanId"');
 
 
     return _db
         .collection(_ordersCollection)
-        .where('customerId', whereIn: [cleanId, '$cleanId '])
-        // Temporarily removed orderBy to fix the "No Orders Found" issue.
-        // Combining 'where' and 'orderBy' requires a manual Firestore Index.
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => Order.fromJson({...doc.data(), 'id': doc.id}))
-            .toList());
+        .where('customerId', isEqualTo: cleanId)
+        .snapshots(includeMetadataChanges: true) // Added back to see cache vs server in logs
+        .map((snapshot) {
+      debugPrint('[OrderService] 📥 Snapshot received! Source: ${snapshot.metadata.isFromCache ? "CACHE" : "SERVER"}');
+      debugPrint('[OrderService] 📥 Docs count: ${snapshot.docs.length}');
+      
+      final orders = snapshot.docs
+          .map((doc) => Order.fromJson({...doc.data(), 'id': doc.id}))
+          .toList();
+      
+      debugPrint('[OrderService] ✅ Returning ${orders.length} parsed orders');
+      return orders;
+    }).handleError((error) {
+      debugPrint('[OrderService] ❌ STREAM ERROR: $error');
+    });
   }
 
 
