@@ -74,8 +74,12 @@ class Order {
   });
 
   String get statusText {
-    // 🧠 Derived Status Logic
-    // If we have detailed lists, calculate the "final" status based on progress
+    // 1. Check for Terminal Statuses First
+    if (status == OrderStatus.completed) return 'Delivered';
+    if (status == OrderStatus.cancelled) return 'Cancelled';
+
+
+    // 2. Derived Status Logic based on progress
     if (subOrders != null && subOrders!.isNotEmpty) {
       bool allDelivered = subOrders!.every((so) => so.status == SubOrderStatus.delivered);
       bool allPacked = subOrders!.every((so) => so.status == SubOrderStatus.packed || so.status == SubOrderStatus.delivered);
@@ -84,34 +88,31 @@ class Order {
       if (hasTailor) {
         final tj = tailorJobs!.first;
         if (tj.status == TailorJobStatus.confirmed) {
-          if (orderDate.isAfter(tj.confirmedAt ?? DateTime(2000))) {
-             // Basic confirmed
-          } else {
-            return "Tailor Confirmed — Stitching Started";
-          }
+          return "Tailor Confirmed — Stitching Started";
         }
         if (tj.status == TailorJobStatus.quoted) return "Quote Received from Tailor";
         if (tj.status == TailorJobStatus.pending) return "Requested Master Tailor";
       }
 
-      if (allDelivered) return "Delivered";
+
+      if (allDelivered) return "Items Delivered";
       if (allPacked) return "Order Packed";
       return "Preparing Order";
     }
 
+
+    // 3. Fallback to main status field text
     switch (status) {
       case OrderStatus.awaitingConfirmation:
         return 'Awaiting Confirmation';
       case OrderStatus.processing:
         return 'Processing';
       case OrderStatus.awaitingTailorSearch:
-        return 'Awaiting Tailor Search';
+        return 'Awaiting Tailor Selection';
       case OrderStatus.tailorPending:
         return 'Tailor Pending';
-      case OrderStatus.completed:
-        return 'Completed';
-      case OrderStatus.cancelled:
-        return 'Cancelled';
+      default:
+        return 'Processing';
     }
   }
 
