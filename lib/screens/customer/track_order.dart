@@ -111,8 +111,8 @@ class OrderTrackScreen extends StatelessWidget {
         final estimatedDelivery = tailorJob?.estimatedDeliveryDate != null
             ? DateFormat('dd MMM yyyy').format(tailorJob!.estimatedDeliveryDate!)
             : (order.tailorSelectionDeadline != null
-                ? DateFormat('dd MMM yyyy').format(order.tailorSelectionDeadline!)
-                : 'Pending');
+            ? DateFormat('dd MMM yyyy').format(order.tailorSelectionDeadline!)
+            : 'Pending');
         final lastUpdated = events.isNotEmpty
             ? DateFormat('dd MMM yyyy').format(events.first.date)
             : DateFormat('dd MMM yyyy').format(order.orderDate);
@@ -164,13 +164,15 @@ class OrderTrackScreen extends StatelessWidget {
     final List<TrackEvent> events = [];
     final customerAddress = customer?.address ?? 'Customer Address';
 
-    // 1. Order Placed
+
+    // 1. Order Placed (Priority 0)
     events.add(TrackEvent(
       type: TrackEventType.orderPlaced,
       material: '',
       partyName: 'Sketch2Stitch',
       date: order.orderDate,
     ));
+
 
     // 2. Awaiting Tailor Selection
     if (order.status == OrderStatus.awaitingTailorSearch) {
@@ -185,10 +187,12 @@ class OrderTrackScreen extends StatelessWidget {
       ));
     }
 
-    // 3. Sub-orders logic
+
+    // 3. Sub-orders logic (Priority 1)
     for (var so in subOrders) {
       final retailerName = partyNames[so.retailerId] ?? 'Retailer';
       final materialList = so.items?.map((i) => productNames[i.productId] ?? 'Material').join(', ') ?? 'Materials';
+
 
       if (so.status == SubOrderStatus.preparing) {
         events.add(TrackEvent(
@@ -208,7 +212,7 @@ class OrderTrackScreen extends StatelessWidget {
           type: TrackEventType.subOrderPacked,
           material: materialList,
           partyName: retailerName,
-          date: so.deliveryDate ?? order.orderDate,
+          date: so.deliveryDate ?? order.orderDate.add(const Duration(minutes: 1)),
         ));
       } else if (so.status == SubOrderStatus.delivered) {
         events.add(TrackEvent(
@@ -221,8 +225,9 @@ class OrderTrackScreen extends StatelessWidget {
           type: TrackEventType.subOrderPacked,
           material: materialList,
           partyName: retailerName,
-          date: so.deliveryDate ?? order.orderDate,
+          date: order.orderDate.add(const Duration(minutes: 1)),
         ));
+
 
         final isToTailor = so.deliveryDestination == SubOrderDeliveryDestination.tailor;
         events.add(TrackEvent(
@@ -230,15 +235,16 @@ class OrderTrackScreen extends StatelessWidget {
           material: materialList,
           partyName: retailerName,
           destination: isToTailor ? (partyNames[tailorJob?.tailorId] ?? 'Tailor') : customerAddress,
-          date: so.deliveryDate ?? DateTime.now(),
+          date: so.deliveryDate ?? order.orderDate.add(const Duration(minutes: 2)),
         ));
       }
     }
 
-    // 4. Tailor Job logic
+
+    // 4. Tailor Job logic (Priority 2)
     if (tailorJob != null) {
       final tailorName = partyNames[tailorJob.tailorId] ?? 'Tailor';
-      final baseDate = tailorJob.requestedAt ?? tailorJob.createdAt ?? order.orderDate;
+      final baseDate = tailorJob.requestedAt ?? tailorJob.createdAt ?? order.orderDate.add(const Duration(minutes: 3));
 
 
       // Find the materials linked to this order to provide context
@@ -249,11 +255,11 @@ class OrderTrackScreen extends StatelessWidget {
 
       if (tailorJob.status == TailorJobStatus.pending) {
         events.add(TrackEvent(
-          type: TrackEventType.tailorRequested, 
-          material: allMaterials, 
-          partyName: tailorName, 
-          note: combinedRetailers.isNotEmpty ? 'Using fabric from $combinedRetailers' : null,
-          date: baseDate
+            type: TrackEventType.tailorRequested,
+            material: allMaterials,
+            partyName: tailorName,
+            note: combinedRetailers.isNotEmpty ? 'Using fabric from $combinedRetailers' : null,
+            date: baseDate
         ));
       } else if (tailorJob.status == TailorJobStatus.rejected || tailorJob.status == TailorJobStatus.tailorDeclined) {
         events.add(TrackEvent(type: TrackEventType.tailorRequested, material: allMaterials, partyName: tailorName, date: baseDate));
@@ -261,7 +267,7 @@ class OrderTrackScreen extends StatelessWidget {
           type: TrackEventType.tailorRejected,
           material: '',
           partyName: tailorName,
-          date: DateTime.now(),
+          date: baseDate.add(const Duration(minutes: 1)),
           note: tailorJob.rejectionReason,
         ));
       } else if (tailorJob.status == TailorJobStatus.quoted) {
@@ -270,7 +276,7 @@ class OrderTrackScreen extends StatelessWidget {
           type: TrackEventType.tailorQuoted,
           material: '',
           partyName: tailorName,
-          date: tailorJob.createdAt ?? baseDate,
+          date: tailorJob.createdAt ?? baseDate.add(const Duration(minutes: 1)),
           note: tailorJob.quoteAmount != null ? 'Quote Received: ৳${tailorJob.quoteAmount}' : null,
         ));
       } else if (tailorJob.status == TailorJobStatus.confirmed || tailorJob.confirmedAt != null) {
@@ -279,13 +285,13 @@ class OrderTrackScreen extends StatelessWidget {
           type: TrackEventType.tailorQuoted,
           material: '',
           partyName: tailorName,
-          date: tailorJob.createdAt ?? baseDate,
+          date: baseDate.add(const Duration(minutes: 1)),
         ));
         events.add(TrackEvent(
           type: TrackEventType.tailorConfirmed,
           material: '',
           partyName: tailorName,
-          date: tailorJob.confirmedAt ?? DateTime.now(),
+          date: tailorJob.confirmedAt ?? baseDate.add(const Duration(minutes: 2)),
         ));
       } else if (tailorJob.status == TailorJobStatus.expired) {
         events.add(TrackEvent(type: TrackEventType.tailorRequested, material: allMaterials, partyName: tailorName, date: baseDate));
@@ -293,13 +299,14 @@ class OrderTrackScreen extends StatelessWidget {
           type: TrackEventType.tailorExpired,
           material: '',
           partyName: tailorName,
-          date: DateTime.now(),
+          date: baseDate.add(const Duration(minutes: 1)),
           note: 'The quote response deadline has passed.',
         ));
       }
     }
 
-    // Order level final statuses
+
+    // 5. Final statuses (Priority 3)
     if (order.status == OrderStatus.completed) {
       final tailorName = tailorJob != null ? (partyNames[tailorJob.tailorId] ?? 'Tailor') : 'Tailor';
       events.add(TrackEvent(
@@ -307,7 +314,7 @@ class OrderTrackScreen extends StatelessWidget {
         material: '',
         partyName: tailorName,
         destination: customerAddress,
-        date: DateTime.now(),
+        date: DateTime.now(), // Always at the very end
       ));
     } else if (order.status == OrderStatus.cancelled) {
       events.add(TrackEvent(
@@ -318,8 +325,17 @@ class OrderTrackScreen extends StatelessWidget {
       ));
     }
 
-    // Sort ascending (oldest first at the top, newest at the bottom)
-    events.sort((a, b) => a.date.compareTo(b.date));
+
+    // 🧠 Pure Chronological Sorting:
+    // Sort by DATE only (Earliest first at the top).
+    // This maintains the truth of the timeline based on your database timestamps.
+    events.sort((a, b) {
+      final dateCompare = a.date.compareTo(b.date);
+      if (dateCompare != 0) return dateCompare;
+      // If timestamps match exactly, use type priority
+      return a.type.index.compareTo(b.type.index);
+    });
+
 
     return events;
   }
@@ -350,7 +366,7 @@ class OrderTrackScreen extends StatelessWidget {
             height: 30,
             fit: BoxFit.contain,
             errorBuilder: (context, error, stackTrace) =>
-                const Icon(Icons.checkroom_rounded, size: 26, color: Color(0xFF2E7D32)),
+            const Icon(Icons.checkroom_rounded, size: 26, color: Color(0xFF2E7D32)),
           ),
           const SizedBox(width: 8),
           const Text('Sketch2Stitch', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87)),
