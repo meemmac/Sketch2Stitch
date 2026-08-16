@@ -100,20 +100,52 @@ class OrderService {
 
     return _db
         .collection(_ordersCollection)
-        .where('customerId', isEqualTo: cleanId)
-        .snapshots(includeMetadataChanges: true) // Added back to see cache vs server in logs
-        .map((snapshot) {
-      debugPrint('[OrderService] 📥 Snapshot received! Source: ${snapshot.metadata.isFromCache ? "CACHE" : "SERVER"}');
-      debugPrint('[OrderService] 📥 Docs count: ${snapshot.docs.length}');
+        .where('customerId', whereIn: [cleanId, '$cleanId '])
+        // 🧠 Removed orderBy to bypass index requirement for manual testing
+        .snapshots()
+        .asyncMap((snapshot) async {
+      debugPrint('[OrderService] 📥 Snapshot received! Docs count: ${snapshot.docs.length}');
       
-      final orders = snapshot.docs
-          .map((doc) => Order.fromJson({...doc.data(), 'id': doc.id}))
-          .toList();
+      final List<Order> orders = [];
       
-      debugPrint('[OrderService] ✅ Returning ${orders.length} parsed orders');
+      for (var doc in snapshot.docs) {
+        try {
+          final data = doc.data() as Map<String, dynamic>;
+          Order order = Order.fromJson({...data, 'id': doc.id});
+          
+          // Deep fetch details...
+          final subOrdersSnap = await _db
+              .collection(_subOrdersCollection)
+              .where('orderId', isEqualTo: order.id)
+              .get();
+          
+          List<SubOrder> subOrders = subOrdersSnap.docs
+              .map((d) => SubOrder.fromJson({...d.data(), 'id': d.id}))
+              .toList();
+
+
+          final tailorJobSnap = await _db
+              .collection(_tailorJobsCollection)
+              .where('orderId', isEqualTo: order.id)
+              .get();
+          
+          List<TailorJob> tailorJobs = tailorJobSnap.docs
+              .map((d) => TailorJob.fromJson({...d.data(), 'id': d.id}))
+              .toList();
+
+
+          orders.add(order.copyWith(subOrders: subOrders, tailorJobs: tailorJobs));
+        } catch (e) {
+          debugPrint('[OrderService] ❌ Error parsing ${doc.id}: $e');
+        }
+      }
+
+
+      // Sort in memory instead of database to avoid index errors
+      orders.sort((a, b) => b.orderDate.compareTo(a.orderDate));
+      
+      debugPrint('[OrderService] ✅ Successfully returning ${orders.length} orders');
       return orders;
-    }).handleError((error) {
-      debugPrint('[OrderService] ❌ STREAM ERROR: $error');
     });
   }
 

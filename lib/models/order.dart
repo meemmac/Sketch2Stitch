@@ -74,6 +74,31 @@ class Order {
   });
 
   String get statusText {
+    // 🧠 Derived Status Logic
+    // If we have detailed lists, calculate the "final" status based on progress
+    if (subOrders != null && subOrders!.isNotEmpty) {
+      bool allDelivered = subOrders!.every((so) => so.status == SubOrderStatus.delivered);
+      bool allPacked = subOrders!.every((so) => so.status == SubOrderStatus.packed || so.status == SubOrderStatus.delivered);
+      
+      bool hasTailor = tailorJobs != null && tailorJobs!.isNotEmpty;
+      if (hasTailor) {
+        final tj = tailorJobs!.first;
+        if (tj.status == TailorJobStatus.confirmed) {
+          if (orderDate.isAfter(tj.confirmedAt ?? DateTime(2000))) {
+             // Basic confirmed
+          } else {
+            return "Tailor Confirmed — Stitching Started";
+          }
+        }
+        if (tj.status == TailorJobStatus.quoted) return "Quote Received from Tailor";
+        if (tj.status == TailorJobStatus.pending) return "Requested Master Tailor";
+      }
+
+      if (allDelivered) return "Delivered";
+      if (allPacked) return "Order Packed";
+      return "Preparing Order";
+    }
+
     switch (status) {
       case OrderStatus.awaitingConfirmation:
         return 'Awaiting Confirmation';
@@ -88,6 +113,19 @@ class Order {
       case OrderStatus.cancelled:
         return 'Cancelled';
     }
+  }
+
+  int get itemCount => (subOrders?.length ?? 0) + (tailorJobs?.length ?? 0);
+
+  double get totalAmount {
+    double total = 0;
+    subOrders?.forEach((so) {
+      total += so.itemsSubtotal + so.deliveryCharge;
+    });
+    tailorJobs?.forEach((tj) {
+      total += (tj.quoteAmount ?? 0) + (tj.deliveryCharge ?? 0);
+    });
+    return total;
   }
 
   Color get statusColor {

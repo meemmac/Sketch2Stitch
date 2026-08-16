@@ -245,6 +245,14 @@ class TailorJob {
   };
 
   factory TailorJob.fromJson(Map<String, dynamic> json) {
+    DateTime? parseDate(dynamic value) {
+      if (value == null) return null;
+      if (value is Timestamp) return value.toDate();
+      if (value is String) return DateTime.tryParse(value);
+      return null;
+    }
+
+
     return TailorJob(
       id: json['id'] ?? '',
       orderId: json['orderId'] ?? '',
@@ -252,18 +260,10 @@ class TailorJob {
       measurementId: json['measurementId'] ?? '',
       designIds: List<String>.from(json['designIds'] ?? []),
       status: TailorJobStatus.fromValue(json['status'] ?? 'pending'),
-      confirmedAt: json['confirmedAt'] != null
-          ? DateTime.parse(json['confirmedAt'])
-          : null,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
-          : null,
-      requestedAt: json['requestedAt'] != null
-          ? DateTime.parse(json['requestedAt'])
-          : null,
-      estimatedDeliveryDate: json['estimatedDeliveryDate'] != null
-          ? DateTime.parse(json['estimatedDeliveryDate'])
-          : null,
+      confirmedAt: parseDate(json['confirmedAt']),
+      createdAt: parseDate(json['createdAt']),
+      requestedAt: parseDate(json['requestedAt']),
+      estimatedDeliveryDate: parseDate(json['estimatedDeliveryDate']),
       specialInstructions: json['specialInstructions'],
       rejectionReason: json['rejectionReason'],
       quoteAmount: json['quoteAmount']?.toDouble(),
@@ -275,12 +275,8 @@ class TailorJob {
       tailorPaymentStatus: TailorPaymentStatus.fromValue(
         json['tailorPaymentStatus'] ?? 'unpaid',
       ),
-      quoteResponseDeadline: json['quoteResponseDeadline'] != null
-          ? DateTime.parse(json['quoteResponseDeadline'])
-          : null,
-      autoReleaseAt: json['autoReleaseAt'] != null
-          ? DateTime.parse(json['autoReleaseAt'])
-          : null,
+      quoteResponseDeadline: parseDate(json['quoteResponseDeadline']),
+      autoReleaseAt: parseDate(json['autoReleaseAt']),
     );
   }
 }

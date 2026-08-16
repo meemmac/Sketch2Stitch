@@ -112,6 +112,14 @@ class SubOrder {
   };
 
   factory SubOrder.fromJson(Map<String, dynamic> json) {
+    DateTime? parseDate(dynamic value) {
+      if (value == null) return null;
+      if (value is Timestamp) return value.toDate();
+      if (value is String) return DateTime.tryParse(value);
+      return null;
+    }
+
+
     return SubOrder(
       id: json['id'] ?? '',
       orderId: json['orderId'] ?? '',
@@ -121,12 +129,8 @@ class SubOrder {
         json['deliveryDestination'] ?? 'pending',
       ),
       deliveryPoint: json['deliveryPoint'] as GeoPoint?,
-      deliveryDate: json['deliveryDate'] != null
-          ? DateTime.parse(json['deliveryDate'])
-          : null,
-      autoReleaseAt: json['autoReleaseAt'] != null
-          ? DateTime.parse(json['autoReleaseAt'])
-          : null,
+      deliveryDate: parseDate(json['deliveryDate']),
+      autoReleaseAt: parseDate(json['autoReleaseAt']),
       itemsSubtotal: (json['itemsSubtotal'] ?? 0).toDouble(),
       deliveryCharge: (json['deliveryCharge'] ?? 0).toDouble(),
       deliveryDistanceKm: (json['deliveryDistanceKm'] as num?)?.toDouble(),

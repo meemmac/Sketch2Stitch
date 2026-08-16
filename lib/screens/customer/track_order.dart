@@ -31,6 +31,7 @@ class TrackEvent {
   final TrackEventType type;
   final String material;
   final String partyName;
+  final String? destination;
   final DateTime date;
   final String? note;
 
@@ -38,6 +39,7 @@ class TrackEvent {
     required this.type,
     required this.material,
     required this.partyName,
+    this.destination,
     required this.date,
     this.note,
   });
@@ -160,6 +162,7 @@ class OrderTrackScreen extends StatelessWidget {
     required Customer? customer,
   }) {
     final List<TrackEvent> events = [];
+    final customerAddress = customer?.address ?? 'Customer Address';
 
     // 1. Order Placed
     events.add(TrackEvent(
@@ -225,7 +228,8 @@ class OrderTrackScreen extends StatelessWidget {
         events.add(TrackEvent(
           type: isToTailor ? TrackEventType.shippingToTailor : TrackEventType.subOrderDelivered,
           material: materialList,
-          partyName: isToTailor ? (partyNames[tailorJob?.tailorId] ?? 'Tailor') : (customer?.name ?? 'Customer'),
+          partyName: retailerName,
+          destination: isToTailor ? (partyNames[tailorJob?.tailorId] ?? 'Tailor') : customerAddress,
           date: so.deliveryDate ?? DateTime.now(),
         ));
       }
@@ -275,10 +279,12 @@ class OrderTrackScreen extends StatelessWidget {
 
     // Order level final statuses
     if (order.status == OrderStatus.completed) {
+      final tailorName = tailorJob != null ? (partyNames[tailorJob.tailorId] ?? 'Tailor') : 'Tailor';
       events.add(TrackEvent(
-        type: TrackEventType.orderCompleted,
+        type: TrackEventType.tailorCompleted,
         material: '',
-        partyName: 'Customer',
+        partyName: tailorName,
+        destination: customerAddress,
         date: DateTime.now(),
       ));
     } else if (order.status == OrderStatus.cancelled) {
@@ -290,8 +296,8 @@ class OrderTrackScreen extends StatelessWidget {
       ));
     }
 
-    // Sort descending (latest first at the top)
-    events.sort((a, b) => b.date.compareTo(a.date));
+    // Sort ascending (oldest first at the top, newest at the bottom)
+    events.sort((a, b) => a.date.compareTo(b.date));
 
     return events;
   }
@@ -439,17 +445,7 @@ class OrderTrackScreen extends StatelessWidget {
                   RichText(
                     text: TextSpan(
                       style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
-                      children: [
-                        TextSpan(text: '${style.verb} '),
-                        if (event.material.isNotEmpty) ...[
-                          const TextSpan(text: 'for ', style: TextStyle(fontWeight: FontWeight.normal)),
-                          TextSpan(text: event.material, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          const TextSpan(text: ' from '),
-                          TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        ] else ...[
-                          TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        ],
-                      ],
+                      children: _buildEventSpans(event, style),
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -473,6 +469,49 @@ class OrderTrackScreen extends StatelessWidget {
     );
   }
 
+  List<InlineSpan> _buildEventSpans(TrackEvent event, _TrackEventStyle style) {
+    if (event.type == TrackEventType.tailorCompleted) {
+      return [
+        const TextSpan(text: 'Delivered to '),
+        TextSpan(text: event.destination ?? 'Customer Address', style: const TextStyle(fontWeight: FontWeight.bold)),
+        const TextSpan(text: ' from '),
+        TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+      ];
+    }
+
+    if (event.type == TrackEventType.subOrderDelivered && event.destination != null) {
+      return [
+        const TextSpan(text: 'Delivered '),
+        TextSpan(text: event.material, style: const TextStyle(fontWeight: FontWeight.bold)),
+        const TextSpan(text: ' from '),
+        TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+        const TextSpan(text: ' to '),
+        TextSpan(text: event.destination!, style: const TextStyle(fontWeight: FontWeight.bold)),
+      ];
+    }
+
+    if (event.type == TrackEventType.tailorConfirmed) {
+      return [
+        TextSpan(text: style.verb), // "Tailor Confirmed — Stitching Started"
+        const TextSpan(text: ' from '),
+        TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+      ];
+    }
+
+    // Default template (Preparing, Packed, etc.)
+    return [
+      TextSpan(text: '${style.verb} '),
+      if (event.material.isNotEmpty) ...[
+        const TextSpan(text: 'for ', style: TextStyle(fontWeight: FontWeight.normal)),
+        TextSpan(text: event.material, style: const TextStyle(fontWeight: FontWeight.bold)),
+        const TextSpan(text: ' from '),
+        TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+      ] else ...[
+        TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+      ],
+    ];
+  }
+
   _TrackEventStyle _styleFor(TrackEventType type) {
     switch (type) {
       case TrackEventType.orderPlaced:
@@ -485,7 +524,7 @@ class OrderTrackScreen extends StatelessWidget {
         return _TrackEventStyle(
           color: Colors.orange.shade600,
           icon: Icons.pending_rounded,
-          verb: 'Preparing Order',
+          verb: 'Preparing order',
         );
       case TrackEventType.subOrderPacked:
         return _TrackEventStyle(
