@@ -7,6 +7,7 @@ import '../../services/ai_service.dart';
 import '../../models/user_role.dart';
 import '../../utils/api_config.dart';
 import '../../widgets/dashboard_drawer.dart';
+import '../../widgets/top_feedback_banner.dart';
 
 class AITestScreen extends StatefulWidget {
   const AITestScreen({super.key});
@@ -66,9 +67,8 @@ class _AITestScreenState extends State<AITestScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error picking personal image: $e")),
-      );
+      AppFeedback.show(context, "Error picking personal image: $e",
+          isError: true);
     }
   }
 
@@ -82,9 +82,8 @@ class _AITestScreenState extends State<AITestScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error picking reference image: $e")),
-      );
+      AppFeedback.show(context, "Error picking reference image: $e",
+          isError: true);
     }
   }
 
@@ -99,8 +98,10 @@ class _AITestScreenState extends State<AITestScreen> {
     const hfToken = APIConfig.hfToken;
 
     if (geminiKey.isEmpty || geminiKey == 'YOUR_GEMINI_API_KEY_HERE') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please make sure Gemini API Key is set in lib/utils/api_config.dart")),
+      AppFeedback.show(
+        context,
+        "Please make sure Gemini API Key is set in lib/utils/api_config.dart",
+        isError: true,
       );
       return;
     }

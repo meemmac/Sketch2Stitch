@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/review.dart';
+import 'Cloudinary_service.dart';
 
 class ReviewService {
   ReviewService({FirebaseFirestore? firestore})
@@ -129,38 +130,226 @@ class ReviewService {
 
   // ─── Retailer Review Functions ───────────────────────────────────────────
 
-  /// Fetches reviews for a specific retailer shop with optional filtering and sorting.
-  Future<List<Review>> fetchShopReviews(
-    String retailerId, {
-    int? starFilter,
-    String sortBy = 'createdAt',
-    bool descending = true,
-  }) async {
-    try {
-      Query query = _db
-          .collection(_reviewsCollection)
-          .where('targetId', isEqualTo: retailerId)
-          .where('targetRole', isEqualTo: ReviewTargetRole.retailer.name);
+  /// Streams reviews for a specific retailer shop.
+  Stream<List<Review>> streamShopReviews(String retailerId) {
+    return _db
+        .collection(_reviewsCollection)
+        .where('targetId', isEqualTo: retailerId)
+        .where('targetRole', isEqualTo: ReviewTargetRole.retailer.name)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
+            .toList());
+  }
 
-      if (starFilter != null) {
-        query = query.where('rating', isEqualTo: starFilter.toDouble());
+  /// Streams detailed reviews for a retailer shop (includes customer and product info).
+  Stream<List<Map<String, dynamic>>> streamDetailedShopReviews(String retailerId) {
+    /* 
+    // PREVIOUS SEQUENTIAL VERSION (Slower)
+    return _db
+        .collection(_reviewsCollection)
+        .where('targetId', isEqualTo: retailerId)
+        .where('targetRole', isEqualTo: ReviewTargetRole.retailer.name)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      List<Map<String, dynamic>> detailedReviews = [];
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final String customerId = data['customerId'];
+        final String? orderId = data['orderId'];
+
+        // Fetch customer name
+        final customerDoc = await _db.collection('Customer').doc(customerId).get();
+        final customerName = customerDoc.exists ? (customerDoc.data()?['name'] ?? 'Anonymous') : 'Anonymous';
+
+        // Fetch products from the sub-order for this retailer
+        List<Map<String, dynamic>> products = [];
+        if (orderId != null) {
+          final subOrderSnap = await _db
+              .collection('Sub-orders')
+              .where('orderId', isEqualTo: orderId)
+              .where('retailerId', isEqualTo: retailerId)
+              .limit(1)
+              .get();
+
+          if (subOrderSnap.docs.isNotEmpty) {
+            final subOrderId = subOrderSnap.docs.first.id;
+            final itemsSnap = await _db
+                .collection('Order-Items')
+                .where('subOrderId', isEqualTo: subOrderId)
+                .get();
+
+            for (var itemDoc in itemsSnap.docs) {
+              final itemData = itemDoc.data();
+              final productId = itemData['productId'];
+              final optionId = itemData['optionId'];
+
+              final productDoc = await _db.collection('Products').doc(productId).get();
+              if (productDoc.exists) {
+                final productData = productDoc.data()!;
+                final List<dynamic> colorOptions = productData['colorOptions'] ?? [];
+                final option = colorOptions.firstWhere(
+                  (o) => o['optionId'] == optionId,
+                  orElse: () => null,
+                );
+
+                final rawImages = (option?['image'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                final resolvedImages = _resolveImageUrls(rawImages);
+
+                products.add({
+                  'name': productData['productName'] ?? 'Unknown Product',
+                  'image': resolvedImages.isNotEmpty ? resolvedImages.first : '',
+                  'price': (option?['price'] ?? 0).toDouble(),
+                });
+              }
+            }
+          }
+        }
+
+        detailedReviews.add({
+          'review': {...data, 'id': doc.id},
+          'userName': customerName,
+          'products': products,
+        });
       }
+      return detailedReviews;
+    });
+    */
 
-      // Note: top reviews sorting might involve high ratings
-      if (sortBy == 'top') {
-        query = query.orderBy('rating', descending: true);
-      } else {
-        query = query.orderBy(sortBy, descending: descending);
-      }
+    // OPTIMIZED PARALLEL VERSION
+    return _db
+        .collection(_reviewsCollection)
+        .where('targetId', isEqualTo: retailerId)
+        .where('targetRole', isEqualTo: ReviewTargetRole.retailer.name)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      // Local caches to avoid redundant fetches
+      final Map<String, String> customerNameCache = {};
+      final Map<String, List<Map<String, dynamic>>> subOrderProductsCache = {};
 
-      final snapshot = await query.get();
-      return snapshot.docs
-          .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
+      final List<Map<String, dynamic>?> results = await Future.wait(
+        snapshot.docs.map((doc) async {
+          try {
+            final data = doc.data();
+            final String customerId = data['customerId'];
+            final String? orderId = data['orderId'];
+
+            // 1. Fetch customer name (parallelized/cached)
+            if (!customerNameCache.containsKey(customerId)) {
+              final customerDoc = await _db.collection('Customer').doc(customerId).get();
+              customerNameCache[customerId] = customerDoc.exists ? (customerDoc.data()?['name'] ?? 'Anonymous') : 'Anonymous';
+            }
+            final customerName = customerNameCache[customerId]!;
+
+            // 2. Fetch products from the sub-order for this retailer
+            List<Map<String, dynamic>> products = [];
+            if (orderId != null) {
+              final cacheKey = "${orderId}_$retailerId";
+              if (!subOrderProductsCache.containsKey(cacheKey)) {
+                final subOrderSnap = await _db
+                    .collection('Sub-orders')
+                    .where('orderId', isEqualTo: orderId)
+                    .where('retailerId', isEqualTo: retailerId)
+                    .limit(1)
+                    .get();
+
+                if (subOrderSnap.docs.isNotEmpty) {
+                  final subOrderId = subOrderSnap.docs.first.id;
+                  final itemsSnap = await _db
+                      .collection('Order-Items')
+                      .where('subOrderId', isEqualTo: subOrderId)
+                      .get();
+
+                  // Fetch all product details for this sub-order in parallel
+                  final subOrderProducts = await Future.wait(
+                    itemsSnap.docs.map((itemDoc) async {
+                      final itemData = itemDoc.data();
+                      final productId = itemData['productId'];
+                      final optionId = itemData['optionId'];
+
+                      final productDoc = await _db.collection('Products').doc(productId).get();
+                      if (productDoc.exists) {
+                        final productData = productDoc.data()!;
+                        final List<dynamic> colorOptions = productData['colorOptions'] ?? [];
+                        final option = colorOptions.firstWhere(
+                          (o) => o['optionId'] == optionId,
+                          orElse: () => null,
+                        );
+
+                        final rawImages = (option?['image'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                        final resolvedImages = _resolveImageUrls(rawImages);
+
+                        return {
+                          'name': productData['productName'] ?? 'Unknown Product',
+                          'image': resolvedImages.isNotEmpty ? resolvedImages.first : '',
+                          'price': (option?['price'] ?? 0).toDouble(),
+                        };
+                      }
+                      return null;
+                    }),
+                  ).then((list) => list.whereType<Map<String, dynamic>>().toList());
+                  
+                  subOrderProductsCache[cacheKey] = subOrderProducts;
+                } else {
+                  subOrderProductsCache[cacheKey] = [];
+                }
+              }
+              products = subOrderProductsCache[cacheKey]!;
+            }
+
+            return {
+              'review': {...data, 'id': doc.id},
+              'userName': customerName,
+              'products': products,
+            };
+          } catch (e) {
+            debugPrint("ReviewService: Error processing review: $e");
+            return null;
+          }
+        }),
+      );
+
+      return results.whereType<Map<String, dynamic>>().toList();
+    });
+  }
+
+  /// Streams review statistics for a retailer shop.
+  Stream<Map<String, dynamic>> streamShopReviewStats(String retailerId) {
+    return _db
+        .collection(_reviewsCollection)
+        .where('targetId', isEqualTo: retailerId)
+        .where('targetRole', isEqualTo: ReviewTargetRole.retailer.name)
+        .snapshots()
+        .map((snap) {
+      final reviews = snap.docs
+          .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
           .toList();
-    } catch (e) {
-      debugPrint('Error fetching shop reviews: $e');
-      return [];
-    }
+
+      if (reviews.isEmpty) {
+        return {
+          'total': 0,
+          'average': 0.0,
+          'distribution': {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        };
+      }
+
+      final total = reviews.length;
+      final avg = reviews.fold(0.0, (sum, r) => sum + r.rating) / total;
+      final distribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0};
+      for (var r in reviews) {
+        int star = r.rating.floor().clamp(1, 5);
+        distribution[star] = (distribution[star] ?? 0) + 1;
+      }
+
+      return {
+        'total': total,
+        'average': avg,
+        'distribution': distribution,
+      };
+    });
   }
 
   /// Gets review statistics for a retailer shop.
@@ -324,5 +513,108 @@ class ReviewService {
       debugPrint('Error fetching reviews by target: $e');
       return [];
     }
+  }
+
+  /// Streams reviews for a specific tailor.
+  Stream<List<Review>> streamTailorReviews(String tailorId) {
+    return _db
+        .collection(_reviewsCollection)
+        .where('targetId', isEqualTo: tailorId)
+        .where('targetRole', isEqualTo: ReviewTargetRole.tailor.name)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
+            .toList());
+  }
+
+  /// Streams detailed reviews for a tailor (includes customer info).
+  Stream<List<Map<String, dynamic>>> streamDetailedTailorReviews(String tailorId) {
+    return _db
+        .collection(_reviewsCollection)
+        .where('targetId', isEqualTo: tailorId)
+        .where('targetRole', isEqualTo: ReviewTargetRole.tailor.name)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      final Map<String, String> customerNameCache = {};
+
+      final List<Map<String, dynamic>?> results = await Future.wait(
+        snapshot.docs.map((doc) async {
+          try {
+            final data = doc.data();
+            final String customerId = data['customerId'];
+
+            if (!customerNameCache.containsKey(customerId)) {
+              final customerDoc = await _db.collection('Customer').doc(customerId).get();
+              customerNameCache[customerId] = customerDoc.exists ? (customerDoc.data()?['name'] ?? 'Anonymous') : 'Anonymous';
+            }
+            final customerName = customerNameCache[customerId]!;
+
+            return {
+              'review': {...data, 'id': doc.id},
+              'userName': customerName,
+            };
+          } catch (e) {
+            debugPrint("ReviewService: Error processing tailor review: $e");
+            return null;
+          }
+        }),
+      );
+
+      return results.whereType<Map<String, dynamic>>().toList();
+    });
+  }
+
+  /// Streams review statistics for a tailor.
+  Stream<Map<String, dynamic>> streamTailorReviewStats(String tailorId) {
+    return _db
+        .collection(_reviewsCollection)
+        .where('targetId', isEqualTo: tailorId)
+        .where('targetRole', isEqualTo: ReviewTargetRole.tailor.name)
+        .snapshots()
+        .map((snap) {
+      final reviews = snap.docs
+          .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
+          .toList();
+
+      if (reviews.isEmpty) {
+        return {
+          'total': 0,
+          'average': 0.0,
+          'distribution': {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        };
+      }
+
+      final total = reviews.length;
+      final avg = reviews.fold(0.0, (sum, r) => sum + r.rating) / total;
+      final distribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0};
+      for (var r in reviews) {
+        int star = r.rating.floor().clamp(1, 5);
+        distribution[star] = (distribution[star] ?? 0) + 1;
+      }
+
+      return {
+        'total': total,
+        'average': avg,
+        'distribution': distribution,
+      };
+    });
+  }
+
+  // ─── Image Helpers ──────────────────────────────────────────────────────
+
+  List<String> _resolveImageUrls(List<String> imagePaths) {
+    final svc = CloudinaryService();
+    return imagePaths.map((p) {
+      final url = p.contains('cloudinary.com') ? p : _getCDNUrl(p);
+      return svc.getOptimizedImageUrl(url);
+    }).toList();
+  }
+
+  String _getCDNUrl(String imagePath) {
+    if (imagePath.startsWith('http')) return imagePath;
+    final cleaned = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+    return 'https://res.cloudinary.com/${CloudinaryService.cloudName}/image/upload/$cleaned';
   }
 }

@@ -1,10 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/screens/customer/home_screen.dart';
 import 'package:sketch2stitch/screens/shared/welcome_screen.dart';
 import 'package:sketch2stitch/services/auth_service.dart';
 import 'package:sketch2stitch/services/user_session.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
 import '../../models/customer.dart';
 import '../../models/tailor.dart';
@@ -101,7 +101,7 @@ class AuthWrapper extends StatelessWidget {
         location = profile.location;
       } else if (profile is Retailer) {
         shopName = profile.shopName;
-        name = profile.shopName; 
+        name = profile.shopName;
         email = profile.email;
         phone = profile.phone;
         address = profile.address;

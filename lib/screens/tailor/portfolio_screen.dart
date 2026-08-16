@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../models/portfolio.dart';
 import '../../services/portfolio_service.dart';
 import '../../services/user_session.dart';
+import '../../widgets/top_feedback_banner.dart';
 
 /// ─── Portfolio Screen ───────────────────────────────────────────────────
 ///
@@ -325,17 +326,14 @@ Future<String> _uploadImage(String tailorId, File file) async {
                                 } on PortfolioServiceException catch (e) {
                                   setM(() => isSaving = false);
                                   if (!mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text(e.message)),
-                                  );
+                                  AppFeedback.show(context, e.message,
+                                      isError: true);
                                 } catch (_) {
                                   setM(() => isSaving = false);
                                   if (!mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text("Couldn't upload image. Try again."),
-                                    ),
-                                  );
+                                  AppFeedback.show(context,
+                                      "Couldn't upload image. Try again.",
+                                      isError: true);
                                 }
                               },
                         child: isSaving
@@ -380,7 +378,7 @@ Future<String> _uploadImage(String tailorId, File file) async {
       setState(() {
         items.insert(index.clamp(0, items.length), item);
       });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      AppFeedback.show(context, e.message, isError: true);
     }
   }
 

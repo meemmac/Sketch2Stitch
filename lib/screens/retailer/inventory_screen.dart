@@ -7,6 +7,7 @@ import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/services/inventory_service.dart';
 import 'package:sketch2stitch/services/user_session.dart';
 import '../../widgets/video_preview_player.dart';
+import '../../widgets/top_feedback_banner.dart';
 
 class ProductColorVariant {
   String colorName;
@@ -629,9 +630,8 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   Future<void> _showProductPreview(InventoryItem item) async {
     if (item.variants.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("This item has no color variants yet")),
-      );
+      AppFeedback.show(context, "This item has no color variants yet",
+          isError: true);
       return;
     }
 
@@ -2265,9 +2265,10 @@ class _InventoryScreenState extends State<InventoryScreen>
                                 try {
                                   await _inventoryService.deleteProduct(item.id);
                                   _showFeedback("Product deleted successfully!");
-                                } catch (e) {
-                                  debugPrint("Error deleting product: $e");
-                                  _showFeedback("Error deleting product: $e", isError: true);
+                                } catch (_) {
+                                  _showFeedback(
+                                      "Couldn't delete the product. Please try again.",
+                                      isError: true);
                                 }
                               }
                             }),

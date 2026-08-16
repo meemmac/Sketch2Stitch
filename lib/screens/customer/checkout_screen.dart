@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'cart_screen.dart';
 import 'tailoring_setup_screen.dart';
 import '../../models/measurement.dart';
-import 'order_session.dart';
 import 'tailoring_callbacks.dart';
 import '../../models/sub_order.dart';
 import '../../services/bkash_service.dart';
 import 'bkash_payment_screen.dart';
+import '../../services/checkout_service.dart';
+import '../../services/user_session.dart';
+import '../../widgets/top_feedback_banner.dart';
 
 /// ─── Checkout Screen ────────────────────────────────────────────────────
 ///
@@ -38,7 +40,17 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final Set<String> _paidRetailers = {};
+
+  /// bKash transaction id per retailer, captured on a successful execute so
+  /// it can be written onto that retailer's `Payments` record.
+  final Map<String, String> _trxIds = {};
+
   String? _payingRetailerId;
+  bool _isPlacingOrder = false;
+
+  final CheckoutService _checkoutService = CheckoutService();
+
+  String get _customerId => UserSession.instance.uid ?? '';
 
   Map<String, List<CartLine>> get _groupedByRetailer {
     final Map<String, List<CartLine>> grouped = {};
@@ -60,9 +72,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _payRetailer(String retailerId) async {
     setState(() => _payingRetailerId = retailerId);
     try {
-      final subtotal = widget.cartLines
-          .where((l) => l.retailerId == retailerId)
-          .fold<double>(0, (sum, l) => sum + l.lineTotal);
+      final lines =
+          widget.cartLines.where((l) => l.retailerId == retailerId).toList();
+
+      // Stock can move between opening the cart and paying, so re-check this
+      // retailer's lines before taking any money. placeOrder() re-validates
+      // atomically at the end too — this is purely so the customer finds out
+      // before they pay rather than after.
+      final problems = await _checkoutService.validateStock(
+        lines
+            .map((l) => OrderItemInput(
+                  productId: l.productId,
+                  optionId: l.optionId,
+                  quantity: l.quantity,
+                ))
+            .toList(),
+      );
+
+      if (!mounted) return;
+      if (problems.isNotEmpty) {
+        setState(() => _payingRetailerId = null);
+        _showPaymentError(problems.first);
+        return;
+      }
+
+      final subtotal = lines.fold<double>(0, (sum, l) => sum + l.lineTotal);
       final amount = subtotal + _deliveryChargeFor(retailerId);
 
       // Step 1 + 2: grant token, create payment — get bkashURL.
@@ -89,7 +123,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
 
       // Step 4: execute payment — confirms the transaction.
-      await BkashService.instance.executePayment(
+      final executed = await BkashService.instance.executePayment(
         paymentID: pending.paymentID,
         idToken: pending.idToken,
       );
@@ -97,21 +131,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (!mounted) return;
       setState(() {
         _paidRetailers.add(retailerId);
+        // Kept so the Payments record written at order creation carries the
+        // real bKash transaction id rather than an empty field.
+        _trxIds[retailerId] = executed.trxID;
         _payingRetailerId = null;
       });
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: const Text('Payment confirmed successfully'),
-            backgroundColor: const Color(0xFF1B5E20),
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
+      AppFeedback.show(context, 'Payment confirmed successfully');
     } on BkashException catch (e) {
       if (!mounted) return;
       _showPaymentError(e.message);
@@ -131,41 +156,85 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _showPaymentError(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red.shade800,
-          duration: const Duration(seconds: 5),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+    AppFeedback.show(
+      context,
+      message,
+      isError: true,
+      duration: const Duration(seconds: 5),
+    );
+  }
+
+  /// Creates the order in Firestore, clears the cart, starts a local
+  /// OrderRecord, and navigates into that order's tailoring setup.
+  Future<void> _continueToTailoring() async {
+    if (_customerId.isEmpty) {
+      _showPaymentError('Please sign in again before placing your order.');
+      return;
+    }
+
+    setState(() => _isPlacingOrder = true);
+    try {
+      // Step 1: write the whole order in ONE transaction — Orders, one
+      // Sub-order per retailer with its Order-Items, one Payments record per
+      // retailer, and the matching stock decrements. Stock is re-validated
+      // inside that transaction, so the last unit can't be sold twice and a
+      // failure part-way can't leave a paid-for order half-written.
+      final placed = await _checkoutService.placeOrder(
+        customerId: _customerId,
+        subOrders: [
+          for (final subOrder in widget.subOrders)
+            SubOrderInput(
+              retailerId: subOrder.retailerId,
+              itemsSubtotal: subOrder.itemsSubtotal,
+              deliveryCharge: subOrder.deliveryCharge,
+              deliveryDistanceKm: subOrder.deliveryDistanceKm,
+              deliveryPoint: subOrder.deliveryPoint,
+              transactionId: _trxIds[subOrder.retailerId],
+              items: widget.cartLines
+                  .where((l) => l.retailerId == subOrder.retailerId)
+                  .map((l) => OrderItemInput(
+                        productId: l.productId,
+                        optionId: l.optionId,
+                        quantity: l.quantity,
+                      ))
+                  .toList(),
+            ),
+        ],
+      );
+
+      // Step 2: the cart has become an order — clear it. Delegated to the
+      // cart screen's own handler so there's one place that owns clearing.
+      widget.onOrderPlaced();
+
+      // Step 3: hand straight off to the tailoring stage against the real
+      // Firestore documents placeOrder() just wrote — no local mirror, so
+      // the state survives a restart and the tailor can actually see the
+      // job the customer is about to create.
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TailoringSetupScreen(
+            orderId: placed.order.id,
+            orderDate: placed.order.orderDate,
+            savedMeasurements: [widget.measurement],
+            subOrders: placed.subOrders,
+            callbacks: buildTailoringCallbacks(placed.order.id),
           ),
         ),
       );
-  }
-
-  /// Clears the cart, starts exactly ONE new order from this checkout's
-  /// sub-orders, and navigates into that order's tailoring setup. This is
-  /// the only place a new OrderRecord gets created.
-  void _continueToTailoring() {
-    widget.onOrderPlaced(); // clears the cart
-
-    final order = OrderStore.instance.startOrder(widget.subOrders);
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => TailoringSetupScreen(
-          orderId: order.orderId,
-          orderDate: order.orderDate,
-          savedMeasurements: [widget.measurement],
-          subOrders: order.subOrders, // the stamped copies, not widget.subOrders
-          callbacks: buildTailoringCallbacks(order.orderId),
-        ),
-      ),
-    );
+    } on CheckoutServiceException catch (e) {
+      if (!mounted) return;
+      // Nothing was written — the transaction rolled back in full — so the
+      // customer can fix their cart and retry without a duplicate order.
+      _showPaymentError(e.message);
+    } catch (e) {
+      debugPrint('[Checkout] Order creation error: $e');
+      if (!mounted) return;
+      _showPaymentError('Could not place your order. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isPlacingOrder = false);
+    }
   }
 
   @override
@@ -375,7 +444,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             const SizedBox(width: 16),
             ElevatedButton(
-              onPressed: _allPaid ? _continueToTailoring : null,
+              onPressed: (_allPaid && !_isPlacingOrder) ? _continueToTailoring : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green.shade800,
                 foregroundColor: Colors.white,
@@ -384,7 +453,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 elevation: 0,
               ),
-              child: const Text("Continue", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              child: _isPlacingOrder
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text("Continue", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             ),
           ],
         ),

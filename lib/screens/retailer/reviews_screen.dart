@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import '../../services/review_service.dart';
+import '../../services/auth_service.dart';
+import '../../models/review.dart';
 
 class ReviewProduct {
   final String name;
@@ -39,10 +43,99 @@ class RetailerReviewsScreen extends StatefulWidget {
 }
 
 class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
+  final ReviewService _reviewService = ReviewService();
+  final AuthService _authService = AuthService();
+  StreamSubscription? _reviewsSubscription;
+  StreamSubscription? _statsSubscription;
+
+  bool _isLoading = true;
+  double _averageRating = 0.0;
+  int _totalRatings = 0;
+  Map<int, int> _ratingDistribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0};
+
   final Color primaryGreen = const Color(0xFF4F7942);
   String _selectedFilter = "Top reviews";
 
-  final List<UserReview> _reviews = [
+  List<UserReview> _allReviews = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  @override
+  void dispose() {
+    _reviewsSubscription?.cancel();
+    _statsSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _loadData() {
+    final retailerId = _authService.currentUser?.uid;
+    if (retailerId == null) {
+      return;
+    }
+
+    // Listen to stats
+    _statsSubscription = _reviewService.streamShopReviewStats(retailerId).listen((stats) {
+      if (!mounted) return;
+      setState(() {
+        _averageRating = stats['average'] ?? 0.0;
+        _totalRatings = stats['total'] ?? 0;
+        _ratingDistribution = Map<int, int>.from(stats['distribution'] ?? {});
+      });
+    });
+
+    // Listen to reviews
+    _reviewsSubscription = _reviewService.streamDetailedShopReviews(retailerId).listen((data) {
+      if (!mounted) return;
+      setState(() {
+        _allReviews = data.map((item) {
+          final reviewMap = item['review'];
+          final review = Review.fromJson(reviewMap);
+          final productsList = item['products'] as List<dynamic>;
+
+          return UserReview(
+            userName: item['userName'] ?? 'Anonymous',
+            rating: review.rating,
+            dateLabel: review.timeAgo,
+            createdAt: review.createdAt,
+            comment: review.comment,
+            products: productsList.map((p) => ReviewProduct(
+              name: p['name'],
+              image: p['image'],
+              price: p['price'],
+            )).toList(),
+          );
+        }).toList();
+        _isLoading = false;
+      });
+    });
+  }
+
+  List<UserReview> get _filteredReviews {
+    List<UserReview> sortedList = List.from(_allReviews);
+    switch (_selectedFilter) {
+      case "Top reviews":
+        // Sort by high rating first
+        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
+        break;
+      case "Newest":
+        sortedList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        break;
+      case "Highest rating":
+        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
+        break;
+      case "Lowest rating":
+        sortedList.sort((a, b) => a.rating.compareTo(b.rating));
+        break;
+    }
+    return sortedList;
+  }
+
+/*
+  final List<UserReview> _dummyReviews = [
     UserReview(
       userName: "Tasphia",
       rating: 4.0,
@@ -83,26 +176,7 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
       ],
     ),
   ];
-
-  List<UserReview> get _filteredReviews {
-    List<UserReview> sortedList = List.from(_reviews);
-    switch (_selectedFilter) {
-      case "Top reviews":
-        // Sort by high rating first
-        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
-        break;
-      case "Newest":
-        sortedList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        break;
-      case "Highest rating":
-        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
-        break;
-      case "Lowest rating":
-        sortedList.sort((a, b) => a.rating.compareTo(b.rating));
-        break;
-    }
-    return sortedList;
-  }
+*/
 
   @override
   Widget build(BuildContext context) {
@@ -114,7 +188,7 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87, size: 20),
+          icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Column(
@@ -131,32 +205,42 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
           ],
         ),
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildRatingSummary(),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
-              child: Text(
-                "Reviews",
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator())
+        : SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildRatingSummary(),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
+                  child: Text(
+                    "Reviews",
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                _buildFilterChips(),
+                const SizedBox(height: 16),
+                if (filtered.isEmpty)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: Text("No reviews found yet."),
+                    ),
+                  )
+                else
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: filtered.length,
+                    separatorBuilder: (context, index) => const SizedBox(height: 16),
+                    itemBuilder: (context, index) => _buildReviewItem(filtered[index]),
+                  ),
+                const SizedBox(height: 32),
+              ],
             ),
-            _buildFilterChips(),
-            const SizedBox(height: 16),
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: filtered.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 16),
-              itemBuilder: (context, index) => _buildReviewItem(filtered[index]),
-            ),
-            const SizedBox(height: 32),
-          ],
-        ),
-      ),
+          ),
     );
   }
 
@@ -176,24 +260,35 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  "4.2",
-                  style: TextStyle(fontSize: 42, fontWeight: FontWeight.w900),
+                Text(
+                  _averageRating.toStringAsFixed(1),
+                  style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w900),
                 ),
                 Row(
                   children: List.generate(
                     5,
-                    (index) => Icon(
-                      index < 4 ? Icons.star : Icons.star_half,
-                      color: Colors.orange,
-                      size: 18,
-                    ),
+                    (index) {
+                      double starVal = index + 1;
+                      IconData icon;
+                      if (_averageRating >= starVal) {
+                        icon = Icons.star;
+                      } else if (_averageRating >= starVal - 0.5) {
+                        icon = Icons.star_half;
+                      } else {
+                        icon = Icons.star_border;
+                      }
+                      return Icon(
+                        icon,
+                        color: Colors.orange,
+                        size: 18,
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  "100+ All ratings",
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                Text(
+                  "$_totalRatings All ratings",
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ],
             ),
@@ -202,11 +297,11 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
             flex: 6,
             child: Column(
               children: [
-                _ratingBar(5, 0.8),
-                _ratingBar(4, 0.4),
-                _ratingBar(3, 0.2),
-                _ratingBar(2, 0.1),
-                _ratingBar(1, 0.3),
+                _ratingBar(5, _totalRatings == 0 ? 0 : (_ratingDistribution[5] ?? 0) / _totalRatings),
+                _ratingBar(4, _totalRatings == 0 ? 0 : (_ratingDistribution[4] ?? 0) / _totalRatings),
+                _ratingBar(3, _totalRatings == 0 ? 0 : (_ratingDistribution[3] ?? 0) / _totalRatings),
+                _ratingBar(2, _totalRatings == 0 ? 0 : (_ratingDistribution[2] ?? 0) / _totalRatings),
+                _ratingBar(1, _totalRatings == 0 ? 0 : (_ratingDistribution[1] ?? 0) / _totalRatings),
               ],
             ),
           ),
@@ -350,12 +445,7 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Image.asset(
-              product.image,
-              width: 50,
-              height: 50,
-              fit: BoxFit.cover,
-            ),
+            child: _buildImage(product.image, 50, 50),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -379,6 +469,43 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildImage(String path, double width, double height) {
+    if (path.startsWith('http')) {
+      return Image.network(
+        path,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint("ReviewScreen: Error loading network image: $path - $error");
+          return _imagePlaceholder(width, height);
+        },
+      );
+    } else if (path.isNotEmpty) {
+      return Image.asset(
+        path,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint("ReviewScreen: Error loading asset image: $path - $error");
+          return _imagePlaceholder(width, height);
+        },
+      );
+    } else {
+      return _imagePlaceholder(width, height);
+    }
+  }
+
+  Widget _imagePlaceholder(double width, double height) {
+    return Container(
+      width: width,
+      height: height,
+      color: Colors.grey.shade200,
+      child: const Icon(Icons.image, color: Colors.grey),
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -5,6 +6,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import '../../widgets/top_feedback_banner.dart';
 
 /// Free, no-API-key map picker built on flutter_map + OpenStreetMap-based
 /// tiles. Returns a Firestore GeoPoint via Navigator.pop when confirmed.
@@ -28,6 +30,16 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   bool _searching = false;
   List<Map<String, dynamic>> _searchResults = [];
 
+  /// Typeahead state. Nominatim's usage policy caps callers at ~1 request per
+  /// second, so keystrokes are debounced rather than sent one-per-character,
+  /// and a sequence number drops responses that arrive out of order (a slow
+  /// "dha" landing after a fast "dhaka" would otherwise overwrite the results).
+  static const _debounce = Duration(milliseconds: 450);
+  static const _minQueryLength = 3;
+  Timer? _debounceTimer;
+  int _searchSeq = 0;
+  String _lastQuery = '';
+
   @override
   void initState() {
     super.initState();
@@ -38,53 +50,89 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _searchLocation(String query) async {
+  /// Called on every keystroke: schedules a suggestion lookup once typing
+  /// pauses. Short queries are ignored — Nominatim returns near-useless matches
+  /// for one or two characters and it wastes the rate limit.
+  void _onSearchChanged(String query) {
+    setState(() {}); // refresh the clear/search suffix icon
+    _debounceTimer?.cancel();
+
+    final trimmed = query.trim();
+    if (trimmed.length < _minQueryLength) {
+      _searchSeq++; // invalidate any in-flight request
+      if (_searchResults.isNotEmpty || _searching) {
+        setState(() {
+          _searchResults = [];
+          _searching = false;
+        });
+      }
+      return;
+    }
+    if (trimmed == _lastQuery) return;
+
+    _debounceTimer = Timer(_debounce, () => _searchLocation(trimmed));
+  }
+
+  /// [showEmptyFeedback] is false for typeahead lookups — a banner on every
+  /// pause mid-word would be noise. The explicit search/submit still reports it.
+  Future<void> _searchLocation(String query, {bool showEmptyFeedback = false}) async {
+    _debounceTimer?.cancel();
     final trimmed = query.trim();
     if (trimmed.isEmpty) {
       setState(() => _searchResults = []);
       return;
     }
 
+    _lastQuery = trimmed;
+    final seq = ++_searchSeq;
     setState(() => _searching = true);
     try {
       final uri = Uri.parse(
         'https://nominatim.openstreetmap.org/search'
         '?q=${Uri.encodeQueryComponent(trimmed)}'
-        '&format=json&addressdetails=1&limit=5',
+        // Soft-biased to Bangladesh: the viewbox lifts local matches without
+        // `bounded=1`, so foreign places still appear, just lower down. An
+        // unbiased search lets same-named foreign places crowd them out.
+        '&format=json&addressdetails=1&limit=15'
+        '&viewbox=88.0,26.7,92.7,20.5',
       );
       final response = await http.get(
         uri,
         headers: {
           'User-Agent': 'com.example.sketch2stitch',
-          'Accept-Language': 'en',
+          // Bangla first so places tagged only in Bangla still match, with
+          // English as the fallback label.
+          'Accept-Language': 'bn,en',
         },
       );
+
+      // A newer keystroke already superseded this request.
+      if (!mounted || seq != _searchSeq) return;
 
       if (response.statusCode == 200) {
         final List results = jsonDecode(response.body);
         setState(() {
           _searchResults = results.cast<Map<String, dynamic>>();
         });
-        if (results.isEmpty && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No results found for that location')),
-          );
+        if (results.isEmpty && showEmptyFeedback && mounted) {
+          AppFeedback.show(context, 'No results found for that location',
+              isError: true);
         }
       } else {
         throw Exception('Search failed (${response.statusCode})');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Search error: $e')),
-        );
+      if (mounted && seq == _searchSeq && showEmptyFeedback) {
+        AppFeedback.show(context, "Couldn't search right now. Try again.",
+            isError: true);
       }
     } finally {
-      if (mounted) setState(() => _searching = false);
+      if (mounted && seq == _searchSeq) setState(() => _searching = false);
     }
   }
 
@@ -92,8 +140,13 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     final lat = double.parse(result['lat']);
     final lon = double.parse(result['lon']);
     final target = ll.LatLng(lat, lon);
+    // Drop any pending/in-flight lookup so a late response can't re-open the
+    // suggestion list over the map the user just picked on.
+    _debounceTimer?.cancel();
+    _searchSeq++;
     setState(() {
       _picked = target;
+      _searching = false;
       _searchResults = [];
       _searchController.text = result['display_name'] ?? '';
     });
@@ -121,9 +174,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       _mapController.move(target, 16);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not get current location: $e')),
-        );
+        AppFeedback.show(context, 'Could not get your current location.',
+            isError: true);
       }
     } finally {
       if (mounted) setState(() => _locating = false);
@@ -197,8 +249,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 child: TextField(
                   controller: _searchController,
                   textInputAction: TextInputAction.search,
-                  onSubmitted: _searchLocation,
-                  onChanged: (_) => setState(() {}),
+                  onSubmitted: (q) => _searchLocation(q, showEmptyFeedback: true),
+                  onChanged: _onSearchChanged,
                   decoration: InputDecoration(
                     hintText: 'Search for an address or area',
                     border: InputBorder.none,
@@ -218,12 +270,20 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                                 icon: const Icon(Icons.clear, color: Colors.black45),
                                 onPressed: () {
                                   _searchController.clear();
-                                  setState(() => _searchResults = []);
+                                  _debounceTimer?.cancel();
+                                  _searchSeq++;
+                                  _lastQuery = '';
+                                  setState(() {
+                                    _searchResults = [];
+                                    _searching = false;
+                                  });
                                 },
                               )
                             : IconButton(
                                 icon: const Icon(Icons.arrow_forward, color: Color(0xFF6C9985)),
-                                onPressed: () => _searchLocation(_searchController.text),
+                                onPressed: () => _searchLocation(
+                                    _searchController.text,
+                                    showEmptyFeedback: true),
                               )),
                   ),
                 ),
@@ -274,7 +334,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 ),
               ),
             ),
-          if (_searchResults.isEmpty)
+          // Hidden while the user is typing, so the hint doesn't flicker in and
+          // out between keystrokes as suggestions come and go.
+          if (_searchResults.isEmpty && _searchController.text.isEmpty)
             Positioned(
               top: 66,
               left: 16,
