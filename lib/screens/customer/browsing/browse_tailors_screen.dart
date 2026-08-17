@@ -556,7 +556,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
 }
 
 // ============================================================================
-// TailorDetailScreen
+// TailorDetailScreen - FIXED PORTFOLIO LOADING
 // ============================================================================
 
 class TailorDetailScreen extends StatefulWidget {
@@ -652,45 +652,45 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     }
   }
 
-Future<void> _loadReviews() async {
-  setState(() {
-    _isLoading = true;
-    _isLoadingReviews = true;
-  });
-  try {
-    // Use the ReviewService to get real reviews from Firestore
-    final reviews = await _reviewService.getReviewsByTargetId(
-      widget.tailor.id,
-      ReviewTargetRole.tailor,
-      limit: 50,
-    );
-    
-    print('✅ Loaded ${reviews.length} reviews for tailor: ${widget.tailor.name}');
-    
+  Future<void> _loadReviews() async {
     setState(() {
-      _reviews = reviews;
-      _isLoading = false;
-      _isLoadingReviews = false;
-      if (_reviews.isNotEmpty) {
-        final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
-        _averageRating = sum / _reviews.length;
-      }
+      _isLoading = true;
+      _isLoadingReviews = true;
     });
-  } catch (e) {
-    print('❌ Error loading reviews: $e');
-    setState(() {
-      _isLoading = false;
-      _isLoadingReviews = false;
-    });
+    try {
+      final reviews = await _reviewService.getReviewsByTargetId(
+        widget.tailor.id,
+        ReviewTargetRole.tailor,
+        limit: 50,
+      );
+      
+      print('✅ Loaded ${reviews.length} reviews for tailor: ${widget.tailor.name}');
+      
+      setState(() {
+        _reviews = reviews;
+        _isLoading = false;
+        _isLoadingReviews = false;
+        if (_reviews.isNotEmpty) {
+          final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
+          _averageRating = sum / _reviews.length;
+        }
+      });
+    } catch (e) {
+      print('❌ Error loading reviews: $e');
+      setState(() {
+        _isLoading = false;
+        _isLoadingReviews = false;
+      });
+    }
   }
-}
-   
 
+  // FIXED: Updated _loadPortfolio to handle both manual and auto-generated IDs
   Future<void> _loadPortfolio() async {
     setState(() => _isLoadingPortfolio = true);
     try {
       // First check if tailor has portfolio in the object
       if (widget.tailor.portfolio != null && widget.tailor.portfolio!.isNotEmpty) {
+        print('📦 Using portfolio from tailor object: ${widget.tailor.portfolio!.length} items');
         setState(() {
           _portfolioItems = widget.tailor.portfolio!;
           _isLoadingPortfolio = false;
@@ -699,19 +699,84 @@ Future<void> _loadReviews() async {
       }
       
       // Load from Firestore using PortfolioService
+      print('🔍 Loading portfolio for tailor: ${widget.tailor.id}, Name: ${widget.tailor.name}');
+      
+      // Try direct query first
       final result = await _portfolioService.getTailorPortfolio(
         widget.tailor.id,
         pageSize: 20,
       );
       
       print('✅ Loaded ${result.items.length} portfolio items for tailor ${widget.tailor.id}');
+      if (result.items.isNotEmpty) {
+        for (final item in result.items) {
+          print('   - Portfolio item: ${item.id}, image: ${item.image}, description: ${item.description}');
+        }
+      }
       
       setState(() {
         _portfolioItems = result.items;
         _isLoadingPortfolio = false;
       });
+      
+      // If still no portfolio items, try alternative approach
+      if (_portfolioItems.isEmpty) {
+        print('⚠️ No portfolio items found, trying fallback method...');
+        await _loadPortfolioFallback();
+      }
     } catch (e) {
       print('❌ Error loading portfolio: $e');
+      // Try fallback method
+      await _loadPortfolioFallback();
+    }
+  }
+
+  // Fallback method to try finding portfolio by tailor name
+  Future<void> _loadPortfolioFallback() async {
+    try {
+      print('🔍 Fallback: Trying to find portfolio by tailor name: ${widget.tailor.name}');
+      
+      // Get all portfolio items and filter by tailor name
+      final allPortfolioSnapshot = await FirebaseFirestore.instance
+          .collection('Portfolio')
+          .get();
+      
+      final List<Portfolio> foundItems = [];
+      
+      for (final doc in allPortfolioSnapshot.docs) {
+        final data = doc.data();
+        final tailorId = data['tailorId'] as String?;
+        
+        if (tailorId != null) {
+          // Check if this tailorId exists and matches the name
+          final tailorDoc = await FirebaseFirestore.instance
+              .collection('Tailor')
+              .doc(tailorId)
+              .get();
+          
+          if (tailorDoc.exists) {
+            final tailorData = tailorDoc.data();
+            final name = tailorData?['name'] as String?;
+            if (name == widget.tailor.name) {
+              foundItems.add(Portfolio.fromJson({...data, 'id': doc.id}));
+              print('   ✅ Found portfolio item for tailor: $name');
+            }
+          }
+        }
+      }
+      
+      if (foundItems.isNotEmpty) {
+        print('✅ Fallback: Found ${foundItems.length} portfolio items for tailor: ${widget.tailor.name}');
+        setState(() {
+          _portfolioItems = foundItems;
+          _isLoadingPortfolio = false;
+        });
+      } else {
+        print('❌ Fallback: No portfolio items found for tailor: ${widget.tailor.name}');
+        setState(() => _isLoadingPortfolio = false);
+      }
+    } catch (e) {
+      print('❌ Fallback error: $e');
       setState(() => _isLoadingPortfolio = false);
     }
   }
@@ -854,7 +919,7 @@ Future<void> _loadReviews() async {
     final isSmallScreen = screenWidth < 380;
 
     return Scaffold(
-      bottomNavigationBar: (_isCustomer && widget.onTailorSelected != null && !isUnavailable)
+      bottomNavigationBar: (_isCustomer && !isUnavailable)
           ? _buildBookButton()
           : null,
       body: Column(
@@ -1145,13 +1210,11 @@ Future<void> _loadReviews() async {
   Widget _buildCoverImage() {
     String imageUrl = 'assets/images/fab.jpg';
 
-    // First try to use profile picture
     if (widget.tailor.profilePicture != null && 
         widget.tailor.profilePicture!.isNotEmpty) {
       imageUrl = widget.tailor.profilePicture!;
     }
     
-    // If no profile picture, try portfolio first image
     if (imageUrl == 'assets/images/fab.jpg' && _portfolioItems.isNotEmpty) {
       final firstItem = _portfolioItems.first;
       if (firstItem.image != null && firstItem.image!.isNotEmpty) {
@@ -1201,7 +1264,18 @@ Future<void> _loadReviews() async {
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton(
-          onPressed: () => widget.onTailorSelected!(widget.tailor.id),
+          onPressed: () {
+            if (widget.onTailorSelected != null) {
+              widget.onTailorSelected!(widget.tailor.id);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Booking feature coming soon!'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            }
+          },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.green.shade800,
             foregroundColor: Colors.white,
@@ -1449,6 +1523,7 @@ Future<void> _loadReviews() async {
             onPressed: () {
               setState(() {
                 _isLoading = true;
+                _isLoadingReviews = true;
               });
               _loadReviews();
             },
@@ -1694,7 +1769,7 @@ Future<void> _loadReviews() async {
   List<Review> _getFilteredReviews() {
     switch (_selectedFilter) {
       case "5 Star":
-        return _reviews.where((r) => r.rating >= 4.5).toList(); // 5 star means 4.5+
+        return _reviews.where((r) => r.rating >= 4.5).toList();
       case "4 Star & above":
         return _reviews.where((r) => r.rating >= 4.0).toList();
       default:
@@ -1703,15 +1778,12 @@ Future<void> _loadReviews() async {
   }
 
   int _getRatingCount(double rating) {
-    // Count reviews with this rating (rounded to nearest integer)
     return _reviews.where((r) => r.rating.round() == rating.round()).length;
   }
 
   Widget _buildReviewsPageItem(Review review) {
-    // Generate a consistent customer name based on customerId
     String customerName = 'Customer';
     if (review.customerId.isNotEmpty) {
-      // Use a hash of the customerId to generate a consistent name
       final hash = review.customerId.hashCode.abs();
       final names = ['Alex', 'Sam', 'Jordan', 'Taylor', 'Morgan', 'Casey', 'Riley', 'Avery'];
       customerName = names[hash % names.length];
@@ -1773,4 +1845,3 @@ Future<void> _loadReviews() async {
     );
   }
 }
-

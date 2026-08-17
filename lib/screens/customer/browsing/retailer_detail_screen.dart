@@ -13,510 +13,6 @@ import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// ============================================================================
-// RetailersPageBody
-// ============================================================================
-
-class RetailersPageBody extends StatefulWidget {
-  final ValueNotifier<String> searchQuery;
-  final RetailersFilterData filterData;
-  final UserRole userRole;
-  final void Function(String retailerId)? onRetailerSelected;
-
-  const RetailersPageBody({
-    super.key,
-    required this.searchQuery,
-    required this.filterData,
-    this.userRole = UserRole.customer,
-    this.onRetailerSelected,
-  });
-
-  @override
-  State<RetailersPageBody> createState() => _RetailersPageBodyState();
-}
-
-class _RetailersPageBodyState extends State<RetailersPageBody>
-    with AutomaticKeepAliveClientMixin {
-  @override
-  bool get wantKeepAlive => true;
-
-  final BrowseService _browseService = BrowseService();
-  final FavoriteService _favoriteService = FavoriteService();
-  String? _currentUserId;
-
-  @override
-  void initState() {
-    super.initState();
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      _currentUserId = user.uid;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-
-    return ValueListenableBuilder<String>(
-      valueListenable: widget.searchQuery,
-      builder: (context, searchQuery, _) {
-        return StreamBuilder<List<Retailer>>(
-          stream: _browseService.getRetailersByFilter(
-            minRating: widget.filterData.minRating > 0
-                ? widget.filterData.minRating
-                : null,
-            location: widget.filterData.location != 'All'
-                ? widget.filterData.location
-                : null,
-            sortBy: widget.filterData.sortBy,
-            search: searchQuery.isNotEmpty ? searchQuery : null,
-          ),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 64,
-                      color: Colors.red[300],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Error loading retailers',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      snapshot.error?.toString() ?? 'Unknown error',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[500],
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            if (snapshot.connectionState == ConnectionState.waiting &&
-                !snapshot.hasData) {
-              return const Center(
-                child: CircularProgressIndicator(
-                  color: Color(0xFF6B8F71),
-                ),
-              );
-            }
-
-            final retailers = snapshot.data ?? [];
-
-            if (retailers.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.storefront_outlined,
-                      size: 64,
-                      color: Colors.grey[400],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No Retailers found',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Try adjusting your filters or search terms',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            return Column(
-              children: [
-                _buildHeroSection(),
-                Expanded(
-                  child: _buildRetailersGrid(retailers),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildHeroSection() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenWidth < 400;
-
-    return Container(
-      margin: EdgeInsets.symmetric(
-        horizontal: isSmallScreen ? 12 : 16,
-        vertical: 8,
-      ),
-      padding: EdgeInsets.all(isSmallScreen ? 14 : 16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF4A7C59), Color(0xFF6B8F71)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Quality Retailers',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Trusted stores for premium fabrics and materials',
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.white.withOpacity(0.9),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _buildHeroChip(Icons.verified, 'Authentic', isSmallScreen),
-              const SizedBox(width: 8),
-              _buildHeroChip(Icons.price_check, 'Best Prices', isSmallScreen),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeroChip(IconData icon, String label, bool isSmall) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: isSmall ? 10 : 12,
-        vertical: isSmall ? 4 : 5,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white, size: isSmall ? 12 : 14),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRetailersGrid(List<Retailer> retailers) {
-    if (retailers.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.search_off_rounded,
-              size: 64,
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No Retailers found',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Try adjusting your filters or search terms',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey[500],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    final isSmallScreen = screenWidth < 400;
-    final spacing = isSmallScreen ? 10.0 : 12.0;
-    final cardAspectRatio = screenHeight < 700 ? 0.72 : 0.78;
-
-    return GridView.builder(
-      padding: EdgeInsets.all(spacing),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: cardAspectRatio,
-        crossAxisSpacing: spacing,
-        mainAxisSpacing: spacing,
-      ),
-      itemCount: retailers.length,
-      itemBuilder: (context, index) {
-        final retailer = retailers[index];
-        return _buildRetailerCard(retailer, isSmallScreen);
-      },
-    );
-  }
-
-  Widget _buildRetailerCard(Retailer retailer, bool isSmall) {
-    final bool isTopRated = retailer.rating >= 4.8;
-    String imageUrl = retailer.profilePicture ?? 'assets/images/fab.jpg';
-
-    return GestureDetector(
-      onTap: () {
-        if (widget.onRetailerSelected != null) {
-          widget.onRetailerSelected!(retailer.id);
-        } else {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => RetailerDetailScreen(
-                retailer: retailer,
-                userRole: widget.userRole,
-                onRetailerSelected: widget.onRetailerSelected,
-              ),
-            ),
-          );
-        }
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE8ECF0), width: 0.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              flex: 5,
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(14),
-                    ),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: double.infinity,
-                      child: imageUrl.startsWith('http')
-                          ? Image.network(
-                              imageUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                color: const Color(0xFF6B8F71).withOpacity(0.12),
-                                child: Icon(
-                                  Icons.store,
-                                  size: isSmall ? 36 : 40,
-                                  color: const Color(0xFF4A7C59),
-                                ),
-                              ),
-                            )
-                          : Image.asset(
-                              imageUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                color: const Color(0xFF6B8F71).withOpacity(0.12),
-                                child: Icon(
-                                  Icons.store,
-                                  size: isSmall ? 36 : 40,
-                                  color: const Color(0xFF4A7C59),
-                                ),
-                              ),
-                            ),
-                    ),
-                  ),
-                  if (isTopRated)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isSmall ? 8 : 10,
-                          vertical: isSmall ? 4 : 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF6B8F71),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
-                            width: 0.3,
-                          ),
-                        ),
-                        child: Text(
-                          '⭐ Top Rated',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  Positioned(
-                    bottom: 8,
-                    right: 8,
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isSmall ? 6 : 8,
-                        vertical: isSmall ? 3 : 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.7),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.star,
-                            color: Colors.amber,
-                            size: isSmall ? 10 : 12,
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            retailer.rating.toStringAsFixed(1),
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Flexible(
-              flex: 4,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  isSmall ? 10 : 12,
-                  isSmall ? 8 : 10,
-                  isSmall ? 10 : 12,
-                  isSmall ? 10 : 12,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      retailer.shopName,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        height: 1.2,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    SizedBox(height: isSmall ? 4 : 6),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on,
-                          size: isSmall ? 12 : 14,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            retailer.generalArea,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[600],
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 1,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '2.5 km',
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: Colors.green.shade800,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// RetailerDetailScreen - FIXED
-// ============================================================================
-
 class RetailerDetailScreen extends StatefulWidget {
   final Retailer retailer;
   final VoidCallback? onBackPressed;
@@ -541,7 +37,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   bool _showFabrics = true;
   List<Review> _reviews = [];
   bool _isLoading = true;
-  bool _isLoadingReviews = true;
   double _averageRating = 0.0;
   String _selectedFilter = "Top reviews";
   
@@ -553,14 +48,15 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   List<Product> _products = [];
   bool _isLoadingProducts = true;
 
-  // Categories that are considered "Elements" (non-fabric items)
   final List<String> _elementCategories = [
-    'Material',
-  ];
-
-  // Categories that are considered "Fabrics"
-  final List<String> _fabricCategories = [
-    'Fabric',
+    'Fasteners',
+    'Buttons',
+    'Threads',
+    'Embellishments',
+    'Trims',
+    'Ribbons',
+    'Lace',
+    'Beads',
   ];
 
   bool get _isCustomer => widget.userRole == UserRole.customer;
@@ -625,150 +121,191 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     }
   }
 
-  Future<void> _loadProducts() async {
-    setState(() => _isLoadingProducts = true);
-    try {
-      String retailerId = widget.retailer.id;
-      print('🔍 Loading products for retailer: $retailerId');
+ Future<void> _loadProducts() async {
+  setState(() => _isLoadingProducts = true);
+  try {
+    // Get the retailer ID from the widget
+    String retailerId = widget.retailer.id;
+    print('🔍 Retailer ID from widget: "$retailerId"');
+    print('🔍 Retailer shop name: ${widget.retailer.shopName}');
+    
+    // Get all products from Firestore
+    final allProducts = await _browseService.getProductsByFilter().first;
+    print('📦 Total products in Firestore: ${allProducts.length}');
+    
+    List<Product> retailerProducts = [];
+    
+    // Try multiple ways to find products:
+    
+    // 1. Try matching by the exact retailer ID (could be auto-generated or hardcoded)
+    if (retailerId.isNotEmpty) {
+      retailerProducts = allProducts
+          .where((p) => p.retailerId == retailerId)
+          .toList();
+      print('✅ Found ${retailerProducts.length} products matching retailer ID: $retailerId');
+    }
+    
+    // 2. If no products found, try to find the retailer in Firestore by shop name
+    if (retailerProducts.isEmpty) {
+      print('⚠️ No products found for retailer ID: $retailerId');
+      print('🔍 Looking for retailer by shop name: ${widget.retailer.shopName}');
       
-      final allProducts = await _browseService.getProductsByFilter().first;
-      print('📦 Total products in Firestore: ${allProducts.length}');
-      
-      List<Product> retailerProducts = [];
-      
-      // Try by retailer ID
-      if (retailerId.isNotEmpty) {
-        retailerProducts = allProducts
-            .where((p) => p.retailerId == retailerId)
-            .toList();
-        print('✅ Found ${retailerProducts.length} products by retailer ID');
-      }
-      
-      // If no products, try by shop name
-      if (retailerProducts.isEmpty) {
-        print('🔍 Trying to find retailer by shop name: ${widget.retailer.shopName}');
-        try {
-          final retailerSnapshot = await FirebaseFirestore.instance
-              .collection('Retailer')
-              .where('shopName', isEqualTo: widget.retailer.shopName)
-              .limit(1)
-              .get();
+      try {
+        final retailerSnapshot = await FirebaseFirestore.instance
+            .collection('Retailer')
+            .where('shopName', isEqualTo: widget.retailer.shopName)
+            .limit(1)
+            .get();
+        
+        if (retailerSnapshot.docs.isNotEmpty) {
+          final doc = retailerSnapshot.docs.first;
+          final foundRetailerId = doc.id;
+          print('✅ Found retailer in Firestore with ID: $foundRetailerId');
           
-          if (retailerSnapshot.docs.isNotEmpty) {
-            final doc = retailerSnapshot.docs.first;
-            final foundRetailerId = doc.id;
-            print('✅ Found retailer with ID: $foundRetailerId');
-            
-            retailerProducts = allProducts
-                .where((p) => p.retailerId == foundRetailerId)
-                .toList();
-            print('✅ Found ${retailerProducts.length} products by shop name');
-          }
-        } catch (e) {
-          print('❌ Error finding retailer by shop name: $e');
+          // Try to find products with this retailer ID
+          retailerProducts = allProducts
+              .where((p) => p.retailerId == foundRetailerId)
+              .toList();
+          print('✅ Found ${retailerProducts.length} products for Firestore retailer ID: $foundRetailerId');
         }
+      } catch (e) {
+        print('❌ Error finding retailer by shop name: $e');
       }
+    }
+    
+    // 3. If still no products, try hardcoded retailer IDs (retailer1, retailer2, etc.)
+    if (retailerProducts.isEmpty) {
+      print('⚠️ No products found by Firestore ID, trying hardcoded IDs...');
       
-      // If still no products, use retailer's existing products
-      if (retailerProducts.isEmpty && widget.retailer.products != null) {
-        print('📦 Using products from retailer object: ${widget.retailer.products!.length}');
-        retailerProducts = widget.retailer.products!;
+      // Map of shop names to hardcoded IDs
+      final Map<String, String> hardcodedIds = {
+        'Dhaka Fabric House': 'retailer1',
+        'Chowdhury Textiles': 'retailer2',
+        'Silk & Lace Emporium': 'retailer3',
+      };
+      
+      final hardcodedId = hardcodedIds[widget.retailer.shopName];
+      if (hardcodedId != null) {
+        retailerProducts = allProducts
+            .where((p) => p.retailerId == hardcodedId)
+            .toList();
+        print('✅ Found ${retailerProducts.length} products for hardcoded ID: $hardcodedId');
+      } else {
+        print('❌ No hardcoded ID found for shop: ${widget.retailer.shopName}');
       }
-      
-      // Print product details
-      if (retailerProducts.isNotEmpty) {
-        for (final product in retailerProducts) {
-          print('   - ${product.productName} (Category: ${product.category})');
-        }
+    }
+    
+    // 4. If still no products, use retailer's existing products
+    if (retailerProducts.isEmpty && widget.retailer.products != null) {
+      print('📦 Using products from retailer object (${widget.retailer.products!.length})');
+      retailerProducts = widget.retailer.products!;
+    }
+    
+    // Print product details for debugging
+    if (retailerProducts.isNotEmpty) {
+      print('📄 Products found:');
+      for (final product in retailerProducts) {
+        print('   - ${product.productName} (Retailer ID: ${product.retailerId})');
       }
-      
+    } else {
+      print('❌ No products found for this retailer');
+    }
+    
+    setState(() {
+      _products = retailerProducts;
+      _isLoadingProducts = false;
+    });
+  } catch (e) {
+    print('❌ Error loading products: $e');
+    if (widget.retailer.products != null) {
       setState(() {
-        _products = retailerProducts;
+        _products = widget.retailer.products!;
         _isLoadingProducts = false;
       });
-    } catch (e) {
-      print('❌ Error loading products: $e');
-      if (widget.retailer.products != null) {
+    } else {
+      setState(() => _isLoadingProducts = false);
+    }
+  }
+}
+Future<void> _loadReviews() async {
+  setState(() => _isLoading = true);
+  try {
+    // Get retailer ID
+    String retailerId = widget.retailer.id;
+    print('🔍 Loading reviews for retailer: $retailerId');
+    
+    // Try to find the retailer by shop name if the ID doesn't work
+    if (retailerId.isNotEmpty) {
+      try {
+        final reviews = await _reviewService.getReviewsByTargetId(
+          retailerId,
+          ReviewTargetRole.retailer,
+          limit: 20,
+        );
+        
+        if (reviews.isNotEmpty) {
+          print('✅ Loaded ${reviews.length} reviews for retailer ID: $retailerId');
+          setState(() {
+            _reviews = reviews;
+            _isLoading = false;
+            if (_reviews.isNotEmpty) {
+              final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
+              _averageRating = sum / _reviews.length;
+            }
+          });
+          return;
+        }
+      } catch (e) {
+        print('❌ Error loading reviews for ID: $retailerId');
+      }
+    }
+    
+    // If no reviews found, try to find by shop name
+    print('🔍 Trying to find reviews by shop name...');
+    try {
+      final retailerSnapshot = await FirebaseFirestore.instance
+          .collection('Retailer')
+          .where('shopName', isEqualTo: widget.retailer.shopName)
+          .limit(1)
+          .get();
+      
+      if (retailerSnapshot.docs.isNotEmpty) {
+        final doc = retailerSnapshot.docs.first;
+        final foundRetailerId = doc.id;
+        print('✅ Found retailer by shop name with ID: $foundRetailerId');
+        
+        final reviews = await _reviewService.getReviewsByTargetId(
+          foundRetailerId,
+          ReviewTargetRole.retailer,
+          limit: 20,
+        );
+        
+        print('✅ Loaded ${reviews.length} reviews for retailer: ${widget.retailer.shopName}');
         setState(() {
-          _products = widget.retailer.products!;
-          _isLoadingProducts = false;
+          _reviews = reviews;
+          _isLoading = false;
+          if (_reviews.isNotEmpty) {
+            final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
+            _averageRating = sum / _reviews.length;
+          }
         });
       } else {
-        setState(() => _isLoadingProducts = false);
+        print('❌ No retailer found by shop name: ${widget.retailer.shopName}');
+        setState(() => _isLoading = false);
       }
-    }
-  }
-
-  Future<void> _loadReviews() async {
-    setState(() {
-      _isLoading = true;
-      _isLoadingReviews = true;
-    });
-    try {
-      String retailerId = widget.retailer.id;
-      print('🔍 Loading reviews for retailer: $retailerId');
-      
-      // Try by retailer ID
-      var reviews = await _reviewService.getReviewsByTargetId(
-        retailerId,
-        ReviewTargetRole.retailer,
-        limit: 50,
-      );
-      
-      print('✅ Loaded ${reviews.length} reviews by retailer ID');
-      
-      // If no reviews, try by shop name
-      if (reviews.isEmpty) {
-        print('🔍 Trying to find retailer by shop name: ${widget.retailer.shopName}');
-        try {
-          final retailerSnapshot = await FirebaseFirestore.instance
-              .collection('Retailer')
-              .where('shopName', isEqualTo: widget.retailer.shopName)
-              .limit(1)
-              .get();
-          
-          if (retailerSnapshot.docs.isNotEmpty) {
-            final doc = retailerSnapshot.docs.first;
-            final foundRetailerId = doc.id;
-            print('✅ Found retailer with ID: $foundRetailerId');
-            
-            reviews = await _reviewService.getReviewsByTargetId(
-              foundRetailerId,
-              ReviewTargetRole.retailer,
-              limit: 50,
-            );
-            print('✅ Loaded ${reviews.length} reviews by shop name');
-          }
-        } catch (e) {
-          print('❌ Error finding retailer by shop name: $e');
-        }
-      }
-      
-      setState(() {
-        _reviews = reviews;
-        _isLoading = false;
-        _isLoadingReviews = false;
-        if (_reviews.isNotEmpty) {
-          final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
-          _averageRating = sum / _reviews.length;
-          print('📊 Average rating: $_averageRating from ${_reviews.length} reviews');
-        } else {
-          print('⚠️ No reviews found for this retailer');
-        }
-      });
     } catch (e) {
-      print('❌ Error loading reviews: $e');
-      setState(() {
-        _isLoading = false;
-        _isLoadingReviews = false;
-      });
+      print('❌ Error finding retailer by shop name: $e');
+      setState(() => _isLoading = false);
     }
+  } catch (e) {
+    print('❌ Error loading reviews: $e');
+    setState(() => _isLoading = false);
   }
+}
 
   bool _isElement(Product product) =>
       _elementCategories.contains(product.category);
-  bool _isFabric(Product product) =>
-      _fabricCategories.contains(product.category);
+  bool _isFabric(Product product) => !_isElement(product);
 
   List<Product> get _fabrics => _products.where((p) => _isFabric(p)).toList();
   List<Product> get _elements => _products.where((p) => _isElement(p)).toList();
@@ -778,7 +315,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => ChatScreen(
-          conversationId: '${_currentUserId ?? 'customer'}_${widget.retailer.id}',
+          conversationId: 'current_customer_id_${widget.retailer.id}',
           customerId: _currentUserId ?? 'current_customer_id',
           otherUserId: widget.retailer.id,
           otherUserName: widget.retailer.shopName,
@@ -807,7 +344,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                 children: [
                   _buildAboutSection(isSmallScreen),
                   const SizedBox(height: 24),
-                  // Show category toggle only if both fabrics and elements exist
                   if (_fabrics.isNotEmpty && _elements.isNotEmpty)
                     _buildCategoryToggle(isSmallScreen),
                   const SizedBox(height: 12),
@@ -836,7 +372,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         icon: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.5),
+            color: Colors.black.withValues(alpha: 0.5),
             shape: BoxShape.circle,
           ),
           child: Icon(
@@ -865,7 +401,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.transparent,
-                    Colors.black.withOpacity(0.8),
+                    Colors.black.withValues(alpha: 0.8),
                   ],
                 ),
               ),
@@ -926,10 +462,10 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                             vertical: isSmallScreen ? 6.0 : 8.0,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: Colors.white.withOpacity(0.3),
+                              color: Colors.white.withValues(alpha: 0.3),
                               width: 1.0,
                             ),
                           ),
@@ -987,7 +523,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.green.withOpacity(0.3),
+                                  color: Colors.green.withValues(alpha: 0.3),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Row(
@@ -1070,12 +606,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   Widget _buildCoverImage() {
     String imageUrl = 'assets/images/fab.jpg';
     
-    if (widget.retailer.profilePicture != null && 
-        widget.retailer.profilePicture!.isNotEmpty) {
-      imageUrl = widget.retailer.profilePicture!;
-    }
-    
-    if (imageUrl == 'assets/images/fab.jpg' && _products.isNotEmpty) {
+    if (_products.isNotEmpty) {
       final firstProduct = _products.first;
       if (firstProduct.colorOptions.isNotEmpty) {
         final firstColor = firstProduct.colorOptions.first;
@@ -1083,6 +614,11 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
           imageUrl = firstColor.image.first;
         }
       }
+    }
+    
+    if (widget.retailer.profilePicture != null && 
+        widget.retailer.profilePicture!.isNotEmpty) {
+      imageUrl = widget.retailer.profilePicture!;
     }
     
     if (imageUrl.startsWith('http')) {
@@ -1320,7 +856,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
               border: Border.all(color: const Color(0xFFE8ECF0), width: 0.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -1347,7 +883,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                                     fit: BoxFit.cover,
                                     errorBuilder: (context, error, stackTrace) =>
                                         Container(
-                                          color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                          color: const Color(0xFF6B8F71).withValues(alpha: 0.12),
                                           child: Icon(
                                             isElement
                                                 ? Icons.category
@@ -1362,7 +898,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                                     fit: BoxFit.cover,
                                     errorBuilder: (context, error, stackTrace) =>
                                         Container(
-                                          color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                          color: const Color(0xFF6B8F71).withValues(alpha: 0.12),
                                           child: Icon(
                                             isElement
                                                 ? Icons.category
@@ -1373,7 +909,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                                         ),
                                   ))
                             : Container(
-                                color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                color: const Color(0xFF6B8F71).withValues(alpha: 0.12),
                                 child: Icon(
                                   isElement ? Icons.category : Icons.texture,
                                   size: isSmallScreen ? 36 : 40,
@@ -1382,7 +918,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                               ),
                       ),
                     ),
-                    // Show material badge ONLY for Fabrics (not for Elements)
                     if (!isElement)
                       Positioned(
                         top: 8,
@@ -1393,10 +928,10 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                             vertical: isSmallScreen ? 3 : 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.7),
+                            color: Colors.black.withValues(alpha: 0.7),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               width: 0.3,
                             ),
                           ),
@@ -1423,10 +958,10 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                             vertical: isSmallScreen ? 3 : 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.85),
+                            color: Colors.red.withValues(alpha: 0.85),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               width: 0.3,
                             ),
                           ),
@@ -1595,18 +1130,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.grey),
-            onPressed: () {
-              setState(() {
-                _isLoading = true;
-                _isLoadingReviews = true;
-              });
-              _loadReviews();
-            },
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -1622,13 +1145,11 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
             ),
             _buildReviewsPageFilterChips(),
             const SizedBox(height: 16),
-            if (_isLoadingReviews)
+            if (_isLoading)
               const Center(
                 child: Padding(
                   padding: EdgeInsets.all(40),
-                  child: CircularProgressIndicator(
-                    color: Color(0xFF6B8F71),
-                  ),
+                  child: CircularProgressIndicator(),
                 ),
               )
             else if (_reviews.isEmpty)
@@ -1656,31 +1177,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                   ),
                 ),
               )
-            else if (filtered.isEmpty)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(40),
-                  child: Column(
-                    children: [
-                      Icon(Icons.filter_alt_off, size: 48, color: Colors.grey),
-                      SizedBox(height: 8),
-                      Text(
-                        'No reviews match this filter',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Try selecting a different filter',
-                        style: TextStyle(fontSize: 13, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ),
-              )
             else
               ListView.separated(
                 shrinkWrap: true,
@@ -1690,7 +1186,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                 separatorBuilder: (context, index) =>
                     const SizedBox(height: 16),
                 itemBuilder: (context, index) =>
-                    _buildReviewsPageItem(filtered[index]),
+                    _buildReviewsPageItem(filtered[index], index),
               ),
             const SizedBox(height: 32),
           ],
@@ -1718,18 +1214,10 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     return sortedList;
   }
 
-  int _getRatingCount(double rating) {
-    return _reviews.where((r) => r.rating.round() == rating.round()).length;
-  }
+  int _getRatingCount(double rating) =>
+      _reviews.where((r) => r.rating == rating).length;
 
-  Widget _buildReviewsPageItem(Review review) {
-    String customerName = 'Customer';
-    if (review.customerId.isNotEmpty) {
-      final hash = review.customerId.hashCode.abs();
-      final names = ['Alex', 'Sam', 'Jordan', 'Taylor', 'Morgan', 'Casey', 'Riley', 'Avery'];
-      customerName = names[hash % names.length];
-    }
-    
+  Widget _buildReviewsPageItem(Review review, int index) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1745,7 +1233,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
             children: [
               Expanded(
                 child: Text(
-                  customerName,
+                  'Customer ${index + 1}',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -1765,7 +1253,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
             children: List.generate(
               5,
               (starIndex) => Icon(
-                starIndex < review.rating.round()
+                starIndex < review.rating.floor()
                     ? Icons.star
                     : Icons.star_border,
                 color: Colors.orange,
@@ -1775,7 +1263,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            review.comment.isNotEmpty ? review.comment : 'No comment provided.',
+            review.comment,
             style: const TextStyle(fontSize: 14, height: 1.5),
           ),
         ],
@@ -1784,8 +1272,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   }
 
   Widget _buildReviewsPageSummary() {
-    final totalReviews = _reviews.length;
-    
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
@@ -1802,7 +1288,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  totalReviews > 0 ? _averageRating.toStringAsFixed(1) : '0.0',
+                  _averageRating.toStringAsFixed(1),
                   style: const TextStyle(
                     fontSize: 42,
                     fontWeight: FontWeight.w900,
@@ -1812,9 +1298,9 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                   children: List.generate(
                     5,
                     (index) => Icon(
-                      totalReviews > 0 && index < _averageRating.floor()
+                      index < _averageRating.floor()
                           ? Icons.star
-                          : (totalReviews > 0 && index < _averageRating.ceil()
+                          : (index < _averageRating.ceil()
                                 ? Icons.star_half
                                 : Icons.star_border),
                       color: Colors.orange,
@@ -1824,11 +1310,8 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  "$totalReviews reviews",
-                  style: TextStyle(
-                    color: totalReviews > 0 ? Colors.grey : Colors.grey[400],
-                    fontSize: 12,
-                  ),
+                  "${_reviews.length} reviews",
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ],
             ),
@@ -1874,11 +1357,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                 minHeight: 6,
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            count.toString(),
-            style: const TextStyle(fontSize: 10, color: Colors.grey),
           ),
         ],
       ),

@@ -50,20 +50,22 @@ class PortfolioService {
 
   /// Returns a paginated list of [Portfolio] items for [tailorId].
   ///
+  /// Supports both manual IDs (like 'tailor3') and auto-generated Firestore IDs.
+  ///
   /// Pass `null` as [page] for the first page, or the [PaginatedResult.nextPageCursor]
   /// from the previous call to fetch the next page.
-  ///
-  /// Items are ordered by Firestore document id (insertion order proxy).
   Future<PaginatedResult<Portfolio>> getTailorPortfolio(
     String tailorId, {
     DocumentSnapshot? page,
     int pageSize = defaultPageSize,
   }) async {
     try {
+      print('🔍 PortfolioService: Fetching portfolio for tailorId: $tailorId');
+      
+      // Query by tailorId - supports both manual and auto-generated IDs
       var query = _db
           .collection(_portfolio)
           .where('tailorId', isEqualTo: tailorId)
-          .orderBy(FieldPath.documentId)
           .limit(pageSize);
 
       if (page != null) {
@@ -71,18 +73,91 @@ class PortfolioService {
       }
 
       final snap = await query.get();
+      
+      print('📦 PortfolioService: Query returned ${snap.docs.length} documents');
+
+      if (snap.docs.isEmpty) {
+        // Try to find portfolio by tailor name if ID didn't work
+        print('⚠️ No portfolio found for tailorId: $tailorId, trying to find by tailor name...');
+        final portfolioItems = await _findPortfolioByTailorName(tailorId);
+        if (portfolioItems.isNotEmpty) {
+          print('✅ Found ${portfolioItems.length} portfolio items by tailor name');
+          return PaginatedResult(items: portfolioItems, nextPageCursor: null);
+        }
+        return PaginatedResult(items: [], nextPageCursor: null);
+      }
 
       final items = snap.docs
-          .map((d) => Portfolio.fromJson({...d.data(), 'id': d.id}))
+          .map((d) {
+            final data = d.data();
+            print('   - Portfolio doc: ${d.id}, tailorId: ${data['tailorId']}, image: ${data['image']}');
+            return Portfolio.fromJson({...data, 'id': d.id});
+          })
           .toList();
 
       final cursor = snap.docs.length == pageSize ? snap.docs.last : null;
 
       return PaginatedResult(items: items, nextPageCursor: cursor);
     } on FirebaseException catch (e) {
+      print('❌ PortfolioService FirebaseException: ${e.message}');
       throw PortfolioServiceException(
         'Failed to fetch portfolio: ${e.message ?? e.code}',
       );
+    } catch (e) {
+      print('❌ PortfolioService Error: $e');
+      throw PortfolioServiceException(
+        'Failed to fetch portfolio: $e',
+      );
+    }
+  }
+
+  /// Helper method to find portfolio by tailor name when ID doesn't match
+  Future<List<Portfolio>> _findPortfolioByTailorName(String tailorId) async {
+    try {
+      // First, get the tailor document to find the name
+      final tailorDoc = await _db.collection('Tailor').doc(tailorId).get();
+      if (!tailorDoc.exists) {
+        print('❌ Tailor document not found for ID: $tailorId');
+        return [];
+      }
+
+      final tailorData = tailorDoc.data();
+      final tailorName = tailorData?['name'] as String?;
+      
+      if (tailorName == null || tailorName.isEmpty) {
+        print('❌ Tailor name not found for ID: $tailorId');
+        return [];
+      }
+
+      print('🔍 Found tailor name: $tailorName, searching for portfolio...');
+
+      // Get all portfolio items
+      final allPortfolio = await _db.collection(_portfolio).get();
+      
+      // Filter by tailor name (checking if name is in the document or through tailorId reference)
+      final List<Portfolio> matchingItems = [];
+      
+      for (final doc in allPortfolio.docs) {
+        final data = doc.data();
+        final portfolioTailorId = data['tailorId'] as String?;
+        
+        if (portfolioTailorId != null) {
+          // Check if this portfolio belongs to the tailor by getting the tailor document
+          final tailorDocForPortfolio = await _db.collection('Tailor').doc(portfolioTailorId).get();
+          if (tailorDocForPortfolio.exists) {
+            final tailorDataForPortfolio = tailorDocForPortfolio.data();
+            final name = tailorDataForPortfolio?['name'] as String?;
+            if (name == tailorName) {
+              matchingItems.add(Portfolio.fromJson({...data, 'id': doc.id}));
+            }
+          }
+        }
+      }
+      
+      return matchingItems;
+    } catch (e) {
+      print('❌ Error finding portfolio by tailor name: $e');
+      return [];
     }
   }
 

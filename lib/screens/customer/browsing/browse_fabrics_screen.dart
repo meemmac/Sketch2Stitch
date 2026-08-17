@@ -79,7 +79,6 @@ class FabricProductData {
   factory FabricProductData.fromProduct(Product product) {
     List<FabricMaterialBlend> blends = [];
     
-    // Extract material blends from product's materialType list
     if (product.materialType.isNotEmpty) {
       for (final materialType in product.materialType) {
         blends.add(FabricMaterialBlend(
@@ -190,23 +189,19 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
     return ValueListenableBuilder<String>(
       valueListenable: widget.searchQuery,
       builder: (context, searchQuery, _) {
-        // Get selected materials (remove 'All' if present)
         final materialFilter = widget.filterData.materialTypes.contains('All') 
             ? null 
             : widget.filterData.materialTypes.first;
         
-        // Get selected colors
         final selectedColors = widget.filterData.colors.contains('All')
             ? null
             : widget.filterData.colors;
         
-        // Get search term
         final searchTerm = searchQuery.isNotEmpty ? searchQuery : null;
 
-        // Stream all products first, then filter on client side
         return StreamBuilder<List<Product>>(
           stream: _browseService.getProductsByFilter(
-            category: null, // Don't filter by category in the service
+            category: null,
             materialType: materialFilter,
             minPrice: widget.filterData.minPrice > 0 ? widget.filterData.minPrice : null,
             maxPrice: widget.filterData.maxPrice < 5000 ? widget.filterData.maxPrice : null,
@@ -259,25 +254,15 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
 
             final products = snapshot.data ?? [];
             
-            // Filter products based on showFabrics
             List<Product> filteredProducts;
             if (widget.showFabrics) {
-              // Show only fabrics (categories in _fabricCategories)
               filteredProducts = products.where((p) => _isFabric(p)).toList();
               print('📊 Fabrics filtered: ${filteredProducts.length} from ${products.length} total');
-              for (final p in filteredProducts) {
-                print('   - ${p.productName} (${p.category})');
-              }
             } else {
-              // Show only elements (categories in _elementCategories)
               filteredProducts = products.where((p) => _isElement(p)).toList();
               print('📊 Elements filtered: ${filteredProducts.length} from ${products.length} total');
-              for (final p in filteredProducts) {
-                print('   - ${p.productName} (${p.category})');
-              }
             }
             
-            // Convert to FabricProductData
             final fabricDataList = filteredProducts
                 .map((product) => FabricProductData.fromProduct(product))
                 .toList();
@@ -315,7 +300,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
               );
             }
 
-            // Apply sorting (already handled by service, but apply additional sorting if needed)
             if (widget.filterData.sortBy == 'lowToHigh') {
               fabricDataList.sort((a, b) => a.product.minPrice.compareTo(b.product.minPrice));
             } else if (widget.filterData.sortBy == 'highToLow') {
@@ -471,6 +455,11 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         final retailerName = _getRetailerName(product.retailerId);
         final materialDisplay = fabricData.materialDisplay;
 
+        // Check if this is an element (Material category) - don't show material blend for elements
+        final bool isElement = _isElement(product);
+        // Show material badge ONLY for Fabrics (not for Elements)
+        final bool showMaterialBadge = widget.showFabrics && !isElement && materialDisplay != "N/A";
+
         return GestureDetector(
           onTap: () => _showFabricDetailOverlay(context, fabricData),
           child: Container(
@@ -514,7 +503,8 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                               : _imageFallback(isSmallScreen),
                         ),
                       ),
-                      if (widget.showFabrics && materialDisplay != "N/A")
+                      // Show material badge ONLY for Fabrics (not for Elements)
+                      if (showMaterialBadge)
                         Positioned(
                           top: 8,
                           right: 8,

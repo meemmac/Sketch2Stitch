@@ -1,12 +1,14 @@
 // lib/screens/customer/messaging/chat_screen.dart
+import 'dart:async';  // ← Add this import for StreamSubscription
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:photo_view/photo_view.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sketch2stitch/models/message.dart';
 import 'package:sketch2stitch/models/user_role.dart';
+import 'package:sketch2stitch/services/messaging_service.dart';
+import 'package:sketch2stitch/services/auth_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -42,9 +44,15 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   final FocusNode _focusNode = FocusNode();
   final ImagePicker _imagePicker = ImagePicker();
   
+  final MessagingService _messagingService = MessagingService();
+  final AuthService _authService = AuthService();
+
   List<Message> _messages = [];
   bool _isLoading = true;
   bool _isTyping = false;
+  bool _isBlocked = false;
+  String? _currentUserId;
+  UserRole? _currentUserRole;
   
   // Reply tracking
   String? _replyingToMessageId;
@@ -54,21 +62,26 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   String? _selectedMessageId;
   late AnimationController _typingAnimationController;
   late Animation<double> _typingAnimation;
-  
-  // Conversation status
-  bool _isBlocked = false;
 
   // Overlay notification
   OverlayEntry? _notificationOverlay;
+
+  // Firestore subscriptions
+  StreamSubscription? _messagesSubscription;
+  StreamSubscription? _typingSubscription;
+  StreamSubscription? _conversationSubscription;
 
   @override
   void initState() {
     super.initState();
     
+    _currentUserId = _authService.currentUser?.uid ?? widget.customerId;
+    _currentUserRole = UserRole.customer;
     _isBlocked = widget.isBlocked ?? false;
     
-    _loadMessages();
     _loadConversationStatus();
+    _loadMessages();
+    _listenToTypingStatus();
     _markConversationAsRead();
     
     _typingAnimationController = AnimationController(
@@ -87,12 +100,77 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     _scrollController.dispose();
     _focusNode.dispose();
     _typingAnimationController.dispose();
+    _messagesSubscription?.cancel();
+    _typingSubscription?.cancel();
+    _conversationSubscription?.cancel();
     _removeNotificationOverlay();
     _markConversationAsRead();
     super.dispose();
   }
 
-  // ─── Top Notification System ──────────────────────────────────────────
+  // ─── Load Conversation Status ─────────────────────────────────────────────
+
+  Future<void> _loadConversationStatus() async {
+    try {
+      final conversation = await _messagingService.getConversationByConversationId(
+        widget.conversationId,
+      );
+      if (conversation != null && mounted) {
+        setState(() {
+          _isBlocked = conversation.isBlocked;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading conversation status: $e');
+    }
+  }
+
+  // ─── Firestore Listeners ──────────────────────────────────────────────────
+
+  void _loadMessages() {
+    setState(() => _isLoading = true);
+
+    _messagesSubscription = _messagingService
+        .getMessagesByConversationId(widget.conversationId)
+        .listen((messages) {
+          if (mounted) {
+            setState(() {
+              _messages = messages;
+              _isLoading = false;
+            });
+            _scrollToBottom();
+          }
+        }, onError: (error) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+            _showTopNotification('Failed to load messages', isError: true);
+          }
+        });
+  }
+
+  void _listenToTypingStatus() {
+    _typingSubscription = _messagingService
+        .streamTypingStatus(widget.conversationId, widget.otherUserId)
+        .listen((isTyping) {
+          if (mounted) {
+            setState(() {
+              _isTyping = isTyping;
+            });
+          }
+        });
+  }
+
+  // ─── Typing Status ─────────────────────────────────────────────────────────
+
+  void _onTypingChanged(String value) {
+    _messagingService.setTypingStatus(
+      widget.conversationId,
+      widget.customerId,
+      value.isNotEmpty,
+    );
+  }
+
+  // ─── Top Notification System ──────────────────────────────────────────────
 
   void _showTopNotification(String message, {bool isError = false}) {
     _removeNotificationOverlay();
@@ -110,7 +188,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: isError ? Colors.red[700] : const Color.fromARGB(255, 45, 141, 61), 
+                color: isError ? Colors.red[700] : const Color.fromARGB(255, 45, 141, 61),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
@@ -157,7 +235,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     overlay.insert(entry);
     _notificationOverlay = entry;
     
-    // Auto dismiss after 2 seconds
     Future.delayed(const Duration(seconds: 2), () {
       _removeNotificationOverlay();
     });
@@ -168,64 +245,30 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     _notificationOverlay = null;
   }
 
-  // ─── Load Data ──────────────────────────────────────────────────────
-
-  Future<void> _loadMessages() async {
-    setState(() => _isLoading = true);
-    
-    try {
-      // TODO: Replace with API call
-      await Future.delayed(const Duration(milliseconds: 500));
-      final sampleMessages = _getSampleMessages();
-      setState(() {
-        _messages = sampleMessages;
-        _isLoading = false;
-      });
-      _scrollToBottom();
-      
-    } catch (e) {
-      setState(() => _isLoading = false);
-      _showTopNotification('Failed to load messages', isError: true);
-    }
-  }
-
-  Future<void> _loadConversationStatus() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      
-      if (widget.isBlocked == null) {
-        final isBlocked = prefs.getBool('blocked_${widget.conversationId}') ?? false;
-        setState(() {
-          _isBlocked = isBlocked;
-        });
-      }
-      
-    } catch (_) {
-      // Non-fatal: the conversation still opens without the cached status.
-    }
-  }
-
-  // ─── Mark as Read ──────────────────────────────────────────────────
+  // ─── Mark as Read ──────────────────────────────────────────────────────────
 
   Future<void> _markConversationAsRead() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-        'last_read_${widget.conversationId}',
-        DateTime.now().toIso8601String(),
+      // Mark conversation as read
+      await _messagingService.markConversationReadByConversationId(
+        widget.conversationId,
       );
-      await prefs.setInt('unread_count_${widget.conversationId}', 0);
+      
+      // Mark individual messages as read
+      await _messagingService.markMessagesRead(
+        widget.conversationId,
+        widget.customerId,
+      );
       
       if (widget.onConversationRead != null) {
         widget.onConversationRead!(widget.conversationId);
       }
-      
-    } catch (_) {
-      // Non-fatal: the unread badge just stays until the next open.
+    } catch (e) {
+      debugPrint('Error marking conversation as read: $e');
     }
   }
 
-  // ─── Send Message ──────────────────────────────────────────────────
+  // ─── Send Message ─────────────────────────────────────────────────────────
 
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
@@ -236,74 +279,50 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       return;
     }
 
-    final newMessage = Message(
-      id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
-      conversationId: widget.conversationId,
-      senderId: widget.customerId,
-      senderRole: UserRole.customer,
-      msgText: text,
-      sentAt: DateTime.now(),
-      replyToMessageId: _replyingToMessageId,
-      replyToText: _replyingToMessageText,
-      replyToSender: _replyingToSender,
-      isRead: false,
+    // Clear typing status
+    _messagingService.setTypingStatus(
+      widget.conversationId,
+      widget.customerId,
+      false,
     );
 
+    // Clear input and reply
+    _messageController.clear();
+    final replyId = _replyingToMessageId;
+    final replyText = _replyingToMessageText;
+    final replySender = _replyingToSender;
     setState(() {
-      _messages.add(newMessage);
-      _messageController.clear();
       _replyingToMessageId = null;
       _replyingToMessageText = null;
       _replyingToSender = null;
     });
-    _scrollToBottom();
 
     try {
-      setState(() => _isTyping = true);
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          final replies = [
-            'That\'s great! I\'ll take care of it.',
-            'Perfect! Let me know if you need anything else.',
-            'I understand. I\'ll get back to you shortly.',
-            'Thanks for letting me know! 🙌',
-            'Sure thing! I\'ll prepare that for you.',
-            'Got it! I\'ll update you soon.',
-          ];
-          final reply = replies[DateTime.now().millisecond % replies.length];
-          
-          final replyMessage = Message(
-            id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
-            conversationId: widget.conversationId,
-            senderId: widget.otherUserId,
-            senderRole: widget.otherUserRole,
-            msgText: reply,
-            sentAt: DateTime.now(),
-            isRead: false,
-          );
+      final messageData = {
+        'msgText': text,
+        'senderRole': _currentUserRole?.name ?? UserRole.customer.name,
+        'replyToMessageId': replyId,
+        'replyToText': replyText,
+        'replyToSender': replySender,
+      };
 
-          setState(() {
-            _messages.add(replyMessage);
-            _isTyping = false;
-          });
-          _scrollToBottom();
-        }
-      });
-      
+      await _messagingService.sendMessage(
+        widget.conversationId,
+        widget.customerId,
+        messageData,
+      );
     } catch (e) {
-      setState(() {
-        _messages.removeWhere((m) => m.id == newMessage.id);
-      });
       _showTopNotification('Failed to send message', isError: true);
     }
   }
 
-  // ─── Block Functions ─────────────────────────────────────────────────
+  // ─── Block Functions ──────────────────────────────────────────────────────
 
   Future<void> _blockUser() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('blocked_${widget.conversationId}', true);
+      await _messagingService.blockConversationByConversationId(
+        widget.conversationId,
+      );
       
       setState(() {
         _isBlocked = true;
@@ -318,7 +337,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       Future.delayed(const Duration(seconds: 1), () {
         Navigator.pop(context);
       });
-      
     } catch (e) {
       _showTopNotification('Failed to block user', isError: true);
     }
@@ -326,8 +344,9 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
   Future<void> _unblockUser() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('blocked_${widget.conversationId}');
+      await _messagingService.unblockConversationByConversationId(
+        widget.conversationId,
+      );
       
       setState(() {
         _isBlocked = false;
@@ -338,13 +357,12 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       if (widget.onConversationRead != null) {
         widget.onConversationRead!(widget.conversationId);
       }
-      
     } catch (e) {
       _showTopNotification('Failed to unblock user', isError: true);
     }
   }
 
-  // ─── Message Options ─────────────────────────────────────────────────
+  // ─── Message Options ──────────────────────────────────────────────────────
 
   void _showMessageOptions(Message message) {
     setState(() {
@@ -391,15 +409,16 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                         _copyMessage(message);
                       },
                     ),
-                    _buildActionOption(
-                      icon: Icons.delete_outline,
-                      label: 'Delete',
-                      color: Colors.red,
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showDeleteConfirmation(message);
-                      },
-                    ),
+                    if (message.senderId == widget.customerId)
+                      _buildActionOption(
+                        icon: Icons.delete_outline,
+                        label: 'Delete',
+                        color: Colors.red,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _showDeleteConfirmation(message);
+                        },
+                      ),
                   ],
                 ),
               ],
@@ -493,11 +512,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
-                setState(() {
-                  _messages.removeWhere((m) => m.id == message.id);
-                  _selectedMessageId = null;
-                });
-                _showTopNotification('Message deleted');
+                _deleteMessage(message);
               },
               child: const Text(
                 'Delete',
@@ -510,7 +525,16 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     );
   }
 
-  // ─── Image/Attachment Functions ──────────────────────────────────────
+  Future<void> _deleteMessage(Message message) async {
+    try {
+      await _messagingService.deleteMessageByMessageId(message.id);
+      _showTopNotification('Message deleted');
+    } catch (e) {
+      _showTopNotification('Failed to delete message', isError: true);
+    }
+  }
+
+  // ─── Image/Attachment Functions ──────────────────────────────────────────
 
   Future<void> _pickImage() async {
     final XFile? image = await _imagePicker.pickImage(
@@ -521,7 +545,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     );
     
     if (image != null) {
-      _sendAttachment(image.path, 'image');
+      _sendAttachment(File(image.path), 'image');
     }
   }
 
@@ -534,11 +558,12 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     );
     
     if (image != null) {
-      _sendAttachment(image.path, 'image');
+      _sendAttachment(File(image.path), 'image');
     }
   }
 
   Future<void> _pickDocument() async {
+    // Use image picker for documents
     final XFile? document = await _imagePicker.pickImage(
       source: ImageSource.gallery,
       maxWidth: 1024,
@@ -548,33 +573,46 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     
     if (document != null) {
       final fileName = document.path.split('/').last;
-      _sendAttachment(document.path, 'document', fileName: fileName);
+      _sendAttachment(File(document.path), 'document', fileName: fileName);
     }
   }
 
-  void _sendAttachment(String path, String type, {String? fileName}) {
+  Future<void> _sendAttachment(File file, String type, {String? fileName}) async {
     if (_isBlocked) {
       _showTopNotification('Cannot send messages to blocked user', isError: true);
       return;
     }
 
-    final messageText = type == 'document' ? '📄 $fileName' : '';
-    
-    final newMessage = Message(
-      id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
-      conversationId: widget.conversationId,
-      senderId: widget.customerId,
-      senderRole: UserRole.customer,
-      msgText: messageText,
-      attachment: path,
-      sentAt: DateTime.now(),
-      isRead: false,
-    );
+    try {
+      // Show uploading indicator
+      _showTopNotification('Uploading attachment...');
+      
+      // Upload to Cloudinary
+      final imageUrl = await _messagingService.uploadAttachmentFile(file);
+      
+      if (imageUrl == null) {
+        _showTopNotification('Failed to upload attachment', isError: true);
+        return;
+      }
 
-    setState(() {
-      _messages.add(newMessage);
-    });
-    _scrollToBottom();
+      final messageText = type == 'document' ? '📄 $fileName' : '';
+      
+      final messageData = {
+        'msgText': messageText,
+        'senderRole': _currentUserRole?.name ?? UserRole.customer.name,
+        'attachment': imageUrl,
+      };
+
+      await _messagingService.sendMessage(
+        widget.conversationId,
+        widget.customerId,
+        messageData,
+      );
+      
+      _removeNotificationOverlay();
+    } catch (e) {
+      _showTopNotification('Failed to send attachment', isError: true);
+    }
   }
 
   void _showAttachmentOptions() {
@@ -683,7 +721,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     );
   }
 
-  void _showImageFullScreen(String imagePath) {
+  void _showImageFullScreen(String imageUrl) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -699,7 +737,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
           ),
           body: Center(
             child: PhotoView(
-              imageProvider: FileImage(File(imagePath)),
+              imageProvider: NetworkImage(imageUrl),
               minScale: PhotoViewComputedScale.contained,
               maxScale: PhotoViewComputedScale.covered * 2,
             ),
@@ -709,7 +747,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     );
   }
 
-  // ─── Dialog Functions ─────────────────────────────────────────────────
+  // ─── Dialog Functions ─────────────────────────────────────────────────────
 
   void _showBlockConfirmation() {
     if (_isBlocked) {
@@ -802,10 +840,11 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
+                // Clear messages locally only - Firestore still has them
                 setState(() {
                   _messages.clear();
                 });
-                _showTopNotification('Chat cleared');
+                _showTopNotification('Chat cleared locally');
               },
               child: const Text(
                 'Clear',
@@ -868,7 +907,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                   _showClearChatConfirmation();
                 },
               ),
-              // ─── Delete Conversation REMOVED ──────────────────────
             ],
           ),
         );
@@ -876,7 +914,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     );
   }
 
-  // ─── Helper Functions ─────────────────────────────────────────────────
+  // ─── Helper Functions ─────────────────────────────────────────────────────
 
   String _formatTime(DateTime time) {
     final hour = time.hour > 12 ? time.hour - 12 : time.hour;
@@ -913,81 +951,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     });
   }
 
-  List<Message> _getSampleMessages() {
-    return [
-      Message(
-        id: 'm1',
-        conversationId: widget.conversationId,
-        senderId: widget.otherUserId,
-        senderRole: widget.otherUserRole,
-        msgText: 'Hello! How can I help you today? 👋',
-        sentAt: DateTime.now().subtract(const Duration(hours: 3)),
-        isRead: true,
-        readAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 55)),
-      ),
-      Message(
-        id: 'm2',
-        conversationId: widget.conversationId,
-        senderId: widget.customerId,
-        senderRole: UserRole.customer,
-        msgText: 'Hi! I need some help with my order.',
-        sentAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 50)),
-        isRead: true,
-        readAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 45)),
-      ),
-      Message(
-        id: 'm3',
-        conversationId: widget.conversationId,
-        senderId: widget.otherUserId,
-        senderRole: widget.otherUserRole,
-        msgText: 'Sure! What can I assist you with?',
-        sentAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 45)),
-        isRead: true,
-        readAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 40)),
-      ),
-      Message(
-        id: 'm4',
-        conversationId: widget.conversationId,
-        senderId: widget.customerId,
-        senderRole: UserRole.customer,
-        msgText: 'I want to check the status of my order.',
-        sentAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 40)),
-        isRead: true,
-        readAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 35)),
-      ),
-      Message(
-        id: 'm5',
-        conversationId: widget.conversationId,
-        senderId: widget.otherUserId,
-        senderRole: widget.otherUserRole,
-        msgText: 'Let me check that for you... 📋',
-        sentAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 35)),
-        isRead: true,
-        readAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 30)),
-      ),
-      Message(
-        id: 'm6',
-        conversationId: widget.conversationId,
-        senderId: widget.otherUserId,
-        senderRole: widget.otherUserRole,
-        msgText: 'Your order is being processed and will be shipped soon! 🚀',
-        sentAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 30)),
-        isRead: false,
-      ),
-      Message(
-        id: 'm7',
-        conversationId: widget.conversationId,
-        senderId: widget.customerId,
-        senderRole: UserRole.customer,
-        msgText: 'Thank you so much! 😊',
-        sentAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 25)),
-        isRead: true,
-        readAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 20)),
-      ),
-    ];
-  }
-
-  // ─── Build Methods ────────────────────────────────────────────────────
+  // ─── Build Methods ────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -1002,7 +966,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
         ),
         title: Row(
           children: [
-            // ✅ Avatar - Show first letter for Customer, image for others
             CircleAvatar(
               radius: 20,
               backgroundColor: widget.otherUserRole == UserRole.customer
@@ -1011,7 +974,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               backgroundImage: (widget.otherUserRole != UserRole.customer &&
                   widget.otherUserAvatar != null &&
                   widget.otherUserAvatar!.isNotEmpty)
-                  ? AssetImage(widget.otherUserAvatar!)
+                  ? NetworkImage(widget.otherUserAvatar!)
                   : null,
               child: (widget.otherUserRole == UserRole.customer ||
                   widget.otherUserAvatar == null ||
@@ -1044,10 +1007,10 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    _isBlocked ? 'Blocked' : '',
+                    _isTyping ? 'Typing...' : (_isBlocked ? 'Blocked' : ''),
                     style: TextStyle(
                       fontSize: 11,
-                      color: _isBlocked ? Colors.red[300] : Colors.white70,
+                      color: _isTyping ? Colors.green[300] : (_isBlocked ? Colors.red[300] : Colors.white70),
                     ),
                   ),
                 ],
@@ -1101,10 +1064,8 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               },
             ),
           ),
-
           if (_replyingToMessageId != null)
             _buildReplyIndicator(),
-
           _buildMessageInput(),
         ],
       ),
@@ -1298,11 +1259,21 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                       width: 200,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.file(
-                          File(message.attachment!),
+                        child: Image.network(
+                          message.attachment!,
                           height: 150,
                           width: double.infinity,
                           fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Container(
+                              height: 150,
+                              color: Colors.grey[200],
+                              child: const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                            );
+                          },
                           errorBuilder: (context, error, stackTrace) => Container(
                             height: 150,
                             color: Colors.grey[200],
@@ -1591,7 +1562,10 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               child: TextField(
                 controller: _messageController,
                 focusNode: _focusNode,
-                onChanged: (value) => setState(() {}),
+                onChanged: (value) {
+                  setState(() {});
+                  _onTypingChanged(value);
+                },
                 decoration: const InputDecoration(
                   hintText: 'Type a message...',
                   border: InputBorder.none,
@@ -1625,4 +1599,4 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       ),
     );
   }
-} 
+}
