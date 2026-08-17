@@ -629,32 +629,19 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   Future<void> _loadProducts() async {
     setState(() => _isLoadingProducts = true);
     try {
-      // Get the retailer ID from the widget
       String retailerId = widget.retailer.id;
-      print('🔍 Retailer ID from widget: "$retailerId"');
-      print('🔍 Retailer shop name: ${widget.retailer.shopName}');
       
-      // Get all products from Firestore
       final allProducts = await _browseService.getProductsByFilter().first;
-      print('📦 Total products in Firestore: ${allProducts.length}');
       
       List<Product> retailerProducts = [];
       
-      // Try multiple ways to find products:
-      
-      // 1. Try matching by the exact retailer ID
       if (retailerId.isNotEmpty) {
         retailerProducts = allProducts
             .where((p) => p.retailerId == retailerId)
             .toList();
-        print('✅ Found ${retailerProducts.length} products matching retailer ID: $retailerId');
       }
       
-      // 2. If no products found, try to find the retailer in Firestore by shop name
       if (retailerProducts.isEmpty) {
-        print('⚠️ No products found for retailer ID: $retailerId');
-        print('🔍 Looking for retailer by shop name: ${widget.retailer.shopName}');
-        
         try {
           final retailerSnapshot = await FirebaseFirestore.instance
               .collection('Retailer')
@@ -665,33 +652,18 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
           if (retailerSnapshot.docs.isNotEmpty) {
             final doc = retailerSnapshot.docs.first;
             final foundRetailerId = doc.id;
-            print('✅ Found retailer in Firestore with ID: $foundRetailerId');
             
-            // Try to find products with this retailer ID
             retailerProducts = allProducts
                 .where((p) => p.retailerId == foundRetailerId)
                 .toList();
-            print('✅ Found ${retailerProducts.length} products for Firestore retailer ID: $foundRetailerId');
           }
         } catch (e) {
-          print('❌ Error finding retailer by shop name: $e');
+          // Ignore
         }
       }
       
-      // 3. If still no products, use retailer's existing products
       if (retailerProducts.isEmpty && widget.retailer.products != null) {
-        print('📦 Using products from retailer object (${widget.retailer.products!.length})');
         retailerProducts = widget.retailer.products!;
-      }
-      
-      // Print product details for debugging
-      if (retailerProducts.isNotEmpty) {
-        print('📄 Products found:');
-        for (final product in retailerProducts) {
-          print('   - ${product.productName} (Category: ${product.category}, Retailer ID: ${product.retailerId})');
-        }
-      } else {
-        print('❌ No products found for this retailer');
       }
       
       setState(() {
@@ -699,7 +671,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         _isLoadingProducts = false;
       });
     } catch (e) {
-      print('❌ Error loading products: $e');
       if (widget.retailer.products != null) {
         setState(() {
           _products = widget.retailer.products!;
@@ -711,93 +682,40 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     }
   }
 
-  Future<void> _loadReviews() async {
+Future<void> _loadReviews() async {
+  setState(() {
+    _isLoading = true;
+    _isLoadingReviews = true;
+  });
+  try {
+    String retailerId = widget.retailer.id;
+    print('🔍 Loading reviews for retailer: $retailerId');
+    
+    final reviews = await _reviewService.getReviewsByTargetId(
+      retailerId,
+      ReviewTargetRole.retailer,
+      limit: 50,
+    );
+    
+    print('✅ Loaded ${reviews.length} reviews for retailer: ${widget.retailer.shopName}');
+    
     setState(() {
-      _isLoading = true;
-      _isLoadingReviews = true;
+      _reviews = reviews;
+      _isLoading = false;
+      _isLoadingReviews = false;
+      if (_reviews.isNotEmpty) {
+        final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
+        _averageRating = sum / _reviews.length;
+      }
     });
-    try {
-      // Get retailer ID
-      String retailerId = widget.retailer.id;
-      print('🔍 Loading reviews for retailer: $retailerId');
-      
-      // Try to get reviews using the retailer ID
-      try {
-        final reviews = await _reviewService.getReviewsByTargetId(
-          retailerId,
-          ReviewTargetRole.retailer,
-          limit: 50,
-        );
-        
-        if (reviews.isNotEmpty) {
-          print('✅ Loaded ${reviews.length} reviews for retailer ID: $retailerId');
-          setState(() {
-            _reviews = reviews;
-            _isLoading = false;
-            _isLoadingReviews = false;
-            if (_reviews.isNotEmpty) {
-              final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
-              _averageRating = sum / _reviews.length;
-            }
-          });
-          return;
-        }
-      } catch (e) {
-        print('❌ Error loading reviews for ID: $retailerId - $e');
-      }
-      
-      // If no reviews found, try to find by shop name
-      print('🔍 Trying to find reviews by shop name...');
-      try {
-        final retailerSnapshot = await FirebaseFirestore.instance
-            .collection('Retailer')
-            .where('shopName', isEqualTo: widget.retailer.shopName)
-            .limit(1)
-            .get();
-        
-        if (retailerSnapshot.docs.isNotEmpty) {
-          final doc = retailerSnapshot.docs.first;
-          final foundRetailerId = doc.id;
-          print('✅ Found retailer by shop name with ID: $foundRetailerId');
-          
-          final reviews = await _reviewService.getReviewsByTargetId(
-            foundRetailerId,
-            ReviewTargetRole.retailer,
-            limit: 50,
-          );
-          
-          print('✅ Loaded ${reviews.length} reviews for retailer: ${widget.retailer.shopName}');
-          setState(() {
-            _reviews = reviews;
-            _isLoading = false;
-            _isLoadingReviews = false;
-            if (_reviews.isNotEmpty) {
-              final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
-              _averageRating = sum / _reviews.length;
-            }
-          });
-        } else {
-          print('❌ No retailer found by shop name: ${widget.retailer.shopName}');
-          setState(() {
-            _isLoading = false;
-            _isLoadingReviews = false;
-          });
-        }
-      } catch (e) {
-        print('❌ Error finding retailer by shop name: $e');
-        setState(() {
-          _isLoading = false;
-          _isLoadingReviews = false;
-        });
-      }
-    } catch (e) {
-      print('❌ Error loading reviews: $e');
-      setState(() {
-        _isLoading = false;
-        _isLoadingReviews = false;
-      });
-    }
+  } catch (e) {
+    print('❌ Error loading reviews: $e');
+    setState(() {
+      _isLoading = false;
+      _isLoadingReviews = false;
+    });
   }
+}
 
   bool _isElement(Product product) =>
       _elementCategories.contains(product.category);
@@ -1102,13 +1020,11 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   Widget _buildCoverImage() {
     String imageUrl = 'assets/images/fab.jpg';
     
-    // First try profile picture
     if (widget.retailer.profilePicture != null && 
         widget.retailer.profilePicture!.isNotEmpty) {
       imageUrl = widget.retailer.profilePicture!;
     }
     
-    // If no profile picture, try first product image
     if (imageUrl == 'assets/images/fab.jpg' && _products.isNotEmpty) {
       final firstProduct = _products.first;
       if (firstProduct.colorOptions.isNotEmpty) {
@@ -1710,7 +1626,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                         'Try selecting a different filter',
                         style: TextStyle(fontSize: 13, color: Colors.grey),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               )
@@ -1752,12 +1668,10 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   }
 
   int _getRatingCount(double rating) {
-    // Count reviews with this rating (rounded to nearest integer)
     return _reviews.where((r) => r.rating.round() == rating.round()).length;
   }
 
   Widget _buildReviewsPageItem(Review review) {
-    // Generate a consistent customer name based on customerId
     String customerName = 'Customer';
     if (review.customerId.isNotEmpty) {
       final hash = review.customerId.hashCode.abs();
@@ -1973,34 +1887,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         customerId: _currentUserId,
         favoriteService: _favoriteService,
       ),
-    );
-  }
-}
-
-// ============================================================================
-// Helper Model
-// ============================================================================
-
-class RetailersFilterData {
-  final double minRating;
-  final String location;
-  final String sortBy;
-
-  const RetailersFilterData({
-    this.minRating = 0,
-    this.location = 'All',
-    this.sortBy = 'default',
-  });
-
-  RetailersFilterData copyWith({
-    double? minRating,
-    String? location,
-    String? sortBy,
-  }) {
-    return RetailersFilterData(
-      minRating: minRating ?? this.minRating,
-      location: location ?? this.location,
-      sortBy: sortBy ?? this.sortBy,
     );
   }
 }

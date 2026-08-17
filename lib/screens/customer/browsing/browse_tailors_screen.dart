@@ -9,6 +9,7 @@ import 'package:sketch2stitch/services/review_service.dart';
 import 'package:sketch2stitch/services/portfolio_service.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -651,36 +652,39 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     }
   }
 
-  Future<void> _loadReviews() async {
+Future<void> _loadReviews() async {
+  setState(() {
+    _isLoading = true;
+    _isLoadingReviews = true;
+  });
+  try {
+    // Use the ReviewService to get real reviews from Firestore
+    final reviews = await _reviewService.getReviewsByTargetId(
+      widget.tailor.id,
+      ReviewTargetRole.tailor,
+      limit: 50,
+    );
+    
+    print('✅ Loaded ${reviews.length} reviews for tailor: ${widget.tailor.name}');
+    
     setState(() {
-      _isLoading = true;
-      _isLoadingReviews = true;
+      _reviews = reviews;
+      _isLoading = false;
+      _isLoadingReviews = false;
+      if (_reviews.isNotEmpty) {
+        final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
+        _averageRating = sum / _reviews.length;
+      }
     });
-    try {
-      // Use the ReviewService to get real reviews from Firestore
-      final reviews = await _reviewService.getReviewsByTargetId(
-        widget.tailor.id,
-        ReviewTargetRole.tailor,
-        limit: 50, // Get more reviews for better filtering
-      );
-      
-      setState(() {
-        _reviews = reviews;
-        _isLoading = false;
-        _isLoadingReviews = false;
-        if (_reviews.isNotEmpty) {
-          final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
-          _averageRating = sum / _reviews.length;
-        }
-      });
-    } catch (e) {
-      print('❌ Error loading reviews: $e');
-      setState(() {
-        _isLoading = false;
-        _isLoadingReviews = false;
-      });
-    }
+  } catch (e) {
+    print('❌ Error loading reviews: $e');
+    setState(() {
+      _isLoading = false;
+      _isLoadingReviews = false;
+    });
   }
+}
+   
 
   Future<void> _loadPortfolio() async {
     setState(() => _isLoadingPortfolio = true);
@@ -1770,30 +1774,3 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   }
 }
 
-// ============================================================================
-// Helper Model (kept from original)
-// ============================================================================
-
-class TailorsFilterData {
-  final double minRating;
-  final String location;
-  final String sortBy;
-
-  const TailorsFilterData({
-    this.minRating = 0,
-    this.location = 'All',
-    this.sortBy = 'default',
-  });
-
-  TailorsFilterData copyWith({
-    double? minRating,
-    String? location,
-    String? sortBy,
-  }) {
-    return TailorsFilterData(
-      minRating: minRating ?? this.minRating,
-      location: location ?? this.location,
-      sortBy: sortBy ?? this.sortBy,
-    );
-  }
-}

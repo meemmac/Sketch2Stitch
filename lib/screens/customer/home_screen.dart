@@ -8,8 +8,6 @@ import 'package:sketch2stitch/screens/customer/browsing/browse_fabrics_screen.da
 import 'package:sketch2stitch/screens/customer/browsing/browse_tailors_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
-import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dart';
-import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
 import 'package:sketch2stitch/widgets/cart_icon_button.dart';
 import 'package:sketch2stitch/services/browse_service.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';

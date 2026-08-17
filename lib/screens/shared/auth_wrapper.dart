@@ -10,9 +10,6 @@ import 'package:sketch2stitch/screens/shared/welcome_screen.dart';
 import 'package:sketch2stitch/services/auth_service.dart';
 import 'package:sketch2stitch/services/user_session.dart';
 import 'package:sketch2stitch/widgets/dashboard_drawer.dart';
-import '../../models/customer.dart';
-import '../../models/tailor.dart';
-import '../../models/retailer.dart';
 
 /// Gatekeeper widget that decides whether to show the Welcome screen
 /// or the Dashboard based on Firebase Auth state.
@@ -76,64 +73,10 @@ class AuthWrapper extends StatelessWidget {
       final profile = await authService.getUserProfile(uid, role);
       if (profile == null) return null;
 
-
-      // Build DrawerProfileData based on role type
+      // Build DrawerProfileData based on role type - FIXED: Remove duplicate declaration
       final drawerData = _buildDrawerProfileData(profile, role);
       
-      // Save to global session using UserSess
-      // Robust mapping from Models to DrawerProfileData
-      String name = '';
-      String shopName = '';
-      String email = '';
-      String phone = '';
-      String address = '';
-      double rating = 0.0;
-      String? profilePicture;
-      String? about;
-      GeoPoint? location;
-
-      if (profile is Customer) {
-        name = profile.name;
-        email = profile.email;
-        phone = profile.phone;
-        address = profile.address;
-        location = profile.location;
-        // Customers have no rating/about/picture in model
-      } else if (profile is Tailor) {
-        name = profile.name;
-        email = profile.email;
-        phone = profile.phone;
-        address = profile.address;
-        rating = profile.rating;
-        profilePicture = profile.profilePicture;
-        about = profile.about;
-        location = profile.location;
-      } else if (profile is Retailer) {
-        shopName = profile.shopName;
-        name = profile.shopName;
-        email = profile.email;
-        phone = profile.phone;
-        address = profile.address;
-        rating = profile.rating;
-        profilePicture = profile.profilePicture;
-        about = profile.about;
-        location = profile.location;
-      }
-
-      final drawerData = DrawerProfileData(
-        name: name,
-        shopName: shopName,
-        email: email,
-        phone: phone,
-        address: address,
-        rating: rating,
-        location: location,
-        profilePicture: profilePicture,
-        about: about ?? '',
-      );
-
-      // Save to global session
->>>>>>> 5f06b31bdb501219404a73b1d597e016f049bfd7
+      // Save to global session using UserSession
       UserSession.instance.setSession(drawerData, role, uid: uid);
       
       return role;
@@ -166,9 +109,7 @@ class AuthWrapper extends StatelessWidget {
         phone = customer.phone;
         address = customer.address;
         location = customer.location;
-        // Customer has NO rating field - keep as 0.0
         rating = 0.0;
-        // Customer doesn't have these fields
         profilePicture = null;
         about = '';
         break;

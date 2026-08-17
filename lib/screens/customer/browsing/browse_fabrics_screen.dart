@@ -131,56 +131,12 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
 
   // Categories that are considered "Elements" (non-fabric items)
   final List<String> _elementCategories = [
-    'Buttons',
-    'Threads',
-    'Embellishments',
-    'Trims',
-    'Ribbons',
-    'Fasteners',
-    'Lace',
-    'Beads',
-    'Sequins',
-    'Patches',
-    'Zippers',
-    'Elastics',
-    'Interfacing',
-    'Closures',
-    'Hooks',
-    'Eyes',
-    'Snaps',
-    'Velcro',
-    'Cords',
-    'Tassels',
-    'Fringes',
+    'Material',
   ];
 
   // Categories that are considered "Fabrics"
   final List<String> _fabricCategories = [
-    'Cotton',
-    'Silk',
-    'Linen',
-    'Wool',
-    'Polyester',
-    'Nylon',
-    'Rayon',
-    'Satin',
-    'Velvet',
-    'Denim',
-    'Canvas',
-    'Twill',
-    'Jersey',
-    'Knit',
-    'Chiffon',
-    'Organza',
-    'Tulle',
-    'Lace Fabric',
-    'Brocade',
-    'Tapestry',
-    'Fleece',
-    'Terry',
-    'Muslin',
-    'Calico',
-    'Felt',
+    'Fabric',
   ];
 
   bool _isElement(Product product) =>
