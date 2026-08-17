@@ -1,5 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/user_role.dart';
+import 'package:sketch2stitch/models/order.dart';
+import 'package:sketch2stitch/services/order_service.dart';
+import 'package:intl/intl.dart';
 import 'track_order.dart';
 
 class OrderListScreen extends StatefulWidget {
@@ -15,116 +19,13 @@ class OrderListScreen extends StatefulWidget {
 }
 
 class _OrderListScreenState extends State<OrderListScreen> {
-  // Dummy order data with all statuses
-  final List<Map<String, dynamic>> _orders = [
-    {
-      'id': 'OR001',
-      'status': 'Pending Retailer Confirmation',
-      'date': '22 Dec 2026',
-      'items': 3,
-      'total': '৳ 4,500',
-      'statusColor': Colors.orange,
-      'estimatedDelivery': '25 Dec 2026',
-      'lastUpdated': '22 Dec 2026',
-      'deliveryAddress': 'The Shakespeare Centre, Henley Street, CV37 6QW Stratford-upon-Avon, UK.',
-      'events': [
-        TrackEvent(type: TrackEventType.orderPlaced, material: '', partyName: 'Sketch2Stitch', date: DateTime(2026, 12, 20)),
-        TrackEvent(type: TrackEventType.subOrderPreparing, material: 'Fine Cotton', partyName: 'Cotton Palace', date: DateTime(2026, 12, 20)),
-        TrackEvent(type: TrackEventType.subOrderPacked, material: 'Fine Cotton', partyName: 'Cotton Palace', date: DateTime(2026, 12, 21)),
-        TrackEvent(type: TrackEventType.awaitingTailorSelection, material: '', partyName: 'You', date: DateTime(2026, 12, 21)),
-      ],
-    },
-    {
-      'id': 'OR002',
-      'status': 'Order Confirmed from Retailer(s)',
-      'date': '23 Dec 2026',
-      'items': 2,
-      'total': '৳ 6,200',
-      'statusColor': Colors.blue,
-      'estimatedDelivery': '28 Dec 2026',
-      'lastUpdated': '23 Dec 2026',
-      'deliveryAddress': '123 Retailer Street, Dhaka, Bangladesh',
-      'events': [
-        TrackEvent(type: TrackEventType.orderPlaced, material: '', partyName: 'Sketch2Stitch', date: DateTime(2026, 12, 22)),
-        TrackEvent(type: TrackEventType.subOrderPreparing, material: 'Silk Fabric', partyName: 'Silk House', date: DateTime(2026, 12, 22)),
-        TrackEvent(type: TrackEventType.subOrderPacked, material: 'Silk Fabric', partyName: 'Silk House', date: DateTime(2026, 12, 23)),
-        TrackEvent(type: TrackEventType.orderConfirmedRetailer, material: 'Silk Fabric', partyName: 'Silk House', date: DateTime(2026, 12, 23)),
-      ],
-    },
-    {
-      'id': 'OR003',
-      'status': 'Order Confirmed from Tailor',
-      'date': '24 Dec 2026',
-      'items': 4,
-      'total': '৳ 8,900',
-      'statusColor': Colors.purple,
-      'estimatedDelivery': '30 Dec 2026',
-      'lastUpdated': '24 Dec 2026',
-      'deliveryAddress': '45 Tailor Lane, Dhaka, Bangladesh',
-      'events': [
-        TrackEvent(type: TrackEventType.orderPlaced, material: '', partyName: 'Sketch2Stitch', date: DateTime(2026, 12, 23)),
-        TrackEvent(type: TrackEventType.subOrderPreparing, material: 'Cotton', partyName: 'Cotton Palace', date: DateTime(2026, 12, 23)),
-        TrackEvent(type: TrackEventType.subOrderPacked, material: 'Cotton', partyName: 'Cotton Palace', date: DateTime(2026, 12, 24)),
-        TrackEvent(type: TrackEventType.tailorRequested, material: '', partyName: 'Master Tailor', date: DateTime(2026, 12, 24)),
-        TrackEvent(type: TrackEventType.tailorConfirmed, material: '', partyName: 'Master Tailor', date: DateTime(2026, 12, 24)),
-      ],
-    },
-    {
-      'id': 'OR004',
-      'status': 'Shipping to Tailor',
-      'date': '25 Dec 2026',
-      'items': 2,
-      'total': '৳ 6,200',
-      'statusColor': Colors.teal,
-      'estimatedDelivery': '28 Dec 2026',
-      'lastUpdated': '25 Dec 2026',
-      'deliveryAddress': '123 Tailor Street, Dhaka, Bangladesh',
-      'events': [
-        TrackEvent(type: TrackEventType.orderPlaced, material: '', partyName: 'Sketch2Stitch', date: DateTime(2026, 12, 22)),
-        TrackEvent(type: TrackEventType.subOrderPreparing, material: 'Silk Fabric', partyName: 'Silk House', date: DateTime(2026, 12, 22)),
-        TrackEvent(type: TrackEventType.subOrderPacked, material: 'Silk Fabric', partyName: 'Silk House', date: DateTime(2026, 12, 23)),
-        TrackEvent(type: TrackEventType.tailorRequested, material: '', partyName: 'Master Tailor', date: DateTime(2026, 12, 23)),
-        TrackEvent(type: TrackEventType.tailorConfirmed, material: '', partyName: 'Master Tailor', date: DateTime(2026, 12, 23)),
-        TrackEvent(type: TrackEventType.shippingToTailor, material: 'Silk Fabric', partyName: 'Master Tailor', date: DateTime(2026, 12, 24)),
-      ],
-    },
-    {
-      'id': 'OR005',
-      'status': 'Shipping to Customer',
-      'date': '26 Dec 2026',
-      'items': 4,
-      'total': '৳ 8,900',
-      'statusColor': Colors.indigo,
-      'estimatedDelivery': '30 Dec 2026',
-      'lastUpdated': '26 Dec 2026',
-      'deliveryAddress': '45 Customer Lane, Dhaka, Bangladesh',
-      'events': [
-        TrackEvent(type: TrackEventType.orderPlaced, material: '', partyName: 'Sketch2Stitch', date: DateTime(2026, 12, 23)),
-        TrackEvent(type: TrackEventType.subOrderPreparing, material: 'Cotton', partyName: 'Cotton Palace', date: DateTime(2026, 12, 23)),
-        TrackEvent(type: TrackEventType.subOrderPacked, material: 'Cotton', partyName: 'Cotton Palace', date: DateTime(2026, 12, 24)),
-        TrackEvent(type: TrackEventType.tailorConfirmed, material: '', partyName: 'Master Tailor', date: DateTime(2026, 12, 24)),
-        TrackEvent(type: TrackEventType.tailorCompleted, material: 'Custom Dress', partyName: 'Master Tailor', date: DateTime(2026, 12, 28)),
-        TrackEvent(type: TrackEventType.shippingToCustomer, material: 'Custom Dress', partyName: 'DHL Express', date: DateTime(2026, 12, 29)),
-      ],
-    },
-    {
-      'id': 'OR006',
-      'status': 'Delivered',
-      'date': '27 Dec 2026',
-      'items': 1,
-      'total': '৳ 2,300',
-      'statusColor': Colors.green,
-      'estimatedDelivery': '27 Dec 2026',
-      'lastUpdated': '27 Dec 2026',
-      'deliveryAddress': '78 New Market Road, Dhaka, Bangladesh',
-      'events': [
-        TrackEvent(type: TrackEventType.orderPlaced, material: '', partyName: 'Sketch2Stitch', date: DateTime(2026, 12, 25)),
-        TrackEvent(type: TrackEventType.subOrderPreparing, material: 'Linen', partyName: 'Mukta Kapors', date: DateTime(2026, 12, 25)),
-        TrackEvent(type: TrackEventType.subOrderPacked, material: 'Linen', partyName: 'Mukta Kapors', date: DateTime(2026, 12, 25)),
-        TrackEvent(type: TrackEventType.subOrderDelivered, material: 'Linen', partyName: 'Customer', date: DateTime(2026, 12, 25)),
-      ],
-    },
-  ];
+  Stream<List<Order>> _getOrdersStream() {
+    return FirebaseAuth.instance.authStateChanges().asyncExpand((user) {
+      if (user == null) return Stream.value([]);
+      return OrderService().streamCustomerOrders(user.uid);
+    });
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -153,18 +54,33 @@ class _OrderListScreenState extends State<OrderListScreen> {
         ),
         centerTitle: false,
       ),
-      body: _orders.isEmpty
-          ? _buildEmptyState()
-          : ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _orders.length,
-        itemBuilder: (context, index) {
-          final order = _orders[index];
-          return _buildOrderCard(order);
+      body: StreamBuilder<List<Order>>(
+        stream: _getOrdersStream(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: Color(0xFF2E7D32)));
+          }
+
+
+          final orders = snapshot.data ?? [];
+          
+          if (orders.isEmpty) {
+            return _buildEmptyState();
+          }
+
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: orders.length,
+            itemBuilder: (context, index) {
+              return _buildOrderCard(orders[index]);
+            },
+          );
         },
       ),
     );
   }
+
 
   Widget _buildEmptyState() {
     return Center(
@@ -178,7 +94,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'No Orders Yet',
+            'No Orders Found',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -186,11 +102,11 @@ class _OrderListScreenState extends State<OrderListScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            'Your orders will appear here',
+          const Text(
+            'Your current order history is empty.',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey.shade500,
+              color: Colors.grey,
             ),
           ),
         ],
@@ -198,7 +114,10 @@ class _OrderListScreenState extends State<OrderListScreen> {
     );
   }
 
-  Widget _buildOrderCard(Map<String, dynamic> order) {
+
+  Widget _buildOrderCard(Order order) {
+    final dateStr = DateFormat('dd MMM yyyy').format(order.orderDate);
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -206,7 +125,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -216,7 +135,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
-            _navigateToOrderTrack(context, order);
+            _navigateToOrderTrack(context, order.id);
           },
           borderRadius: BorderRadius.circular(16),
           child: Padding(
@@ -227,31 +146,38 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: order['statusColor'],
-                            shape: BoxShape.circle,
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: order.statusColor,
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Order #${order['id']}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Order #${order.id.toUpperCase()}',
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          'Last Update',
+                          'Order Date',
                           style: TextStyle(
                             fontSize: 10,
                             color: Colors.grey.shade400,
@@ -259,7 +185,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                           ),
                         ),
                         Text(
-                          order['date'],
+                          dateStr,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -280,18 +206,19 @@ class _OrderListScreenState extends State<OrderListScreen> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '${order['items']} items',
+                      '${order.itemCount} items',
                       style: TextStyle(
                         fontSize: 13,
                         color: Colors.grey.shade600,
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 12),
                     Text(
-                      order['total'],
+                      '৳ ${order.totalAmount.toStringAsFixed(0)}',
                       style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green.shade800,
                       ),
                     ),
                   ],
@@ -306,15 +233,15 @@ class _OrderListScreenState extends State<OrderListScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: (order['statusColor'] as Color).withOpacity(0.1),
+                        color: order.statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        order['status'],
+                        order.statusText,
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: order['statusColor'],
+                          color: order.statusColor,
                         ),
                       ),
                     ),
@@ -356,17 +283,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
     );
   }
 
-  void _navigateToOrderTrack(BuildContext context, Map<String, dynamic> order) {
+
+  void _navigateToOrderTrack(BuildContext context, String orderId) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => OrderTrackScreen(
-          orderId: order['id'],
-          status: order['status'],
-          estimatedDelivery: order['estimatedDelivery'],
-          lastUpdated: order['lastUpdated'],
-          deliveryAddress: order['deliveryAddress'],
-          events: order['events'],
+          orderId: orderId,
           userRole: widget.userRole,
         ),
       ),

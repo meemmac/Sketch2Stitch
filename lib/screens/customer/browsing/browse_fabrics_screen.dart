@@ -129,6 +129,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
   String? _currentUserId;
   Map<String, String> _retailerNames = {};
 
+  // Categories that are considered "Elements" (non-fabric items)
   final List<String> _elementCategories = [
     'Buttons',
     'Threads',
@@ -143,10 +144,50 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
     'Zippers',
     'Elastics',
     'Interfacing',
+    'Closures',
+    'Hooks',
+    'Eyes',
+    'Snaps',
+    'Velcro',
+    'Cords',
+    'Tassels',
+    'Fringes',
+  ];
+
+  // Categories that are considered "Fabrics"
+  final List<String> _fabricCategories = [
+    'Cotton',
+    'Silk',
+    'Linen',
+    'Wool',
+    'Polyester',
+    'Nylon',
+    'Rayon',
+    'Satin',
+    'Velvet',
+    'Denim',
+    'Canvas',
+    'Twill',
+    'Jersey',
+    'Knit',
+    'Chiffon',
+    'Organza',
+    'Tulle',
+    'Lace Fabric',
+    'Brocade',
+    'Tapestry',
+    'Fleece',
+    'Terry',
+    'Muslin',
+    'Calico',
+    'Felt',
   ];
 
   bool _isElement(Product product) =>
       _elementCategories.contains(product.category);
+  
+  bool _isFabric(Product product) =>
+      _fabricCategories.contains(product.category);
 
   @override
   void initState() {
@@ -193,9 +234,6 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
     return ValueListenableBuilder<String>(
       valueListenable: widget.searchQuery,
       builder: (context, searchQuery, _) {
-        // Determine category filter
-        final categoryFilter = widget.showFabrics ? null : 'Elements';
-        
         // Get selected materials (remove 'All' if present)
         final materialFilter = widget.filterData.materialTypes.contains('All') 
             ? null 
@@ -209,9 +247,10 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         // Get search term
         final searchTerm = searchQuery.isNotEmpty ? searchQuery : null;
 
+        // Stream all products first, then filter on client side
         return StreamBuilder<List<Product>>(
           stream: _browseService.getProductsByFilter(
-            category: categoryFilter,
+            category: null, // Don't filter by category in the service
             materialType: materialFilter,
             minPrice: widget.filterData.minPrice > 0 ? widget.filterData.minPrice : null,
             maxPrice: widget.filterData.maxPrice < 5000 ? widget.filterData.maxPrice : null,
@@ -267,11 +306,19 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
             // Filter products based on showFabrics
             List<Product> filteredProducts;
             if (widget.showFabrics) {
-              // Show only fabrics (non-element categories)
-              filteredProducts = products.where((p) => !_isElement(p)).toList();
+              // Show only fabrics (categories in _fabricCategories)
+              filteredProducts = products.where((p) => _isFabric(p)).toList();
+              print('📊 Fabrics filtered: ${filteredProducts.length} from ${products.length} total');
+              for (final p in filteredProducts) {
+                print('   - ${p.productName} (${p.category})');
+              }
             } else {
-              // Show only elements
+              // Show only elements (categories in _elementCategories)
               filteredProducts = products.where((p) => _isElement(p)).toList();
+              print('📊 Elements filtered: ${filteredProducts.length} from ${products.length} total');
+              for (final p in filteredProducts) {
+                print('   - ${p.productName} (${p.category})');
+              }
             }
             
             // Convert to FabricProductData

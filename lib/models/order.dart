@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:flutter/material.dart';
 import 'sub_order.dart';
 import 'payment.dart';
@@ -59,6 +60,9 @@ class Order {
   List<Conversation>? conversations;
   List<Review>? reviews;
 
+  // In-memory only (not in Firestore document)
+  String? tailorName;
+
   Order({
     required this.id,
     required this.customerId,
@@ -70,23 +74,70 @@ class Order {
     this.tailorJobs = const [],
     this.conversations = const [],
     this.reviews = const [],
+    this.tailorName,
   });
 
   String get statusText {
+    // 1. Check for Terminal Statuses First
+    if (status == OrderStatus.completed) return 'Delivered';
+    if (status == OrderStatus.cancelled) return 'Cancelled';
+
+
+    // 2. Derived Status Logic based on progress
+    if (subOrders != null && subOrders!.isNotEmpty) {
+      bool allDelivered = subOrders!.every((so) => so.status == SubOrderStatus.delivered);
+      bool allPacked = subOrders!.every((so) => so.status == SubOrderStatus.packed || so.status == SubOrderStatus.delivered);
+      
+      bool hasTailor = tailorJobs != null && tailorJobs!.isNotEmpty;
+      if (hasTailor) {
+        final tj = tailorJobs!.first;
+
+        if (tj.status == TailorJobStatus.jobCompleted) {
+          return "Stitching Completed";
+        }
+        if (tj.status == TailorJobStatus.inProgress) {
+          return "Tailor Confirmed — Stitching Started";
+        }
+        if (tj.status == TailorJobStatus.confirmed) {
+          return "Tailor Confirmed — Stitching Started";
+        }
+        if (tj.status == TailorJobStatus.quoted) return "Quote Received from Tailor";
+        if (tj.status == TailorJobStatus.pending) return "Requested Tailor";
+      }
+
+
+      if (allDelivered) return "Items Delivered";
+      if (allPacked) return "Order Packed";
+      return "Preparing Order";
+    }
+
+
+    // 3. Fallback to main status field text
     switch (status) {
       case OrderStatus.awaitingConfirmation:
         return 'Awaiting Confirmation';
       case OrderStatus.processing:
         return 'Processing';
       case OrderStatus.awaitingTailorSearch:
-        return 'Awaiting Tailor Search';
+        return 'Awaiting Tailor Selection';
       case OrderStatus.tailorPending:
         return 'Tailor Pending';
-      case OrderStatus.completed:
-        return 'Completed';
-      case OrderStatus.cancelled:
-        return 'Cancelled';
+      default:
+        return 'Processing';
     }
+  }
+
+  int get itemCount => (subOrders?.length ?? 0) + (tailorJobs?.length ?? 0);
+
+  double get totalAmount {
+    double total = 0;
+    subOrders?.forEach((so) {
+      total += so.itemsSubtotal + so.deliveryCharge;
+    });
+    tailorJobs?.forEach((tj) {
+      total += (tj.quoteAmount ?? 0) + (tj.deliveryCharge ?? 0);
+    });
+    return total;
   }
 
   Color get statusColor {
@@ -117,6 +168,7 @@ class Order {
     List<TailorJob>? tailorJobs,
     List<Conversation>? conversations,
     List<Review>? reviews,
+    String? tailorName,
   }) {
     return Order(
       id: id ?? this.id,
@@ -129,27 +181,47 @@ class Order {
       tailorJobs: tailorJobs ?? this.tailorJobs,
       conversations: conversations ?? this.conversations,
       reviews: reviews ?? this.reviews,
+      tailorName: tailorName ?? this.tailorName,
     );
   }
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'customerId': customerId,
-    'orderDate': orderDate.toIso8601String(),
+    'orderDate': Timestamp.fromDate(orderDate),
     'status': status.toValue,
-    'tailorSelectionDeadline': tailorSelectionDeadline?.toIso8601String(),
+    'tailorSelectionDeadline': tailorSelectionDeadline != null 
+        ? Timestamp.fromDate(tailorSelectionDeadline!) 
+        : null,
   };
 
   factory Order.fromJson(Map<String, dynamic> json) {
+    DateTime parseDate(dynamic value) {
+      if (value == null) return DateTime.now();
+      if (value is Timestamp) return value.toDate();
+      if (value is String) {
+        try {
+          return DateTime.parse(value);
+        } catch (_) {
+          return DateTime.now();
+        }
+      }
+      return DateTime.now();
+    }
+
+
+    // 🧠 Flexible field detection
+    // Try to find the customer ID even if the user named it slightly differently
+    final customerId = json['customerId'] ?? json['userId'] ?? json['uid'] ?? '';
+
+
     return Order(
       id: json['id'] ?? '',
-      customerId: json['customerId'] ?? '',
-      orderDate: json['orderDate'] != null
-          ? DateTime.parse(json['orderDate'])
-          : DateTime.now(),
+      customerId: customerId,
+      orderDate: parseDate(json['orderDate'] ?? json['date']),
       status: OrderStatus.fromValue(json['status'] ?? 'awaiting_confirmation'),
       tailorSelectionDeadline: json['tailorSelectionDeadline'] != null
-          ? DateTime.parse(json['tailorSelectionDeadline'])
+          ? parseDate(json['tailorSelectionDeadline'])
           : null,
     );
   }

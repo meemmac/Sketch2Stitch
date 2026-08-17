@@ -76,10 +76,64 @@ class AuthWrapper extends StatelessWidget {
       final profile = await authService.getUserProfile(uid, role);
       if (profile == null) return null;
 
+
       // Build DrawerProfileData based on role type
       final drawerData = _buildDrawerProfileData(profile, role);
       
-      // Save to global session using UserSession
+      // Save to global session using UserSess
+      // Robust mapping from Models to DrawerProfileData
+      String name = '';
+      String shopName = '';
+      String email = '';
+      String phone = '';
+      String address = '';
+      double rating = 0.0;
+      String? profilePicture;
+      String? about;
+      GeoPoint? location;
+
+      if (profile is Customer) {
+        name = profile.name;
+        email = profile.email;
+        phone = profile.phone;
+        address = profile.address;
+        location = profile.location;
+        // Customers have no rating/about/picture in model
+      } else if (profile is Tailor) {
+        name = profile.name;
+        email = profile.email;
+        phone = profile.phone;
+        address = profile.address;
+        rating = profile.rating;
+        profilePicture = profile.profilePicture;
+        about = profile.about;
+        location = profile.location;
+      } else if (profile is Retailer) {
+        shopName = profile.shopName;
+        name = profile.shopName;
+        email = profile.email;
+        phone = profile.phone;
+        address = profile.address;
+        rating = profile.rating;
+        profilePicture = profile.profilePicture;
+        about = profile.about;
+        location = profile.location;
+      }
+
+      final drawerData = DrawerProfileData(
+        name: name,
+        shopName: shopName,
+        email: email,
+        phone: phone,
+        address: address,
+        rating: rating,
+        location: location,
+        profilePicture: profilePicture,
+        about: about ?? '',
+      );
+
+      // Save to global session
+>>>>>>> 5f06b31bdb501219404a73b1d597e016f049bfd7
       UserSession.instance.setSession(drawerData, role, uid: uid);
       
       return role;

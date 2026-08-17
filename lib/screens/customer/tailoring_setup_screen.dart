@@ -1601,6 +1601,8 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
       case TailorJobStatus.quoted:
         return _buildQuotedCard(job);
       case TailorJobStatus.confirmed:
+      case TailorJobStatus.inProgress:
+      case TailorJobStatus.jobCompleted:
         return _buildFinalizingCard();
       case TailorJobStatus.rejected:
         return _buildRejectedCard(job);
