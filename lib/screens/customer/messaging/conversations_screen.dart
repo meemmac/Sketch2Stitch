@@ -1,5 +1,5 @@
 // lib/screens/customer/messaging/conversations_screen.dart
-import 'dart:async';  
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/conversation.dart';
 import 'package:sketch2stitch/models/message.dart';
@@ -7,6 +7,7 @@ import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
 import 'package:sketch2stitch/services/messaging_service.dart';
 import 'package:sketch2stitch/services/auth_service.dart';
+
 class ConversationsScreen extends StatefulWidget {
   final String customerId;
   final UserRole currentUserRole;
@@ -420,296 +421,300 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
   // ─── New Conversation ─────────────────────────────────────────────────────
 
-  void _showNewConversationDialog() {
-    // Search for users from Firestore
-    String searchQuery = '';
-    List<Map<String, dynamic>> searchResults = [];
-    bool isSearching = false;
+void _showNewConversationDialog() {
+  // Search for users from Firestore
+  String searchQuery = '';
+  List<Map<String, dynamic>> searchResults = [];
+  bool isSearching = false;
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Container(
-              padding: const EdgeInsets.all(16),
-              height: MediaQuery.of(context).size.height * 0.7,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const Text(
+                  'New Conversation',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Search by name or phone number',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Search name or phone...',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
                     ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                    suffixIcon: searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () {
+                              setState(() {
+                                searchQuery = '';
+                                searchResults = [];
+                              });
+                            },
+                          )
+                        : null,
                   ),
-                  const Text(
-                    'New Conversation',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Search by name or phone number',
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Search name or phone...',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[50],
-                      suffixIcon: searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear, size: 18),
-                              onPressed: () {
-                                setState(() {
-                                  searchQuery = '';
-                                  searchResults = [];
-                                });
-                              },
-                            )
-                          : null,
-                    ),
-                    onChanged: (value) async {
+                  onChanged: (value) async {
+                    setState(() {
+                      searchQuery = value;
+                      isSearching = true;
+                    });
+                    
+                    if (value.isNotEmpty) {
+                      final results = await _messagingService.searchUsersByNameOrPhone(value);
                       setState(() {
-                        searchQuery = value;
-                        isSearching = true;
+                        searchResults = results
+                            .where((r) => r['id'] != widget.customerId)
+                            .toList();
+                        isSearching = false;
                       });
-                      
-                      if (value.isNotEmpty) {
-                        final results = await _messagingService.searchUsersByNameOrPhone(value);
-                        setState(() {
-                          searchResults = results
-                              .where((r) => r['id'] != widget.customerId)
-                              .toList();
-                          isSearching = false;
-                        });
-                      } else {
-                        setState(() {
-                          searchResults = [];
-                          isSearching = false;
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: isSearching
-                        ? const Center(child: CircularProgressIndicator())
-                        : searchQuery.isEmpty
-                            ? Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.search,
-                                      size: 64,
-                                      color: Colors.grey[400],
+                    } else {
+                      setState(() {
+                        searchResults = [];
+                        isSearching = false;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: isSearching
+                      ? const Center(child: CircularProgressIndicator())
+                      : searchQuery.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.search,
+                                    size: 64,
+                                    color: Colors.grey[400],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Search for users to chat with',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.grey[600],
                                     ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Search for users to chat with',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.grey[600],
+                                  ),
+                                ],
+                              ),
+                            )
+                          : searchResults.isEmpty
+                              ? Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.person_search,
+                                        size: 64,
+                                        color: Colors.grey[400],
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : searchResults.isEmpty
-                                ? Center(
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.person_search,
-                                          size: 64,
-                                          color: Colors.grey[400],
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'No users found',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.grey[600],
                                         ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          'No users found',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            color: Colors.grey[600],
-                                          ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Try a different name or phone number',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey[500],
                                         ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Try a different name or phone number',
-                                          style: TextStyle(
-                                            fontSize: 13,
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : ListView.builder(
+                                  itemCount: searchResults.length,
+                                  itemBuilder: (context, index) {
+                                    final user = searchResults[index];
+                                    final roleString = user['role'] as String? ?? 'customer';
+                                    final role = UserRole.values.firstWhere(
+                                      (r) => r.name == roleString,
+                                      orElse: () => UserRole.customer,
+                                    );
+                                    final name = user['name'] ?? user['shopName'] ?? 'Unknown';
+                                    final phone = user['phone'] ?? '';
+                                    final avatar = user['profilePicture'];
+
+                                    return ListTile(
+                                      leading: CircleAvatar(
+                                        radius: 24,
+                                        backgroundColor: avatar != null
+                                            ? Colors.grey[200]
+                                            : Colors.grey[300],
+                                        backgroundImage: avatar != null
+                                            ? NetworkImage(avatar)
+                                            : null,
+                                        child: avatar == null
+                                            ? Text(
+                                                name.isNotEmpty
+                                                    ? name[0].toUpperCase()
+                                                    : '?',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.grey[700],
+                                                ),
+                                              )
+                                            : null,
+                                      ),
+                                      title: Text(
+                                        name,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      subtitle: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.phone,
+                                            size: 12,
                                             color: Colors.grey[500],
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                : ListView.builder(
-                                    itemCount: searchResults.length,
-                                    itemBuilder: (context, index) {
-                                      final user = searchResults[index];
-                                      final roleString = user['role'] as String? ?? 'customer';
-                                      final role = UserRole.values.firstWhere(
-                                        (r) => r.name == roleString,
-                                        orElse: () => UserRole.customer,
-                                      );
-                                      final name = user['name'] ?? user['shopName'] ?? 'Unknown';
-                                      final phone = user['phone'] ?? '';
-                                      final avatar = user['profilePicture'];
-
-                                      return ListTile(
-                                        leading: CircleAvatar(
-                                          radius: 24,
-                                          backgroundColor: avatar != null
-                                              ? Colors.grey[200]
-                                              : Colors.grey[300],
-                                          backgroundImage: avatar != null
-                                              ? NetworkImage(avatar)
-                                              : null,
-                                          child: avatar == null
-                                              ? Text(
-                                                  name.isNotEmpty
-                                                      ? name[0].toUpperCase()
-                                                      : '?',
-                                                  style: TextStyle(
-                                                    fontSize: 16,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.grey[700],
-                                                  ),
-                                                )
-                                              : null,
-                                        ),
-                                        title: Text(
-                                          name,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            phone,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey[600],
+                                            ),
                                           ),
-                                        ),
-                                        subtitle: Row(
-                                          children: [
-                                            Icon(
-                                              Icons.phone,
-                                              size: 12,
-                                              color: Colors.grey[500],
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 1,
                                             ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              phone,
+                                            decoration: BoxDecoration(
+                                              color: role == UserRole.tailor
+                                                  ? Colors.green.shade50
+                                                  : role == UserRole.retailer
+                                                  ? Colors.blue.shade50
+                                                  : Colors.orange.shade50,
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              role.name.toUpperCase(),
                                               style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey[600],
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 6,
-                                                vertical: 1,
-                                              ),
-                                              decoration: BoxDecoration(
+                                                fontSize: 10,
                                                 color: role == UserRole.tailor
-                                                    ? Colors.green.shade50
+                                                    ? Colors.green.shade700
                                                     : role == UserRole.retailer
-                                                    ? Colors.blue.shade50
-                                                    : Colors.orange.shade50,
-                                                borderRadius: BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                role.name.toUpperCase(),
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  color: role == UserRole.tailor
-                                                      ? Colors.green.shade700
-                                                      : role == UserRole.retailer
-                                                      ? Colors.blue.shade700
-                                                      : Colors.orange.shade700,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
+                                                    ? Colors.blue.shade700
+                                                    : Colors.orange.shade700,
+                                                fontWeight: FontWeight.w600,
                                               ),
                                             ),
-                                          ],
-                                        ),
-                                        trailing: const Icon(
-                                          Icons.chevron_right,
-                                          color: Colors.grey,
-                                        ),
-                                        onTap: () async {
-                                          Navigator.pop(context);
-                                          final otherId = user['id'];
+                                          ),
+                                        ],
+                                      ),
+                                      trailing: const Icon(
+                                        Icons.chevron_right,
+                                        color: Colors.grey,
+                                      ),
+                                      onTap: () async {
+                                        Navigator.pop(context);
+                                        final otherId = user['id'];
 
-                                          // Check if conversation already exists
-                                          var conversation = await _messagingService
-                                              .getConversationBetween(
-                                                widget.customerId,
-                                                otherId,
+                                        // Check if conversation already exists
+                                        var conversation = await _messagingService
+                                            .getConversationBetween(
+                                              widget.customerId,
+                                              otherId,
+                                            );
+
+                                        // If not, create new conversation
+                                        if (conversation == null) {
+                                          conversation = await _messagingService
+                                              .createConversation(
+                                                customerId: widget.customerId,
+                                                otherId: otherId,
+                                                otherRole: role,
+                                                orderId: '',
                                               );
+                                        }
 
-                                          // If not, create new conversation
-                                          if (conversation == null) {
-                                            conversation = await _messagingService
-                                                .createConversation(
-                                                  customerId: widget.customerId,
-                                                  otherId: otherId,
-                                                  otherRole: role,
-                                                  orderId: '',
-                                                );
-                                          }
+                                        // Now conversation is guaranteed to be non-null
+                                        final Conversation existingConversation = conversation;
 
-                                          // Add to cache
-                                          _userCache[otherId] = {
-                                            'name': name,
-                                            'phone': phone,
-                                            'avatar': avatar,
-                                            'role': role,
-                                            'isAnonymous': false,
-                                          };
+                                        // Add to cache
+                                        _userCache[otherId] = {
+                                          'name': name,
+                                          'phone': phone,
+                                          'avatar': avatar,
+                                          'role': role,
+                                          'isAnonymous': false,
+                                        };
 
-                                          // Navigate to chat
+                                        // Navigate to chat
+                                        if (mounted) {
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
                                               builder: (context) => ChatScreen(
-                                                conversationId: conversation.id,
+                                                conversationId: existingConversation.id,
                                                 customerId: widget.customerId,
                                                 otherUserId: otherId,
                                                 otherUserName: name,
                                                 otherUserRole: role,
                                                 otherUserAvatar: avatar,
-                                                orderId: conversation.orderId,
+                                                orderId: existingConversation.orderId,
                                                 onConversationRead: _onConversationRead,
-                                                isBlocked: conversation.isBlocked,
+                                                isBlocked: existingConversation.isBlocked,
                                               ),
                                             ),
                                           );
-                                        },
-                                      );
-                                    },
-                                  ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // ─── Search Delegate ─────────────────────────────────────────────────────
+                                        }
+                                      },
+                                    );
+                                  },
+                                ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+  // ─── Search ─────────────────────────────────────────────────────────────
 
   void _showSearch() {
     showSearch(

@@ -1,5 +1,5 @@
 // lib/screens/customer/messaging/chat_screen.dart
-import 'dart:async';  // ← Add this import for StreamSubscription
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -143,7 +143,13 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
         }, onError: (error) {
           if (mounted) {
             setState(() => _isLoading = false);
-            _showTopNotification('Failed to load messages', isError: true);
+            // Use ScaffoldMessenger instead of overlay notification for errors
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to load messages: $error'),
+                backgroundColor: Colors.red,
+              ),
+            );
           }
         });
   }
@@ -173,88 +179,103 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   // ─── Top Notification System ──────────────────────────────────────────────
 
   void _showTopNotification(String message, {bool isError = false}) {
-    _removeNotificationOverlay();
+    // Check if mounted and context is available
+    if (!mounted) return;
     
-    final overlay = Overlay.of(context);
-    final entry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: 0,
-        left: 0,
-        right: 0,
-        child: SafeArea(
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: isError ? Colors.red[700] : const Color.fromARGB(255, 45, 141, 61),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.25),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    isError ? Icons.error_outline : Icons.notifications_active,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      message,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+    try {
+      _removeNotificationOverlay();
+
+      final overlay = Overlay.of(context);
+      final entry = OverlayEntry(
+        builder: (context) => Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isError ? Colors.red[700] : const Color.fromARGB(255, 45, 141, 61),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.25),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      isError ? Icons.error_outline : Icons.notifications_active,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        message,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                  ),
-                  GestureDetector(
-                    onTap: _removeNotificationOverlay,
-                    child: const Icon(
-                      Icons.close,
-                      color: Colors.white,
-                      size: 18,
+                    GestureDetector(
+                      onTap: _removeNotificationOverlay,
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 18,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
-    
-    overlay.insert(entry);
-    _notificationOverlay = entry;
-    
-    Future.delayed(const Duration(seconds: 2), () {
-      _removeNotificationOverlay();
-    });
+      );
+
+      overlay.insert(entry);
+      _notificationOverlay = entry;
+
+      Future.delayed(const Duration(seconds: 2), () {
+        _removeNotificationOverlay();
+      });
+    } catch (e) {
+      // Fallback to SnackBar if overlay fails
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: isError ? Colors.red : Colors.green,
+        ),
+      );
+    }
   }
 
   void _removeNotificationOverlay() {
-    _notificationOverlay?.remove();
-    _notificationOverlay = null;
+    try {
+      _notificationOverlay?.remove();
+      _notificationOverlay = null;
+    } catch (e) {
+      // Ignore
+    }
   }
 
   // ─── Mark as Read ──────────────────────────────────────────────────────────
 
   Future<void> _markConversationAsRead() async {
     try {
-      // Mark conversation as read
       await _messagingService.markConversationReadByConversationId(
         widget.conversationId,
       );
       
-      // Mark individual messages as read
       await _messagingService.markMessagesRead(
         widget.conversationId,
         widget.customerId,
@@ -279,14 +300,12 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       return;
     }
 
-    // Clear typing status
     _messagingService.setTypingStatus(
       widget.conversationId,
       widget.customerId,
       false,
     );
 
-    // Clear input and reply
     _messageController.clear();
     final replyId = _replyingToMessageId;
     final replyText = _replyingToMessageText;
@@ -335,7 +354,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       }
       
       Future.delayed(const Duration(seconds: 1), () {
-        Navigator.pop(context);
+        if (mounted) Navigator.pop(context);
       });
     } catch (e) {
       _showTopNotification('Failed to block user', isError: true);
@@ -563,7 +582,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _pickDocument() async {
-    // Use image picker for documents
     final XFile? document = await _imagePicker.pickImage(
       source: ImageSource.gallery,
       maxWidth: 1024,
@@ -584,10 +602,8 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     }
 
     try {
-      // Show uploading indicator
       _showTopNotification('Uploading attachment...');
       
-      // Upload to Cloudinary
       final imageUrl = await _messagingService.uploadAttachmentFile(file);
       
       if (imageUrl == null) {
@@ -840,7 +856,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
-                // Clear messages locally only - Firestore still has them
                 setState(() {
                   _messages.clear();
                 });
