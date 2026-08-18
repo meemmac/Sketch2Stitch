@@ -3,6 +3,7 @@ import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/review.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/models/portfolio.dart';
+import 'package:sketch2stitch/models/customer.dart';
 import 'package:sketch2stitch/services/browse_service.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';
 import 'package:sketch2stitch/services/review_service.dart';
@@ -257,7 +258,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
             Text(
               'No Tailors found',
               style: TextStyle(
-                fontSize: 22,
+                fontSize: 24,
                 fontWeight: FontWeight.w800,
                 letterSpacing: -0.5,
                 color: Colors.grey[600],
@@ -281,7 +282,8 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
 
     final isSmallScreen = screenWidth < 400;
     final spacing = isSmallScreen ? 10.0 : 12.0;
-    final cardAspectRatio = screenHeight < 700 ? 0.72 : 0.78;
+    // Responsive aspect ratio based on screen height
+    final cardAspectRatio = screenHeight < 700 ? 0.80 : 0.85;
 
     return GridView.builder(
       padding: EdgeInsets.all(spacing),
@@ -304,7 +306,6 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
     final bool isFull = tailor.maxOrder == 0;
     String imageUrl = tailor.profilePicture ?? 'assets/images/fab.jpg';
     
-    // Check if user is Tailor or Retailer
     final bool isTailorOrRetailer = widget.userRole == UserRole.tailor || 
                                      widget.userRole == UserRole.retailer;
 
@@ -371,7 +372,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                                     color: const Color(0xFF6B8F71).withOpacity(0.12),
                                     child: Icon(
                                       Icons.person,
-                                      size: isSmall ? 36 : 40,
+                                      size: isSmall ? 30 : 36,
                                       color: const Color(0xFF4A7C59),
                                     ),
                                   ),
@@ -383,7 +384,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                                     color: const Color(0xFF6B8F71).withOpacity(0.12),
                                     child: Icon(
                                       Icons.person,
-                                      size: isSmall ? 36 : 40,
+                                      size: isSmall ? 30 : 36,
                                       color: const Color(0xFF4A7C59),
                                     ),
                                   ),
@@ -393,16 +394,16 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                     ),
                     if (isTopRated && !isFull)
                       Positioned(
-                        top: 8,
-                        right: 8,
+                        top: 6,
+                        right: 6,
                         child: Container(
                           padding: EdgeInsets.symmetric(
-                            horizontal: isSmall ? 8 : 10,
-                            vertical: isSmall ? 4 : 5,
+                            horizontal: isSmall ? 6 : 8,
+                            vertical: isSmall ? 3 : 4,
                           ),
                           decoration: BoxDecoration(
                             color: const Color(0xFF6B8F71),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: Colors.white.withOpacity(0.2),
                               width: 0.3,
@@ -411,7 +412,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                           child: Text(
                             '⭐ Top Rated',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: isSmall ? 9 : 10,
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
                             ),
@@ -419,39 +420,39 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                         ),
                       ),
                     Positioned(
-                      bottom: 8,
-                      right: 8,
+                      bottom: 6,
+                      right: 6,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (isFull)
-                            Container(
-                              margin: const EdgeInsets.only(right: 6),
-                              padding: EdgeInsets.symmetric(
-                                horizontal: isSmall ? 6 : 8,
-                                vertical: isSmall ? 3 : 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.8),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                "Fully Booked",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: isSmall ? 9 : 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
+if (isFull)
+  Container(
+    margin: const EdgeInsets.only(right: 6),
+    padding: EdgeInsets.symmetric(
+      horizontal: isSmall ? 6 : 8,
+      vertical: isSmall ? 3 : 4,
+    ),
+    decoration: BoxDecoration(
+      color: Colors.black.withValues(alpha: 0.8),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Text(
+      "Fully Booked",
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: isSmall ? 9 : 10,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+  ),
                           Container(
                             padding: EdgeInsets.symmetric(
-                              horizontal: isSmall ? 6 : 8,
-                              vertical: isSmall ? 3 : 4,
+                              horizontal: isSmall ? 5 : 6,
+                              vertical: isSmall ? 2 : 3,
                             ),
                             decoration: BoxDecoration(
                               color: Colors.black.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -459,14 +460,14 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                                 Icon(
                                   Icons.star,
                                   color: Colors.amber,
-                                  size: isSmall ? 10 : 12,
+                                  size: isSmall ? 8 : 10,
                                 ),
-                                const SizedBox(width: 3),
+                                const SizedBox(width: 2),
                                 Text(
                                   tailor.rating.toStringAsFixed(1),
                                   style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: 11,
+                                    fontSize: isSmall ? 9 : 10,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -480,13 +481,13 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                 ),
               ),
               Flexible(
-                flex: 4,
+                flex: 3,
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(
-                    isSmall ? 10 : 12,
                     isSmall ? 8 : 10,
-                    isSmall ? 10 : 12,
-                    isSmall ? 10 : 12,
+                    isSmall ? 6 : 8,
+                    isSmall ? 8 : 10,
+                    isSmall ? 8 : 10,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -495,15 +496,15 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                       Text(
                         tailor.name,
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: isSmall ? 11 : 12,
                           fontWeight: FontWeight.w600,
-                          height: 1.2,
+                          height: 1.1,
                           color: isFull ? Colors.grey.shade700 : Colors.black,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      SizedBox(height: isSmall ? 4 : 6),
+                      SizedBox(height: isSmall ? 2 : 4),
                       Row(
                         children: [
                           Icon(
@@ -511,12 +512,12 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                             size: isSmall ? 12 : 14,
                             color: isFull ? Colors.grey.shade400 : Colors.grey[600],
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 2),
                           Expanded(
                             child: Text(
                               tailor.generalArea,
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: isSmall ? 11 : 12,
                                 color: isFull ? Colors.grey.shade400 : Colors.grey[600],
                               ),
                               maxLines: 1,
@@ -525,22 +526,21 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                           ),
                         ],
                       ),
-                      // Only show delivery info for customers
                       if (!isTailorOrRetailer) ...[
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Row(
                           children: [
                             Icon(
                               Icons.directions_bike_outlined,
-                              size: isSmall ? 12 : 14,
+                              size: isSmall ? 10 : 12,
                               color: isFull ? Colors.grey.shade400 : Colors.grey[600],
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 2),
                             Expanded(
                               child: Text(
                                 "1.8 km",
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: isSmall ? 9 : 10,
                                   color: isFull ? Colors.grey.shade400 : Colors.grey[600],
                                 ),
                                 maxLines: 1,
@@ -563,7 +563,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
 }
 
 // ============================================================================
-// TailorDetailScreen - FIXED REVIEW LOADING
+// TailorDetailScreen - WITH CUSTOMER NAME FETCHING
 // ============================================================================
 
 class TailorDetailScreen extends StatefulWidget {
@@ -598,6 +598,9 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   
   List<Portfolio> _portfolioItems = [];
   bool _isLoadingPortfolio = true;
+
+  // Cache for customer names
+  final Map<String, String> _customerNameCache = {};
 
   bool get _isCustomer => widget.userRole == UserRole.customer;
   bool get isUnavailable => widget.tailor.maxOrder == 0;
@@ -659,28 +662,94 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     }
   }
 
+  Future<String> _getCustomerName(String customerId) async {
+    // Check cache first
+    if (_customerNameCache.containsKey(customerId)) {
+      return _customerNameCache[customerId]!;
+    }
+
+    try {
+      final customerDoc = await FirebaseFirestore.instance
+          .collection('Customer')
+          .doc(customerId)
+          .get();
+
+      String name = 'Customer';
+      if (customerDoc.exists) {
+        final data = customerDoc.data();
+        if (data != null) {
+          final customer = Customer.fromJson(data, id: customerId);
+          name = customer.name.isNotEmpty ? customer.name : 'Customer';
+        }
+      }
+      
+      // Cache the result
+      _customerNameCache[customerId] = name;
+      return name;
+    } catch (e) {
+      print('Error fetching customer name: $e');
+      return 'Customer';
+    }
+  }
+
   Future<void> _loadReviews() async {
     setState(() {
       _isLoading = true;
       _isLoadingReviews = true;
     });
     try {
-      // Load reviews for this tailor with targetRole = 'tailor'
-      final reviews = await _reviewService.getReviewsByTargetId(
-        widget.tailor.id,
+      String tailorId = widget.tailor.id;
+      print('🔍 Loading reviews for tailor ID: $tailorId');
+      
+      // Get reviews from ReviewService
+      var reviews = await _reviewService.getReviewsByTargetId(
+        tailorId,
         ReviewTargetRole.tailor,
         limit: 50,
       );
       
-      print('✅ Loaded ${reviews.length} reviews for tailor: ${widget.tailor.name} (ID: ${widget.tailor.id})');
+      print('✅ Loaded ${reviews.length} reviews by tailor ID');
       
-      // Debug: Print each review to verify data
+      // If no reviews found, try to find by tailor name (for manually created reviews)
+      if (reviews.isEmpty) {
+        print('🔍 No reviews found by ID, trying by name...');
+        
+        final allReviewsSnapshot = await FirebaseFirestore.instance
+            .collection('Reviews')
+            .where('targetRole', isEqualTo: 'tailor')
+            .get();
+        
+        for (final doc in allReviewsSnapshot.docs) {
+          final data = doc.data();
+          final targetId = data['targetId'] as String?;
+          
+          if (targetId != null && targetId == widget.tailor.name) {
+            reviews.add(Review.fromJson({...data, 'id': doc.id}));
+            print('   ✅ Found review with targetId: $targetId');
+          }
+        }
+        print('✅ Total reviews found after name search: ${reviews.length}');
+      }
+      
+      // Enrich reviews with customer names
+      final enrichedReviews = <Review>[];
       for (final review in reviews) {
-        print('   - Review: rating=${review.rating}, comment=${review.comment}, customer=${review.customerId}');
+        final customerName = await _getCustomerName(review.customerId);
+        // Create a copy of the review - we'll store customerName in the review object
+        // Since Review model doesn't have customerName field, we'll use a workaround
+        // by creating a custom object or using an extension
+        final enrichedReview = review.copyWith(
+          // We can't add customerName to Review model directly, 
+          // so we'll store it separately in a map
+        );
+        enrichedReviews.add(enrichedReview);
+        // Store the customer name in a map for display
+        _customerNameCache[review.customerId] = customerName;
+        print('   - Review: rating=${review.rating}, customer=$customerName');
       }
       
       setState(() {
-        _reviews = reviews;
+        _reviews = enrichedReviews;
         _isLoading = false;
         _isLoadingReviews = false;
         if (_reviews.isNotEmpty) {
@@ -701,11 +770,9 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     }
   }
 
-  // FIXED: Updated _loadPortfolio to handle both manual and auto-generated IDs
   Future<void> _loadPortfolio() async {
     setState(() => _isLoadingPortfolio = true);
     try {
-      // First check if tailor has portfolio in the object
       if (widget.tailor.portfolio != null && widget.tailor.portfolio!.isNotEmpty) {
         print('📦 Using portfolio from tailor object: ${widget.tailor.portfolio!.length} items');
         setState(() {
@@ -715,45 +782,31 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         return;
       }
       
-      // Load from Firestore using PortfolioService
-      print('🔍 Loading portfolio for tailor: ${widget.tailor.id}, Name: ${widget.tailor.name}');
-      
-      // Try direct query first
+      print('🔍 Loading portfolio for tailor: ${widget.tailor.id}');
       final result = await _portfolioService.getTailorPortfolio(
         widget.tailor.id,
         pageSize: 20,
       );
       
-      print('✅ Loaded ${result.items.length} portfolio items for tailor ${widget.tailor.id}');
-      if (result.items.isNotEmpty) {
-        for (final item in result.items) {
-          print('   - Portfolio item: ${item.id}, image: ${item.image}, description: ${item.description}');
-        }
-      }
+      print('✅ Loaded ${result.items.length} portfolio items');
       
       setState(() {
         _portfolioItems = result.items;
         _isLoadingPortfolio = false;
       });
       
-      // If still no portfolio items, try alternative approach
       if (_portfolioItems.isEmpty) {
-        print('⚠️ No portfolio items found, trying fallback method...');
+        print('⚠️ No portfolio items found, trying fallback...');
         await _loadPortfolioFallback();
       }
     } catch (e) {
       print('❌ Error loading portfolio: $e');
-      // Try fallback method
       await _loadPortfolioFallback();
     }
   }
 
-  // Fallback method to try finding portfolio by tailor name
   Future<void> _loadPortfolioFallback() async {
     try {
-      print('🔍 Fallback: Trying to find portfolio by tailor name: ${widget.tailor.name}');
-      
-      // Get all portfolio items and filter by tailor name
       final allPortfolioSnapshot = await FirebaseFirestore.instance
           .collection('Portfolio')
           .get();
@@ -765,7 +818,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         final tailorId = data['tailorId'] as String?;
         
         if (tailorId != null) {
-          // Check if this tailorId exists and matches the name
           final tailorDoc = await FirebaseFirestore.instance
               .collection('Tailor')
               .doc(tailorId)
@@ -776,20 +828,18 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
             final name = tailorData?['name'] as String?;
             if (name == widget.tailor.name) {
               foundItems.add(Portfolio.fromJson({...data, 'id': doc.id}));
-              print('   ✅ Found portfolio item for tailor: $name');
             }
           }
         }
       }
       
       if (foundItems.isNotEmpty) {
-        print('✅ Fallback: Found ${foundItems.length} portfolio items for tailor: ${widget.tailor.name}');
+        print('✅ Fallback: Found ${foundItems.length} portfolio items');
         setState(() {
           _portfolioItems = foundItems;
           _isLoadingPortfolio = false;
         });
       } else {
-        print('❌ Fallback: No portfolio items found for tailor: ${widget.tailor.name}');
         setState(() => _isLoadingPortfolio = false);
       }
     } catch (e) {
@@ -935,7 +985,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 380;
     
-    // Check if user is Tailor or Retailer
     final bool isTailorOrRetailer = widget.userRole == UserRole.tailor || 
                                      widget.userRole == UserRole.retailer;
 
@@ -1140,7 +1189,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            // Only show delivery info for customers
                             if (_isCustomer && !isTailorOrRetailer) ...[
                               const SizedBox(width: 8),
                               Container(
@@ -1508,7 +1556,8 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     );
   }
 
-  // FIXED: Build reviews page with proper data from Firestore
+  // ─── Reviews Page ─────────────────────────────────────────────────────────
+
   Widget _buildReviewsPage() {
     final filtered = _getFilteredReviews();
 
@@ -1546,6 +1595,10 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.grey),
             onPressed: () {
+              setState(() {
+                _isLoading = true;
+                _isLoadingReviews = true;
+              });
               _loadReviews();
             },
           ),
@@ -1591,6 +1644,10 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                         ),
                       ),
                       SizedBox(height: 4),
+                      Text(
+                        'Be the first to review this tailor!',
+                        style: TextStyle(fontSize: 13, color: Colors.grey),
+                      ),
                     ],
                   ),
                 ),
@@ -1799,15 +1856,8 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   }
 
   Widget _buildReviewsPageItem(Review review) {
-    // Try to get customer name from review or use fallback
-    String customerName = 'Customer';
-    if (review.customerId.isNotEmpty) {
-      // You can fetch customer name from Firestore if needed
-      // For now, use a hash-based fallback
-      final hash = review.customerId.hashCode.abs();
-      final names = ['Alex', 'Sam', 'Jordan', 'Taylor', 'Morgan', 'Casey', 'Riley', 'Avery'];
-      customerName = names[hash % names.length];
-    }
+    // Get customer name from cache
+    final customerName = _customerNameCache[review.customerId] ?? 'Customer';
     
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1860,6 +1910,16 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
               height: 1.5,
             ),
           ),
+          if (review.orderId != null && review.orderId!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Order: ${review.orderId!.substring(0, review.orderId!.length > 8 ? 8 : review.orderId!.length)}...',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey[500],
+              ),
+            ),
+          ],
         ],
       ),
     );

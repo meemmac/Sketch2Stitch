@@ -281,7 +281,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
 
     final isSmallScreen = screenWidth < 400;
     final spacing = isSmallScreen ? 10.0 : 12.0;
-    final cardAspectRatio = screenHeight < 700 ? 0.72 : 0.78;
+    final cardAspectRatio = screenHeight < 700 ? 0.80 : 0.85;
 
     return GridView.builder(
       padding: EdgeInsets.all(spacing),
@@ -477,10 +477,10 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                         Expanded(
                           child: Text(
                             retailer.generalArea,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[600],
-                            ),
+                           style: TextStyle(
+                                fontSize: isSmall ? 11 : 12,
+                              color: Colors.grey[600],  
+                              ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -706,53 +706,81 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     }
   }
 
-  Future<void> _loadReviews() async {
-    setState(() {
-      _isLoading = true;
-      _isLoadingReviews = true;
-    });
-    try {
-      String retailerId = widget.retailer.id;
-      print('🔍 Loading reviews for retailer: $retailerId');
+// In RetailerDetailScreen, replace the _loadReviews method with:
+
+Future<void> _loadReviews() async {
+  setState(() {
+    _isLoading = true;
+    _isLoadingReviews = true;
+  });
+  try {
+    // Get the retailer ID - could be from the retailer object or from a separate query
+    String retailerId = widget.retailer.id;
+    print('🔍 Loading reviews for retailer ID: $retailerId');
+    
+    // First try to find reviews by retailer ID
+    var reviews = await _reviewService.getReviewsByTargetId(
+      retailerId,
+      ReviewTargetRole.retailer,
+      limit: 50,
+    );
+    
+    print('✅ Loaded ${reviews.length} reviews by retailer ID');
+    
+    // If no reviews found, try to find by shop name or other identifier
+    if (reviews.isEmpty) {
+      print('🔍 No reviews found by ID, trying alternate methods...');
       
-      // Load reviews by retailer ID with targetRole = 'retailer'
-      final reviews = await _reviewService.getReviewsByTargetId(
-        retailerId,
-        ReviewTargetRole.retailer,
-        limit: 50,
-      );
+      // Try to find reviews where targetId matches the shop name (for manually created reviews)
+      final allReviewsSnapshot = await FirebaseFirestore.instance
+          .collection('Reviews')
+          .where('targetRole', isEqualTo: 'retailer')
+          .get();
       
-      print('✅ Loaded ${reviews.length} reviews for retailer: ${widget.retailer.shopName}');
-      
-      // Debug: Print each review
-      for (final review in reviews) {
-        print('   - Review: rating=${review.rating}, comment=${review.comment}, customer=${review.customerId}');
+      for (final doc in allReviewsSnapshot.docs) {
+        final data = doc.data();
+        final targetId = data['targetId'] as String?;
+        
+        if (targetId != null) {
+          // Check if this targetId matches our shop name or ID
+          if (targetId == widget.retailer.shopName || 
+              targetId == widget.retailer.id ||
+              targetId.contains(widget.retailer.shopName)) {
+            reviews.add(Review.fromJson({...data, 'id': doc.id}));
+            print('   ✅ Found review with targetId: $targetId');
+          }
+        }
       }
       
-      setState(() {
-        _reviews = reviews;
-        _isLoading = false;
-        _isLoadingReviews = false;
-        if (_reviews.isNotEmpty) {
-          final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
-          _averageRating = sum / _reviews.length;
-          print('📊 Average rating: $_averageRating from ${_reviews.length} reviews');
-        } else {
-          print('⚠️ No reviews found for this retailer');
-          _averageRating = 0.0;
-        }
-      });
-    } catch (e) {
-      print('❌ Error loading reviews: $e');
-      setState(() {
-        _isLoading = false;
-        _isLoadingReviews = false;
-        _reviews = [];
-        _averageRating = 0.0;
-      });
+      print('✅ Total reviews found: ${reviews.length}');
     }
+    
+    // Debug: Print each review
+    for (final review in reviews) {
+      print('   - Review: rating=${review.rating}, comment=${review.comment}, customer=${review.customerId}');
+    }
+    
+    setState(() {
+      _reviews = reviews;
+      _isLoading = false;
+      _isLoadingReviews = false;
+      if (_reviews.isNotEmpty) {
+        final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
+        _averageRating = sum / _reviews.length;
+      } else {
+        _averageRating = 0.0;
+      }
+    });
+  } catch (e) {
+    print('❌ Error loading reviews: $e');
+    setState(() {
+      _isLoading = false;
+      _isLoadingReviews = false;
+      _reviews = [];
+      _averageRating = 0.0;
+    });
   }
-
+}
   bool _isElement(Product product) =>
       _elementCategories.contains(product.category);
   bool _isFabric(Product product) =>
