@@ -3,6 +3,7 @@ import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/review.dart';
 import 'package:sketch2stitch/models/user_role.dart';
+import 'package:sketch2stitch/models/customer.dart';
 import 'package:sketch2stitch/services/review_service.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';
 import 'package:sketch2stitch/services/browse_service.dart';
@@ -303,7 +304,6 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
     final bool isTopRated = retailer.rating >= 4.8;
     String imageUrl = retailer.profilePicture ?? 'assets/images/fab.jpg';
     
-    // Check if user is Tailor or Retailer
     final bool isTailorOrRetailer = widget.userRole == UserRole.tailor || 
                                      widget.userRole == UserRole.retailer;
 
@@ -458,8 +458,8 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                     Text(
                       retailer.shopName,
                       style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                        fontSize: isSmall ? 13 : 15,
+                        fontWeight: FontWeight.w700,
                         height: 1.2,
                       ),
                       maxLines: 1,
@@ -477,15 +477,14 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                         Expanded(
                           child: Text(
                             retailer.generalArea,
-                           style: TextStyle(
-                                fontSize: isSmall ? 11 : 12,
-                              color: Colors.grey[600],  
-                              ),
+                            style: TextStyle(
+                              fontSize: isSmall ? 11 : 12,
+                              color: Colors.grey[600],
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        // Only show distance for customers
                         if (!isTailorOrRetailer) ...[
                           const SizedBox(width: 4),
                           Container(
@@ -521,7 +520,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
 }
 
 // ============================================================================
-// RetailerDetailScreen - FIXED REVIEWS
+// RetailerDetailScreen - WITH CUSTOMER NAME FETCHING
 // ============================================================================
 
 class RetailerDetailScreen extends StatefulWidget {
@@ -560,15 +559,12 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   List<Product> _products = [];
   bool _isLoadingProducts = true;
 
-  // Categories that are considered "Elements" (non-fabric items)
-  final List<String> _elementCategories = [
-    'Material',
-  ];
+  // Cache for customer names
+  final Map<String, String> _customerNameCache = {};
 
-  // Categories that are considered "Fabrics"
-  final List<String> _fabricCategories = [
-    'Fabric',
-  ];
+  // Categories
+  final List<String> _elementCategories = ['Material'];
+  final List<String> _fabricCategories = ['Fabric'];
 
   bool get _isCustomer => widget.userRole == UserRole.customer;
 
@@ -632,6 +628,40 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     }
   }
 
+  Future<String> _getCustomerName(String customerId) async {
+    // Check cache first
+    if (_customerNameCache.containsKey(customerId)) {
+      return _customerNameCache[customerId]!;
+    }
+
+    try {
+      print('🔍 Fetching customer name for ID: $customerId');
+      final customerDoc = await FirebaseFirestore.instance
+          .collection('Customer')
+          .doc(customerId)
+          .get();
+
+      String name = 'Customer';
+      if (customerDoc.exists) {
+        final data = customerDoc.data();
+        if (data != null) {
+          final customer = Customer.fromJson(data, id: customerId);
+          name = customer.name.isNotEmpty ? customer.name : 'Customer';
+          print('✅ Found customer name: $name');
+        }
+      } else {
+        print('⚠️ Customer document not found for ID: $customerId');
+      }
+      
+      // Cache the result
+      _customerNameCache[customerId] = name;
+      return name;
+    } catch (e) {
+      print('❌ Error fetching customer name: $e');
+      return 'Customer';
+    }
+  }
+
   Future<void> _loadProducts() async {
     setState(() => _isLoadingProducts = true);
     try {
@@ -643,7 +673,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
       
       List<Product> retailerProducts = [];
       
-      // Try by retailer ID
       if (retailerId.isNotEmpty) {
         retailerProducts = allProducts
             .where((p) => p.retailerId == retailerId)
@@ -651,7 +680,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         print('✅ Found ${retailerProducts.length} products by retailer ID');
       }
       
-      // If no products, try by shop name
       if (retailerProducts.isEmpty) {
         print('🔍 Trying to find retailer by shop name: ${widget.retailer.shopName}');
         try {
@@ -676,13 +704,11 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         }
       }
       
-      // If still no products, use retailer's existing products
       if (retailerProducts.isEmpty && widget.retailer.products != null) {
         print('📦 Using products from retailer object: ${widget.retailer.products!.length}');
         retailerProducts = widget.retailer.products!;
       }
       
-      // Print product details
       if (retailerProducts.isNotEmpty) {
         for (final product in retailerProducts) {
           print('   - ${product.productName} (Category: ${product.category})');
@@ -706,85 +732,70 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     }
   }
 
-// In RetailerDetailScreen, replace the _loadReviews method with:
-
-Future<void> _loadReviews() async {
-  setState(() {
-    _isLoading = true;
-    _isLoadingReviews = true;
-  });
-  try {
-    // Get the retailer ID - could be from the retailer object or from a separate query
-    String retailerId = widget.retailer.id;
-    print('🔍 Loading reviews for retailer ID: $retailerId');
-    
-    // First try to find reviews by retailer ID
-    var reviews = await _reviewService.getReviewsByTargetId(
-      retailerId,
-      ReviewTargetRole.retailer,
-      limit: 50,
-    );
-    
-    print('✅ Loaded ${reviews.length} reviews by retailer ID');
-    
-    // If no reviews found, try to find by shop name or other identifier
-    if (reviews.isEmpty) {
-      print('🔍 No reviews found by ID, trying alternate methods...');
+  Future<void> _loadReviews() async {
+    setState(() {
+      _isLoading = true;
+      _isLoadingReviews = true;
+    });
+    try {
+      // Use the retailer's Firestore document ID
+      String retailerId = widget.retailer.id;
+      print('🔍 Loading reviews for retailer ID: $retailerId');
+      print('🔍 Retailer name: ${widget.retailer.shopName}');
       
-      // Try to find reviews where targetId matches the shop name (for manually created reviews)
-      final allReviewsSnapshot = await FirebaseFirestore.instance
-          .collection('Reviews')
-          .where('targetRole', isEqualTo: 'retailer')
-          .get();
+      // FIRST: Try by ID (this should work since reviews have targetId = retailer ID)
+      var reviews = await _reviewService.getReviewsByTargetId(
+        retailerId,
+        ReviewTargetRole.retailer,
+        limit: 50,
+      );
       
-      for (final doc in allReviewsSnapshot.docs) {
-        final data = doc.data();
-        final targetId = data['targetId'] as String?;
-        
-        if (targetId != null) {
-          // Check if this targetId matches our shop name or ID
-          if (targetId == widget.retailer.shopName || 
-              targetId == widget.retailer.id ||
-              targetId.contains(widget.retailer.shopName)) {
-            reviews.add(Review.fromJson({...data, 'id': doc.id}));
-            print('   ✅ Found review with targetId: $targetId');
-          }
+      print('✅ Loaded ${reviews.length} reviews by retailer ID');
+      
+      // If no reviews found by ID, try by shop name as fallback (for manual entries)
+      if (reviews.isEmpty) {
+        print('🔍 No reviews found by ID. Trying fallback by shop name: ${widget.retailer.shopName}');
+        reviews = await _reviewService.getReviewsByName(
+          widget.retailer.shopName,
+          ReviewTargetRole.retailer,
+          limit: 50,
+        );
+        print('✅ Loaded ${reviews.length} reviews by shop name (fallback)');
+      }
+      
+      // Enrich reviews with customer names
+      final enrichedReviews = <Review>[];
+      for (final review in reviews) {
+        final customerName = await _getCustomerName(review.customerId);
+        _customerNameCache[review.customerId] = customerName;
+        enrichedReviews.add(review);
+        print('   - Review: rating=${review.rating}, customer=$customerName, targetId=${review.targetId}');
+      }
+      
+      setState(() {
+        _reviews = enrichedReviews;
+        _isLoading = false;
+        _isLoadingReviews = false;
+        if (_reviews.isNotEmpty) {
+          final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
+          _averageRating = sum / _reviews.length;
+        } else {
+          _averageRating = 0.0;
         }
-      }
-      
-      print('✅ Total reviews found: ${reviews.length}');
-    }
-    
-    // Debug: Print each review
-    for (final review in reviews) {
-      print('   - Review: rating=${review.rating}, comment=${review.comment}, customer=${review.customerId}');
-    }
-    
-    setState(() {
-      _reviews = reviews;
-      _isLoading = false;
-      _isLoadingReviews = false;
-      if (_reviews.isNotEmpty) {
-        final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
-        _averageRating = sum / _reviews.length;
-      } else {
+      });
+    } catch (e) {
+      print('❌ Error loading reviews: $e');
+      setState(() {
+        _isLoading = false;
+        _isLoadingReviews = false;
+        _reviews = [];
         _averageRating = 0.0;
-      }
-    });
-  } catch (e) {
-    print('❌ Error loading reviews: $e');
-    setState(() {
-      _isLoading = false;
-      _isLoadingReviews = false;
-      _reviews = [];
-      _averageRating = 0.0;
-    });
+      });
+    }
   }
-}
-  bool _isElement(Product product) =>
-      _elementCategories.contains(product.category);
-  bool _isFabric(Product product) =>
-      _fabricCategories.contains(product.category);
+
+  bool _isElement(Product product) => _elementCategories.contains(product.category);
+  bool _isFabric(Product product) => _fabricCategories.contains(product.category);
 
   List<Product> get _fabrics => _products.where((p) => _isFabric(p)).toList();
   List<Product> get _elements => _products.where((p) => _isElement(p)).toList();
@@ -811,7 +822,6 @@ Future<void> _loadReviews() async {
     final isSmallScreen = screenWidth < 380;
     final isMediumScreen = screenWidth >= 380 && screenWidth < 600;
     
-    // Check if user is Tailor or Retailer
     final bool isTailorOrRetailer = widget.userRole == UserRole.tailor || 
                                      widget.userRole == UserRole.retailer;
 
@@ -827,7 +837,6 @@ Future<void> _loadReviews() async {
                 children: [
                   _buildAboutSection(isSmallScreen),
                   const SizedBox(height: 24),
-                  // Show category toggle only if both fabrics and elements exist
                   if (_fabrics.isNotEmpty && _elements.isNotEmpty)
                     _buildCategoryToggle(isSmallScreen),
                   const SizedBox(height: 12),
@@ -999,7 +1008,6 @@ Future<void> _loadReviews() async {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            // Only show delivery info for customers
                             if (_isCustomer && !isTailorOrRetailer) ...[
                               const SizedBox(width: 8),
                               Container(
@@ -1169,19 +1177,17 @@ Future<void> _loadReviews() async {
               child: Container(
                 padding: EdgeInsets.symmetric(
                   horizontal: isSmallScreen ? 12.0 : 16.0,
-                  vertical: isSmallScreen ? 8.0 : 10.0,
+                  vertical: isSmallScreen ? 6.0 : 8.0,
                 ),
                 decoration: BoxDecoration(
-                  color: _showFabrics
-                      ? const Color(0xFF2C5C44)
-                      : Colors.transparent,
+                  color: _showFabrics ? const Color(0xFF2C5C44) : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Center(
                   child: Text(
                     'Fabrics (${_fabrics.length})',
                     style: TextStyle(
-                      fontSize: isSmallScreen ? 13.0 : 14.0,
+                      fontSize: isSmallScreen ? 12.0 : 13.0,
                       fontWeight: FontWeight.w600,
                       color: _showFabrics ? Colors.white : Colors.grey[700],
                     ),
@@ -1196,19 +1202,17 @@ Future<void> _loadReviews() async {
               child: Container(
                 padding: EdgeInsets.symmetric(
                   horizontal: isSmallScreen ? 12.0 : 16.0,
-                  vertical: isSmallScreen ? 8.0 : 10.0,
+                  vertical: isSmallScreen ? 6.0 : 8.0,
                 ),
                 decoration: BoxDecoration(
-                  color: !_showFabrics
-                      ? const Color(0xFF2C5C44)
-                      : Colors.transparent,
+                  color: !_showFabrics ? const Color(0xFF2C5C44) : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Center(
                   child: Text(
                     'Elements (${_elements.length})',
                     style: TextStyle(
-                      fontSize: isSmallScreen ? 13.0 : 14.0,
+                      fontSize: isSmallScreen ? 12.0 : 13.0,
                       fontWeight: FontWeight.w600,
                       color: !_showFabrics ? Colors.white : Colors.grey[700],
                     ),
@@ -1275,8 +1279,7 @@ Future<void> _loadReviews() async {
             ),
             if (products.length > 6)
               TextButton(
-                onPressed: () =>
-                    setState(() => _showAllProducts = !_showAllProducts),
+                onPressed: () => setState(() => _showAllProducts = !_showAllProducts),
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.symmetric(
                     horizontal: isSmallScreen ? 8.0 : 16.0,
@@ -1307,21 +1310,19 @@ Future<void> _loadReviews() async {
         ? products
         : (products.length > 6 ? products.take(6).toList() : products);
     final screenWidth = MediaQuery.of(context).size.width;
-    final spacing = isSmallScreen ? 10.0 : 12.0;
-
-    final cardWidth = (screenWidth - (spacing * 3)) / 2;
-    final cardHeight = isSmallScreen ? 220.0 : 240.0;
-    final imageHeight = isSmallScreen ? 130.0 : 150.0;
-    final contentPadding = isSmallScreen ? 8.0 : 10.0;
+    final spacing = isSmallScreen ? 8.0 : 10.0;
+    final imageHeight = isSmallScreen ? 100.0 : 120.0;
+    final contentPadding = isSmallScreen ? 6.0 : 8.0;
+    final fontSize = isSmallScreen ? 10.0 : 11.0;
 
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: cardWidth / cardHeight,
         crossAxisSpacing: spacing,
         mainAxisSpacing: spacing,
+        childAspectRatio: 0.75,
       ),
       itemCount: displayProducts.length,
       itemBuilder: (context, index) {
@@ -1337,12 +1338,12 @@ Future<void> _loadReviews() async {
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFFE8ECF0), width: 0.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 8,
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
               ],
@@ -1354,9 +1355,7 @@ Future<void> _loadReviews() async {
                 Stack(
                   children: [
                     ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(14),
-                      ),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                       child: Container(
                         width: double.infinity,
                         height: imageHeight,
@@ -1370,10 +1369,8 @@ Future<void> _loadReviews() async {
                                         Container(
                                           color: const Color(0xFF6B8F71).withOpacity(0.12),
                                           child: Icon(
-                                            isElement
-                                                ? Icons.category
-                                                : Icons.texture,
-                                            size: isSmallScreen ? 36 : 40,
+                                            isElement ? Icons.category : Icons.texture,
+                                            size: isSmallScreen ? 28 : 32,
                                             color: const Color(0xFF4A7C59),
                                           ),
                                         ),
@@ -1385,10 +1382,8 @@ Future<void> _loadReviews() async {
                                         Container(
                                           color: const Color(0xFF6B8F71).withOpacity(0.12),
                                           child: Icon(
-                                            isElement
-                                                ? Icons.category
-                                                : Icons.texture,
-                                            size: isSmallScreen ? 36 : 40,
+                                            isElement ? Icons.category : Icons.texture,
+                                            size: isSmallScreen ? 28 : 32,
                                             color: const Color(0xFF4A7C59),
                                           ),
                                         ),
@@ -1397,25 +1392,24 @@ Future<void> _loadReviews() async {
                                 color: const Color(0xFF6B8F71).withOpacity(0.12),
                                 child: Icon(
                                   isElement ? Icons.category : Icons.texture,
-                                  size: isSmallScreen ? 36 : 40,
+                                  size: isSmallScreen ? 28 : 32,
                                   color: const Color(0xFF4A7C59),
                                 ),
                               ),
                       ),
                     ),
-                    // Show material badge ONLY for Fabrics (not for Elements)
                     if (!isElement)
                       Positioned(
-                        top: 8,
-                        right: 8,
+                        top: 4,
+                        right: 4,
                         child: Container(
                           padding: EdgeInsets.symmetric(
-                            horizontal: isSmallScreen ? 6 : 8,
-                            vertical: isSmallScreen ? 3 : 4,
+                            horizontal: isSmallScreen ? 4 : 6,
+                            vertical: isSmallScreen ? 2 : 3,
                           ),
                           decoration: BoxDecoration(
                             color: Colors.black.withOpacity(0.7),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color: Colors.white.withOpacity(0.2),
                               width: 0.3,
@@ -1424,7 +1418,7 @@ Future<void> _loadReviews() async {
                           child: Text(
                             _materialBadgeText(product),
                             style: TextStyle(
-                              fontSize: isSmallScreen ? 9 : 10,
+                              fontSize: isSmallScreen ? 7 : 8,
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 0.3,
@@ -1436,16 +1430,16 @@ Future<void> _loadReviews() async {
                       ),
                     if (outOfStock)
                       Positioned(
-                        top: 8,
-                        left: 8,
+                        top: 4,
+                        left: 4,
                         child: Container(
                           padding: EdgeInsets.symmetric(
-                            horizontal: isSmallScreen ? 6 : 8,
-                            vertical: isSmallScreen ? 3 : 4,
+                            horizontal: isSmallScreen ? 4 : 6,
+                            vertical: isSmallScreen ? 2 : 3,
                           ),
                           decoration: BoxDecoration(
                             color: Colors.red.withOpacity(0.85),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color: Colors.white.withOpacity(0.2),
                               width: 0.3,
@@ -1454,7 +1448,7 @@ Future<void> _loadReviews() async {
                           child: Text(
                             'Out of Stock',
                             style: TextStyle(
-                              fontSize: isSmallScreen ? 9 : 10,
+                              fontSize: isSmallScreen ? 7 : 8,
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
                             ),
@@ -1472,18 +1466,18 @@ Future<void> _loadReviews() async {
                       Text(
                         product.productName,
                         style: TextStyle(
-                          fontSize: isSmallScreen ? 11 : 12,
+                          fontSize: fontSize,
                           fontWeight: FontWeight.w600,
-                          height: 1.2,
+                          height: 1.1,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      SizedBox(height: isSmallScreen ? 4 : 6),
+                      SizedBox(height: isSmallScreen ? 2 : 3),
                       Text(
                         product.priceRange,
                         style: TextStyle(
-                          fontSize: isSmallScreen ? 11 : 12,
+                          fontSize: fontSize,
                           fontWeight: FontWeight.w700,
                           color: const Color(0xFF4A7C59),
                         ),
@@ -1491,7 +1485,7 @@ Future<void> _loadReviews() async {
                         overflow: TextOverflow.ellipsis,
                       ),
                       if (!outOfStock && product.colorOptions.isNotEmpty) ...[
-                        SizedBox(height: isSmallScreen ? 4 : 6),
+                        SizedBox(height: isSmallScreen ? 2 : 3),
                         Wrap(
                           spacing: isSmallScreen ? 2 : 3,
                           runSpacing: 2,
@@ -1515,7 +1509,7 @@ Future<void> _loadReviews() async {
   Widget _colorDot(ColorOption option, bool isSmall) {
     final color = _resolveColor(option.color);
     final bool outOfStock = option.stock <= 0;
-    final double size = isSmall ? 10 : 12;
+    final double size = isSmall ? 8 : 10;
     return Opacity(
       opacity: outOfStock ? 0.35 : 1.0,
       child: Container(
@@ -1532,45 +1526,29 @@ Future<void> _loadReviews() async {
 
   Color _resolveColor(String name) {
     switch (name.toLowerCase()) {
-      case 'white':
-        return Colors.white;
-      case 'black':
-        return Colors.black;
-      case 'pink':
-        return Colors.pink[200]!;
-      case 'blue':
-        return Colors.blue[300]!;
-      case 'green':
-        return Colors.green[300]!;
-      case 'beige':
-        return const Color(0xFFE8DCC8);
-      case 'brown':
-        return Colors.brown[300]!;
-      case 'gold':
-        return const Color(0xFFD4AF37);
-      case 'silver':
-        return Colors.grey[400]!;
-      case 'purple':
-        return Colors.purple[300]!;
-      default:
-        return Colors.grey[300]!;
+      case 'white': return Colors.white;
+      case 'black': return Colors.black;
+      case 'pink': return Colors.pink[200]!;
+      case 'blue': return Colors.blue[300]!;
+      case 'green': return Colors.green[300]!;
+      case 'beige': return const Color(0xFFE8DCC8);
+      case 'brown': return Colors.brown[300]!;
+      case 'gold': return const Color(0xFFD4AF37);
+      case 'silver': return Colors.grey[400]!;
+      case 'purple': return Colors.purple[300]!;
+      default: return Colors.grey[300]!;
     }
   }
 
   String _materialBadgeText(Product product) {
-    final material = product.materialType.isNotEmpty ? product.materialType.first.type : "";
-    if (material.isEmpty || material == "N/A") {
-      return "N/A";
-    }
-    if (material.contains('%')) {
-      return material;
-    }
+    if (product.materialType.isEmpty) return "N/A";
+    final material = product.materialType.first.type;
+    if (material.isEmpty || material == "N/A") return "N/A";
+    if (material.contains('%')) return material;
     if (material.contains(',')) {
       final parts = material.split(',').map((s) => s.trim()).toList();
       final hasPercentages = parts.any((p) => p.contains('%'));
-      if (hasPercentages) {
-        return material;
-      }
+      if (hasPercentages) return material;
       return "100% $material";
     }
     return "100% $material";
@@ -1583,6 +1561,8 @@ Future<void> _loadReviews() async {
     );
   }
 
+  // ─── Reviews Page ─────────────────────────────────────────────────────────
+
   Widget _buildReviewsPage() {
     final filtered = _getFilteredReviews();
 
@@ -1592,11 +1572,7 @@ Future<void> _loadReviews() async {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back,
-            color: Colors.black87,
-            size: 20,
-          ),
+          icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Column(
@@ -1708,8 +1684,7 @@ Future<void> _loadReviews() async {
                 physics: const NeverScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: filtered.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 16),
+                separatorBuilder: (context, index) => const SizedBox(height: 16),
                 itemBuilder: (context, index) =>
                     _buildReviewsPageItem(filtered[index]),
               ),
@@ -1744,12 +1719,8 @@ Future<void> _loadReviews() async {
   }
 
   Widget _buildReviewsPageItem(Review review) {
-    String customerName = 'Customer';
-    if (review.customerId.isNotEmpty) {
-      final hash = review.customerId.hashCode.abs();
-      final names = ['Alex', 'Sam', 'Jordan', 'Taylor', 'Morgan', 'Casey', 'Riley', 'Avery'];
-      customerName = names[hash % names.length];
-    }
+    // Get customer name from cache
+    final customerName = _customerNameCache[review.customerId] ?? 'Customer';
     
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1907,12 +1878,7 @@ Future<void> _loadReviews() async {
   }
 
   Widget _buildReviewsPageFilterChips() {
-    final filters = [
-      "Top reviews",
-      "Newest",
-      "Highest rating",
-      "Lowest rating",
-    ];
+    final filters = ["Top reviews", "Newest", "Highest rating", "Lowest rating"];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16),

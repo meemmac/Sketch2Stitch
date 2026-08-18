@@ -282,7 +282,6 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
 
     final isSmallScreen = screenWidth < 400;
     final spacing = isSmallScreen ? 10.0 : 12.0;
-    // Responsive aspect ratio based on screen height
     final cardAspectRatio = screenHeight < 700 ? 0.80 : 0.85;
 
     return GridView.builder(
@@ -425,26 +424,26 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-if (isFull)
-  Container(
-    margin: const EdgeInsets.only(right: 6),
-    padding: EdgeInsets.symmetric(
-      horizontal: isSmall ? 6 : 8,
-      vertical: isSmall ? 3 : 4,
-    ),
-    decoration: BoxDecoration(
-      color: Colors.black.withValues(alpha: 0.8),
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: Text(
-      "Fully Booked",
-      style: TextStyle(
-        color: Colors.white,
-        fontSize: isSmall ? 9 : 10,
-        fontWeight: FontWeight.bold,
-      ),
-    ),
-  ),
+                          if (isFull)
+                            Container(
+                              margin: const EdgeInsets.only(right: 6),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isSmall ? 6 : 8,
+                                vertical: isSmall ? 3 : 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.8),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                "Fully Booked",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: isSmall ? 9 : 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                           Container(
                             padding: EdgeInsets.symmetric(
                               horizontal: isSmall ? 5 : 6,
@@ -496,8 +495,8 @@ if (isFull)
                       Text(
                         tailor.name,
                         style: TextStyle(
-                          fontSize: isSmall ? 11 : 12,
-                          fontWeight: FontWeight.w600,
+                          fontSize: isSmall ? 13 : 15,
+                          fontWeight: FontWeight.w700,
                           height: 1.1,
                           color: isFull ? Colors.grey.shade700 : Colors.black,
                         ),
@@ -699,9 +698,10 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     });
     try {
       String tailorId = widget.tailor.id;
-      print('🔍 Loading reviews for tailor ID: $tailorId');
+      String tailorName = widget.tailor.name;
+      print('🔍 Loading reviews for tailor: $tailorId, Name: $tailorName');
       
-      // Get reviews from ReviewService
+      // Try by ID first (auto-generated)
       var reviews = await _reviewService.getReviewsByTargetId(
         tailorId,
         ReviewTargetRole.tailor,
@@ -710,41 +710,23 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       
       print('✅ Loaded ${reviews.length} reviews by tailor ID');
       
-      // If no reviews found, try to find by tailor name (for manually created reviews)
+      // If no reviews found, try by name (manual entries)
       if (reviews.isEmpty) {
         print('🔍 No reviews found by ID, trying by name...');
-        
-        final allReviewsSnapshot = await FirebaseFirestore.instance
-            .collection('Reviews')
-            .where('targetRole', isEqualTo: 'tailor')
-            .get();
-        
-        for (final doc in allReviewsSnapshot.docs) {
-          final data = doc.data();
-          final targetId = data['targetId'] as String?;
-          
-          if (targetId != null && targetId == widget.tailor.name) {
-            reviews.add(Review.fromJson({...data, 'id': doc.id}));
-            print('   ✅ Found review with targetId: $targetId');
-          }
-        }
-        print('✅ Total reviews found after name search: ${reviews.length}');
+        reviews = await _reviewService.getReviewsByName(
+          tailorName,
+          ReviewTargetRole.tailor,
+          limit: 50,
+        );
+        print('✅ Loaded ${reviews.length} reviews by tailor name');
       }
       
       // Enrich reviews with customer names
       final enrichedReviews = <Review>[];
       for (final review in reviews) {
         final customerName = await _getCustomerName(review.customerId);
-        // Create a copy of the review - we'll store customerName in the review object
-        // Since Review model doesn't have customerName field, we'll use a workaround
-        // by creating a custom object or using an extension
-        final enrichedReview = review.copyWith(
-          // We can't add customerName to Review model directly, 
-          // so we'll store it separately in a map
-        );
-        enrichedReviews.add(enrichedReview);
-        // Store the customer name in a map for display
         _customerNameCache[review.customerId] = customerName;
+        enrichedReviews.add(review);
         print('   - Review: rating=${review.rating}, customer=$customerName');
       }
       

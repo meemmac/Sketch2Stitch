@@ -13,7 +13,6 @@ class ReviewService {
 
   // ─── Customer Review Functions ───────────────────────────────────────────
 
-  /// Fetches all reviews submitted by a specific customer.
   Future<List<Review>> fetchMyReviewHistory(String customerId) async {
     try {
       final snapshot = await _db
@@ -23,7 +22,7 @@ class ReviewService {
           .get();
 
       return snapshot.docs
-          .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
+          .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
           .toList();
     } catch (e) {
       debugPrint('Error fetching review history: $e');
@@ -31,7 +30,6 @@ class ReviewService {
     }
   }
 
-  /// Calculates summary statistics for a customer's review history.
   Future<Map<String, dynamic>> getReviewSummaryStats(String customerId) async {
     try {
       final reviews = await fetchMyReviewHistory(customerId);
@@ -64,7 +62,6 @@ class ReviewService {
     }
   }
 
-  /// Filters a customer's reviews by recipient type (tailor, retailer, product).
   Future<List<Review>> filterReviews(String customerId, ReviewTargetRole recipientType) async {
     try {
       final snapshot = await _db
@@ -75,7 +72,7 @@ class ReviewService {
           .get();
 
       return snapshot.docs
-          .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
+          .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
           .toList();
     } catch (e) {
       debugPrint('Error filtering reviews: $e');
@@ -83,7 +80,6 @@ class ReviewService {
     }
   }
 
-  /// Submits a general review for an order recipient.
   Future<void> submitReview({
     required String orderId,
     required String customerId,
@@ -110,7 +106,6 @@ class ReviewService {
     }
   }
 
-  /// Specific helper to submit a tailor review.
   Future<void> submitTailorReview(
     String customerId,
     String tailorId,
@@ -130,7 +125,6 @@ class ReviewService {
 
   // ─── Retailer Review Functions ───────────────────────────────────────────
 
-  /// Streams reviews for a specific retailer shop.
   Stream<List<Review>> streamShopReviews(String retailerId) {
     return _db
         .collection(_reviewsCollection)
@@ -139,14 +133,11 @@ class ReviewService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snap) => snap.docs
-            .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
+            .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
             .toList());
   }
 
-  /// Streams detailed reviews for a retailer shop (includes customer and product info).
   Stream<List<Map<String, dynamic>>> streamDetailedShopReviews(String retailerId) {
-    /* 
-    // PREVIOUS SEQUENTIAL VERSION (Slower)
     return _db
         .collection(_reviewsCollection)
         .where('targetId', isEqualTo: retailerId)
@@ -154,97 +145,22 @@ class ReviewService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .asyncMap((snapshot) async {
-      List<Map<String, dynamic>> detailedReviews = [];
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final String customerId = data['customerId'];
-        final String? orderId = data['orderId'];
-
-        // Fetch customer name
-        final customerDoc = await _db.collection('Customer').doc(customerId).get();
-        final customerName = customerDoc.exists ? (customerDoc.data()?['name'] ?? 'Anonymous') : 'Anonymous';
-
-        // Fetch products from the sub-order for this retailer
-        List<Map<String, dynamic>> products = [];
-        if (orderId != null) {
-          final subOrderSnap = await _db
-              .collection('Sub-orders')
-              .where('orderId', isEqualTo: orderId)
-              .where('retailerId', isEqualTo: retailerId)
-              .limit(1)
-              .get();
-
-          if (subOrderSnap.docs.isNotEmpty) {
-            final subOrderId = subOrderSnap.docs.first.id;
-            final itemsSnap = await _db
-                .collection('Order-Items')
-                .where('subOrderId', isEqualTo: subOrderId)
-                .get();
-
-            for (var itemDoc in itemsSnap.docs) {
-              final itemData = itemDoc.data();
-              final productId = itemData['productId'];
-              final optionId = itemData['optionId'];
-
-              final productDoc = await _db.collection('Products').doc(productId).get();
-              if (productDoc.exists) {
-                final productData = productDoc.data()!;
-                final List<dynamic> colorOptions = productData['colorOptions'] ?? [];
-                final option = colorOptions.firstWhere(
-                  (o) => o['optionId'] == optionId,
-                  orElse: () => null,
-                );
-
-                final rawImages = (option?['image'] as List?)?.map((e) => e.toString()).toList() ?? [];
-                final resolvedImages = _resolveImageUrls(rawImages);
-
-                products.add({
-                  'name': productData['productName'] ?? 'Unknown Product',
-                  'image': resolvedImages.isNotEmpty ? resolvedImages.first : '',
-                  'price': (option?['price'] ?? 0).toDouble(),
-                });
-              }
-            }
-          }
-        }
-
-        detailedReviews.add({
-          'review': {...data, 'id': doc.id},
-          'userName': customerName,
-          'products': products,
-        });
-      }
-      return detailedReviews;
-    });
-    */
-
-    // OPTIMIZED PARALLEL VERSION
-    return _db
-        .collection(_reviewsCollection)
-        .where('targetId', isEqualTo: retailerId)
-        .where('targetRole', isEqualTo: ReviewTargetRole.retailer.name)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .asyncMap((snapshot) async {
-      // Local caches to avoid redundant fetches
       final Map<String, String> customerNameCache = {};
       final Map<String, List<Map<String, dynamic>>> subOrderProductsCache = {};
 
       final List<Map<String, dynamic>?> results = await Future.wait(
         snapshot.docs.map((doc) async {
           try {
-            final data = doc.data();
-            final String customerId = data['customerId'];
-            final String? orderId = data['orderId'];
+            final data = doc.data() as Map<String, dynamic>;
+            final String customerId = data['customerId'] as String;
+            final String? orderId = data['orderId'] as String?;
 
-            // 1. Fetch customer name (parallelized/cached)
             if (!customerNameCache.containsKey(customerId)) {
               final customerDoc = await _db.collection('Customer').doc(customerId).get();
               customerNameCache[customerId] = customerDoc.exists ? (customerDoc.data()?['name'] ?? 'Anonymous') : 'Anonymous';
             }
             final customerName = customerNameCache[customerId]!;
 
-            // 2. Fetch products from the sub-order for this retailer
             List<Map<String, dynamic>> products = [];
             if (orderId != null) {
               final cacheKey = "${orderId}_$retailerId";
@@ -263,16 +179,15 @@ class ReviewService {
                       .where('subOrderId', isEqualTo: subOrderId)
                       .get();
 
-                  // Fetch all product details for this sub-order in parallel
                   final subOrderProducts = await Future.wait(
                     itemsSnap.docs.map((itemDoc) async {
-                      final itemData = itemDoc.data();
-                      final productId = itemData['productId'];
-                      final optionId = itemData['optionId'];
+                      final itemData = itemDoc.data() as Map<String, dynamic>;
+                      final productId = itemData['productId'] as String;
+                      final optionId = itemData['optionId'] as int;
 
                       final productDoc = await _db.collection('Products').doc(productId).get();
                       if (productDoc.exists) {
-                        final productData = productDoc.data()!;
+                        final productData = productDoc.data() as Map<String, dynamic>;
                         final List<dynamic> colorOptions = productData['colorOptions'] ?? [];
                         final option = colorOptions.firstWhere(
                           (o) => o['optionId'] == optionId,
@@ -316,7 +231,6 @@ class ReviewService {
     });
   }
 
-  /// Streams review statistics for a retailer shop.
   Stream<Map<String, dynamic>> streamShopReviewStats(String retailerId) {
     return _db
         .collection(_reviewsCollection)
@@ -325,7 +239,7 @@ class ReviewService {
         .snapshots()
         .map((snap) {
       final reviews = snap.docs
-          .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
+          .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
           .toList();
 
       if (reviews.isEmpty) {
@@ -352,11 +266,8 @@ class ReviewService {
     });
   }
 
-  /// Gets review statistics for a retailer shop.
   Future<Map<String, dynamic>> getShopReviewStats(String retailerId) async {
     try {
-      // We fetch all reviews to calculate stats. For very large numbers, 
-      // this should be moved to a Cloud Function that updates a stats doc.
       final snapshot = await _db
           .collection(_reviewsCollection)
           .where('targetId', isEqualTo: retailerId)
@@ -364,7 +275,7 @@ class ReviewService {
           .get();
 
       final reviews = snapshot.docs
-          .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
+          .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
           .toList();
 
       if (reviews.isEmpty) return {'total': 0, 'average': 0.0, 'distribution': {1:0, 2:0, 3:0, 4:0, 5:0}};
@@ -389,7 +300,6 @@ class ReviewService {
     }
   }
 
-  /// Fetches all reviews associated with a specific order.
   Future<List<Review>> fetchReviewRelatedItems(String orderId) async {
     try {
       final snapshot = await _db
@@ -398,7 +308,7 @@ class ReviewService {
           .get();
 
       return snapshot.docs
-          .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
+          .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
           .toList();
     } catch (e) {
       debugPrint('Error fetching review related items: $e');
@@ -406,7 +316,6 @@ class ReviewService {
     }
   }
 
-  /// Responds to a review (Retailer functionality).
   Future<void> respondToReview(String reviewId, String retailerComment) async {
     try {
       await _db.collection(_reviewsCollection).doc(reviewId).update({
@@ -421,7 +330,6 @@ class ReviewService {
 
   // ─── Tailor Review Functions ─────────────────────────────────────────────
 
-  /// Fetches reviews for a specific tailor with optional filtering and sorting.
   Future<List<Review>> fetchTailorReviews(
     String tailorId, {
     int? ratingFilter,
@@ -450,7 +358,6 @@ class ReviewService {
     }
   }
 
-  /// Gets reputation summary for a tailor.
   Future<Map<String, dynamic>> getTailorReputationSummary(String tailorId) async {
     try {
       final reviews = await fetchTailorReviews(tailorId);
@@ -469,27 +376,33 @@ class ReviewService {
     }
   }
 
-  /// Fetches a single review's detailed metadata.
   Future<Review?> fetchReviewMetadata(String reviewId) async {
     try {
       final doc = await _db.collection(_reviewsCollection).doc(reviewId).get();
       if (!doc.exists || doc.data() == null) return null;
-      return Review.fromJson({...doc.data()!, 'id': doc.id});
+      return Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id});
     } catch (e) {
       debugPrint('Error fetching review metadata: $e');
       return null;
     }
   }
 
-  /// General fetch for reviews by target (any role).
+  // ─── Main Review Fetch - PRIORITIZES targetId ───────────────────────────
+
   Future<List<Review>> getReviewsByTargetId(
     String targetId, 
     ReviewTargetRole targetRole, {
     int? filter, 
-    int limit = 20,
+    int limit = 50,
     DocumentSnapshot? startAfter,
   }) async {
     try {
+      print('🔍 getReviewsByTargetId called');
+      print('   - targetId: $targetId');
+      print('   - targetRole: ${targetRole.name}');
+      print('   - Collection: $_reviewsCollection');
+      
+      // DIRECT QUERY by targetId (this is the primary method)
       Query query = _db
           .collection(_reviewsCollection)
           .where('targetId', isEqualTo: targetId)
@@ -506,16 +419,109 @@ class ReviewService {
       }
 
       final snapshot = await query.get();
-      return snapshot.docs
+      
+      print('📊 Direct query found ${snapshot.docs.length} documents');
+      
+      // Debug: Print each review found
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        print('   - Review: targetId=${data['targetId']}, rating=${data['rating']}, customer=${data['customerId']}');
+      }
+      
+      List<Review> reviews = snapshot.docs
           .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
           .toList();
+      
+      // If reviews found, return them
+      if (reviews.isNotEmpty) {
+        print('✅ Found ${reviews.length} reviews by exact targetId match');
+        return reviews;
+      }
+      
+      // FALLBACK: Try case-insensitive match
+      print('🔍 No reviews found by direct query. Trying case-insensitive match...');
+      
+      final allReviewsSnapshot = await _db
+          .collection(_reviewsCollection)
+          .where('targetRole', isEqualTo: targetRole.name)
+          .get();
+      
+      print('📊 Total reviews with targetRole ${targetRole.name}: ${allReviewsSnapshot.docs.length}');
+      
+      List<Review> matchedReviews = [];
+      for (var doc in allReviewsSnapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final String? docTargetId = data['targetId'] as String?;
+        
+        if (docTargetId != null && docTargetId.toLowerCase() == targetId.toLowerCase()) {
+          matchedReviews.add(Review.fromJson({...data, 'id': doc.id}));
+          print('   ✅ MATCH FOUND: $docTargetId == $targetId');
+        }
+      }
+      
+      if (matchedReviews.isNotEmpty) {
+        print('✅ Found ${matchedReviews.length} reviews by case-insensitive matching');
+        matchedReviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        if (matchedReviews.length > limit) {
+          return matchedReviews.sublist(0, limit);
+        }
+        return matchedReviews;
+      }
+      
+      print('⚠️ No reviews found for targetId: $targetId');
+      return [];
+      
     } catch (e) {
       debugPrint('Error fetching reviews by target: $e');
+      debugPrint('Stack trace: ${StackTrace.current}');
       return [];
     }
   }
 
-  /// Streams reviews for a specific tailor.
+  // ─── Get Reviews by Name (Fallback for manual entries) ──────────────────
+
+  Future<List<Review>> getReviewsByName(
+    String name, 
+    ReviewTargetRole targetRole, {
+    int limit = 50,
+  }) async {
+    try {
+      print('🔍 getReviewsByName called with name: $name, targetRole: ${targetRole.name}');
+      
+      final snapshot = await _db
+          .collection(_reviewsCollection)
+          .where('targetRole', isEqualTo: targetRole.name)
+          .get();
+      
+      final List<Review> matchingReviews = [];
+      
+      for (final doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final String? targetId = data['targetId'] as String?;
+        
+        if (targetId != null && targetId.toLowerCase() == name.toLowerCase()) {
+          matchingReviews.add(Review.fromJson({...data, 'id': doc.id}));
+          print('   ✅ Found review with targetId: $targetId');
+        }
+      }
+      
+      matchingReviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      
+      if (matchingReviews.length > limit) {
+        return matchingReviews.sublist(0, limit);
+      }
+      
+      print('✅ Found ${matchingReviews.length} reviews by name: $name');
+      return matchingReviews;
+      
+    } catch (e) {
+      debugPrint('Error fetching reviews by name: $e');
+      return [];
+    }
+  }
+
+  // ─── Streams ──────────────────────────────────────────────────────────────
+
   Stream<List<Review>> streamTailorReviews(String tailorId) {
     return _db
         .collection(_reviewsCollection)
@@ -524,11 +530,10 @@ class ReviewService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snap) => snap.docs
-            .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
+            .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
             .toList());
   }
 
-  /// Streams detailed reviews for a tailor (includes customer info).
   Stream<List<Map<String, dynamic>>> streamDetailedTailorReviews(String tailorId) {
     return _db
         .collection(_reviewsCollection)
@@ -542,8 +547,8 @@ class ReviewService {
       final List<Map<String, dynamic>?> results = await Future.wait(
         snapshot.docs.map((doc) async {
           try {
-            final data = doc.data();
-            final String customerId = data['customerId'];
+            final data = doc.data() as Map<String, dynamic>;
+            final String customerId = data['customerId'] as String;
 
             if (!customerNameCache.containsKey(customerId)) {
               final customerDoc = await _db.collection('Customer').doc(customerId).get();
@@ -566,7 +571,6 @@ class ReviewService {
     });
   }
 
-  /// Streams review statistics for a tailor.
   Stream<Map<String, dynamic>> streamTailorReviewStats(String tailorId) {
     return _db
         .collection(_reviewsCollection)
@@ -575,7 +579,7 @@ class ReviewService {
         .snapshots()
         .map((snap) {
       final reviews = snap.docs
-          .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
+          .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
           .toList();
 
       if (reviews.isEmpty) {
