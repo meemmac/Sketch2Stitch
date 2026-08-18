@@ -303,6 +303,10 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
     final bool isTopRated = tailor.rating >= 4.8;
     final bool isFull = tailor.maxOrder == 0;
     String imageUrl = tailor.profilePicture ?? 'assets/images/fab.jpg';
+    
+    // Check if user is Tailor or Retailer
+    final bool isTailorOrRetailer = widget.userRole == UserRole.tailor || 
+                                     widget.userRole == UserRole.retailer;
 
     return GestureDetector(
       onTap: () {
@@ -521,28 +525,31 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.directions_bike_outlined,
-                            size: isSmall ? 12 : 14,
-                            color: isFull ? Colors.grey.shade400 : Colors.grey[600],
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              "1.8 km",
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isFull ? Colors.grey.shade400 : Colors.grey[600],
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                      // Only show delivery info for customers
+                      if (!isTailorOrRetailer) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.directions_bike_outlined,
+                              size: isSmall ? 12 : 14,
+                              color: isFull ? Colors.grey.shade400 : Colors.grey[600],
                             ),
-                          ),
-                        ],
-                      ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                "1.8 km",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isFull ? Colors.grey.shade400 : Colors.grey[600],
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -556,7 +563,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
 }
 
 // ============================================================================
-// TailorDetailScreen - FIXED PORTFOLIO LOADING
+// TailorDetailScreen - FIXED REVIEW LOADING
 // ============================================================================
 
 class TailorDetailScreen extends StatefulWidget {
@@ -658,13 +665,19 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       _isLoadingReviews = true;
     });
     try {
+      // Load reviews for this tailor with targetRole = 'tailor'
       final reviews = await _reviewService.getReviewsByTargetId(
         widget.tailor.id,
         ReviewTargetRole.tailor,
         limit: 50,
       );
       
-      print('✅ Loaded ${reviews.length} reviews for tailor: ${widget.tailor.name}');
+      print('✅ Loaded ${reviews.length} reviews for tailor: ${widget.tailor.name} (ID: ${widget.tailor.id})');
+      
+      // Debug: Print each review to verify data
+      for (final review in reviews) {
+        print('   - Review: rating=${review.rating}, comment=${review.comment}, customer=${review.customerId}');
+      }
       
       setState(() {
         _reviews = reviews;
@@ -673,6 +686,8 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         if (_reviews.isNotEmpty) {
           final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
           _averageRating = sum / _reviews.length;
+        } else {
+          _averageRating = 0.0;
         }
       });
     } catch (e) {
@@ -680,6 +695,8 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       setState(() {
         _isLoading = false;
         _isLoadingReviews = false;
+        _reviews = [];
+        _averageRating = 0.0;
       });
     }
   }
@@ -917,6 +934,10 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 380;
+    
+    // Check if user is Tailor or Retailer
+    final bool isTailorOrRetailer = widget.userRole == UserRole.tailor || 
+                                     widget.userRole == UserRole.retailer;
 
     return Scaffold(
       bottomNavigationBar: (_isCustomer && !isUnavailable)
@@ -945,7 +966,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
           Expanded(
             child: CustomScrollView(
               slivers: [
-                _buildAppBar(isSmallScreen),
+                _buildAppBar(isSmallScreen, isTailorOrRetailer),
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
@@ -968,7 +989,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     );
   }
 
-  SliverAppBar _buildAppBar(bool isSmallScreen) {
+  SliverAppBar _buildAppBar(bool isSmallScreen, bool isTailorOrRetailer) {
     final ratingSize = isSmallScreen ? 12.0 : 14.0;
     final fontSize = isSmallScreen ? 20.0 : 22.0;
 
@@ -1119,7 +1140,8 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            if (_isCustomer) ...[
+                            // Only show delivery info for customers
+                            if (_isCustomer && !isTailorOrRetailer) ...[
                               const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(
@@ -1480,10 +1502,13 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   void _showReviewsOverlay(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => _buildReviewsPage()),
+      MaterialPageRoute(
+        builder: (context) => _buildReviewsPage(),
+      ),
     );
   }
 
+  // FIXED: Build reviews page with proper data from Firestore
   Widget _buildReviewsPage() {
     final filtered = _getFilteredReviews();
 
@@ -1521,10 +1546,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.grey),
             onPressed: () {
-              setState(() {
-                _isLoading = true;
-                _isLoadingReviews = true;
-              });
               _loadReviews();
             },
           ),
@@ -1570,10 +1591,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                         ),
                       ),
                       SizedBox(height: 4),
-                      Text(
-                        'Be the first to review this tailor!',
-                        style: TextStyle(fontSize: 13, color: Colors.grey),
-                      ),
                     ],
                   ),
                 ),
@@ -1782,8 +1799,11 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   }
 
   Widget _buildReviewsPageItem(Review review) {
+    // Try to get customer name from review or use fallback
     String customerName = 'Customer';
     if (review.customerId.isNotEmpty) {
+      // You can fetch customer name from Firestore if needed
+      // For now, use a hash-based fallback
       final hash = review.customerId.hashCode.abs();
       final names = ['Alex', 'Sam', 'Jordan', 'Taylor', 'Morgan', 'Casey', 'Riley', 'Avery'];
       customerName = names[hash % names.length];

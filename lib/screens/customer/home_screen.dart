@@ -1278,6 +1278,10 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         ? product.colorOptions.first.image.first
         : null;
     final bool outOfStock = product.colorOptions.every((c) => c.stock <= 0);
+    
+    // Check if user is Tailor or Retailer
+    final bool isTailorOrRetailer = _currentRole == UserRole.tailor || 
+                                     _currentRole == UserRole.retailer;
 
     return GestureDetector(
       onTap: () => _showProductOverlay(product),
@@ -1436,7 +1440,36 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                               )
                               .toList(),
                         ),
-                        Row(
+                        // Only show delivery info for customers
+                        if (!isTailorOrRetailer)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.directions_bike,
+                                size: 12,
+                                color: Colors.grey[600],
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                'Tk 50',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 6),
+                    // Only show delivery info for customers
+                    if (!isTailorOrRetailer)
+                      Align(
+                        alignment: Alignment.bottomRight,
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
@@ -1455,32 +1488,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ] else ...[
-                    const SizedBox(height: 6),
-                    Align(
-                      alignment: Alignment.bottomRight,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.directions_bike,
-                            size: 12,
-                            color: Colors.grey[600],
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            'Tk 50',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
                       ),
-                    ),
                   ],
                 ],
               ),
@@ -1579,6 +1587,10 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   Widget _buildTailorCard(Tailor tailor) {
     final bool isTopRated = tailor.rating >= 4.8;
     final String imageUrl = tailor.profilePicture ?? 'assets/images/fab.jpg';
+    
+    // Check if user is Tailor or Retailer
+    final bool isTailorOrRetailer = _currentRole == UserRole.tailor || 
+                                     _currentRole == UserRole.retailer;
 
     return GestureDetector(
       onTap: () => _openTailorDetail(tailor),
@@ -1719,50 +1731,55 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '1.8 km',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: Colors.green.shade800,
-                            fontWeight: FontWeight.bold,
+                      // Only show distance for customers
+                      if (!isTailorOrRetailer) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 1,
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.bottomRight,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.directions_bike,
-                          size: 12,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          'Tk 50',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w600,
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '1.8 km',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.green.shade800,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
+                  const SizedBox(height: 8),
+                  // Only show delivery info for customers
+                  if (!isTailorOrRetailer)
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.directions_bike,
+                            size: 12,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            'Tk 50',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -1791,6 +1808,10 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   Widget _buildRetailerCard(Retailer retailer) {
     final bool isTopRated = retailer.rating >= 4.8;
     final String imageUrl = retailer.profilePicture ?? 'assets/images/fab.jpg';
+    
+    // Check if user is Tailor or Retailer
+    final bool isTailorOrRetailer = _currentRole == UserRole.tailor || 
+                                     _currentRole == UserRole.retailer;
 
     return GestureDetector(
       onTap: () => _openRetailerDetail(retailer),
@@ -1931,50 +1952,55 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '2.5 km',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: Colors.green.shade800,
-                            fontWeight: FontWeight.bold,
+                      // Only show distance for customers
+                      if (!isTailorOrRetailer) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 1,
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.bottomRight,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.directions_bike,
-                          size: 12,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          'Tk 50',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w600,
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '2.5 km',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.green.shade800,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
+                  const SizedBox(height: 8),
+                  // Only show delivery info for customers
+                  if (!isTailorOrRetailer)
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.directions_bike,
+                            size: 12,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            'Tk 50',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),

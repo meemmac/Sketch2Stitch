@@ -429,10 +429,13 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
 
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-
     final isSmallScreen = screenWidth < 400;
     final spacing = isSmallScreen ? 10.0 : 12.0;
     final cardAspectRatio = screenHeight < 700 ? 0.72 : 0.78;
+
+    // Check if user is Tailor or Retailer
+    final bool isTailorOrRetailer = widget.userRole == UserRole.tailor || 
+                                     widget.userRole == UserRole.retailer;
 
     return GridView.builder(
       padding: EdgeInsets.all(spacing),
@@ -628,21 +631,23 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                                           .toList(),
                                     ),
                             ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.directions_bike, size: isSmallScreen ? 14 : 16, color: const Color.fromARGB(255, 107, 106, 106)),
-                                const SizedBox(width: 2),
-                                Text(
-                                  'Tk 50',
-                                  style: TextStyle(
-                                    fontSize: isSmallScreen ? 12 : 14,
-                                    color: const Color.fromARGB(255, 107, 106, 106),
-                                    fontWeight: FontWeight.w600,
+                            // Only show delivery info for customers
+                            if (!isTailorOrRetailer)
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.directions_bike, size: isSmallScreen ? 14 : 16, color: const Color.fromARGB(255, 107, 106, 106)),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    'Tk 50',
+                                    style: TextStyle(
+                                      fontSize: isSmallScreen ? 12 : 14,
+                                      color: const Color.fromARGB(255, 107, 106, 106),
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
+                                ],
+                              ),
                           ],
                         ),
                       ],

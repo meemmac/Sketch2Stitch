@@ -302,6 +302,10 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
   Widget _buildRetailerCard(Retailer retailer, bool isSmall) {
     final bool isTopRated = retailer.rating >= 4.8;
     String imageUrl = retailer.profilePicture ?? 'assets/images/fab.jpg';
+    
+    // Check if user is Tailor or Retailer
+    final bool isTailorOrRetailer = widget.userRole == UserRole.tailor || 
+                                     widget.userRole == UserRole.retailer;
 
     return GestureDetector(
       onTap: () {
@@ -481,25 +485,28 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 1,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '2.5 km',
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: Colors.green.shade800,
-                              fontWeight: FontWeight.bold,
+                        // Only show distance for customers
+                        if (!isTailorOrRetailer) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '2.5 km',
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: Colors.green.shade800,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ],
@@ -514,7 +521,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
 }
 
 // ============================================================================
-// RetailerDetailScreen - FIXED
+// RetailerDetailScreen - FIXED REVIEWS
 // ============================================================================
 
 class RetailerDetailScreen extends StatefulWidget {
@@ -708,40 +715,18 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
       String retailerId = widget.retailer.id;
       print('🔍 Loading reviews for retailer: $retailerId');
       
-      // Try by retailer ID
-      var reviews = await _reviewService.getReviewsByTargetId(
+      // Load reviews by retailer ID with targetRole = 'retailer'
+      final reviews = await _reviewService.getReviewsByTargetId(
         retailerId,
         ReviewTargetRole.retailer,
         limit: 50,
       );
       
-      print('✅ Loaded ${reviews.length} reviews by retailer ID');
+      print('✅ Loaded ${reviews.length} reviews for retailer: ${widget.retailer.shopName}');
       
-      // If no reviews, try by shop name
-      if (reviews.isEmpty) {
-        print('🔍 Trying to find retailer by shop name: ${widget.retailer.shopName}');
-        try {
-          final retailerSnapshot = await FirebaseFirestore.instance
-              .collection('Retailer')
-              .where('shopName', isEqualTo: widget.retailer.shopName)
-              .limit(1)
-              .get();
-          
-          if (retailerSnapshot.docs.isNotEmpty) {
-            final doc = retailerSnapshot.docs.first;
-            final foundRetailerId = doc.id;
-            print('✅ Found retailer with ID: $foundRetailerId');
-            
-            reviews = await _reviewService.getReviewsByTargetId(
-              foundRetailerId,
-              ReviewTargetRole.retailer,
-              limit: 50,
-            );
-            print('✅ Loaded ${reviews.length} reviews by shop name');
-          }
-        } catch (e) {
-          print('❌ Error finding retailer by shop name: $e');
-        }
+      // Debug: Print each review
+      for (final review in reviews) {
+        print('   - Review: rating=${review.rating}, comment=${review.comment}, customer=${review.customerId}');
       }
       
       setState(() {
@@ -754,6 +739,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
           print('📊 Average rating: $_averageRating from ${_reviews.length} reviews');
         } else {
           print('⚠️ No reviews found for this retailer');
+          _averageRating = 0.0;
         }
       });
     } catch (e) {
@@ -761,6 +747,8 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
       setState(() {
         _isLoading = false;
         _isLoadingReviews = false;
+        _reviews = [];
+        _averageRating = 0.0;
       });
     }
   }
@@ -794,11 +782,15 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 380;
     final isMediumScreen = screenWidth >= 380 && screenWidth < 600;
+    
+    // Check if user is Tailor or Retailer
+    final bool isTailorOrRetailer = widget.userRole == UserRole.tailor || 
+                                     widget.userRole == UserRole.retailer;
 
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          _buildAppBar(isSmallScreen),
+          _buildAppBar(isSmallScreen, isTailorOrRetailer),
           SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
@@ -822,7 +814,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     );
   }
 
-  SliverAppBar _buildAppBar(bool isSmallScreen) {
+  SliverAppBar _buildAppBar(bool isSmallScreen, bool isTailorOrRetailer) {
     final ratingSize = isSmallScreen ? 12.0 : 14.0;
     final fontSize = isSmallScreen ? 20.0 : 22.0;
 
@@ -979,7 +971,8 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            if (_isCustomer) ...[
+                            // Only show delivery info for customers
+                            if (_isCustomer && !isTailorOrRetailer) ...[
                               const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(

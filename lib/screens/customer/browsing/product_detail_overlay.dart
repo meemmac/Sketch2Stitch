@@ -197,6 +197,10 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
     // Check if careSymbol exists and is not empty
     final bool hasCareInstructions = widget.product.careSymbol.isNotEmpty;
     
+    // Check if user is Tailor or Retailer
+    final bool isTailorOrRetailer = widget.userRole == UserRole.tailor || 
+                                     widget.userRole == UserRole.retailer;
+    
     return Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.92,
@@ -305,21 +309,23 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                           color: Color(0xFF2C5C44),
                         ),
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.directions_bike, size: 18, color: Colors.grey[600]),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Tk 50 delivery',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w600,
+                      // Only show delivery info for customers
+                      if (!isTailorOrRetailer)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.directions_bike, size: 18, color: Colors.grey[600]),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Tk 50 delivery',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
                       if (!_inStock)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -602,26 +608,31 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                       child: Column(
                         children: [
                           CareInstructionRow(
+                            icon: Icons.wash,
                             label: "Machine Washable",
                             isOk: _canMachineWash(),
                             info: "Indicates whether the garment can be safely washed in a washing machine and the recommended washing conditions. Following these instructions helps maintain the fabric's quality, color, and shape.",
                           ),
                           CareInstructionRow(
+                            icon: Icons.biotech,
                             label: "Bleach Allowed",
                             isOk: _canBleach(),
                             info: "Indicates whether bleach can be safely used on the fabric. Some materials may fade, weaken, or become damaged when exposed to bleach.",
                           ),
                           CareInstructionRow(
+                            icon: Icons.dry_cleaning,
                             label: "Dry Clean Only",
                             isOk: _canDryClean(),
                             info: "Indicates whether the garment should be professionally cleaned using special solvents instead of water. This method is recommended for delicate fabrics or garments with special finishes.",
                           ),
                           CareInstructionRow(
+                            icon: Icons.settings_input_component,
                             label: "Tumble Dry",
                             isOk: _canTumbleDry(),
                             info: "Tumble drying is the process of drying clothes in a clothes dryer (dryer machine) instead of hanging them to air dry. It indicates whether the garment is suitable for tumble drying and the recommended heat setting. Using the wrong drying method may cause shrinking or fabric damage.",
                           ),
                           CareInstructionRow(
+                            icon: Icons.iron,
                             label: "Iron Level",
                             isOk: true,
                             value: _getIronLevel(),
@@ -822,7 +833,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
 
   bool _canMachineWash() {
     final careSymbols = widget.product.careSymbol.map((s) => s.toLowerCase()).toList();
-    return careSymbols.any((s) => s.contains('wash'));
+    return careSymbols.any((s) => s.contains('wash') && !s.contains('do not') && !s.contains('no'));
   }
 
   bool _canBleach() {
@@ -842,12 +853,87 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
 
   String _getIronLevel() {
     final careSymbols = widget.product.careSymbol.map((s) => s.toLowerCase()).toList();
-    if (careSymbols.any((s) => s.contains('iron'))) {
-      if (careSymbols.any((s) => s.contains('low'))) return "Low";
-      if (careSymbols.any((s) => s.contains('medium'))) return "Medium";
-      if (careSymbols.any((s) => s.contains('high'))) return "High";
-      return "Medium";
+    for (final symbol in careSymbols) {
+      if (symbol.contains('iron')) {
+        if (symbol.contains('low')) return "Low";
+        if (symbol.contains('medium')) return "Medium";
+        if (symbol.contains('high')) return "High";
+      }
     }
     return "Medium";
+  }
+}
+
+// ─── CareInstructionRow Widget ─────────────────────────────────────────────
+
+class CareInstructionRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isOk;
+  final String? value;
+  final String info;
+
+  const CareInstructionRow({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.isOk,
+    this.value,
+    required this.info,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: isOk ? Colors.green : Colors.grey),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => _showInfoDialog(context, label, info),
+            child: Icon(Icons.info_outline, size: 16, color: Colors.blue.shade300),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: isOk ? Colors.black87 : Colors.grey),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value ?? (isOk ? "Yes" : "No"),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isOk ? Colors.green.shade800 : Colors.grey,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showInfoDialog(BuildContext context, String title, String content) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: Text(content),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Got it"),
+          ),
+        ],
+      ),
+    );
   }
 }
