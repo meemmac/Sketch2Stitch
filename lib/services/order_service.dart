@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -7,6 +8,8 @@ import '../models/order_item.dart';
 import '../models/tailor_job.dart';
 import '../models/customer.dart';
 import '../models/review.dart';
+import '../models/measurement.dart';
+import '../models/payment.dart';
 import 'Cloudinary_service.dart';
 
 class OrderService {
@@ -127,6 +130,197 @@ class OrderService {
       }
     }
     return SubOrder.fromJson({...data, 'id': snap.id});
+  }
+
+  /// Provides a high-level reactive data stream that consolidates all information
+  /// related to a customer’s journey into a single source of truth.
+  /// Retrieve related entities in parallel to minimize latency.
+  Stream<List<Map<String, dynamic>>> streamDetailedCustomerOrders(String customerId) {
+    return _db
+        .collection(_ordersCollection)
+        .where('customerId', isEqualTo: customerId)
+        .snapshots()
+        .asyncMap((snap) async {
+      if (snap.docs.isEmpty) return <Map<String, dynamic>>[];
+
+      // Internal memory cache for entities to eliminate redundant requests.
+      final Map<String, Future<Map<String, dynamic>>> retailerCache = {};
+      final Map<String, Future<Map<String, dynamic>>> productCache = {};
+      final Map<String, Future<Map<String, dynamic>>> tailorCache = {};
+
+      Future<Map<String, dynamic>> getRetailer(String id) {
+        if (id.isEmpty) return Future.value({'shopName': 'Retailer'});
+        return retailerCache.putIfAbsent(id, () async {
+          try {
+            final doc = await _db.collection('Retailer').doc(id).get();
+            return doc.data() ?? {'shopName': 'Retailer'};
+          } catch (e) {
+            debugPrint('OrderService: Error fetching retailer $id: $e');
+            return {'shopName': 'Retailer'};
+          }
+        });
+      }
+
+      Future<Map<String, dynamic>> getProduct(String id) {
+        if (id.isEmpty) return Future.value({});
+        return productCache.putIfAbsent(id, () async {
+          try {
+            final doc = await _db.collection('Products').doc(id).get();
+            return doc.data() ?? {};
+          } catch (e) {
+            debugPrint('OrderService: Error fetching product $id: $e');
+            return {};
+          }
+        });
+      }
+
+      Future<Map<String, dynamic>> getTailor(String id) {
+        if (id.isEmpty) return Future.value({'name': 'Tailor'});
+        return tailorCache.putIfAbsent(id, () async {
+          try {
+            final doc = await _db.collection('Tailor').doc(id).get();
+            return doc.data() ?? {'name': 'Tailor'};
+          } catch (e) {
+            debugPrint('OrderService: Error fetching tailor $id: $e');
+            return {'name': 'Tailor'};
+          }
+        });
+      }
+
+      try {
+        final List<Map<String, dynamic>> results = await Future.wait(snap.docs.map((doc) async {
+          try {
+            final order = _orderFromSnap(doc);
+            final orderId = doc.id;
+
+            // 1. Concurrent fetching of Sub-orders, Tailor-jobs, and Reviews.
+            final futures = await Future.wait([
+              _db.collection(_subOrdersCollection).where('orderId', isEqualTo: orderId).get(),
+              _db.collection(_tailorJobsCollection).where('orderId', isEqualTo: orderId).get(),
+              _db.collection(_reviewsCollection).where('orderId', isEqualTo: orderId).get(),
+            ]);
+
+            final subSnap = futures[0] as QuerySnapshot<Map<String, dynamic>>;
+            final tailorSnap = futures[1] as QuerySnapshot<Map<String, dynamic>>;
+            final reviewSnap = futures[2] as QuerySnapshot<Map<String, dynamic>>;
+
+            // 2. Process Sub-orders and items in parallel.
+            final subOrdersWithDetails = await Future.wait(subSnap.docs.map((sDoc) async {
+              try {
+                var so = _subOrderFromSnap(sDoc);
+                final retailerId = so.retailerId;
+
+                // Resolve Supplier metadata (using cache).
+                final retailerData = await getRetailer(retailerId);
+
+                // Fetch items for this sub-order.
+                final iSnap = await _db
+                    .collection(_orderItemsCollection)
+                    .where('subOrderId', isEqualTo: sDoc.id)
+                    .get();
+                
+                // Pre-fetch Product specifications for all items in parallel.
+                final itemsWithProducts = await Future.wait(iSnap.docs.map((iDoc) async {
+                  try {
+                    final item = OrderItem.fromJson({...iDoc.data(), 'id': iDoc.id});
+                    final productData = await getProduct(item.productId);
+                    
+                    return {
+                      'item': item,
+                      'product': productData,
+                    };
+                  } catch (e) {
+                    debugPrint('OrderService: Error processing item ${iDoc.id}: $e');
+                    return null;
+                  }
+                }));
+
+                return {
+                  'subOrder': so,
+                  'retailer': retailerData,
+                  'items': itemsWithProducts.whereType<Map<String, dynamic>>().toList(),
+                };
+              } catch (e) {
+                debugPrint('OrderService: Error processing suborder ${sDoc.id}: $e');
+                return null;
+              }
+            }));
+
+            // 3. Process Artisans (Tailor) assignments in parallel.
+            final tailorJobsWithDetails = await Future.wait(tailorSnap.docs.map((tDoc) async {
+              try {
+                var tj = TailorJob.fromJson({...tDoc.data(), 'id': tDoc.id});
+                final tailorId = tj.tailorId;
+
+                // Resolve Artisan name (using cache).
+                final tailorData = await getTailor(tailorId);
+
+                // Access body measurements linked to the service request.
+                Measurement? meas;
+                if (tj.measurementId.isNotEmpty) {
+                  final mDoc = await _db.collection('Measurement').doc(tj.measurementId).get();
+                  if (mDoc.exists) {
+                    meas = Measurement.fromJson({...mDoc.data()!, 'id': mDoc.id});
+                  }
+                }
+
+                return {
+                  'job': tj,
+                  'tailor': tailorData,
+                  'measurement': meas,
+                };
+              } catch (e) {
+                debugPrint('OrderService: Error processing tailorjob ${tDoc.id}: $e');
+                return null;
+              }
+            }));
+
+            final reviews = reviewSnap.docs.map((rDoc) {
+              try {
+                return Review.fromJson({...rDoc.data(), 'id': rDoc.id});
+              } catch (e) {
+                debugPrint('OrderService: Error parsing review ${rDoc.id}: $e');
+                return null;
+              }
+            }).whereType<Review>().toList();
+
+            final validTailorJobs = tailorJobsWithDetails.whereType<Map<String, dynamic>>().toList();
+
+            // Convenience link for Artisan name.
+            if (validTailorJobs.isNotEmpty) {
+              final firstJob = validTailorJobs.first;
+              final tData = firstJob['tailor'] as Map<String, dynamic>?;
+              order.tailorName = tData?['name'];
+            }
+
+            return {
+              'order': order,
+              'subOrders': subOrdersWithDetails.whereType<Map<String, dynamic>>().toList(),
+              'tailorJobs': validTailorJobs,
+              'reviews': reviews,
+            };
+          } catch (e) {
+            debugPrint('OrderService: Critical error processing order ${doc.id}: $e');
+            return <String, dynamic>{};
+          }
+        }));
+
+        final validResults = results.where((r) => r.isNotEmpty).toList();
+        validResults.sort((a, b) {
+          try {
+            final orderA = a['order'] as Order;
+            final orderB = b['order'] as Order;
+            return orderB.orderDate.compareTo(orderA.orderDate);
+          } catch (e) {
+            return 0;
+          }
+        });
+        return validResults;
+      } catch (e) {
+        debugPrint('OrderService: Global error in streamDetailedCustomerOrders: $e');
+        return <Map<String, dynamic>>[];
+      }
+    });
   }
 
   // ─── fetchOrderDetails ─────────────────────────────────────────────────────
