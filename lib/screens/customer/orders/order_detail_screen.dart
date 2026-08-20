@@ -626,7 +626,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    "My Orders",
+                    "Order History",
                     style: TextStyle(
                       fontSize: screenWidth > 400 ? 30 : 24,
                       fontWeight: FontWeight.w900,
