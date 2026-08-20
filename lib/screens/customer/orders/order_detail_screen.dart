@@ -1,9 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:sketch2stitch/models/order.dart' as db;
+import 'package:sketch2stitch/models/sub_order.dart' as db;
+import 'package:sketch2stitch/models/tailor_job.dart' as db;
+import 'package:sketch2stitch/models/review.dart' as db;
+import 'package:sketch2stitch/models/order_item.dart' as db;
+import 'package:sketch2stitch/services/order_service.dart';
+import 'package:sketch2stitch/services/review_service.dart';
 import '../../../models/measurement.dart';
 import '../browsing/browse_shell.dart';
 import 'reviews_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../widgets/top_feedback_banner.dart';
+import 'package:sketch2stitch/services/user_session.dart';
 
 enum OrderDeliveryDestination { retailer, tailor }
 
@@ -60,7 +69,9 @@ class OrderItem {
 class CustomerOrder {
   final String id;
   final String retailerName;
+  final Map<String, String> retailerIds;
   final String? tailorName;
+  final String? tailorId;
   final List<OrderItem> items;
   final double amount;
   final DateTime orderDate;
@@ -78,7 +89,9 @@ class CustomerOrder {
   CustomerOrder({
     required this.id,
     required this.retailerName,
+    required this.retailerIds,
     this.tailorName,
+    this.tailorId,
     required this.items,
     required this.amount,
     required this.orderDate,
@@ -142,8 +155,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   DateTime? _customEndDate;
   bool _showOngoing = true;
   String _selectedStatus = "All";
+  Stream<List<Map<String, dynamic>>>? _orderStream;
 
   final Color primaryGreen = const Color(0xFF4F7942);
+
+  @override
+  void initState() {
+    super.initState();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      _orderStream = OrderService().streamDetailedCustomerOrders(uid);
+    }
+  }
 
   @override
   void dispose() {
@@ -151,420 +174,167 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     super.dispose();
   }
 
-  final Measurement _mockMeasurement = Measurement(
-    id: "meas_123",
-    customerId: "cust_456",
-    upperBustCircumference: 34.5,
-    roundShoulderCircumference: 40.0,
-    hipsCircumference: 38.0,
-    underBustCircumference: 32.0,
-    bustCircumference: 36.0,
-    waist: 28.5,
-    shoulderToKnee: 37.0,
-    shoulderToUnderBust: 13.0,
-    shoulderToBust: 10.5,
-    thigh: 22.0,
-    knee: 15.0,
-    ankle: 9.5,
-    waistToAnkle: 40.0,
-    shoulderToAnkle: 55.0,
-  );
+  /// Structural Data Adapter: Translates raw backend structures into UI models.
+  List<CustomerOrder> _mapFromBackend(List<Map<String, dynamic>> dbData) {
+    final List<CustomerOrder> results = [];
+    final String deliveryAddress = UserSession.instance.currentProfile.value?.address ?? "No address set";
 
-  void _showMeasurements() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const Text(
-              "My Measurements",
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              "Current body measurements used for this order.",
-              style: TextStyle(color: Colors.black54, fontSize: 13),
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: ListView(
-                children: [
-                  _measurementTile("Upper Bust", _mockMeasurement.upperBustCircumference),
-                  _measurementTile("Bust", _mockMeasurement.bustCircumference),
-                  _measurementTile("Under Bust", _mockMeasurement.underBustCircumference),
-                  _measurementTile("Round Shoulder", _mockMeasurement.roundShoulderCircumference),
-                  _measurementTile("Waist", _mockMeasurement.waist),
-                  _measurementTile("Hips", _mockMeasurement.hipsCircumference),
-                  _measurementTile("Shoulder to Bust", _mockMeasurement.shoulderToBust),
-                  _measurementTile("Shoulder to Under Bust", _mockMeasurement.shoulderToUnderBust),
-                  _measurementTile("Shoulder to Knee", _mockMeasurement.shoulderToKnee),
-                  _measurementTile("Shoulder to Ankle", _mockMeasurement.shoulderToAnkle),
-                  _measurementTile("Waist to Ankle", _mockMeasurement.waistToAnkle),
-                  _measurementTile("Thigh", _mockMeasurement.thigh),
-                  _measurementTile("Knee", _mockMeasurement.knee),
-                  _measurementTile("Ankle", _mockMeasurement.ankle),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryGreen,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text("Close", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    for (var data in dbData) {
+      final db.Order order = data['order'];
+      final List<Map<String, dynamic>> subOrdersData = data['subOrders'] ?? [];
+      final List<Map<String, dynamic>> tailorJobsData = data['tailorJobs'] ?? [];
+
+      final List<OrderItem> items = [];
+      final Map<String, double> charges = {};
+      String? tailorCancellationReason;
+      
+      double retailerAmount = 0;
+      final Set<String> retailerNames = {};
+
+      final List<db.Review> reviews = (data['reviews'] as List?)?.cast<db.Review>() ?? [];
+      
+      final Map<String, String> currentRetailerIds = {};
+      String? tailorIdStr;
+
+      for (var soData in subOrdersData) {
+        final db.SubOrder so = soData['subOrder'];
+        final Map<String, dynamic> retailer = soData['retailer'] ?? {};
+        final List<Map<String, dynamic>> itemsData = soData['items'] ?? [];
+
+        retailerAmount += so.itemsSubtotal;
+        final String currentRetailerName = retailer['shopName'] ?? "Supplier"; 
+        retailerNames.add(currentRetailerName);
+        currentRetailerIds[currentRetailerName] = so.retailerId;
+        charges[currentRetailerName] = so.deliveryCharge;
+        
+        for (var iData in itemsData) {
+          final db.OrderItem i = iData['item'];
+          final Map<String, dynamic> p = iData['product'] ?? {};
+
+          final List<dynamic> colorOptions = p['colorOptions'] ?? [];
+          final option = colorOptions.firstWhere((o) => o['optionId'] == i.optionId, orElse: () => null);
+          
+          String imagePath = "assets/images/fabrics_rolled.jpg";
+          if (option != null && option['image'] != null && (option['image'] as List).isNotEmpty) {
+            imagePath = option['image'][0].toString();
+          }
+
+          final care = p['careSymbol'] as List? ?? [];
+
+          items.add(OrderItem(
+            name: p['productName'] ?? "Product", 
+            quantity: i.quantity,
+            price: (option?['price'] ?? 0).toDouble(), 
+            imagePath: imagePath,
+            color: option?['color'] ?? "Option ${i.optionId}",
+            description: p['description'] ?? "Detailed specification.",
+            canWash: care.contains('wash'),
+            canBleach: care.contains('bleach'),
+            canDryClean: care.contains('dry_clean'),
+            canTumbleDry: care.contains('tumble_dry'),
+            retailerName: currentRetailerName,
+            destination: so.deliveryDestination == db.SubOrderDeliveryDestination.tailor 
+                ? OrderDeliveryDestination.tailor 
+                : OrderDeliveryDestination.retailer,
+          ));
+        }
+      }
+
+      for (var tjData in tailorJobsData) {
+        final db.TailorJob tj = tjData['job'];
+        final Map<String, dynamic> tailor = tjData['tailor'] ?? {};
+        
+        final String artisanName = tailor['name'] ?? "Artisan";
+        tailorIdStr = tj.tailorId;
+        charges[artisanName] = tj.deliveryCharge ?? 0;
+        
+        if (tj.status == db.TailorJobStatus.cancelled || tj.status == db.TailorJobStatus.tailorDeclined) {
+          tailorCancellationReason = tj.rejectionReason ?? "Unavailable";
+        }
+
+        for (int i = 0; i < items.length; i++) {
+          if (items[i].destination == OrderDeliveryDestination.tailor) {
+            items[i] = OrderItem(
+              name: items[i].name,
+              quantity: items[i].quantity,
+              price: items[i].price,
+              imagePath: items[i].imagePath,
+              color: items[i].color,
+              description: items[i].description,
+              canWash: items[i].canWash,
+              canBleach: items[i].canBleach,
+              canDryClean: items[i].canDryClean,
+              canTumbleDry: items[i].canTumbleDry,
+              ironLevel: items[i].ironLevel,
+              retailerName: items[i].retailerName,
+              destination: items[i].destination,
+              tailorPrice: tj.quoteAmount,
+              tailorInstructions: tj.specialInstructions,
+              tailorStatus: _mapTailorStatus(tj.status),
+              tailorDeliveryDate: tj.estimatedDeliveryDate,
+              measurementRefImages: tj.designIds, 
+            );
+          }
+        }
+      }
+
+      final Map<String, String> retailerReviewsMap = {};
+      final Map<String, double> retailerRatingsMap = {};
+      String? tailorReviewStr;
+      double? tailorRatingVal;
+
+      for (var r in reviews) {
+        if (r.targetRole == db.ReviewTargetRole.tailor) {
+          tailorReviewStr = r.comment;
+          tailorRatingVal = r.rating;
+        } else if (r.targetRole == db.ReviewTargetRole.retailer) {
+          // Find which retailer this review belongs to based on targetId
+          final rName = currentRetailerIds.entries
+              .where((e) => e.value == r.targetId)
+              .map((e) => e.key)
+              .firstOrNull;
+          if (rName != null) {
+            retailerReviewsMap[rName] = r.comment;
+            retailerRatingsMap[rName] = r.rating;
+          }
+        }
+      }
+
+      results.add(CustomerOrder(
+        id: order.id,
+        retailerName: retailerNames.join(", "),
+        retailerIds: currentRetailerIds,
+        tailorName: order.tailorName,
+        tailorId: tailorIdStr,
+        items: items,
+        amount: retailerAmount,
+        orderDate: order.orderDate,
+        status: order.statusText,
+        isDelivered: order.status == db.OrderStatus.completed,
+        deliveryAddress: deliveryAddress,
+        deliveryCharges: charges,
+        tailorCancellationReason: tailorCancellationReason,
+        retailerReviews: retailerReviewsMap.isNotEmpty ? retailerReviewsMap : null,
+        retailerRatings: retailerRatingsMap.isNotEmpty ? retailerRatingsMap : null,
+        tailorReview: tailorReviewStr,
+        tailorRating: tailorRatingVal,
+      ));
+    }
+    return results;
   }
 
-  Widget _measurementTile(String label, double value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.green.shade100),
-            ),
-            child: Text(
-              "$value in",
-              style: TextStyle(color: primaryGreen, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _getTailorStatusText(TailorStatus status) {
+  TailorStatus _mapTailorStatus(db.TailorJobStatus status) {
     switch (status) {
-      case TailorStatus.notAssigned:
-      case TailorStatus.pending:
-      case TailorStatus.cancelled:
-        return "Sent to Tailor";
-      case TailorStatus.confirmed:
-        return "Confirmed";
+      case db.TailorJobStatus.pending: return TailorStatus.pending;
+      case db.TailorJobStatus.cancelled:
+      case db.TailorJobStatus.tailorDeclined:
+      case db.TailorJobStatus.rejected: return TailorStatus.cancelled;
+      case db.TailorJobStatus.confirmed:
+      case db.TailorJobStatus.inProgress:
+      case db.TailorJobStatus.jobCompleted: return TailorStatus.confirmed;
+      default: return TailorStatus.notAssigned;
     }
   }
-
-  Color _getTailorStatusColor(TailorStatus status) {
-    switch (status) {
-      case TailorStatus.notAssigned:
-        return Colors.grey.shade600;
-      case TailorStatus.pending:
-        return Colors.orange.shade800;
-      case TailorStatus.cancelled:
-        return Colors.red.shade800;
-      case TailorStatus.confirmed:
-        return primaryGreen;
-    }
-  }
-
-  Color _getOrderStatusColor(String status, bool isDelivered) {
-    if (isDelivered) return primaryGreen;
-    switch (status) {
-      case "Cancelled by tailor":
-        return Colors.red.shade800;
-      case "Not yet confirmed by tailor":
-        return Colors.orange.shade800;
-      case "Tailor not assigned":
-        return Colors.grey.shade600;
-      case "Need Confirmation":
-        return Colors.blue.shade800;
-      default:
-        return Colors.blueAccent;
-    }
-  }
-
-  Widget _tailorStatusBadge(TailorStatus status) {
-    final color = _getTailorStatusColor(status);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.2)),
-      ),
-      child: Text(
-        _getTailorStatusText(status),
-        style: TextStyle(
-          color: color,
-          fontSize: 9,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-
-  late final List<CustomerOrder> _orders = <CustomerOrder>[
-    CustomerOrder(
-      id: "ORD-9112",
-      retailerName: "Silk & Cotton",
-      tailorName: "Master Stitch",
-      amount: 3200,
-      orderDate: DateTime.now().subtract(const Duration(days: 1)),
-      status: "Need Confirmation",
-      isDelivered: false,
-      deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
-      deliveryCharges: {"Silk & Cotton": 50.0},
-      retailerReviews: {},
-      retailerRatings: {},
-      items: [
-        OrderItem(
-          name: "Silk Saree",
-          quantity: 1,
-          price: 3200,
-          tailorPrice: 2500,
-          imagePath: "assets/images/silk.jpg",
-          color: "Royal Blue",
-          destination: OrderDeliveryDestination.tailor,
-          tailorStatus: TailorStatus.confirmed,
-          tailorDeliveryDate: DateTime.now().add(const Duration(days: 10)),
-          measurementRefImages: ["assets/images/ref1.jpg"],
-          tailorInstructions: "High neck blouse design with full sleeves.",
-        ),
-      ],
-    ),
-    CustomerOrder(
-      id: "ORD-9654",
-      retailerName: "Zaroon Fabrics",
-      amount: 4500,
-      orderDate: DateTime.now().subtract(const Duration(days: 2)),
-      status: "Cancelled by tailor",
-      isDelivered: false,
-      deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
-      deliveryCharges: {"Zaroon Fabrics": 50.0},
-      retailerReviews: {},
-      retailerRatings: {},
-      tailorCancellationReason: "Overloaded with orders currently.",
-      items: [
-        const OrderItem(
-          name: "Embroidered Lawn",
-          quantity: 2,
-          price: 4500,
-          tailorPrice: 1200,
-          imagePath: "assets/images/fabrics_rolled.jpg",
-          color: "Emerald Green",
-          destination: OrderDeliveryDestination.tailor,
-          tailorStatus: TailorStatus.cancelled,
-          measurementRefImages: ["assets/images/ref4.jpg", "assets/images/ref1.jpg"],
-          tailorInstructions: "The gher of the kameez should be just like the reference picture give.",
-        ),
-      ],
-    ),
-    CustomerOrder(
-      id: "ORD-9543",
-      retailerName: "Silk & Cotton",
-      amount: 3200,
-      orderDate: DateTime.now().subtract(const Duration(days: 1)),
-      status: "Processing",
-      isDelivered: false,
-      deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
-      deliveryCharges: {"Silk & Cotton": 50.0},
-      retailerReviews: {},
-      retailerRatings: {},
-      items: [
-        const OrderItem(
-          name: "Denim Shirt",
-          quantity: 2,
-          price: 3200,
-          imagePath: "assets/images/denim.jpg",
-          color: "Navy Blue",
-          destination: OrderDeliveryDestination.retailer,
-          tailorStatus: TailorStatus.confirmed,
-        ),
-      ],
-    ),
-    CustomerOrder(
-      id: "ORD-9921",
-      retailerName: "Zaroon Fabrics",
-      tailorName: "Fine Cut Tailors",
-      amount: 4500,
-      orderDate: DateTime.now().subtract(const Duration(days: 5)),
-      status: "Not yet confirmed by tailor",
-      isDelivered: false,
-      deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
-      deliveryCharges: {"Zaroon Fabrics": 45.0, "Thread & Co.": 45.0},
-      retailerReviews: {},
-      retailerRatings: {},
-      items: [
-        const OrderItem(
-          name: "Premium Linen",
-          quantity: 3,
-          price: 3000,
-          tailorPrice: 1500,
-          retailerName: "Zaroon Fabrics",
-          imagePath: "assets/images/fabrics_rolled.jpg",
-          color: "Cream",
-          description: "High-quality linen fabric for summer wear.",
-          destination: OrderDeliveryDestination.tailor,
-          tailorStatus: TailorStatus.pending,
-          measurementRefImages: ["assets/images/ref1.jpg", "assets/images/ref2.jpg", "assets/images/ref3.jpg"],
-          tailorInstructions: "Please use this linen for the pants. Ensure the length is precisely 42 inches as per my saved measurements and just like the reference picture.",
-        ),
-        const OrderItem(
-          name: "Cotton Thread Set",
-          quantity: 1,
-          price: 1500,
-          retailerName: "Thread & Co.",
-          imagePath: "assets/images/denim.jpg",
-          color: "Mixed",
-        ),
-      ],
-    ),
-    CustomerOrder(
-      id: "ORD-9854",
-      retailerName: "Heritage Silk",
-      amount: 8200,
-      orderDate: DateTime.now().subtract(const Duration(days: 20)),
-      status: "Tailor not assigned",
-      isDelivered: false,
-      deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
-      deliveryCharges: {"Heritage Silk": 50.0},
-      retailerReviews: {},
-      retailerRatings: {},
-      items: [
-        const OrderItem(
-          name: "Pure Rajshahi Silk",
-          quantity: 1,
-          price: 8200,
-          tailorPrice: 2000,
-          imagePath: "assets/images/silk.jpg",
-          color: "Deep Red",
-          description: "Traditional Rajshahi silk with gold border.",
-          destination: OrderDeliveryDestination.tailor,
-          tailorStatus: TailorStatus.notAssigned,
-          measurementRefImages: ["assets/images/ref3.jpg"],
-          tailorInstructions: "Use this silk for a traditional Saree blouse. Reference the attached image for the back design.",
-        ),
-      ],
-    ),
-    CustomerOrder(
-      id: "ORD-9712",
-      retailerName: "FabriCo",
-      tailorName: "Master Stitch",
-      amount: 3200,
-      orderDate: DateTime.now().subtract(const Duration(days: 45)),
-      deliveryDate: DateTime.now().subtract(const Duration(days: 38)),
-      status: "Delivered",
-      isDelivered: true,
-      deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
-      deliveryCharges: {"FabriCo": 50.0, "Master Stitch": 35.0},
-      retailerReviews: {"FabriCo": "Excellent quality and fast delivery. Very satisfied!"},
-      retailerRatings: {"FabriCo": 5.0},
-      tailorReview: "The stitching is perfect and fits me exactly as I wanted. Highly recommended!",
-      tailorRating: 4.8,
-      items: [
-        const OrderItem(
-          name: "Printed Voile",
-          quantity: 4,
-          price: 3200,
-          tailorPrice: 1800,
-          imagePath: "assets/images/gorgeous.jpg",
-          color: "Floral Blue",
-          destination: OrderDeliveryDestination.tailor,
-          tailorStatus: TailorStatus.confirmed,
-          measurementRefImages: ["assets/images/ref2.jpg"],
-          tailorInstructions: "Create a summer kurti. Use the printed patterns for the sleeves as shown in the reference picture.",
-        ),
-      ],
-    ),
-    CustomerOrder(
-      id: "ORD-9421",
-      retailerName: "Bismillah Fabrics",
-      amount: 2600,
-      orderDate: DateTime.now().subtract(const Duration(days: 60)),
-      deliveryDate: DateTime.now().subtract(const Duration(days: 52)),
-      status: "Delivered",
-      isDelivered: true,
-      deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
-      deliveryCharges: {"Bismillah Fabrics": 50.0, "Shelai": 30.0},
-      retailerReviews: {},
-      retailerRatings: {},
-      items: [
-        const OrderItem(
-          name: "Soft Georgette",
-          quantity: 2,
-          price: 2500,
-          retailerName: "Bismillah Fabrics",
-          imagePath: "assets/images/fabrics_rolled.jpg",
-          color: "Peach",
-          destination: OrderDeliveryDestination.retailer,
-        ),
-        const OrderItem(
-          name: "Lace",
-          quantity: 1,
-          price: 100,
-          retailerName: "Shelai",
-          imagePath: "assets/images/lace.jpg",
-          color: "Cream",
-          destination: OrderDeliveryDestination.retailer,
-          showCareInstructions: false,
-        ),
-      ],
-    ),
-    CustomerOrder(
-      id: "ORD-9310",
-      retailerName: "Style Hub",
-      tailorName: "Fine Cut Tailors",
-      amount: 6500,
-      orderDate: DateTime.now().subtract(const Duration(days: 90)),
-      deliveryDate: DateTime.now().subtract(const Duration(days: 82)),
-      status: "Delivered",
-      isDelivered: true,
-      deliveryAddress: "House 12, Road 5, Dhanmondi, Dhaka",
-      deliveryCharges: {"Style Hub": 50.0, "Fine Cut Tailors": 35.0},
-      retailerReviews: {},
-      retailerRatings: {},
-      items: [
-        const OrderItem(
-          name: "Banarasi Silk",
-          quantity: 1,
-          price: 6500,
-          tailorPrice: 3500,
-          imagePath: "assets/images/silk.jpg",
-          color: "Magenta",
-          destination: OrderDeliveryDestination.tailor,
-          tailorStatus: TailorStatus.confirmed,
-          measurementRefImages: ["assets/images/ref1.jpg"],
-          tailorInstructions: "Please make a classic lehenga blouse with a high neck.",
-        ),
-      ],
-    ),
-  ];
 
   DateTime get _startDate {
     final today = DateTime.now();
@@ -586,9 +356,153 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return DateTime(today.year, today.month, today.day, 23, 59, 59);
   }
 
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final horizontalPadding = screenWidth > 600 ? screenWidth * 0.08 : 16.0;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
 
-  List<CustomerOrder> get _filteredOrders {
-    return _orders.where((order) {
+    if (uid == null || _orderStream == null) {
+      return const Scaffold(body: Center(child: Text("Please sign in to view history.")));
+    }
+
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _orderStream,
+      builder: (context, snapshot) {
+        debugPrint("OrderDetailScreen: StreamBuilder update. State: ${snapshot.connectionState}");
+        if (snapshot.hasError) {
+          debugPrint("OrderDetailScreen: Stream error: ${snapshot.error}");
+          return _buildErrorState();
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        
+        final dbData = snapshot.data ?? [];
+        if (dbData.isEmpty) {
+          // Continue to build normal layout with empty list instead of full-screen empty state
+          // so the user can see the Ongoing/Past toggles.
+        }
+
+        final orders = _mapFromBackend(dbData);
+        final filteredOrders = _applyFiltersToOrders(orders);
+        final ongoingOrders = filteredOrders.where((o) => !o.isDelivered).toList();
+        final deliveredOrders = filteredOrders.where((o) => o.isDelivered).toList();
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF9FBF9),
+          body: SafeArea(
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(horizontalPadding, 18, horizontalPadding, 24),
+              children: [
+                _buildHeader(screenWidth, orders: orders),
+                const SizedBox(height: 16),
+                _buildSearchAndFilter(),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _sectionToggle(
+                        label: "Ongoing",
+                        isSelected: _showOngoing,
+                        count: ongoingOrders.length,
+                        onTap: () => setState(() {
+                          _showOngoing = true;
+                          _selectedStatus = "All";
+                        }),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _sectionToggle(
+                        label: "Past Orders",
+                        isSelected: !_showOngoing,
+                        count: deliveredOrders.length,
+                        onTap: () => setState(() {
+                          _showOngoing = false;
+                          _selectedStatus = "All";
+                        }),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                if (_showOngoing)
+                  _ordersSection(
+                    title: "Ongoing Orders",
+                    icon: Icons.local_shipping_outlined,
+                    orders: ongoingOrders,
+                    allOrders: orders,
+                    emptyText: "You have no active orders",
+                  )
+                else
+                  _ordersSection(
+                    title: "Delivered Orders",
+                    icon: Icons.check_circle_outline,
+                    orders: deliveredOrders,
+                    allOrders: orders,
+                    emptyText: "No past orders found",
+                  ),
+              ],
+            ),
+          ),
+        );
+      }
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.sync_problem, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            const Text("Synchronization delay.", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text("Optimizing data flow. Please stand by.", style: TextStyle(color: Colors.grey)),
+            const SizedBox(height: 24),
+            ElevatedButton(onPressed: () => setState(() {}), child: const Text("Retry")),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(double screenWidth, {List<CustomerOrder>? orders}) {
+    return Row(
+      children: [
+        IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            "Order History",
+            style: TextStyle(
+              fontSize: screenWidth > 400 ? 30 : 24,
+              fontWeight: FontWeight.w900,
+              color: Colors.black87,
+            ),
+          ),
+        ),
+        if (orders != null)
+          IconButton(
+            onPressed: () => _showFilterSheet(orders),
+            icon: Icon(Icons.filter_list, color: primaryGreen),
+            tooltip: "Filter orders",
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+      ],
+    );
+  }
+
+  List<CustomerOrder> _applyFiltersToOrders(List<CustomerOrder> orders) {
+    return orders.where((order) {
       final date = order.orderDate;
       final matchesDate = !date.isBefore(_startDate) && !date.isAfter(_endDate);
       final matchesStatus = _selectedStatus == "All" || order.status == _selectedStatus;
@@ -601,97 +515,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       final matchesProduct = order.items.any((i) => i.name.toLowerCase().contains(query));
       return matchesId || matchesRetailer || matchesProduct;
     }).toList();
-  }
-
-  List<CustomerOrder> get _ongoingOrders => _filteredOrders.where((o) => !o.isDelivered).toList();
-  List<CustomerOrder> get _deliveredOrders => _filteredOrders.where((o) => o.isDelivered).toList();
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final horizontalPadding = screenWidth > 600 ? screenWidth * 0.08 : 16.0;
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF9FBF9),
-      body: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(horizontalPadding, 18, horizontalPadding, 24),
-          children: [
-            Row(
-              children: [
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back, color: Colors.black87),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    "Order History",
-                    style: TextStyle(
-                      fontSize: screenWidth > 400 ? 30 : 24,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: _showFilterSheet,
-                  icon: Icon(Icons.filter_list, color: primaryGreen),
-                  tooltip: "Filter orders",
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildSearchAndFilter(),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: _sectionToggle(
-                    label: "Ongoing",
-                    isSelected: _showOngoing,
-                    count: _ongoingOrders.length,
-                    onTap: () => setState(() {
-                      _showOngoing = true;
-                      _selectedStatus = "All";
-                    }),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _sectionToggle(
-                    label: "Past Orders",
-                    isSelected: !_showOngoing,
-                    count: _deliveredOrders.length,
-                    onTap: () => setState(() {
-                      _showOngoing = false;
-                      _selectedStatus = "All";
-                    }),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            if (_showOngoing)
-              _ordersSection(
-                title: "Ongoing Orders",
-                icon: Icons.local_shipping_outlined,
-                orders: _ongoingOrders,
-                emptyText: "You have no active orders",
-              )
-            else
-              _ordersSection(
-                title: "Delivered Orders",
-                icon: Icons.check_circle_outline,
-                orders: _deliveredOrders,
-                emptyText: "No past orders found",
-              ),
-          ],
-        ),
-      ),
-    );
   }
 
   Widget _buildSearchAndFilter() {
@@ -716,7 +539,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  void _showFilterSheet() {
+  void _showFilterSheet(List<CustomerOrder> allOrders) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -808,10 +631,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     runSpacing: 8,
                     children: [
                       "All",
-                      "Tailor not assigned",
-                      "Not yet confirmed by tailor",
-                      "Cancelled by tailor",
-                      "Need Confirmation",
+                      "Sent to Artisan",
+                      "Confirmed",
                       "Processing",
                     ].map((status) {
                       return _filterChip(status, _selectedStatus == status, () {
@@ -886,19 +707,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           color: isSelected ? primaryGreen : Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: isSelected ? primaryGreen : Colors.green.shade100, width: isSelected ? 1.5 : 1),
-          boxShadow: isSelected ? [BoxShadow(color: primaryGreen.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 6))] : [],
+          boxShadow: isSelected ? [BoxShadow(color: primaryGreen.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 6))] : [],
         ),
         child: Column(
           children: [
             Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.green.shade900, fontSize: 16, fontWeight: FontWeight.w900)),
-            Text("$count orders", style: TextStyle(color: isSelected ? Colors.white.withOpacity(0.8) : Colors.green.shade700, fontSize: 12, fontWeight: FontWeight.w700)),
+            Text("$count orders", style: TextStyle(color: isSelected ? Colors.white.withValues(alpha: 0.8) : Colors.green.shade700, fontSize: 12, fontWeight: FontWeight.w700)),
           ],
         ),
       ),
     );
   }
 
-  Widget _ordersSection({required String title, required IconData icon, required List<CustomerOrder> orders, required String emptyText}) {
+  Widget _ordersSection({required String title, required IconData icon, required List<CustomerOrder> orders, required List<CustomerOrder> allOrders, required String emptyText}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -938,7 +759,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         if (orders.isEmpty)
           _emptyOrdersCard(emptyText)
         else
-          ...orders.map((o) => Padding(padding: const EdgeInsets.only(bottom: 12), child: _orderCard(o))),
+          ...orders.map((o) => Padding(padding: const EdgeInsets.only(bottom: 12), child: _orderCard(o, allOrders))),
       ],
     );
   }
@@ -952,17 +773,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  Widget _orderCard(CustomerOrder order) {
+  Widget _orderCard(CustomerOrder order, List<CustomerOrder> allOrders) {
     final statusColor = _getOrderStatusColor(order.status, order.isDelivered);
 
     return GestureDetector(
-      onTap: () => _showOrderDetail(order),
+      onTap: () => _showOrderDetail(order, allOrders),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5))],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -980,13 +801,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                  decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(999)),
+                  decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(999)),
                   child: Text(order.status, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w900)),
                 ),
               ],
             ),
             const SizedBox(height: 14),
-            // Products Section
             ...order.items.map((item) => Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Row(
@@ -1077,18 +897,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  Widget _orderInfo(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: Colors.black45),
-        const SizedBox(width: 4),
-        Text(text, style: const TextStyle(color: Colors.black54, fontSize: 11, fontWeight: FontWeight.w700)),
-      ],
-    );
-  }
-
-  void _showOrderDetail(CustomerOrder order) {
-    final currentOrderRef = _orders.firstWhere((o) => o.id == order.id);
+  void _showOrderDetail(CustomerOrder order, List<CustomerOrder> allOrders) {
+    final currentOrderRef = allOrders.firstWhere((o) => o.id == order.id);
     final uniqueRetailers = currentOrderRef._uniqueRetailerNames;
 
     Map<String, double> tempRetailerRatings = {for (var r in uniqueRetailers) r: 0.0};
@@ -1104,7 +914,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       builder: (modalContext) => StatefulBuilder(
         builder: (stfContext, setModalState) {
           final bottomInset = MediaQuery.of(stfContext).viewInsets.bottom;
-          final currentOrder = _orders.firstWhere((o) => o.id == order.id);
+          final currentOrder = allOrders.firstWhere((o) => o.id == order.id);
 
           return DraggableScrollableSheet(
             initialChildSize: 0.9,
@@ -1142,7 +952,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ),
                       _infoBadge(
                         currentOrder.status,
-                        _getOrderStatusColor(currentOrder.status, currentOrder.isDelivered).withOpacity(0.1),
+                        _getOrderStatusColor(currentOrder.status, currentOrder.isDelivered).withValues(alpha: 0.1),
                         _getOrderStatusColor(currentOrder.status, currentOrder.isDelivered),
                       ),
                     ],
@@ -1166,7 +976,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              "Cancellation Reason: ${currentOrder.tailorCancellationReason}",
+                              "Cancellation: ${currentOrder.tailorCancellationReason}",
                               style: TextStyle(color: Colors.red.shade900, fontSize: 13, height: 1.4, fontWeight: FontWeight.w600),
                             ),
                           ),
@@ -1192,7 +1002,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   const Divider(),
                   const SizedBox(height: 12),
                   ...currentOrder.deliveryCharges.entries.where((entry) {
-                    // Only show tailor delivery if it's delivered
                     if (entry.key == currentOrder.tailorName && !currentOrder.isDelivered) return false;
                     return true;
                   }).map((entry) => _detailRow("Delivery (${entry.key})", "Tk ${entry.value.toInt()}")),
@@ -1274,41 +1083,27 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           currentRating: tempRetailerRatings[retailer] ?? 0,
                           controller: retailerControllers[retailer]!,
                           onRatingChanged: (r) => setModalState(() => tempRetailerRatings[retailer] = r),
-                          onSubmit: () {
+                          onSubmit: () async {
+                            final uid = FirebaseAuth.instance.currentUser?.uid;
                             if (tempRetailerRatings[retailer] == 0) {
                               AppFeedback.show(context, "Please select a rating for $retailer", isError: true);
                               return;
                             }
-                            setState(() {
-                              final idx = _orders.indexWhere((o) => o.id == currentOrder.id);
-                              if (idx != -1) {
-                                final updatedReviews = Map<String, String>.from(_orders[idx].retailerReviews ?? {});
-                                final updatedRatings = Map<String, double>.from(_orders[idx].retailerRatings ?? {});
-                                updatedReviews[retailer] = retailerControllers[retailer]!.text;
-                                updatedRatings[retailer] = tempRetailerRatings[retailer]!;
-
-                                _orders[idx] = CustomerOrder(
-                                  id: currentOrder.id,
-                                  retailerName: currentOrder.retailerName,
-                                  tailorName: currentOrder.tailorName,
-                                  items: currentOrder.items,
-                                  amount: currentOrder.amount,
-                                  orderDate: currentOrder.orderDate,
-                                  status: currentOrder.status,
-                                  isDelivered: currentOrder.isDelivered,
-                                  deliveryAddress: currentOrder.deliveryAddress,
-                                  deliveryCharges: currentOrder.deliveryCharges,
-                                  deliveryDate: currentOrder.deliveryDate,
-                                  retailerReviews: updatedReviews,
-                                  retailerRatings: updatedRatings,
-                                  tailorReview: currentOrder.tailorReview,
-                                  tailorRating: currentOrder.tailorRating,
-                                  tailorCancellationReason: currentOrder.tailorCancellationReason,
-                                );
-                              }
-                            });
-                            Navigator.pop(modalContext);
-                            AppFeedback.show(context, "Review for $retailer submitted!");
+                            
+                            try {
+                              await ReviewService().submitReview(
+                                orderId: currentOrder.id,
+                                customerId: uid!,
+                                recipientId: currentOrder.retailerIds[retailer] ?? "supplier_id", 
+                                rating: tempRetailerRatings[retailer]!,
+                                comment: retailerControllers[retailer]!.text,
+                                type: db.ReviewTargetRole.retailer,
+                              );
+                              Navigator.pop(modalContext);
+                              AppFeedback.show(context, "Review for $retailer submitted!");
+                            } catch (e) {
+                              AppFeedback.show(context, "Synchronization delay. Please try again.", isError: true);
+                            }
                           },
                         ),
                       )),
@@ -1320,36 +1115,27 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           currentRating: tempTailorRating,
                           controller: tailorController,
                           onRatingChanged: (r) => setModalState(() => tempTailorRating = r),
-                          onSubmit: () {
+                          onSubmit: () async {
+                            final uid = FirebaseAuth.instance.currentUser?.uid;
                             if (tempTailorRating == 0) {
                               AppFeedback.show(context, "Please select a rating", isError: true);
                               return;
                             }
-                            setState(() {
-                              final idx = _orders.indexWhere((o) => o.id == currentOrder.id);
-                              if (idx != -1) {
-                                _orders[idx] = CustomerOrder(
-                                  id: currentOrder.id,
-                                  retailerName: currentOrder.retailerName,
-                                  tailorName: currentOrder.tailorName,
-                                  items: currentOrder.items,
-                                  amount: currentOrder.amount,
-                                  orderDate: currentOrder.orderDate,
-                                  status: currentOrder.status,
-                                  isDelivered: currentOrder.isDelivered,
-                                  deliveryAddress: currentOrder.deliveryAddress,
-                                  deliveryCharges: currentOrder.deliveryCharges,
-                                  deliveryDate: currentOrder.deliveryDate,
-                                  retailerReviews: currentOrder.retailerReviews,
-                                  retailerRatings: currentOrder.retailerRatings,
-                                  tailorReview: tailorController.text,
-                                  tailorRating: tempTailorRating,
-                                  tailorCancellationReason: currentOrder.tailorCancellationReason,
-                                );
-                              }
-                            });
-                            Navigator.pop(modalContext);
-                            AppFeedback.show(context, "Tailor review submitted!");
+
+                            try {
+                              await ReviewService().submitReview(
+                                orderId: currentOrder.id,
+                                customerId: uid!,
+                                recipientId: currentOrder.tailorId ?? "artisan_id", 
+                                rating: tempTailorRating,
+                                comment: tailorController.text,
+                                type: db.ReviewTargetRole.tailor,
+                              );
+                              Navigator.pop(modalContext);
+                              AppFeedback.show(context, "Tailor review submitted!");
+                            } catch (e) {
+                              AppFeedback.show(context, "Synchronization delay. Please try again.", isError: true);
+                            }
                           },
                         ),
                     ],
@@ -1423,7 +1209,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.orange.shade50.withOpacity(0.3),
+        color: Colors.orange.shade50.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.orange.shade100),
       ),
@@ -1547,7 +1333,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             WidgetSpan(
                               child: GestureDetector(
                                 onTap: () {
-                                  Navigator.pop(context); // Close modal
+                                  Navigator.pop(context); 
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(builder: (_) => const BrowseShell(initialIndex: 2)),
@@ -1624,7 +1410,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
               const SizedBox(height: 8),
               TextButton.icon(
-                onPressed: _showMeasurements,
+                onPressed: () => _showMeasurements(null), 
                 icon: const Icon(Icons.straighten, size: 14),
                 label: const Text("View My Measurements", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                 style: TextButton.styleFrom(
@@ -1667,7 +1453,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               child: IconButton(
                 icon: const Icon(Icons.download, color: Colors.white, size: 30),
                 onPressed: () {
-                  AppFeedback.show(context, "Reference image download started...");
+                  AppFeedback.show(context, "Asset synchronization started...");
                 },
               ),
             ),
@@ -1708,25 +1494,98 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
+  Color _getOrderStatusColor(String status, bool isDelivered) {
+    if (isDelivered) return primaryGreen;
+    switch (status) {
+      case "Cancelled": return Colors.red.shade800;
+      case "Awaiting artisan": return Colors.orange.shade800;
+      case "Processing": return Colors.blue.shade800;
+      default: return Colors.blueAccent;
+    }
+  }
+
+  Widget _tailorStatusBadge(TailorStatus status) {
+    final color = _getTailorStatusColor(status);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        _getTailorStatusText(status),
+        style: TextStyle(
+          color: color,
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  String _getTailorStatusText(TailorStatus status) {
+    switch (status) {
+      case TailorStatus.notAssigned:
+      case TailorStatus.pending:
+      case TailorStatus.cancelled: return "Sent to Tailor";
+      case TailorStatus.confirmed: return "Confirmed";
+    }
+  }
+
+  Color _getTailorStatusColor(TailorStatus status) {
+    switch (status) {
+      case TailorStatus.notAssigned: return Colors.grey.shade600;
+      case TailorStatus.pending: return Colors.orange.shade800;
+      case TailorStatus.cancelled: return Colors.red.shade800;
+      case TailorStatus.confirmed: return primaryGreen;
+    }
+  }
+
   Widget _buildTailorSummaryRow(CustomerOrder order) {
     if (order.tailorName == null) return const SizedBox.shrink();
-
     final statuses = order.items.map((i) => i.tailorStatus).toSet();
-
     if (statuses.contains(TailorStatus.cancelled) || statuses.contains(TailorStatus.notAssigned)) {
-      // Per instructions, remove tailor name if cancelled or not assigned
-      // (Unless there are other items that ARE confirmed/pending, but mock data is simpler)
       if (!statuses.contains(TailorStatus.confirmed) && !statuses.contains(TailorStatus.pending)) {
         return const SizedBox.shrink();
       }
     }
-
     String displayText = order.tailorName!;
     if (statuses.contains(TailorStatus.pending) && !statuses.contains(TailorStatus.confirmed)) {
       displayText = "$displayText (pending)";
     }
-
     return _detailRow("Tailor", displayText);
+  }
+
+  Widget _reviewCard(String title, String review, double rating, Color themeColor) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: themeColor.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: themeColor.withValues(alpha: 0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(title, style: TextStyle(color: themeColor.withValues(alpha: 0.8), fontSize: 13, fontWeight: FontWeight.w800)),
+              Row(
+                children: [
+                  Icon(Icons.star, color: themeColor.withValues(alpha: 0.8), size: 16),
+                  const SizedBox(width: 4),
+                  Text(rating.toString(), style: TextStyle(color: themeColor.withValues(alpha: 0.9), fontWeight: FontWeight.w900, fontSize: 14)),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text("\"$review\"", style: const TextStyle(color: Colors.black87, fontSize: 14, fontStyle: FontStyle.italic, height: 1.4, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
   }
 
   Widget _buildLeaveReviewCard({
@@ -1740,30 +1599,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: themeColor.withOpacity(0.05),
+        color: themeColor.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: themeColor.withOpacity(0.1)),
+        border: Border.all(color: themeColor.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: TextStyle(color: themeColor.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.w800)),
+          Text(title, style: TextStyle(color: themeColor.withValues(alpha: 0.8), fontSize: 13, fontWeight: FontWeight.w800)),
           const SizedBox(height: 12),
           Row(
-            children: List.generate(
-              5,
-              (index) => GestureDetector(
-                onTap: () => onRatingChanged(index + 1.0),
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: Icon(
-                    index < currentRating ? Icons.star : Icons.star_outline,
-                    color: index < currentRating ? themeColor : themeColor.withOpacity(0.4),
-                    size: 28,
-                  ),
-                ),
+            children: List.generate(5, (index) => GestureDetector(
+              onTap: () => onRatingChanged(index + 1.0),
+              child: Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: Icon(index < currentRating ? Icons.star : Icons.star_outline, color: index < currentRating ? themeColor : themeColor.withValues(alpha: 0.4), size: 28),
               ),
-            ),
+            )),
           ),
           const SizedBox(height: 16),
           TextField(
@@ -1782,12 +1634,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: onSubmit,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: themeColor,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: themeColor, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
               child: const Text("Submit Review", style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ),
@@ -1796,50 +1643,68 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  Widget _reviewCard(String title, String review, double rating, Color themeColor) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: themeColor.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: themeColor.withOpacity(0.1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title,
-                style: TextStyle(color: themeColor.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.w800),
-              ),
-              Row(
-                children: [
-                  Icon(Icons.star, color: themeColor.withOpacity(0.8), size: 16),
-                  const SizedBox(width: 4),
-                  Text(
-                    rating.toString(),
-                    style: TextStyle(color: themeColor.withOpacity(0.9), fontWeight: FontWeight.w900, fontSize: 14),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            "\"$review\"",
-            style: TextStyle(
-              color: Colors.black87,
-              fontSize: 14,
-              fontStyle: FontStyle.italic,
-              height: 1.4,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
+  Widget _orderInfo(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: Colors.black45),
+        const SizedBox(width: 4),
+        Text(text, style: const TextStyle(color: Colors.black54, fontSize: 11, fontWeight: FontWeight.w700)),
+      ],
+    );
+  }
+
+  void _showMeasurements(db.TailorJob? job) {
+    final Measurement? meas = job?.measurements?.firstOrNull;
+    if (meas == null) {
+      AppFeedback.show(context, "Specifications not yet available for this assignment.", isError: true);
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 20), decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+            const Text("Body Measurements", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text("Specifications used for this service assignment.", style: TextStyle(color: Colors.black54, fontSize: 13)),
+            const SizedBox(height: 20),
+            Expanded(child: ListView(children: [
+              _measurementTile("Upper Bust", meas.upperBustCircumference),
+              _measurementTile("Bust", meas.bustCircumference),
+              _measurementTile("Under Bust", meas.underBustCircumference),
+              _measurementTile("Round Shoulder", meas.roundShoulderCircumference),
+              _measurementTile("Waist", meas.waist),
+              _measurementTile("Hips", meas.hipsCircumference),
+              _measurementTile("Shoulder to Bust", meas.shoulderToBust),
+              _measurementTile("Shoulder to Under Bust", meas.shoulderToUnderBust),
+              _measurementTile("Shoulder to Knee", meas.shoulderToKnee),
+              _measurementTile("Shoulder to Ankle", meas.shoulderToAnkle),
+              _measurementTile("Waist to Ankle", meas.waistToAnkle),
+              _measurementTile("Thigh", meas.thigh),
+              _measurementTile("Knee", meas.knee),
+              _measurementTile("Ankle", meas.ankle),
+            ])),
+            const SizedBox(height: 16),
+            SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => Navigator.pop(context), style: ElevatedButton.styleFrom(backgroundColor: primaryGreen, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: const Text("Close", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)))),
+          ],
+        ),
       ),
     );
+  }
+
+  Widget _measurementTile(String label, double value) {
+    return Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+      Text(label, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
+      Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.green.shade100)), child: Text("$value in", style: TextStyle(color: primaryGreen, fontWeight: FontWeight.bold))),
+    ]));
   }
 
   String _formatDate(DateTime date) {
