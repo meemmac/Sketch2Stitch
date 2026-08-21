@@ -395,19 +395,16 @@ class MessagingService {
     }
   }
 
-  /// Searches for users across Customers, Tailors, and Retailers by name or phone.
-  /// Note: Firestore doesn't support cross-collection queries. This performs three queries.
+  /// Searches for users across Customers, Tailors, and Retailers by name, shopName, or phone.
   Future<List<Map<String, dynamic>>> searchUsersByNameOrPhone(String query) async {
     if (query.isEmpty) return [];
     
     try {
       final List<Map<String, dynamic>> results = [];
-      
-      // We search by name or phone. For simplicity, we search for prefix match.
       final collections = [_customers, _tailors, _retailers];
       
       for (var col in collections) {
-        // Search by name
+        // 1. Search by 'name' field
         final nameSnap = await _db.collection(col)
             .where('name', isGreaterThanOrEqualTo: query)
             .where('name', isLessThanOrEqualTo: '$query\uf8ff')
@@ -417,10 +414,34 @@ class MessagingService {
         results.addAll(nameSnap.docs.map((doc) => {
           ...doc.data(),
           'id': doc.id,
-          'role': col == _customers ? 'customer' : (col == _tailors ? 'tailor' : 'retailer')
+          'role': col == _customers ? 'customer' : (col == _tailors ? 'tailor' : 'retailer'),
+          'name': doc.data()['name'] ?? doc.data()['shopName'] ?? 'Unknown',
         }));
 
-        // Search by phone (if not enough results)
+
+        // 2. Search by 'shopName' field (Specifically for Retailers)
+        if (col == _retailers) {
+          final shopSnap = await _db.collection(col)
+              .where('shopName', isGreaterThanOrEqualTo: query)
+              .where('shopName', isLessThanOrEqualTo: '$query\uf8ff')
+              .limit(5)
+              .get();
+          
+          for (var doc in shopSnap.docs) {
+            // Avoid adding duplicates if already found by 'name'
+            if (!results.any((r) => r['id'] == doc.id)) {
+              results.add({
+                ...doc.data(),
+                'id': doc.id,
+                'role': 'retailer',
+                'name': doc.data()['shopName'] ?? 'Unknown',
+              });
+            }
+          }
+        }
+
+
+        // 3. Search by 'phone' field
         if (results.length < 10) {
           final phoneSnap = await _db.collection(col)
               .where('phone', isGreaterThanOrEqualTo: query)
@@ -428,11 +449,16 @@ class MessagingService {
               .limit(5)
               .get();
           
-          results.addAll(phoneSnap.docs.map((doc) => {
-            ...doc.data(),
-            'id': doc.id,
-            'role': col == _customers ? 'customer' : (col == _tailors ? 'tailor' : 'retailer')
-          }));
+          for (var doc in phoneSnap.docs) {
+            if (!results.any((r) => r['id'] == doc.id)) {
+              results.add({
+                ...doc.data(),
+                'id': doc.id,
+                'role': col == _customers ? 'customer' : (col == _tailors ? 'tailor' : 'retailer'),
+                'name': doc.data()['name'] ?? doc.data()['shopName'] ?? 'Unknown',
+              });
+            }
+          }
         }
       }
       
