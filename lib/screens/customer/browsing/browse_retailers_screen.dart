@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/models/product.dart';
@@ -13,6 +14,20 @@ import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+// ─── Review Product Class ────────────────────────────────────────────────
+
+class ReviewProduct {
+  final String name;
+  final String image;
+  final double price;
+
+  const ReviewProduct({
+    required this.name,
+    required this.image,
+    required this.price,
+  });
+}
 
 // ============================================================================
 // RetailersPageBody
@@ -520,7 +535,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
 }
 
 // ============================================================================
-// RetailerDetailScreen - WITH CUSTOMER NAME FETCHING
+// RetailerDetailScreen - WITH LIKED PRODUCTS SECTION
 // ============================================================================
 
 class RetailerDetailScreen extends StatefulWidget {
@@ -561,6 +576,12 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
 
   // Cache for customer names
   final Map<String, String> _customerNameCache = {};
+  
+  // Cache for review products (Liked products)
+  final Map<String, List<ReviewProduct>> _reviewProductsCache = {};
+  
+  // Stream subscription for reviews
+  StreamSubscription? _reviewSubscription;
 
   // Categories
   final List<String> _elementCategories = ['Material'];
@@ -572,9 +593,15 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   void initState() {
     super.initState();
     _getCurrentUser();
-    _loadReviews();
+    _loadReviewsUsingStream();
     _loadProducts();
     _checkFavoriteStatus();
+  }
+
+  @override
+  void dispose() {
+    _reviewSubscription?.cancel();
+    super.dispose();
   }
 
   void _getCurrentUser() {
@@ -628,37 +655,83 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     }
   }
 
-  Future<String> _getCustomerName(String customerId) async {
-    // Check cache first
-    if (_customerNameCache.containsKey(customerId)) {
-      return _customerNameCache[customerId]!;
-    }
-
+  // ✅ Load reviews using stream that includes customer names and products
+  void _loadReviewsUsingStream() {
+    setState(() {
+      _isLoading = true;
+      _isLoadingReviews = true;
+    });
+    
     try {
-      print('🔍 Fetching customer name for ID: $customerId');
-      final customerDoc = await FirebaseFirestore.instance
-          .collection('Customer')
-          .doc(customerId)
-          .get();
-
-      String name = 'Customer';
-      if (customerDoc.exists) {
-        final data = customerDoc.data();
-        if (data != null) {
-          final customer = Customer.fromJson(data, id: customerId);
-          name = customer.name.isNotEmpty ? customer.name : 'Customer';
-          print('✅ Found customer name: $name');
-        }
-      } else {
-        print('⚠️ Customer document not found for ID: $customerId');
-      }
+      String retailerId = widget.retailer.id;
+      print('🔍 Loading detailed reviews for retailer: $retailerId');
       
-      // Cache the result
-      _customerNameCache[customerId] = name;
-      return name;
+      _reviewSubscription?.cancel();
+      
+      _reviewSubscription = _reviewService.streamDetailedShopReviews(retailerId).listen(
+        (detailedReviews) {
+          print('✅ Received ${detailedReviews.length} detailed reviews for retailer');
+          
+          if (!mounted) return;
+          
+          final reviews = <Review>[];
+          final customerNames = <String, String>{};
+          final reviewProducts = <String, List<ReviewProduct>>{};
+          
+          for (final item in detailedReviews) {
+            final reviewMap = item['review'] as Map<String, dynamic>;
+            final review = Review.fromJson(reviewMap);
+            final userName = item['userName'] as String? ?? 'Customer';
+            final productsList = item['products'] as List<dynamic>? ?? [];
+            
+            // Extract products (Liked products)
+            final products = productsList.map((p) => ReviewProduct(
+              name: p['name'] as String? ?? 'Unknown Product',
+              image: p['image'] as String? ?? '',
+              price: (p['price'] as num?)?.toDouble() ?? 0,
+            )).toList();
+            
+            reviews.add(review);
+            customerNames[review.customerId] = userName;
+            reviewProducts[review.id] = products;
+          }
+          
+          setState(() {
+            _reviews = reviews;
+            _customerNameCache.addAll(customerNames);
+            _reviewProductsCache.addAll(reviewProducts);
+            _isLoading = false;
+            _isLoadingReviews = false;
+            
+            if (_reviews.isNotEmpty) {
+              final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
+              _averageRating = sum / _reviews.length;
+            } else {
+              _averageRating = 0.0;
+            }
+          });
+        },
+        onError: (error) {
+          print('❌ Error loading detailed reviews: $error');
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _isLoadingReviews = false;
+              _reviews = [];
+              _averageRating = 0.0;
+            });
+          }
+        },
+      );
+      
     } catch (e) {
-      print('❌ Error fetching customer name: $e');
-      return 'Customer';
+      print('❌ Error loading reviews: $e');
+      setState(() {
+        _isLoading = false;
+        _isLoadingReviews = false;
+        _reviews = [];
+        _averageRating = 0.0;
+      });
     }
   }
 
@@ -729,68 +802,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
       } else {
         setState(() => _isLoadingProducts = false);
       }
-    }
-  }
-
-  Future<void> _loadReviews() async {
-    setState(() {
-      _isLoading = true;
-      _isLoadingReviews = true;
-    });
-    try {
-      // Use the retailer's Firestore document ID
-      String retailerId = widget.retailer.id;
-      print('🔍 Loading reviews for retailer ID: $retailerId');
-      print('🔍 Retailer name: ${widget.retailer.shopName}');
-      
-      // FIRST: Try by ID (this should work since reviews have targetId = retailer ID)
-      var reviews = await _reviewService.getReviewsByTargetId(
-        retailerId,
-        ReviewTargetRole.retailer,
-        limit: 50,
-      );
-      
-      print('✅ Loaded ${reviews.length} reviews by retailer ID');
-      
-      // If no reviews found by ID, try by shop name as fallback (for manual entries)
-      if (reviews.isEmpty) {
-        print('🔍 No reviews found by ID. Trying fallback by shop name: ${widget.retailer.shopName}');
-        reviews = await _reviewService.getReviewsByName(
-          widget.retailer.shopName,
-          ReviewTargetRole.retailer,
-          limit: 50,
-        );
-        print('✅ Loaded ${reviews.length} reviews by shop name (fallback)');
-      }
-      
-      // Enrich reviews with customer names
-      final enrichedReviews = <Review>[];
-      for (final review in reviews) {
-        final customerName = await _getCustomerName(review.customerId);
-        _customerNameCache[review.customerId] = customerName;
-        enrichedReviews.add(review);
-        print('   - Review: rating=${review.rating}, customer=$customerName, targetId=${review.targetId}');
-      }
-      
-      setState(() {
-        _reviews = enrichedReviews;
-        _isLoading = false;
-        _isLoadingReviews = false;
-        if (_reviews.isNotEmpty) {
-          final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
-          _averageRating = sum / _reviews.length;
-        } else {
-          _averageRating = 0.0;
-        }
-      });
-    } catch (e) {
-      print('❌ Error loading reviews: $e');
-      setState(() {
-        _isLoading = false;
-        _isLoadingReviews = false;
-        _reviews = [];
-        _averageRating = 0.0;
-      });
     }
   }
 
@@ -1564,8 +1575,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   // ─── Reviews Page ─────────────────────────────────────────────────────────
 
   Widget _buildReviewsPage() {
-    final filtered = _getFilteredReviews();
-
     return Scaffold(
       backgroundColor: const Color(0xFFF9FBF9),
       appBar: AppBar(
@@ -1600,182 +1609,58 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                 _isLoading = true;
                 _isLoadingReviews = true;
               });
-              _loadReviews();
+              _loadReviewsUsingStream();
             },
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildReviewsPageSummary(),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
-              child: Text(
-                "Reviews",
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
+      body: _isLoadingReviews
+          ? const Center(child: CircularProgressIndicator())
+          : StatefulBuilder(
+              builder: (context, setState) {
+                final filtered = _getFilteredReviews();
+                
+                return SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildRatingSummary(),
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
+                        child: Text(
+                          "Reviews",
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      _buildFilterChips(setState),
+                      const SizedBox(height: 16),
+                      if (filtered.isEmpty)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(32.0),
+                            child: Text("No reviews found yet."),
+                          ),
+                        )
+                      else
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: filtered.length,
+                          separatorBuilder: (context, index) => const SizedBox(height: 16),
+                          itemBuilder: (context, index) =>
+                              _buildReviewsPageItem(filtered[index]),
+                        ),
+                      const SizedBox(height: 32),
+                    ],
+                  ),
+                );
+              },
             ),
-            _buildReviewsPageFilterChips(),
-            const SizedBox(height: 16),
-            if (_isLoadingReviews)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(40),
-                  child: CircularProgressIndicator(
-                    color: Color(0xFF6B8F71),
-                  ),
-                ),
-              )
-            else if (_reviews.isEmpty)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(40),
-                  child: Column(
-                    children: [
-                      Icon(Icons.rate_review, size: 48, color: Colors.grey),
-                      SizedBox(height: 8),
-                      Text(
-                        'No reviews yet',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Be the first to review this retailer!',
-                        style: TextStyle(fontSize: 13, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else if (filtered.isEmpty)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(40),
-                  child: Column(
-                    children: [
-                      Icon(Icons.filter_alt_off, size: 48, color: Colors.grey),
-                      SizedBox(height: 8),
-                      Text(
-                        'No reviews match this filter',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Try selecting a different filter',
-                        style: TextStyle(fontSize: 13, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: filtered.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 16),
-                itemBuilder: (context, index) =>
-                    _buildReviewsPageItem(filtered[index]),
-              ),
-            const SizedBox(height: 32),
-          ],
-        ),
-      ),
     );
   }
 
-  List<Review> _getFilteredReviews() {
-    List<Review> sortedList = List.from(_reviews);
-    switch (_selectedFilter) {
-      case "Top reviews":
-        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
-        break;
-      case "Newest":
-        sortedList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        break;
-      case "Highest rating":
-        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
-        break;
-      case "Lowest rating":
-        sortedList.sort((a, b) => a.rating.compareTo(b.rating));
-        break;
-    }
-    return sortedList;
-  }
-
-  int _getRatingCount(double rating) {
-    return _reviews.where((r) => r.rating.round() == rating.round()).length;
-  }
-
-  Widget _buildReviewsPageItem(Review review) {
-    // Get customer name from cache
-    final customerName = _customerNameCache[review.customerId] ?? 'Customer';
-    
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  customerName,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Text(
-                review.timeAgo,
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: List.generate(
-              5,
-              (starIndex) => Icon(
-                starIndex < review.rating.round()
-                    ? Icons.star
-                    : Icons.star_border,
-                color: Colors.orange,
-                size: 14,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            review.comment.isNotEmpty ? review.comment : 'No comment provided.',
-            style: const TextStyle(fontSize: 14, height: 1.5),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReviewsPageSummary() {
+  Widget _buildRatingSummary() {
     final totalReviews = _reviews.length;
     
     return Container(
@@ -1803,15 +1688,22 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                 Row(
                   children: List.generate(
                     5,
-                    (index) => Icon(
-                      totalReviews > 0 && index < _averageRating.floor()
-                          ? Icons.star
-                          : (totalReviews > 0 && index < _averageRating.ceil()
-                                ? Icons.star_half
-                                : Icons.star_border),
-                      color: Colors.orange,
-                      size: 18,
-                    ),
+                    (index) {
+                      double starVal = index + 1;
+                      IconData icon;
+                      if (_averageRating >= starVal) {
+                        icon = Icons.star;
+                      } else if (_averageRating >= starVal - 0.5) {
+                        icon = Icons.star_half;
+                      } else {
+                        icon = Icons.star_border;
+                      }
+                      return Icon(
+                        icon,
+                        color: Colors.orange,
+                        size: 18,
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -1829,11 +1721,11 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
             flex: 6,
             child: Column(
               children: [
-                _reviewsPageRatingBar(5, _getRatingCount(5.0)),
-                _reviewsPageRatingBar(4, _getRatingCount(4.0)),
-                _reviewsPageRatingBar(3, _getRatingCount(3.0)),
-                _reviewsPageRatingBar(2, _getRatingCount(2.0)),
-                _reviewsPageRatingBar(1, _getRatingCount(1.0)),
+                _ratingBar(5, _getRatingCount(5.0)),
+                _ratingBar(4, _getRatingCount(4.0)),
+                _ratingBar(3, _getRatingCount(3.0)),
+                _ratingBar(2, _getRatingCount(2.0)),
+                _ratingBar(1, _getRatingCount(1.0)),
               ],
             ),
           ),
@@ -1842,17 +1734,14 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     );
   }
 
-  Widget _reviewsPageRatingBar(int star, int count) {
+  Widget _ratingBar(int star, int count) {
     final total = _reviews.length;
     final percent = total > 0 ? count / total : 0.0;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          Text(
-            "$star",
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-          ),
+          Text("$star", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           const SizedBox(width: 4),
           const Icon(Icons.star, color: Colors.orange, size: 12),
           const SizedBox(width: 8),
@@ -1867,17 +1756,16 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          Text(
-            count.toString(),
-            style: const TextStyle(fontSize: 10, color: Colors.grey),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildReviewsPageFilterChips() {
+  int _getRatingCount(double rating) {
+    return _reviews.where((r) => r.rating.round() == rating.round()).length;
+  }
+
+  Widget _buildFilterChips(StateSetter setState) {
     final filters = ["Top reviews", "Newest", "Highest rating", "Lowest rating"];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -1891,7 +1779,11 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
               label: Text(filter),
               selected: isSelected,
               onSelected: (val) {
-                if (val) setState(() => _selectedFilter = filter);
+                if (val) {
+                  setState(() {
+                    _selectedFilter = filter;
+                  });
+                }
               },
               selectedColor: const Color(0xFF1E232C),
               labelStyle: TextStyle(
@@ -1909,6 +1801,170 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
           );
         }).toList(),
       ),
+    );
+  }
+
+  List<Review> _getFilteredReviews() {
+    List<Review> sortedList = List.from(_reviews);
+    switch (_selectedFilter) {
+      case "Top reviews":
+        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
+        break;
+      case "Newest":
+        sortedList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        break;
+      case "Highest rating":
+        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
+        break;
+      case "Lowest rating":
+        sortedList.sort((a, b) => a.rating.compareTo(b.rating));
+        break;
+    }
+    return sortedList;
+  }
+
+  Widget _buildReviewsPageItem(Review review) {
+    final customerName = _customerNameCache[review.customerId] ?? 'Customer';
+    final products = _reviewProductsCache[review.id] ?? [];
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            customerName,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Row(
+                children: List.generate(
+                  5,
+                  (index) => Icon(
+                    index < review.rating.floor() ? Icons.star : Icons.star_border,
+                    color: Colors.orange,
+                    size: 14,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                "• ${review.timeAgo}",
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            review.comment.isNotEmpty ? review.comment : 'No comment provided.',
+            style: const TextStyle(fontSize: 14, height: 1.5),
+          ),
+          if (products.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text(
+              "Liked products",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 70,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: products.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 12),
+                itemBuilder: (context, index) => _buildProductMiniCard(products[index]),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductMiniCard(ReviewProduct product) {
+    return Container(
+      width: 220,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: _buildImage(product.image, 50, 50),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  "Tk ${product.price.toInt()}",
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImage(String path, double width, double height) {
+    if (path.startsWith('http')) {
+      return Image.network(
+        path,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint("ReviewScreen: Error loading network image: $path - $error");
+          return _imagePlaceholder(width, height);
+        },
+      );
+    } else if (path.isNotEmpty) {
+      return Image.asset(
+        path,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint("ReviewScreen: Error loading asset image: $path - $error");
+          return _imagePlaceholder(width, height);
+        },
+      );
+    } else {
+      return _imagePlaceholder(width, height);
+    }
+  }
+
+  Widget _imagePlaceholder(double width, double height) {
+    return Container(
+      width: width,
+      height: height,
+      color: Colors.grey.shade200,
+      child: const Icon(Icons.image, color: Colors.grey),
     );
   }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/review.dart';
@@ -10,9 +11,9 @@ import 'package:sketch2stitch/services/review_service.dart';
 import 'package:sketch2stitch/services/portfolio_service.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
 
 // ============================================================================
 // TailorsPageBody
@@ -562,7 +563,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
 }
 
 // ============================================================================
-// TailorDetailScreen - WITH CUSTOMER NAME FETCHING
+// TailorDetailScreen - WITH REVIEWS_SCREEN STYLE FILTERS
 // ============================================================================
 
 class TailorDetailScreen extends StatefulWidget {
@@ -600,6 +601,9 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
 
   // Cache for customer names
   final Map<String, String> _customerNameCache = {};
+  
+  // Stream subscription for reviews
+  StreamSubscription? _reviewSubscription;
 
   bool get _isCustomer => widget.userRole == UserRole.customer;
   bool get isUnavailable => widget.tailor.maxOrder == 0;
@@ -608,9 +612,15 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   void initState() {
     super.initState();
     _getCurrentUser();
-    _loadReviews();
+    _loadReviewsUsingStream();
     _loadPortfolio();
     _checkFavoriteStatus();
+  }
+
+  @override
+  void dispose() {
+    _reviewSubscription?.cancel();
+    super.dispose();
   }
 
   void _getCurrentUser() {
@@ -661,86 +671,75 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     }
   }
 
-  Future<String> _getCustomerName(String customerId) async {
-    // Check cache first
-    if (_customerNameCache.containsKey(customerId)) {
-      return _customerNameCache[customerId]!;
-    }
-
-    try {
-      final customerDoc = await FirebaseFirestore.instance
-          .collection('Customer')
-          .doc(customerId)
-          .get();
-
-      String name = 'Customer';
-      if (customerDoc.exists) {
-        final data = customerDoc.data();
-        if (data != null) {
-          final customer = Customer.fromJson(data, id: customerId);
-          name = customer.name.isNotEmpty ? customer.name : 'Customer';
-        }
-      }
-      
-      // Cache the result
-      _customerNameCache[customerId] = name;
-      return name;
-    } catch (e) {
-      print('Error fetching customer name: $e');
-      return 'Customer';
+  // ✅ CORRECT: Filters by rating
+  List<Review> _getFilteredReviews() {
+    switch (_selectedFilter) {
+      case "5 Star":
+        return _reviews.where((r) => r.rating >= 4.5).toList();
+      case "4 Star & above":
+        return _reviews.where((r) => r.rating >= 4.0).toList();
+      default:
+        return List.from(_reviews);
     }
   }
 
-  Future<void> _loadReviews() async {
+  void _loadReviewsUsingStream() {
     setState(() {
       _isLoading = true;
       _isLoadingReviews = true;
     });
+    
     try {
       String tailorId = widget.tailor.id;
-      String tailorName = widget.tailor.name;
-      print('🔍 Loading reviews for tailor: $tailorId, Name: $tailorName');
+      print('🔍 Loading detailed reviews for tailor: $tailorId');
       
-      // Try by ID first (auto-generated)
-      var reviews = await _reviewService.getReviewsByTargetId(
-        tailorId,
-        ReviewTargetRole.tailor,
-        limit: 50,
+      _reviewSubscription?.cancel();
+      
+      _reviewSubscription = _reviewService.streamDetailedTailorReviews(tailorId).listen(
+        (detailedReviews) {
+          print('✅ Received ${detailedReviews.length} detailed reviews for tailor');
+          
+          if (!mounted) return;
+          
+          final reviews = <Review>[];
+          final customerNames = <String, String>{};
+          
+          for (final item in detailedReviews) {
+            final reviewMap = item['review'] as Map<String, dynamic>;
+            final review = Review.fromJson(reviewMap);
+            final userName = item['userName'] as String? ?? 'Customer';
+            
+            reviews.add(review);
+            customerNames[review.customerId] = userName;
+          }
+          
+          setState(() {
+            _reviews = reviews;
+            _customerNameCache.addAll(customerNames);
+            _isLoading = false;
+            _isLoadingReviews = false;
+            
+            if (_reviews.isNotEmpty) {
+              final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
+              _averageRating = sum / _reviews.length;
+            } else {
+              _averageRating = 0.0;
+            }
+          });
+        },
+        onError: (error) {
+          print('❌ Error loading detailed reviews: $error');
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _isLoadingReviews = false;
+              _reviews = [];
+              _averageRating = 0.0;
+            });
+          }
+        },
       );
       
-      print('✅ Loaded ${reviews.length} reviews by tailor ID');
-      
-      // If no reviews found, try by name (manual entries)
-      if (reviews.isEmpty) {
-        print('🔍 No reviews found by ID, trying by name...');
-        reviews = await _reviewService.getReviewsByName(
-          tailorName,
-          ReviewTargetRole.tailor,
-          limit: 50,
-        );
-        print('✅ Loaded ${reviews.length} reviews by tailor name');
-      }
-      
-      // Enrich reviews with customer names
-      final enrichedReviews = <Review>[];
-      for (final review in reviews) {
-        final customerName = await _getCustomerName(review.customerId);
-        _customerNameCache[review.customerId] = customerName;
-        enrichedReviews.add(review);
-        print('   - Review: rating=${review.rating}, customer=$customerName');
-      }
-      
-      setState(() {
-        _reviews = enrichedReviews;
-        _isLoading = false;
-        _isLoadingReviews = false;
-        if (_reviews.isNotEmpty) {
-          final sum = _reviews.fold(0.0, (total, review) => total + review.rating);
-          _averageRating = sum / _reviews.length;
-        } else {
-          _averageRating = 0.0;
-        }
-      });
     } catch (e) {
       print('❌ Error loading reviews: $e');
       setState(() {
@@ -1322,7 +1321,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Booking feature coming soon!'),
+                  content: Text('Booked this tailor'),
                   backgroundColor: Colors.orange,
                 ),
               );
@@ -1529,31 +1528,23 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     );
   }
 
+  // ─── Reviews Page ─────────────────────────────────────────────────────────
+
   void _showReviewsOverlay(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => _buildReviewsPage(),
-      ),
+      MaterialPageRoute(builder: (context) => _buildReviewsPage()),
     );
   }
 
-  // ─── Reviews Page ─────────────────────────────────────────────────────────
-
   Widget _buildReviewsPage() {
-    final filtered = _getFilteredReviews();
-
     return Scaffold(
       backgroundColor: const Color(0xFFF9FBF9),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back,
-            color: Colors.black87,
-            size: 20,
-          ),
+          icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Column(
@@ -1581,103 +1572,58 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                 _isLoading = true;
                 _isLoadingReviews = true;
               });
-              _loadReviews();
+              _loadReviewsUsingStream();
             },
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildReviewsPageSummary(),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
-              child: Text(
-                "Feedback from Customers",
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
+      body: _isLoadingReviews
+          ? const Center(child: CircularProgressIndicator())
+          : StatefulBuilder(
+              builder: (context, setState) {
+                final filtered = _getFilteredReviews();
+                
+                return SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildRatingSummary(),
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
+                        child: Text(
+                          "Feedback from Customers",
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      _buildFilterChips(setState),
+                      const SizedBox(height: 16),
+                      if (filtered.isEmpty)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(32.0),
+                            child: Text("No reviews found yet."),
+                          ),
+                        )
+                      else
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: filtered.length,
+                          separatorBuilder: (context, index) => const SizedBox(height: 16),
+                          itemBuilder: (context, index) =>
+                              _buildReviewsPageItem(filtered[index]),
+                        ),
+                      const SizedBox(height: 32),
+                    ],
+                  ),
+                );
+              },
             ),
-            _buildReviewsPageFilterChips(),
-            const SizedBox(height: 16),
-            if (_isLoadingReviews)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(40),
-                  child: CircularProgressIndicator(
-                    color: Color(0xFF6B8F71),
-                  ),
-                ),
-              )
-            else if (_reviews.isEmpty)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(40),
-                  child: Column(
-                    children: [
-                      Icon(Icons.rate_review, size: 48, color: Colors.grey),
-                      SizedBox(height: 8),
-                      Text(
-                        'No reviews yet',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Be the first to review this tailor!',
-                        style: TextStyle(fontSize: 13, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else if (filtered.isEmpty)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(40),
-                  child: Column(
-                    children: [
-                      Icon(Icons.filter_alt_off, size: 48, color: Colors.grey),
-                      SizedBox(height: 8),
-                      Text(
-                        'No reviews match this filter',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Try selecting a different filter',
-                        style: TextStyle(fontSize: 13, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: filtered.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 16),
-                itemBuilder: (context, index) =>
-                    _buildReviewsPageItem(filtered[index]),
-              ),
-            const SizedBox(height: 32),
-          ],
-        ),
-      ),
     );
   }
 
-  Widget _buildReviewsPageSummary() {
+  Widget _buildRatingSummary() {
     final totalReviews = _reviews.length;
     
     return Container(
@@ -1705,15 +1651,22 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                 Row(
                   children: List.generate(
                     5,
-                    (index) => Icon(
-                      totalReviews > 0 && index < _averageRating.floor()
-                          ? Icons.star
-                          : (totalReviews > 0 && index < _averageRating.ceil()
-                                ? Icons.star_half
-                                : Icons.star_border),
-                      color: Colors.orange,
-                      size: 18,
-                    ),
+                    (index) {
+                      double starVal = index + 1;
+                      IconData icon;
+                      if (_averageRating >= starVal) {
+                        icon = Icons.star;
+                      } else if (_averageRating >= starVal - 0.5) {
+                        icon = Icons.star_half;
+                      } else {
+                        icon = Icons.star_border;
+                      }
+                      return Icon(
+                        icon,
+                        color: Colors.orange,
+                        size: 18,
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -1737,11 +1690,11 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                _reviewsPageRatingBar(5, _getRatingCount(5.0)),
-                _reviewsPageRatingBar(4, _getRatingCount(4.0)),
-                _reviewsPageRatingBar(3, _getRatingCount(3.0)),
-                _reviewsPageRatingBar(2, _getRatingCount(2.0)),
-                _reviewsPageRatingBar(1, _getRatingCount(1.0)),
+                _ratingBar(5, _getRatingCount(5.0)),
+                _ratingBar(4, _getRatingCount(4.0)),
+                _ratingBar(3, _getRatingCount(3.0)),
+                _ratingBar(2, _getRatingCount(2.0)),
+                _ratingBar(1, _getRatingCount(1.0)),
               ],
             ),
           ),
@@ -1750,17 +1703,14 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     );
   }
 
-  Widget _reviewsPageRatingBar(int star, int count) {
+  Widget _ratingBar(int star, int count) {
     final total = _reviews.length;
     final percent = total > 0 ? count / total : 0.0;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          Text(
-            "$star",
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-          ),
+          Text("$star", style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
           const SizedBox(width: 4),
           const Icon(Icons.star, color: Colors.orange, size: 10),
           const SizedBox(width: 8),
@@ -1775,18 +1725,17 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          Text(
-            count.toString(),
-            style: const TextStyle(fontSize: 10, color: Colors.grey),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildReviewsPageFilterChips() {
-    final filters = ["All reviews", "5 Star", "4 Star & above"];
+  int _getRatingCount(double rating) {
+    return _reviews.where((r) => r.rating.round() == rating.round()).length;
+  }
+
+  Widget _buildFilterChips(StateSetter setState) {
+    final filters = ["All reviews", "5 Star", "4 Star & below"];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1800,7 +1749,9 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
               selected: isSelected,
               onSelected: (val) {
                 if (val) {
-                  setState(() => _selectedFilter = filter);
+                  setState(() {
+                    _selectedFilter = filter;
+                  });
                 }
               },
               selectedColor: const Color(0xFF2C5C44),
@@ -1822,23 +1773,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     );
   }
 
-  List<Review> _getFilteredReviews() {
-    switch (_selectedFilter) {
-      case "5 Star":
-        return _reviews.where((r) => r.rating >= 4.5).toList();
-      case "4 Star & above":
-        return _reviews.where((r) => r.rating >= 4.0).toList();
-      default:
-        return List.from(_reviews);
-    }
-  }
-
-  int _getRatingCount(double rating) {
-    return _reviews.where((r) => r.rating.round() == rating.round()).length;
-  }
-
   Widget _buildReviewsPageItem(Review review) {
-    // Get customer name from cache
     final customerName = _customerNameCache[review.customerId] ?? 'Customer';
     
     return Container(
@@ -1890,6 +1825,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
             style: const TextStyle(
               fontSize: 14,
               height: 1.5,
+              fontStyle: FontStyle.italic,
             ),
           ),
           if (review.orderId != null && review.orderId!.isNotEmpty) ...[

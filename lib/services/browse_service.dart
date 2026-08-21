@@ -162,10 +162,14 @@ class BrowseService {
     String sortBy = 'default',
     String? search,
   }) {
+    print('🔍 getTailorsByFilter called');
+    print('📊 minRating: $minRating, location: $location, sortBy: $sortBy, search: $search');
+    
     Query query = _db.collection('Tailor');
 
     if (minRating != null && minRating > 0) {
       query = query.where('rating', isGreaterThanOrEqualTo: minRating);
+      print('🔍 Filtering by minRating: $minRating');
     }
 
     if (sortBy == 'ratingHighToLow') {
@@ -173,7 +177,24 @@ class BrowseService {
     }
 
     return query.snapshots().map((snapshot) {
-      var tailors = snapshot.docs.map((doc) => Tailor.fromJson(doc.data() as Map<String, dynamic>)).toList();
+      print('📦 Received ${snapshot.docs.length} tailors from Firestore');
+      
+      var tailors = snapshot.docs.map((doc) {
+        try {
+          final data = doc.data() as Map<String, dynamic>;
+          return Tailor.fromJson(data, id: doc.id);
+        } catch (e) {
+          print('❌ Error parsing tailor ${doc.id}: $e');
+          return Tailor(
+            id: doc.id,
+            name: 'Error',
+            email: '',
+            phone: '',
+            address: '',
+            rating: 0.0,
+          );
+        }
+      }).toList();
 
       if (location != null && location != 'All') {
         tailors = tailors
@@ -181,6 +202,7 @@ class BrowseService {
               (t) => t.address.toLowerCase().contains(location.toLowerCase()),
             )
             .toList();
+        print('📊 After location filter: ${tailors.length} tailors');
       }
 
       if (search != null && search.isNotEmpty) {
@@ -189,8 +211,10 @@ class BrowseService {
           t.name.toLowerCase().contains(lowerSearch) ||
           t.address.toLowerCase().contains(lowerSearch)
         ).toList();
+        print('📊 After search filter: ${tailors.length} tailors');
       }
 
+      print('✅ Returning ${tailors.length} tailors');
       return tailors;
     });
   }
@@ -204,7 +228,10 @@ class BrowseService {
           .where('nameLower', isLessThanOrEqualTo: '$normalizedQuery\uf8ff')
           .get();
 
-      return snapshot.docs.map((doc) => Tailor.fromJson(doc.data())).toList();
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return Tailor.fromJson(data, id: doc.id);
+      }).toList();
     } catch (e) {
       print('❌ Error in searchTailorsByQuery: $e');
       return [];
@@ -220,10 +247,14 @@ class BrowseService {
     String sortBy = 'default',
     String? search,
   }) {
+    print('🔍 getRetailersByFilter called');
+    print('📊 minRating: $minRating, location: $location, sortBy: $sortBy, search: $search');
+    
     Query query = _db.collection('Retailer');
 
     if (minRating != null && minRating > 0) {
       query = query.where('rating', isGreaterThanOrEqualTo: minRating);
+      print('🔍 Filtering by minRating: $minRating');
     }
 
     if (sortBy == 'ratingHighToLow') {
@@ -231,7 +262,24 @@ class BrowseService {
     }
 
     return query.snapshots().map((snapshot) {
-      var retailers = snapshot.docs.map((doc) => Retailer.fromJson(doc.data() as Map<String, dynamic>)).toList();
+      print('📦 Received ${snapshot.docs.length} retailers from Firestore');
+      
+      var retailers = snapshot.docs.map((doc) {
+        try {
+          final data = doc.data() as Map<String, dynamic>;
+          return Retailer.fromJson(data, id: doc.id);
+        } catch (e) {
+          print('❌ Error parsing retailer ${doc.id}: $e');
+          return Retailer(
+            id: doc.id,
+            shopName: 'Error',
+            email: '',
+            phone: '',
+            address: '',
+            rating: 0.0,
+          );
+        }
+      }).toList();
 
       if (location != null && location != 'All') {
         retailers = retailers
@@ -239,6 +287,7 @@ class BrowseService {
               (r) => r.address.toLowerCase().contains(location.toLowerCase()),
             )
             .toList();
+        print('📊 After location filter: ${retailers.length} retailers');
       }
 
       if (search != null && search.isNotEmpty) {
@@ -247,8 +296,10 @@ class BrowseService {
           r.shopName.toLowerCase().contains(lowerSearch) ||
           r.address.toLowerCase().contains(lowerSearch)
         ).toList();
+        print('📊 After search filter: ${retailers.length} retailers');
       }
 
+      print('✅ Returning ${retailers.length} retailers');
       return retailers;
     });
   }
@@ -262,7 +313,10 @@ class BrowseService {
           .where('shopNameLower', isLessThanOrEqualTo: '$normalizedQuery\uf8ff')
           .get();
 
-      return snapshot.docs.map((doc) => Retailer.fromJson(doc.data())).toList();
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return Retailer.fromJson(data, id: doc.id);
+      }).toList();
     } catch (e) {
       print('❌ Error in searchRetailersByQuery: $e');
       return [];
