@@ -309,7 +309,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         items: items,
         amount: retailerAmount,
         orderDate: order.orderDate,
-        status: order.statusText,
+        // status: order.statusText,
+        status: _mapStatusToFrontend(order.statusText),
         isDelivered: order.status == db.OrderStatus.completed,
         deliveryAddress: deliveryAddress,
         deliveryCharges: charges,
@@ -333,6 +334,33 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       case db.TailorJobStatus.inProgress:
       case db.TailorJobStatus.jobCompleted: return TailorStatus.confirmed;
       default: return TailorStatus.notAssigned;
+    }
+  }
+
+  String _mapStatusToFrontend(String backendStatus) {
+    switch (backendStatus) {
+      case 'Delivered':
+      case 'Items Delivered':
+        return 'Delivered';
+      case 'Order Packed':
+        return 'Order Packed';
+      case 'Preparing Order':
+      case 'Awaiting Confirmation':
+      case 'Processing':
+        return 'Order Preparing';
+      case 'Tailor Confirmed — Stitching Started':
+        return 'Tailor Confirmed';
+      case 'Quote Received from Tailor':
+      case 'Requested Tailor':
+      case 'Awaiting Tailor Selection':
+      case 'Tailor Pending':
+        return 'Waiting for Tailor Confirmation';
+      case 'Stitching Completed':
+        return 'Out for Delivery';
+      case 'Cancelled':
+        return 'Tailor Rejected';
+      default:
+        return 'Order Preparing';
     }
   }
 
@@ -631,9 +659,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     runSpacing: 8,
                     children: [
                       "All",
-                      "Sent to Artisan",
-                      "Confirmed",
-                      "Processing",
+                      // "Sent to Artisan",
+                      // "Confirmed",
+                      // "Processing",
+                      "Tailor Confirmed",
+                      "Tailor Rejected",
+                      "Order Preparing",
+                      "Order Packed",
+                      "Shipping to Tailor",
+                      "Out for Delivery",
+                      "Waiting for Tailor Confirmation",
                     ].map((status) {
                       return _filterChip(status, _selectedStatus == status, () {
                         setSheetState(() => _selectedStatus = status);
@@ -1497,9 +1532,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Color _getOrderStatusColor(String status, bool isDelivered) {
     if (isDelivered) return primaryGreen;
     switch (status) {
-      case "Cancelled": return Colors.red.shade800;
-      case "Awaiting artisan": return Colors.orange.shade800;
-      case "Processing": return Colors.blue.shade800;
+      // case "Cancelled": return Colors.red.shade800;
+      // case "Awaiting artisan": return Colors.orange.shade800;
+      // case "Processing": return Colors.blue.shade800;
+      case "Tailor Rejected": return Colors.red.shade800;
+      case "Waiting for Tailor Confirmation": return Colors.orange.shade800;
+      case "Order Preparing": return Colors.blue.shade800;
+      case "Order Packed": return Colors.teal.shade700;
+      case "Shipping to Tailor": return Colors.indigo.shade700;
+      case "Tailor Confirmed": return Colors.green.shade700;
+      case "Out for Delivery": return Colors.deepPurple.shade700;
       default: return Colors.blueAccent;
     }
   }
