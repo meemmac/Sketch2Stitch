@@ -423,8 +423,16 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     try {
       final url = await _messagingService.uploadAttachmentFile(file);
       if (url != null) {
+        // 🧠 Detect current user's role from the opposite of otherUserRole 
+        // Or better, we should probably have a role field in this screen too.
+        // For now, let's use a safe logic:
+        final senderRole = (widget.otherUserRole == UserRole.customer) 
+            ? (widget.otherUserId.startsWith('t') ? UserRole.retailer : UserRole.tailor)
+            : UserRole.customer;
+
+
         final data = {
-          'senderRole': UserRole.customer.name,
+          'senderRole': senderRole.name,
           'msgText': type == 'document' ? '📄 ${fileName ?? 'Document'}' : '',
           'attachment': url,
         };
