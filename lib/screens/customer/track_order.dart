@@ -11,20 +11,15 @@ enum TrackEventType {
   orderPlaced,
   subOrderPreparing,
   subOrderPacked,
-  subOrderDelivered,
-  awaitingTailorSelection,
+  shippingToTailor,   // Leg 1: Shop -> Tailor
+  shippingToCustomer, // Leg 2: Shop/Tailor -> Customer
   tailorRequested,
   tailorRejected,
   tailorQuoted,
   tailorConfirmed,
   tailorCompleted,
   tailorExpired,
-  tailorCancelled,
-  shippingToTailor,
-  shippingToCustomer,
   orderCompleted,
-  orderConfirmedRetailer,
-  orderConfirmedTailor,
   orderCancelled,
 }
 
@@ -183,18 +178,6 @@ class OrderTrackScreen extends StatelessWidget {
     ));
 
 
-    // 2. Awaiting Tailor Selection
-    if (order.status == OrderStatus.awaitingTailorSearch) {
-      events.add(TrackEvent(
-        type: TrackEventType.awaitingTailorSelection,
-        material: '',
-        partyName: 'You',
-        date: order.orderDate,
-        note: order.tailorSelectionDeadline != null
-            ? 'Item-addition window open until ${DateFormat('MMM dd').format(order.tailorSelectionDeadline!)}'
-            : null,
-      ));
-    }
 
 
     // 3. Sub-orders logic (Priority 1)
@@ -240,7 +223,7 @@ class OrderTrackScreen extends StatelessWidget {
 
         final isToTailor = so.deliveryDestination == SubOrderDeliveryDestination.tailor;
         events.add(TrackEvent(
-          type: isToTailor ? TrackEventType.shippingToTailor : TrackEventType.subOrderDelivered,
+          type: isToTailor ? TrackEventType.shippingToTailor : TrackEventType.shippingToCustomer,
           material: materialList,
           partyName: retailerName,
           destination: isToTailor ? (partyNames[tailorJob?.tailorId] ?? 'Tailor') : customerAddress,
@@ -311,15 +294,6 @@ class OrderTrackScreen extends StatelessWidget {
           date: baseDate.add(const Duration(minutes: 1)),
           note: 'The quote response deadline has passed.',
         ));
-      } else if (tailorJob.status == TailorJobStatus.cancelled) {
-        events.add(TrackEvent(type: TrackEventType.tailorRequested, material: allMaterials, partyName: tailorName, date: baseDate));
-        events.add(TrackEvent(
-          type: TrackEventType.tailorCancelled,
-          material: '',
-          partyName: tailorName,
-          date: baseDate.add(const Duration(minutes: 1)),
-          note: tailorJob.rejectionReason,
-        ));
       }
     }
 
@@ -335,22 +309,36 @@ class OrderTrackScreen extends StatelessWidget {
         date: DateTime.now(), // Always at the very end
       ));
     } else if (order.status == OrderStatus.cancelled) {
+      // 🧠 Special Logic: Customer cancellation only happens if quote was rejected
+      final bool isQuoteRejected = tailorJob != null && 
+          (tailorJob.status == TailorJobStatus.quoted || tailorJob.status == TailorJobStatus.rejected);
+
+
       events.add(TrackEvent(
         type: TrackEventType.orderCancelled,
         material: '',
-        partyName: 'Sketch2Stitch',
+        partyName: 'You',
         date: DateTime.now(),
+        note: isQuoteRejected 
+            ? 'Quote Rejected — You chose not to proceed with the price or date.' 
+            : 'Order Cancelled.',
       ));
     }
 
 
-    // 🧠 Pure Chronological Sorting:
-    // Sort by DATE only (Earliest first at the top).
-    // This maintains the truth of the timeline based on your database timestamps.
+    // 🧠 Multi-Criteria Sorting Logic:
+    // 1. Primary: Sort by DATE (Oldest first at the top, Latest at the bottom).
+    // 2. Secondary: If dates match, ensure "Order Placed" always wins.
     events.sort((a, b) {
+      // Rule A: Force "Order Placed" to ALWAYS be first regardless of timestamp
+      if (a.type == TrackEventType.orderPlaced) return -1;
+      if (b.type == TrackEventType.orderPlaced) return 1;
+
+
       final dateCompare = a.date.compareTo(b.date);
       if (dateCompare != 0) return dateCompare;
-      // If timestamps match exactly, use type priority
+
+
       return a.type.index.compareTo(b.type.index);
     });
 
@@ -526,9 +514,46 @@ class OrderTrackScreen extends StatelessWidget {
   }
 
   List<InlineSpan> _buildEventSpans(TrackEvent event, _TrackEventStyle style) {
+    // 🧠 Professional Natural Language Formatting
+    
     if (event.type == TrackEventType.tailorCompleted) {
       return [
-        const TextSpan(text: 'Delivered to '),
+        const TextSpan(text: 'Garment Completed by '),
+        TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+      ];
+    }
+
+
+    if (event.type == TrackEventType.tailorConfirmed) {
+      return [
+        const TextSpan(text: 'Stitching Started by '),
+        TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+      ];
+    }
+
+
+    if (event.type == TrackEventType.tailorQuoted) {
+      return [
+        const TextSpan(text: 'Quote Received from '),
+        TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+      ];
+    }
+
+
+    if (event.type == TrackEventType.tailorRejected || event.type == TrackEventType.tailorExpired) {
+      final verb = event.type == TrackEventType.tailorRejected ? 'Rejected' : 'Expired';
+      return [
+        TextSpan(text: 'Request $verb by '),
+        TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+      ];
+    }
+
+
+    if (event.type == TrackEventType.shippingToCustomer) {
+      final bool isGarment = event.material.isEmpty;
+      return [
+        TextSpan(text: isGarment ? 'Finished Garment ' : 'Fabric '),
+        const TextSpan(text: 'sent to '),
         TextSpan(text: event.destination ?? 'Your Address', style: const TextStyle(fontWeight: FontWeight.bold)),
         const TextSpan(text: ' from '),
         TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -544,18 +569,6 @@ class OrderTrackScreen extends StatelessWidget {
         TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
         const TextSpan(text: ' has arrived at '),
         TextSpan(text: event.destination ?? 'the Tailor', style: const TextStyle(fontWeight: FontWeight.bold)),
-      ];
-    }
-
-
-    if (event.type == TrackEventType.subOrderDelivered && event.destination != null) {
-      return [
-        const TextSpan(text: 'Delivered '),
-        TextSpan(text: event.material, style: const TextStyle(fontWeight: FontWeight.bold)),
-        const TextSpan(text: ' from '),
-        TextSpan(text: event.partyName, style: const TextStyle(fontWeight: FontWeight.bold)),
-        const TextSpan(text: ' to '),
-        TextSpan(text: event.destination!, style: const TextStyle(fontWeight: FontWeight.bold)),
       ];
     }
 
@@ -605,18 +618,6 @@ class OrderTrackScreen extends StatelessWidget {
           icon: Icons.inventory_2_rounded,
           verb: 'Packed',
         );
-      case TrackEventType.subOrderDelivered:
-        return _TrackEventStyle(
-          color: Colors.green.shade700,
-          icon: Icons.check_circle_rounded,
-          verb: 'Delivered',
-        );
-      case TrackEventType.awaitingTailorSelection:
-        return _TrackEventStyle(
-          color: Colors.amber.shade700,
-          icon: Icons.search_rounded,
-          verb: 'Awaiting Tailor Selection',
-        );
       case TrackEventType.tailorRequested:
         return _TrackEventStyle(
           color: Colors.blue.shade600,
@@ -653,12 +654,6 @@ class OrderTrackScreen extends StatelessWidget {
           icon: Icons.timer_off_rounded,
           verb: 'Quote Expired',
         );
-      case TrackEventType.tailorCancelled:
-        return _TrackEventStyle(
-          color: Colors.red.shade600,
-          icon: Icons.block_rounded,
-          verb: 'Tailor Job Cancelled',
-        );
       case TrackEventType.shippingToTailor:
         return _TrackEventStyle(
           color: Colors.teal.shade600,
@@ -683,16 +678,6 @@ class OrderTrackScreen extends StatelessWidget {
           icon: Icons.cancel_rounded,
           verb: 'Order Cancelled',
         );
-      case TrackEventType.orderConfirmedRetailer:
-        return _TrackEventStyle(
-            color: Colors.blue.shade600,
-            icon: Icons.storefront_rounded,
-            verb: 'Order Confirmed from Retailer');
-      case TrackEventType.orderConfirmedTailor:
-        return _TrackEventStyle(
-            color: Colors.purple.shade600,
-            icon: Icons.design_services_rounded,
-            verb: 'Order Confirmed from Tailor');
     }
   }
 }
