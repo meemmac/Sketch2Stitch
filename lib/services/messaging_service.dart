@@ -46,48 +46,57 @@ class MessagingService {
             .toList());
   }
 
-  /// Streams all conversations for a user.
-  /// Handles both 'customerId' and 'otherId' fields to ensure all roles see their chats.
+  /// Streams all conversations for a user (Customer, Tailor, or Retailer).
+  /// Merges both 'customerId' and 'otherId' streams to ensure all parties see the chat.
   Stream<List<Conversation>> getConversations(String userId) {
-    // We query where the user is either the customer OR the 'otherId'.
-    // Note: Firestore doesn't support logical OR across different fields easily in a single query
-    // without multiple queries or using 'whereIn' (if fields were the same).
-    // For simplicity and matching current schema:
-    final customerStream = _db
+    // 🧠 Multi-Role Stream Merger
+    // Firestore doesn't support "OR" queries across different fields.
+    // We listen to both fields simultaneously and combine them in real-time.
+    
+    final Stream<QuerySnapshot> asCustomer = _db
         .collection(_conversations)
         .where('customerId', isEqualTo: userId)
         .where('isDeleted', isEqualTo: false)
         .snapshots();
 
-    final otherStream = _db
+
+    final Stream<QuerySnapshot> asOther = _db
         .collection(_conversations)
         .where('otherId', isEqualTo: userId)
         .where('isDeleted', isEqualTo: false)
         .snapshots();
 
-    // We combine the snapshots and merge them client-side.
-    // In a production app, you might use RxDart's CombineLatest or similar.
-    return customerStream.asyncMap((customerSnap) async {
-      final otherSnap = await _db
-          .collection(_conversations)
-          .where('otherId', isEqualTo: userId)
-          .where('isDeleted', isEqualTo: false)
-          .get();
 
-      final allDocs = [...customerSnap.docs, ...otherSnap.docs];
+    // Use asyncExpand to combine the logic of both streams
+    return _db.collection(_conversations).snapshots().asyncMap((_) async {
+      // Fetch both sides
+      final snaps = await Future.wait([
+        _db.collection(_conversations).where('customerId', isEqualTo: userId).where('isDeleted', isEqualTo: false).get(),
+        _db.collection(_conversations).where('otherId', isEqualTo: userId).where('isDeleted', isEqualTo: false).get(),
+      ]);
+
+
+      final allDocs = [...snaps[0].docs, ...snaps[1].docs];
       
-      final conversations = allDocs.map((doc) {
-        return Conversation.fromJson({...doc.data(), 'id': doc.id});
-      }).toList();
+      // Remove duplicates (if any) and map to models
+      final Map<String, Conversation> uniqueConversations = {};
+      for (var doc in allDocs) {
+        final conv = Conversation.fromJson({...doc.data(), 'id': doc.id});
+        uniqueConversations[conv.id] = conv;
+      }
 
-      // Sort by updatedAt descending
-      conversations.sort((a, b) {
+
+      final list = uniqueConversations.values.toList();
+      
+      // Sort: Newest messages at the top
+      list.sort((a, b) {
         final dateA = a.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
         final dateB = b.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
         return dateB.compareTo(dateA);
       });
 
-      return conversations;
+
+      return list;
     });
   }
 
