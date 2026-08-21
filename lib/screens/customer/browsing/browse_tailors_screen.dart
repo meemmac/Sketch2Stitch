@@ -563,7 +563,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
 }
 
 // ============================================================================
-// TailorDetailScreen - WITH REVIEWS_SCREEN STYLE FILTERS
+// TailorDetailScreen - WITH ALL 4 FILTERS WORKING
 // ============================================================================
 
 class TailorDetailScreen extends StatefulWidget {
@@ -668,18 +668,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
           backgroundColor: Colors.red,
         ),
       );
-    }
-  }
-
-  // ✅ CORRECT: Filters by rating
-  List<Review> _getFilteredReviews() {
-    switch (_selectedFilter) {
-      case "5 Star":
-        return _reviews.where((r) => r.rating >= 4.5).toList();
-      case "4 Star & above":
-        return _reviews.where((r) => r.rating >= 4.0).toList();
-      default:
-        return List.from(_reviews);
     }
   }
 
@@ -1321,7 +1309,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Booked this tailor'),
+                  content: Text('Booking feature coming soon!'),
                   backgroundColor: Colors.orange,
                 ),
               );
@@ -1528,318 +1516,320 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     );
   }
 
-  // ─── Reviews Page ─────────────────────────────────────────────────────────
+// ─── Reviews Page - Tailor Style ──────────────────────────────────────────
 
-  void _showReviewsOverlay(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => _buildReviewsPage()),
-    );
-  }
+void _showReviewsOverlay(BuildContext context) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => _buildReviewsPage()),
+  );
+}
 
-  Widget _buildReviewsPage() {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF9FBF9),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 20),
-          onPressed: () => Navigator.pop(context),
+Widget _buildReviewsPage() {
+  return Scaffold(
+    backgroundColor: const Color(0xFFF9FBF9),
+    appBar: AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 20),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Customer Reviews",
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            widget.tailor.name,
+            style: const TextStyle(color: Colors.grey, fontSize: 12),
+          ),
+        ],
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh, color: Colors.grey),
+          onPressed: () {
+            setState(() {
+              _isLoading = true;
+              _isLoadingReviews = true;
+            });
+            _loadReviewsUsingStream();
+          },
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      ],
+    ),
+    body: _isLoadingReviews
+        ? const Center(child: CircularProgressIndicator())
+        : StatefulBuilder(
+            builder: (context, setState) {
+              final filtered = _getFilteredReviews();
+              
+              return SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildReviewSummary(),
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
+                      child: Text(
+                        "Feedback from Customers",
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    _buildFilterChips(setState),
+                    const SizedBox(height: 16),
+                    if (filtered.isEmpty)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(32.0),
+                          child: Text("No reviews found yet."),
+                        ),
+                      )
+                    else
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: filtered.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 16),
+                        itemBuilder: (context, index) =>
+                            _buildReviewItem(filtered[index]),
+                      ),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              );
+            },
+          ),
+  );
+}
+
+Widget _buildReviewSummary() {
+  final totalReviews = _reviews.length;
+  
+  return Container(
+    margin: const EdgeInsets.all(16),
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: Colors.grey.shade200),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          flex: 4,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                totalReviews > 0 ? _averageRating.toStringAsFixed(1) : '0.0',
+                style: const TextStyle(
+                  fontSize: 42,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Row(
+                children: List.generate(
+                  5,
+                  (index) {
+                    double starVal = index + 1;
+                    IconData icon;
+                    if (_averageRating >= starVal) {
+                      icon = Icons.star;
+                    } else if (_averageRating >= starVal - 0.5) {
+                      icon = Icons.star_half;
+                    } else {
+                      icon = Icons.star_border;
+                    }
+                    return Icon(
+                      icon,
+                      color: Colors.orange,
+                      size: 18,
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                "Overall Rating",
+                style: TextStyle(
+                  color: totalReviews > 0 ? Colors.grey : Colors.grey.shade400,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          flex: 6,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Total Reviews: $totalReviews",
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              _ratingBar(5, _getRatingCount(5.0)),
+              _ratingBar(4, _getRatingCount(4.0)),
+              _ratingBar(3, _getRatingCount(3.0)),
+              _ratingBar(2, _getRatingCount(2.0)),
+              _ratingBar(1, _getRatingCount(1.0)),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _ratingBar(int star, int count) {
+  final total = _reviews.length;
+  final percent = total > 0 ? count / total : 0.0;
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 2),
+    child: Row(
+      children: [
+        Text("$star", style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+        const SizedBox(width: 4),
+        const Icon(Icons.star, color: Colors.orange, size: 10),
+        const SizedBox(width: 8),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: percent,
+              backgroundColor: Colors.grey.shade100,
+              color: Colors.orange,
+              minHeight: 4,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+int _getRatingCount(double rating) {
+  return _reviews.where((r) => r.rating.round() == rating.round()).length;
+}
+
+Widget _buildFilterChips(StateSetter setState) {
+  final filters = ["All reviews", "5 Star", "4 Star & above", "4 Star & below"];
+  return SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: Row(
+      children: filters.map((filter) {
+        final isSelected = _selectedFilter == filter;
+        return Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: ChoiceChip(
+            label: Text(filter),
+            selected: isSelected,
+            onSelected: (val) {
+              if (val) {
+                setState(() {
+                  _selectedFilter = filter;
+                });
+              }
+            },
+            selectedColor: const Color(0xFF4F7942),
+            labelStyle: TextStyle(
+              color: isSelected ? Colors.white : Colors.black87,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(
+                color: isSelected ? Colors.transparent : Colors.grey.shade300,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    ),
+  );
+}
+
+// ✅ CORRECT: Filters by rating with ALL 4 options
+List<Review> _getFilteredReviews() {
+  switch (_selectedFilter) {
+    case "5 Star":
+      return _reviews.where((r) => r.rating >= 4.5).toList();
+    case "4 Star & above":
+      return _reviews.where((r) => r.rating >= 4.0).toList();
+    case "4 Star & below":
+      return _reviews.where((r) => r.rating <= 4.0).toList();
+    default:
+      return List.from(_reviews);  // Shows ALL reviews (1-star to 5-star)
+  }
+}
+
+Widget _buildReviewItem(Review review) {
+  final customerName = _customerNameCache[review.customerId] ?? 'Customer';
+  
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: Colors.grey.shade200),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              "Customer Reviews",
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+            Expanded(
+              child: Text(
+                customerName,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             Text(
-              widget.tailor.name,
+              review.timeAgo,
               style: const TextStyle(color: Colors.grey, fontSize: 12),
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.grey),
-            onPressed: () {
-              setState(() {
-                _isLoading = true;
-                _isLoadingReviews = true;
-              });
-              _loadReviewsUsingStream();
-            },
-          ),
-        ],
-      ),
-      body: _isLoadingReviews
-          ? const Center(child: CircularProgressIndicator())
-          : StatefulBuilder(
-              builder: (context, setState) {
-                final filtered = _getFilteredReviews();
-                
-                return SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildRatingSummary(),
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
-                        child: Text(
-                          "Feedback from Customers",
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      _buildFilterChips(setState),
-                      const SizedBox(height: 16),
-                      if (filtered.isEmpty)
-                        const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(32.0),
-                            child: Text("No reviews found yet."),
-                          ),
-                        )
-                      else
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: filtered.length,
-                          separatorBuilder: (context, index) => const SizedBox(height: 16),
-                          itemBuilder: (context, index) =>
-                              _buildReviewsPageItem(filtered[index]),
-                        ),
-                      const SizedBox(height: 32),
-                    ],
-                  ),
-                );
-              },
-            ),
-    );
-  }
-
-  Widget _buildRatingSummary() {
-    final totalReviews = _reviews.length;
-    
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 4,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  totalReviews > 0 ? _averageRating.toStringAsFixed(1) : '0.0',
-                  style: const TextStyle(
-                    fontSize: 42,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Row(
-                  children: List.generate(
-                    5,
-                    (index) {
-                      double starVal = index + 1;
-                      IconData icon;
-                      if (_averageRating >= starVal) {
-                        icon = Icons.star;
-                      } else if (_averageRating >= starVal - 0.5) {
-                        icon = Icons.star_half;
-                      } else {
-                        icon = Icons.star_border;
-                      }
-                      return Icon(
-                        icon,
-                        color: Colors.orange,
-                        size: 18,
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  totalReviews > 0 ? "Overall Rating" : "No ratings yet",
-                  style: TextStyle(
-                    color: totalReviews > 0 ? Colors.grey : Colors.grey[400],
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+        const SizedBox(height: 8),
+        Row(
+          children: List.generate(
+            5,
+            (index) => Icon(
+              index < review.rating.floor() ? Icons.star : Icons.star_border,
+              color: Colors.orange,
+              size: 14,
             ),
           ),
-          Expanded(
-            flex: 6,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Total Reviews: $totalReviews",
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                _ratingBar(5, _getRatingCount(5.0)),
-                _ratingBar(4, _getRatingCount(4.0)),
-                _ratingBar(3, _getRatingCount(3.0)),
-                _ratingBar(2, _getRatingCount(2.0)),
-                _ratingBar(1, _getRatingCount(1.0)),
-              ],
-            ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          review.comment.isNotEmpty ? review.comment : 'No comment provided.',
+          style: const TextStyle(
+            fontSize: 14,
+            height: 1.5,
+            fontStyle: FontStyle.italic,
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _ratingBar(int star, int count) {
-    final total = _reviews.length;
-    final percent = total > 0 ? count / total : 0.0;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Text("$star", style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-          const SizedBox(width: 4),
-          const Icon(Icons.star, color: Colors.orange, size: 10),
-          const SizedBox(width: 8),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: percent,
-                backgroundColor: Colors.grey.shade100,
-                color: Colors.orange,
-                minHeight: 4,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  int _getRatingCount(double rating) {
-    return _reviews.where((r) => r.rating.round() == rating.round()).length;
-  }
-
-  Widget _buildFilterChips(StateSetter setState) {
-    final filters = ["All reviews", "5 Star", "4 Star & below"];
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: filters.map((filter) {
-          final isSelected = _selectedFilter == filter;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text(filter),
-              selected: isSelected,
-              onSelected: (val) {
-                if (val) {
-                  setState(() {
-                    _selectedFilter = filter;
-                  });
-                }
-              },
-              selectedColor: const Color(0xFF2C5C44),
-              labelStyle: TextStyle(
-                color: isSelected ? Colors.white : Colors.black87,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-              backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(
-                  color: isSelected ? Colors.transparent : Colors.grey.shade300,
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildReviewsPageItem(Review review) {
-    final customerName = _customerNameCache[review.customerId] ?? 'Customer';
-    
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  customerName,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Text(
-                review.timeAgo,
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: List.generate(
-              5,
-              (starIndex) => Icon(
-                starIndex < review.rating.round()
-                    ? Icons.star
-                    : Icons.star_border,
-                color: Colors.orange,
-                size: 14,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            review.comment.isNotEmpty ? review.comment : 'No comment provided.',
-            style: const TextStyle(
-              fontSize: 14,
-              height: 1.5,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-          if (review.orderId != null && review.orderId!.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Order: ${review.orderId!.substring(0, review.orderId!.length > 8 ? 8 : review.orderId!.length)}...',
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.grey[500],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 }
