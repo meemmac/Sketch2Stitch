@@ -612,15 +612,22 @@ class DrawerNavigationSection extends StatelessWidget {
                   ),
                 );
               } else if (item['title'] == 'Messages') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ConversationsScreen(
-                      customerId: 'current_customer_id',
-                      currentUserRole: role,
+                if (customerId != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ConversationsScreen(
+                        customerId: customerId!,
+                        currentUserRole: role,
+                      ),
                     ),
-                  ),
-                );
+                  );
+                } else {
+                  onFeedback(
+                    'Please sign in to view messages.',
+                    isError: true,
+                  );
+                }
               } else {
                 onFeedback("Navigation trigger: ${item['title']}");
               }

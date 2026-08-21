@@ -144,6 +144,7 @@ class MessagingService {
     required UserRole otherRole,
     required String orderId,
   }) async {
+    debugPrint('[MessagingService] 🛠️ Creating new conversation: $customerId <-> $otherId');
     try {
       final now = Timestamp.now();
       final data = {
@@ -157,7 +158,10 @@ class MessagingService {
         'updatedAt': now,
       };
 
+
       final ref = await _db.collection(_conversations).add(data);
+      debugPrint('[MessagingService] ✅ Conversation created with ID: ${ref.id}');
+      
       return Conversation(
         id: ref.id,
         customerId: customerId,
@@ -167,7 +171,7 @@ class MessagingService {
         updatedAt: now.toDate(),
       );
     } catch (e) {
-      debugPrint('Error creating conversation: $e');
+      debugPrint('[MessagingService] ❌ Error creating conversation: $e');
       rethrow;
     }
   }
@@ -268,11 +272,17 @@ class MessagingService {
     return _db
         .collection(_messages)
         .where('conversationId', isEqualTo: conversationId)
-        .orderBy('sentAt', descending: false)
+        // 🧠 Removed orderBy to prevent messages from "vanishing" while server timestamp is null.
         .snapshots()
-        .map((snap) => snap.docs
+        .map((snap) {
+          final messages = snap.docs
             .map((doc) => Message.fromJson({...doc.data(), 'id': doc.id}))
-            .toList());
+            .toList();
+          
+          // Sort in memory instead: Oldest messages at the top.
+          messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+          return messages;
+        });
   }
 
   /// Fetches paginated messages for a conversation.
@@ -300,10 +310,8 @@ class MessagingService {
 
   /// Sends a message and updates the conversation timestamp and unread count.
   Future<void> sendMessage(String conversationId, String senderId, Map<String, dynamic> data) async {
+    debugPrint('[MessagingService] 📤 Attempting direct send in conv: $conversationId');
     try {
-      final batch = _db.batch();
-      final msgRef = _db.collection(_messages).doc();
-      
       final msgData = {
         ...data,
         'conversationId': conversationId,
@@ -312,15 +320,22 @@ class MessagingService {
         'isRead': false,
       };
 
-      batch.set(msgRef, msgData);
-      batch.update(_db.collection(_conversations).doc(conversationId), {
+
+      // 1. Add Message document first
+      final docRef = await _db.collection(_messages).add(msgData);
+      debugPrint('[MessagingService] 📥 Message ADDED to Firestore with ID: ${docRef.id}');
+
+
+      // 2. Update Conversation document separately
+      await _db.collection(_conversations).doc(conversationId).set({
         'updatedAt': FieldValue.serverTimestamp(),
         'unreadCount': FieldValue.increment(1),
-      });
-
-      await batch.commit();
+        'isDeleted': false,
+      }, SetOptions(merge: true));
+      
+      debugPrint('[MessagingService] ✅ Conversation metadata UPDATED');
     } catch (e) {
-      debugPrint('Error sending message: $e');
+      debugPrint('[MessagingService] ❌ CRITICAL Error: $e');
       rethrow;
     }
   }
@@ -347,6 +362,29 @@ class MessagingService {
   }
 
   // ─── User Search ──────────────────────────────────────────────────────────
+
+  /// Fetches basic user info (name, profilePicture) for any role.
+  Future<Map<String, dynamic>?> getUserBasicInfo(String userId, UserRole role) async {
+    try {
+      final collection = role == UserRole.customer 
+          ? _customers 
+          : (role == UserRole.tailor ? _tailors : _retailers);
+      
+      final doc = await _db.collection(collection).doc(userId).get();
+      if (!doc.exists || doc.data() == null) return null;
+      
+      final data = doc.data()!;
+      return {
+        'id': userId,
+        'name': data['name'] ?? data['shopName'] ?? 'Unknown',
+        'profilePicture': data['profilePicture'],
+        'role': role.name,
+      };
+    } catch (e) {
+      debugPrint('Error getting user basic info: $e');
+      return null;
+    }
+  }
 
   /// Searches for users across Customers, Tailors, and Retailers by name or phone.
   /// Note: Firestore doesn't support cross-collection queries. This performs three queries.
