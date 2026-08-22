@@ -28,12 +28,10 @@ class BrowseService {
       query = query.where('category', isEqualTo: category);
     }
 
-    // Apply sorting logic
-    if (sortBy == 'lowToHigh') {
-      query = query.orderBy('minPrice', descending: false);
-    } else if (sortBy == 'highToLow') {
-      query = query.orderBy('maxPrice', descending: true);
-    }
+    // Price sorting is deliberately NOT an orderBy here: minPrice/maxPrice are
+    // computed from colorOptions on the model and are never written to
+    // Firestore, so ordering on them would match zero documents. The callers
+    // sort the resulting list client-side instead.
 
     return query.snapshots().map((snapshot) {
       if (snapshot.docs.isEmpty) {
@@ -153,6 +151,8 @@ class BrowseService {
 
     if (sortBy == 'ratingHighToLow') {
       query = query.orderBy('rating', descending: true);
+    } else if (sortBy == 'ratingLowToHigh') {
+      query = query.orderBy('rating', descending: false);
     }
 
     return query.snapshots().map((snapshot) {
@@ -233,6 +233,8 @@ class BrowseService {
 
     if (sortBy == 'ratingHighToLow') {
       query = query.orderBy('rating', descending: true);
+    } else if (sortBy == 'ratingLowToHigh') {
+      query = query.orderBy('rating', descending: false);
     }
 
     return query.snapshots().map((snapshot) {

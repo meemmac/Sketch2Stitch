@@ -134,9 +134,10 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
   Map<String, GeoPoint?> _retailerLocations = {};
   GeoPoint? _customerLocation;
 
-  // Categories that are considered "Elements" (non-fabric items)
+  // Categories that are considered "Elements" (non-fabric items).
+  // Must match the retailer inventory form, which stores "Fabric"/"Element".
   final List<String> _elementCategories = [
-    'Material',
+    'Element',
   ];
 
   // Categories that are considered "Fabrics"
@@ -223,9 +224,12 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
     return ValueListenableBuilder<String>(
       valueListenable: widget.searchQuery,
       builder: (context, searchQuery, _) {
-        final materialFilter = widget.filterData.materialTypes.contains('All') 
-            ? null 
-            : widget.filterData.materialTypes.first;
+        // The material chips are multi-select, so the selection can't be
+        // expressed by the service's single `materialType` argument; it is
+        // applied client-side below instead.
+        final selectedMaterials = widget.filterData.materialTypes.contains('All')
+            ? const <String>[]
+            : widget.filterData.materialTypes;
         
         final selectedColors = widget.filterData.colors.contains('All')
             ? null
@@ -236,7 +240,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         return StreamBuilder<List<Product>>(
           stream: _browseService.getProductsByFilter(
             category: null,
-            materialType: materialFilter,
+            materialType: null,
             minPrice: widget.filterData.minPrice > 0 ? widget.filterData.minPrice : null,
             maxPrice: widget.filterData.maxPrice < 5000 ? widget.filterData.maxPrice : null,
             colors: selectedColors,
@@ -281,7 +285,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                 !snapshot.hasData) {
               return const Center(
                 child: CircularProgressIndicator(
-                  color: Color(0xFF6B8F71),
+                  color: kSage,
                 ),
               );
             }
@@ -293,6 +297,20 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
               filteredProducts = products.where((p) => _isFabric(p)).toList();
             } else {
               filteredProducts = products.where((p) => _isElement(p)).toList();
+            }
+
+            // A product matches if ANY of its material blends matches ANY of
+            // the selected material chips.
+            if (selectedMaterials.isNotEmpty) {
+              filteredProducts = filteredProducts.where((p) {
+                return p.materialType.any(
+                  (m) => selectedMaterials.any(
+                    (selected) => m.type
+                        .toLowerCase()
+                        .contains(selected.toLowerCase()),
+                  ),
+                );
+              }).toList();
             }
             
             final fabricDataList = filteredProducts
@@ -361,7 +379,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       padding: EdgeInsets.all(isSmallScreen ? 14 : 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF4A7C59), Color(0xFF6B8F71)],
+          colors: [Color(0xFF4A7C59), kSage],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -739,7 +757,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
 
   Widget _imageFallback(bool isSmall) {
     return Container(
-      color: const Color(0xFF6B8F71).withOpacity(0.12),
+      color: kSage.withOpacity(0.12),
       child: Icon(
         Icons.texture,
         size: isSmall ? 36 : 40,

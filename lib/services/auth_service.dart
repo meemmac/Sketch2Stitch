@@ -132,9 +132,9 @@ class AuthService {
         case UserRole.customer:
           return Customer.fromJson(data);
         case UserRole.tailor:
-          return Tailor.fromJson(data);
+          return Tailor.fromJson(data, id: uid);
         case UserRole.retailer:
-          return Retailer.fromJson(data);
+          return Retailer.fromJson(data, id: uid);
       }
     } catch (e) {
       debugPrint('Error getting user profile: $e');

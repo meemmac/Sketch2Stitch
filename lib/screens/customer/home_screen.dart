@@ -67,13 +67,10 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   bool _hasError = false;
   String _errorMessage = '';
 
+  // Must match the category values written by the retailer inventory form,
+  // which stores exactly "Fabric" or "Element".
   final List<String> _elementCategories = [
-    'Fasteners',
-    'Buttons',
-    'Threads',
-    'Embellishments',
-    'Trims',
-    'Ribbons',
+    'Element',
   ];
 
   bool _isElement(Product product) =>
@@ -407,7 +404,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CircularProgressIndicator(
-              color: Color(0xFF6B8F71),
+              color: kSage,
             ),
             SizedBox(height: 16),
             Text(
@@ -456,7 +453,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
               ElevatedButton(
                 onPressed: _loadData,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6B8F71),
+                  backgroundColor: kSage,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                   shape: RoundedRectangleBorder(
@@ -1360,7 +1357,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                                 fit: BoxFit.cover,
                                 errorBuilder: (context, error, stackTrace) =>
                                     Container(
-                                      color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                      color: kSage.withOpacity(0.12),
                                       child: Icon(
                                         Icons.texture,
                                         size: 34,
@@ -1373,7 +1370,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                                 fit: BoxFit.cover,
                                 errorBuilder: (context, error, stackTrace) =>
                                     Container(
-                                      color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                      color: kSage.withOpacity(0.12),
                                       child: Icon(
                                         Icons.texture,
                                         size: 34,
@@ -1382,7 +1379,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                                     ),
                               ))
                         : Container(
-                            color: const Color(0xFF6B8F71).withOpacity(0.12),
+                            color: kSage.withOpacity(0.12),
                             child: Icon(
                               Icons.texture,
                               size: 34,
@@ -1668,7 +1665,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
                                 Container(
-                                  color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                  color: kSage.withOpacity(0.12),
                                   child: Icon(Icons.person, size: 34, color: const Color(0xFF4A7C59)),
                                 ),
                           )
@@ -1677,7 +1674,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
                                 Container(
-                                  color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                  color: kSage.withOpacity(0.12),
                                   child: Icon(Icons.person, size: 34, color: const Color(0xFF4A7C59)),
                                 ),
                           ),
@@ -1693,7 +1690,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF6B8F71),
+                        color: kSage,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Text(
@@ -1889,7 +1886,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
                                 Container(
-                                  color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                  color: kSage.withOpacity(0.12),
                                   child: Icon(Icons.store, size: 34, color: const Color(0xFF4A7C59)),
                                 ),
                           )
@@ -1898,7 +1895,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
                                 Container(
-                                  color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                  color: kSage.withOpacity(0.12),
                                   child: Icon(Icons.store, size: 34, color: const Color(0xFF4A7C59)),
                                 ),
                           ),
@@ -1914,7 +1911,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF6B8F71),
+                        color: kSage,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Text(

@@ -153,7 +153,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                 !snapshot.hasData) {
               return const Center(
                 child: CircularProgressIndicator(
-                  color: Color(0xFF6B8F71),
+                  color: kSage,
                 ),
               );
             }
@@ -219,7 +219,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
       padding: EdgeInsets.all(isSmallScreen ? 14 : 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF4A7C59), Color(0xFF6B8F71)],
+          colors: [Color(0xFF4A7C59), kSage],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -400,7 +400,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                               imageUrl,
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) => Container(
-                                color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                color: kSage.withOpacity(0.12),
                                 child: Icon(
                                   Icons.store,
                                   size: isSmall ? 36 : 40,
@@ -412,7 +412,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                               imageUrl,
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) => Container(
-                                color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                color: kSage.withOpacity(0.12),
                                 child: Icon(
                                   Icons.store,
                                   size: isSmall ? 36 : 40,
@@ -432,7 +432,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                           vertical: isSmall ? 3 : 4,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF6B8F71),
+                          color: kSage,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: Colors.white.withOpacity(0.2),
@@ -612,7 +612,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   List<Review> _reviews = [];
   bool _isLoadingReviews = true;
   double _averageRating = 0.0;
-  String _selectedFilter = "Top reviews";
+  String _selectedFilter = "All reviews";
   
   final ReviewService _reviewService = ReviewService();
   final FavoriteService _favoriteService = FavoriteService();
@@ -634,7 +634,8 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   StreamSubscription? _reviewSubscription;
 
   // Categories
-  final List<String> _elementCategories = ['Material'];
+  // Must match the retailer inventory form, which stores "Fabric"/"Element".
+  final List<String> _elementCategories = ['Element'];
   final List<String> _fabricCategories = ['Fabric'];
 
   bool get _isCustomer => widget.userRole == UserRole.customer;
@@ -1293,7 +1294,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(40.0),
-          child: CircularProgressIndicator(color: Color(0xFF6B8F71)),
+          child: CircularProgressIndicator(color: kSage),
         ),
       );
     }
@@ -1425,7 +1426,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                                       fit: BoxFit.cover,
                                       errorBuilder: (context, error, stackTrace) =>
                                           Container(
-                                            color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                            color: kSage.withOpacity(0.12),
                                             child: Icon(
                                               isElement ? Icons.category : Icons.texture,
                                               size: isSmallScreen ? 28 : 32,
@@ -1438,7 +1439,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                                       fit: BoxFit.cover,
                                       errorBuilder: (context, error, stackTrace) =>
                                           Container(
-                                            color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                            color: kSage.withOpacity(0.12),
                                             child: Icon(
                                               isElement ? Icons.category : Icons.texture,
                                               size: isSmallScreen ? 28 : 32,
@@ -1447,7 +1448,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                                           ),
                                     ))
                               : Container(
-                                  color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                  color: kSage.withOpacity(0.12),
                                   child: Icon(
                                     isElement ? Icons.category : Icons.texture,
                                     size: isSmallScreen ? 28 : 32,
@@ -1813,7 +1814,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   }
 
   Widget _buildFilterChips(StateSetter setState) {
-    final filters = ["Top reviews", "Newest", "Highest rating", "Lowest rating"];
+    final filters = ["All reviews", "5 Star", "4 Star & above", "Below 4 Star"];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1832,7 +1833,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                   });
                 }
               },
-              selectedColor: const Color(0xFF6B8F71),
+              selectedColor: kSage,
               labelStyle: TextStyle(
                 color: isSelected ? Colors.white : Colors.black87,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -1851,23 +1852,20 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     );
   }
 
+  // Same rating buckets as the tailor detail screen so both browsing detail
+  // pages filter reviews identically. Buckets are disjoint at the 4.0
+  // boundary: "Below 4 Star" is strictly < 4.0.
   List<Review> _getFilteredReviews() {
-    List<Review> sortedList = List.from(_reviews);
     switch (_selectedFilter) {
-      case "Top reviews":
-        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
-        break;
-      case "Newest":
-        sortedList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        break;
-      case "Highest rating":
-        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
-        break;
-      case "Lowest rating":
-        sortedList.sort((a, b) => a.rating.compareTo(b.rating));
-        break;
+      case "5 Star":
+        return _reviews.where((r) => r.rating >= 5.0).toList();
+      case "4 Star & above":
+        return _reviews.where((r) => r.rating >= 4.0).toList();
+      case "Below 4 Star":
+        return _reviews.where((r) => r.rating < 4.0).toList();
+      default:
+        return List.from(_reviews);
     }
-    return sortedList;
   }
 
   Widget _buildReviewsPageItem(Review review) {

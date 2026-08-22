@@ -139,7 +139,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                 !snapshot.hasData) {
               return const Center(
                 child: CircularProgressIndicator(
-                  color: Color(0xFF6B8F71),
+                  color: kSage,
                 ),
               );
             }
@@ -212,7 +212,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
       padding: EdgeInsets.all(isSmallScreen ? 14 : 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF4A7C59), Color(0xFF6B8F71)],
+          colors: [Color(0xFF4A7C59), kSage],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -404,7 +404,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                                   imageUrl,
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) => Container(
-                                    color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                    color: kSage.withOpacity(0.12),
                                     child: Icon(
                                       Icons.person,
                                       size: isSmall ? 30 : 36,
@@ -416,7 +416,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                                   imageUrl,
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) => Container(
-                                    color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                    color: kSage.withOpacity(0.12),
                                     child: Icon(
                                       Icons.person,
                                       size: isSmall ? 30 : 36,
@@ -437,7 +437,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                             vertical: isSmall ? 3 : 4,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF6B8F71),
+                            color: kSage,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: Colors.white.withOpacity(0.2),
@@ -1423,7 +1423,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(20.0),
-          child: CircularProgressIndicator(color: Color(0xFF6B8F71)),
+          child: CircularProgressIndicator(color: kSage),
         ),
       );
     }
@@ -1800,7 +1800,7 @@ Widget _buildFilterChips(StateSetter setState) {
                 });
               }
             },
-            selectedColor: const Color(0xFF6B8F71),
+            selectedColor: kSage,
             labelStyle: TextStyle(
               color: isSelected ? Colors.white : Colors.black87,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,

@@ -8,16 +8,10 @@ import 'package:sketch2stitch/screens/customer/cart_screen.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Shared sage-green palette (matches VirtualTrialScreen) used across all
-// "Browse" screens — Fabrics, Tailors, Retailers — so they feel like one
-// consistent design language rather than three separately-styled pages.
+// Shared green used across all "Browse" screens — Fabrics, Elements, Tailors,
+// Retailers — so they read as one consistent design language.
 // ─────────────────────────────────────────────────────────────────────────────
-const kSage = Color(0xFF4E8B6F);
-const kSageDark = Color(0xFF2C5C44);
-const kSagePale = Color(0xFFEEF6F0);
-const kInk = Color(0xFF1A2C22);
-const kCardBg = Color(0xFFFBFDF9);
-const kBorder = Color(0xFFDDEBE3);
+const kSage = kSage;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Filter Data Classes
@@ -588,7 +582,7 @@ class _BrowseShellState extends State<BrowseShell> {
                 height: 40,
                 width: 40,
                 decoration: const BoxDecoration(
-                  color: Color(0xFF6B8F71),
+                  color: kSage,
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
@@ -611,7 +605,7 @@ class _BrowseShellState extends State<BrowseShell> {
                 onPressed: _toggleFilterOverlay,
                 icon: Icon(
                   Icons.filter_list,
-                  color: _showFilterOverlay || _hasActiveFilters ? const Color(0xFF6B8F71) : Colors.black87,
+                  color: _showFilterOverlay || _hasActiveFilters ? kSage : Colors.black87,
                   size: 24,
                 ),
                 padding: EdgeInsets.zero,
@@ -738,7 +732,7 @@ class _BrowseShellState extends State<BrowseShell> {
               min: 0,
               max: 5000,
               divisions: 50,
-              activeColor: const Color(0xFF6B8F71),
+              activeColor: kSage,
               inactiveColor: Colors.grey.shade300,
               onChanged: (values) {
                 setState(() {
@@ -808,10 +802,10 @@ class _BrowseShellState extends State<BrowseShell> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade100,
+                      color: isSelected ? kSage : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade300,
+                        color: isSelected ? kSage : Colors.grey.shade300,
                         width: 0.5,
                       ),
                     ),
@@ -879,10 +873,10 @@ class _BrowseShellState extends State<BrowseShell> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade100,
+                      color: isSelected ? kSage : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade300,
+                        color: isSelected ? kSage : Colors.grey.shade300,
                         width: 0.5,
                       ),
                     ),
@@ -905,7 +899,7 @@ class _BrowseShellState extends State<BrowseShell> {
               child: ElevatedButton(
                 onPressed: _applyFilters,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6B8F71),
+                  backgroundColor: kSage,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(
@@ -997,7 +991,7 @@ class _BrowseShellState extends State<BrowseShell> {
               min: 0,
               max: 5000,
               divisions: 50,
-              activeColor: const Color(0xFF6B8F71),
+              activeColor: kSage,
               inactiveColor: Colors.grey.shade300,
               onChanged: (values) {
                 setState(() {
@@ -1067,10 +1061,10 @@ class _BrowseShellState extends State<BrowseShell> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade100,
+                      color: isSelected ? kSage : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade300,
+                        color: isSelected ? kSage : Colors.grey.shade300,
                         width: 0.5,
                       ),
                     ),
@@ -1109,7 +1103,7 @@ class _BrowseShellState extends State<BrowseShell> {
               child: ElevatedButton(
                 onPressed: _applyFilters,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6B8F71),
+                  backgroundColor: kSage,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(
@@ -1147,10 +1141,10 @@ class _BrowseShellState extends State<BrowseShell> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade100,
+          color: isSelected ? kSage : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade300,
+            color: isSelected ? kSage : Colors.grey.shade300,
             width: 0.5,
           ),
         ),
@@ -1192,10 +1186,10 @@ class _BrowseShellState extends State<BrowseShell> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade100,
+          color: isSelected ? kSage : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade300,
+            color: isSelected ? kSage : Colors.grey.shade300,
             width: 0.5,
           ),
         ),
@@ -1237,10 +1231,10 @@ class _BrowseShellState extends State<BrowseShell> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade100,
+          color: isSelected ? kSage : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade300,
+            color: isSelected ? kSage : Colors.grey.shade300,
             width: 0.5,
           ),
         ),
@@ -1282,10 +1276,10 @@ class _BrowseShellState extends State<BrowseShell> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade100,
+          color: isSelected ? kSage : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade300,
+            color: isSelected ? kSage : Colors.grey.shade300,
             width: 0.5,
           ),
         ),
@@ -1439,10 +1433,10 @@ class _BrowseShellState extends State<BrowseShell> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade100,
+                      color: isSelected ? kSage : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade300,
+                        color: isSelected ? kSage : Colors.grey.shade300,
                         width: 0.5,
                       ),
                     ),
@@ -1465,7 +1459,7 @@ class _BrowseShellState extends State<BrowseShell> {
               child: ElevatedButton(
                 onPressed: _applyFilters,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6B8F71),
+                  backgroundColor: kSage,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(
@@ -1615,10 +1609,10 @@ class _BrowseShellState extends State<BrowseShell> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade100,
+                      color: isSelected ? kSage : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade300,
+                        color: isSelected ? kSage : Colors.grey.shade300,
                         width: 0.5,
                       ),
                     ),
@@ -1641,7 +1635,7 @@ class _BrowseShellState extends State<BrowseShell> {
               child: ElevatedButton(
                 onPressed: _applyFilters,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6B8F71),
+                  backgroundColor: kSage,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(
@@ -1705,8 +1699,8 @@ class _BrowseShellState extends State<BrowseShell> {
             final t = (1 - (_page - index).abs()).clamp(0.0, 1.0);
             final fontSize = lerpDouble(14, 17, t)!;
             final color = Color.lerp(
-              const Color(0xFF6B8F71).withValues(alpha: 0.5),
-              const Color(0xFF6B8F71),
+              kSage.withValues(alpha: 0.5),
+              kSage,
               t,
             );
             final weight = t > 0.5 ? FontWeight.bold : FontWeight.w600;
@@ -1734,7 +1728,7 @@ class _BrowseShellState extends State<BrowseShell> {
                       height: 3,
                       width: lerpDouble(0, 24, t),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF6B8F71).withValues(alpha: t),
+                        color: kSage.withValues(alpha: t),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
