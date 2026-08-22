@@ -295,6 +295,14 @@ class AuthService {
 
   /// Sends Firebase's built-in password-reset email (a link, not an OTP).
   /// Works entirely on the client SDK — no Cloud Functions / Blaze plan needed.
+  ///
+  /// Where the link lands depends on the project's **custom action URL**
+  /// (Console → Authentication → Templates → Password reset → Customize
+  /// action URL). Pointed at `public/action.html`, the link bounces into the
+  /// app as `sketch2stitch://reset?oobCode=...` and [ResetPasswordScreen]
+  /// finishes the job in-app. Left unset, Firebase's own web form handles it
+  /// and `_passwordResetContinueUrl` brings the user back afterwards — so
+  /// both paths work and neither breaks the other.
   Future<void> sendPasswordReset(String email) async {
     try {
       final trimmedEmail = email.trim();
@@ -326,6 +334,61 @@ class AuthService {
       throw AuthServiceException(
         'Failed to send reset email. Please check your internet connection and try again.',
       );
+    }
+  }
+
+  /// Checks that an `oobCode` from a password-reset email is still valid and
+  /// returns the address it belongs to, so the reset screen can show the user
+  /// whose password they're about to change.
+  ///
+  /// Client-SDK only — no Cloud Functions, works on the Spark (free) plan.
+  Future<String> verifyPasswordResetCode(String code) async {
+    try {
+      return await _auth.verifyPasswordResetCode(code);
+    } on FirebaseAuthException catch (e) {
+      throw AuthServiceException(_messageForResetCode(e.code));
+    } catch (e) {
+      debugPrint('❌ Error verifying reset code: $e');
+      throw AuthServiceException(
+        'Could not open this reset link. Please request a new one.',
+      );
+    }
+  }
+
+  /// Completes the reset started by the emailed link, entirely inside the app.
+  /// The caller is responsible for enforcing the app's own strength rules
+  /// before calling this — Firebase only rejects passwords under 6 characters.
+  Future<void> confirmPasswordReset({
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      await _auth.confirmPasswordReset(code: code, newPassword: newPassword);
+    } on FirebaseAuthException catch (e) {
+      throw AuthServiceException(_messageForResetCode(e.code));
+    } catch (e) {
+      debugPrint('❌ Error confirming password reset: $e');
+      throw AuthServiceException(
+        'Could not reset your password. Please try again.',
+      );
+    }
+  }
+
+  /// Reset links are single-use and time-limited, so they fail in ways the
+  /// generic sign-in mapping doesn't cover.
+  String _messageForResetCode(String code) {
+    switch (code) {
+      case 'expired-action-code':
+        return 'This reset link has expired. Please request a new one.';
+      case 'invalid-action-code':
+        return 'This reset link is no longer valid — it may have already '
+            'been used. Please request a new one.';
+      case 'user-disabled':
+        return 'This account has been disabled. Please contact support.';
+      case 'user-not-found':
+        return 'No account was found for this reset link.';
+      default:
+        return _messageForCode(code);
     }
   }
 

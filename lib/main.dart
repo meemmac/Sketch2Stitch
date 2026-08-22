@@ -5,6 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:app_links/app_links.dart';
 import 'screens/shared/auth_wrapper.dart';
 import 'screens/shared/login_screen.dart';
+import 'screens/shared/reset_password_screen.dart';
 import 'firebase_options.dart';
 
 /// Global navigator key so the deep-link listener (which lives outside
@@ -61,8 +62,25 @@ class _Sketch2StitchAppState extends State<Sketch2StitchApp> {
   void _handleIncomingLink(Uri uri) {
     debugPrint('🔗 Incoming deep link: $uri');
 
-    // sketch2stitch://reset-done  -> scheme: sketch2stitch, host: reset-done
-    if (uri.scheme == 'sketch2stitch' && uri.host == 'reset-done') {
+    if (uri.scheme != 'sketch2stitch') return;
+
+    // sketch2stitch://reset?oobCode=...  -> the password-reset email, bounced
+    // here by public/action.html so the new password is set inside the app.
+    if (uri.host == 'reset') {
+      final oobCode = uri.queryParameters['oobCode'];
+      if (oobCode == null || oobCode.isEmpty) return;
+      navigatorKey.currentState?.pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => ResetPasswordScreen(oobCode: oobCode),
+        ),
+        (route) => false,
+      );
+      return;
+    }
+
+    // sketch2stitch://reset-done -> kept for links already in users' inboxes
+    // that still point at the old Firebase-hosted reset page.
+    if (uri.host == 'reset-done') {
       navigatorKey.currentState?.pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
         (route) => false,
