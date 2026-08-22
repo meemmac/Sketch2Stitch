@@ -9,11 +9,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../services/tailor_service.dart';
 import '../../../services/user_session.dart';
 import '../../../services/order_service.dart';
+import '../../../services/cart_service.dart';
 import '../../../models/tailor_job.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../widgets/top_feedback_banner.dart';
 
-enum TailorOrderStatus { pending, confirmed, inProgress, ready, completed, cancelled }
+enum TailorOrderStatus { pending, quoted, confirmed, inProgress, ready, completed, cancelled }
 
 class TailorOrderItem {
   final String name;
@@ -62,6 +63,10 @@ class TailorOrder {
   final double? customerRating;
   final String deliveryAddress;
   final Measurement? measurement;
+  final double? deliveryDistanceKm; // #14: used to compute delivery charge at quote time
+  // Job-level price and date (set when tailor quotes — not per-item) #9
+  double jobServicePrice;
+  DateTime? jobEstimatedDeliveryDate;
 
   TailorOrder({
     required this.id,
@@ -78,10 +83,14 @@ class TailorOrder {
     this.customerReview,
     this.customerRating,
     this.measurement,
+    this.deliveryDistanceKm,
+    this.jobServicePrice = 0,
+    this.jobEstimatedDeliveryDate,
   });
 
   int get totalQuantity => items.fold(0, (sumValue, item) => sumValue + item.quantity);
-  double get totalServicePrice => items.fold(0, (sumValue, item) => sumValue + item.servicePrice);
+  // For display purposes use the job-level price when set, otherwise fall back to per-item sum
+  double get totalServicePrice => jobServicePrice > 0 ? jobServicePrice : items.fold(0, (sumValue, item) => sumValue + item.servicePrice);
   double get totalProductPrice => items.fold(0, (sumValue, item) => sumValue + item.productPrice);
 }
 
@@ -152,6 +161,14 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           final items = map['items'] as List<dynamic>;
           final measurementMap = map['measurement'];
 
+          // #16: Skip expired jobs entirely — they are dead jobs and should
+          // not re-appear on the tailor's screen in any section.
+          if (job['status'] == 'expired') continue;
+
+          final mappedStatus = _mapStatus(job['status']);
+          // #9: The whole job has one price and one estimated date.
+          final double jobQuoteAmount = (job['quoteAmount'] ?? 0).toDouble();
+          final DateTime? jobDeliveryDate = _parseDateTime(job['estimatedDeliveryDate']);
 
           _orders.add(TailorOrder(
             id: job['id'],
@@ -160,11 +177,16 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
             customerPhone: customer['phone'] ?? 'N/A',
             totalAmount: (job['quoteAmount'] ?? 0).toDouble() + (job['deliveryCharge'] ?? 0).toDouble(),
             orderDate: _parseDateTime(job['createdAt'] ?? order['orderDate']) ?? DateTime.now(),
-            status: _mapStatus(job['status']),
+            status: mappedStatus,
             isCompleted: job['status'] == 'completed',
-            completionDate: job['status'] == 'completed' ? _parseDateTime(job['confirmedAt']) : null, 
+            completionDate: job['status'] == 'completed' ? _parseDateTime(job['confirmedAt']) : null,
             deliveryAddress: customer['address'] ?? 'N/A',
             measurement: measurementMap != null ? Measurement.fromJson({...measurementMap, 'id': job['measurementId']}) : null,
+            // #14: carry distance so we can compute the charge at Accept time
+            deliveryDistanceKm: (job['deliveryDistanceKm'] as num?)?.toDouble(),
+            // #9: job-level quote price and date
+            jobServicePrice: jobQuoteAmount,
+            jobEstimatedDeliveryDate: jobDeliveryDate,
             items: items.map((i) {
               // Products store care labels the way the retailer inventory
               // form writes them ("Washable", "Dry Clean Only",
@@ -178,9 +200,9 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 imagePath: i['imagePath'],
                 color: i['color'],
                 productPrice: i['price'],
-                servicePrice: (job['quoteAmount'] ?? 0).toDouble(),
+                servicePrice: 0, // #9: price lives at job level now
                 tailorInstructions: job['specialInstructions'] ?? i['instructions'],
-                estimatedDeliveryDate: _parseDateTime(job['estimatedDeliveryDate']),
+                estimatedDeliveryDate: null, // #9: date lives at job level now
                 measurementRefImages: List<String>.from(map['designUrls'] ?? []),
                 canWash: careLower.any((s) => s.contains('wash')),
                 canBleach: careLower.any((s) => s.contains('bleach')),
@@ -212,10 +234,9 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
   TailorOrderStatus _mapStatus(String? status) {
     switch (status?.toLowerCase()) {
       case 'pending': return TailorOrderStatus.pending;
-      // Quote sent — the tailor is done, it's the customer's move now. Groups
-      // with 'confirmed' so a quoted job doesn't fall back into the Pending
-      // bucket and look like it still needs a response.
-      case 'quoted':
+      // #3: quoted and confirmed are now distinct so the tailor can tell
+      // "waiting on customer" from "paid, ready to sew".
+      case 'quoted': return TailorOrderStatus.quoted;
       case 'confirmed': return TailorOrderStatus.confirmed;
       case 'in_progress': return TailorOrderStatus.inProgress;
       case 'ready': return TailorOrderStatus.ready;
@@ -224,7 +245,10 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
       case 'tailor_declined':
       case 'rejected':
         return TailorOrderStatus.cancelled;
-      default: return TailorOrderStatus.pending;
+      // #16: expired is handled before _mapStatus is called (skipped in stream)
+      // Default to cancelled rather than pending so any unknown status
+      // doesn't silently re-appear in the pending bucket.
+      default: return TailorOrderStatus.cancelled;
     }
   }
 
@@ -438,9 +462,11 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     }).toList();
   }
 
-  List<TailorOrder> get _pendingOrders => _filteredOrders.where((o) => o.status == TailorOrderStatus.pending || o.status == TailorOrderStatus.confirmed).toList();
-  List<TailorOrder> get _currentWorkOrders => _filteredOrders.where((o) => o.status == TailorOrderStatus.inProgress || o.status == TailorOrderStatus.ready).toList();
-  List<TailorOrder> get _completedOrders => _filteredOrders.where((o) => o.isCompleted || o.status == TailorOrderStatus.completed).toList();
+  // #3: pending = 'New Request' (needs quoting), quoted = 'Pending Customer' (awaiting payment)
+  List<TailorOrder> get _pendingOrders => _filteredOrders.where((o) => o.status == TailorOrderStatus.pending || o.status == TailorOrderStatus.quoted).toList();
+  // #3: confirmed = customer paid, tailor can now start stitching
+  List<TailorOrder> get _currentWorkOrders => _filteredOrders.where((o) => o.status == TailorOrderStatus.confirmed || o.status == TailorOrderStatus.inProgress || o.status == TailorOrderStatus.ready).toList();
+  List<TailorOrder> get _completedOrders => _filteredOrders.where((o) => o.isCompleted || o.status == TailorOrderStatus.completed || o.status == TailorOrderStatus.cancelled).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -852,7 +878,11 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                       decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(999)),
                       child: Text(_getStatusText(order.status), style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w900)),
                     ),
-                    if (order.status == TailorOrderStatus.inProgress)
+                    // #3: show Update Status from confirmed onward so the
+                    // tailor can press "Start Stitching" once the customer pays.
+                    if (order.status == TailorOrderStatus.confirmed ||
+                        order.status == TailorOrderStatus.inProgress ||
+                        order.status == TailorOrderStatus.ready)
                       TextButton(
                         onPressed: () => _showStatusUpdateSheet(order),
                         style: TextButton.styleFrom(
@@ -1041,8 +1071,103 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 const Text("Customer Requirements", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 ...order.items.map((item) => _itemPreviewCard(order, item, setModalState)),
+                // #9: Single price and date for the whole job, shown once below all items.
+                if (order.status == TailorOrderStatus.pending) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.green.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text("Set Quote Price & Date", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
+                        const SizedBox(height: 4),
+                        const Text("One price covers all items in this job.", style: TextStyle(fontSize: 11, color: Colors.black54)),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text("Stitching Price (Tk)", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
+                                  const SizedBox(height: 6),
+                                  TextField(
+                                    keyboardType: TextInputType.number,
+                                    style: const TextStyle(fontSize: 13),
+                                    decoration: InputDecoration(
+                                      hintText: "e.g. 2000",
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.green.shade300)),
+                                      isDense: true,
+                                    ),
+                                    onChanged: (val) {
+                                      setModalState(() {
+                                        order.jobServicePrice = double.tryParse(val) ?? 0;
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text("Est. Delivery Date", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
+                                  const SizedBox(height: 6),
+                                  InkWell(
+                                    onTap: () async {
+                                      final date = await showDatePicker(
+                                        context: context,
+                                        initialDate: DateTime.now().add(const Duration(days: 7)),
+                                        firstDate: DateTime.now(),
+                                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                                      );
+                                      if (date != null) {
+                                        setModalState(() {
+                                          order.jobEstimatedDeliveryDate = date;
+                                        });
+                                      }
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        border: Border.all(color: Colors.green.shade300),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.calendar_today, size: 14, color: primaryGreen),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            order.jobEstimatedDeliveryDate != null ? _formatDate(order.jobEstimatedDeliveryDate!) : "Select Date",
+                                            style: const TextStyle(fontSize: 12),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 30),
                 const Text("Job Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+
                 const SizedBox(height: 12),
                 _detailRow("Customer", order.customerName),
                 if (order.status != TailorOrderStatus.pending) ...[
@@ -1119,7 +1244,8 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
   }
 
   Widget _buildActionButtons(TailorOrder order, StateSetter setModalState, BuildContext modalContext) {
-    final bool canAccept = order.items.every((i) => i.servicePrice > 0 && i.estimatedDeliveryDate != null);
+    // #9: Accept is enabled when the tailor has set a job-level price and date.
+    final bool canAccept = order.jobServicePrice > 0 && order.jobEstimatedDeliveryDate != null;
 
     return Row(
       children: [
@@ -1127,11 +1253,15 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           child: ElevatedButton(
             onPressed: canAccept ? () async {
               try {
-                final firstItem = order.items.first;
+                // #14: Calculate delivery charge from saved distance the same
+                // way the retailer flow does (CartService.deliveryChargeFor).
+                final deliveryCharge = CartService.deliveryChargeFor(order.deliveryDistanceKm);
+                // #9: send the single job-level price and date
                 await _orderService.acceptTailorJob(
-                  order.id, 
-                  firstItem.servicePrice, 
-                  firstItem.estimatedDeliveryDate!,
+                  order.id,
+                  order.jobServicePrice,
+                  order.jobEstimatedDeliveryDate!,
+                  deliveryCharge: deliveryCharge,
                 );
                 Navigator.pop(modalContext);
                 _showBanner("Job Accepted Successfully!", isError: false);
@@ -1202,85 +1332,9 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
               _careTag(Icons.iron, "Iron: ${item.ironLevel}", true),
             ]),
           ),
-          if (order.status == TailorOrderStatus.pending) ...[
-            const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 8),
-            const Text("Set Price and Date", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text("Stitching Price (Tk)", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
-                      const SizedBox(height: 6),
-                      TextField(
-                        keyboardType: TextInputType.number,
-                        style: const TextStyle(fontSize: 13),
-                        decoration: InputDecoration(
-                          hintText: "e.g. 1500",
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          isDense: true,
-                        ),
-                        onChanged: (val) {
-                          setModalState(() {
-                            item.servicePrice = double.tryParse(val) ?? 0;
-                          });
-                          setState(() {});
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text("Est. Delivery Date", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
-                      const SizedBox(height: 6),
-                      InkWell(
-                        onTap: () async {
-                          final date = await showDatePicker(
-                            context: context,
-                            initialDate: DateTime.now().add(const Duration(days: 7)),
-                            firstDate: DateTime.now(),
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
-                          );
-                          if (date != null) {
-                            setModalState(() {
-                              item.estimatedDeliveryDate = date;
-                            });
-                            setState(() {});
-                          }
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade400),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.calendar_today, size: 14, color: primaryGreen),
-                              const SizedBox(width: 8),
-                              Text(
-                                item.estimatedDeliveryDate != null ? _formatDate(item.estimatedDeliveryDate!) : "Select Date",
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ] else ...[
+          // #9: price & date fields are shown once at the job level (below all
+          // item cards) for pending orders, so nothing here per item.
+          if (order.status != TailorOrderStatus.pending) ...[
             const SizedBox(height: 16),
             const Divider(),
             const SizedBox(height: 8),
@@ -1292,18 +1346,9 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   children: [
                     const Text("Price", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
                     const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Text("Tk ${item.servicePrice.toInt()}", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                        if (order.status == TailorOrderStatus.inProgress || order.status == TailorOrderStatus.confirmed) ...[
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () => _showPriceEditDialog(order, item, setModalState),
-                            child: Icon(Icons.edit, size: 14, color: primaryGreen),
-                          ),
-                        ],
-                      ],
-                    ),
+                    // #8: price pencil removed from ongoing section — price is
+                    // locked once the customer pays.
+                    Text("Tk ${order.totalServicePrice.toInt()}", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                   ],
                 ),
                 Column(
@@ -1311,34 +1356,9 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   children: [
                     const Text("Est. Delivery Date", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
                     const SizedBox(height: 2),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          item.estimatedDeliveryDate != null ? _formatDate(item.estimatedDeliveryDate!) : "Not set",
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                        ),
-                        if (order.status == TailorOrderStatus.inProgress || order.status == TailorOrderStatus.confirmed) ...[
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () async {
-                              final date = await showDatePicker(
-                                context: context,
-                                initialDate: item.estimatedDeliveryDate ?? DateTime.now().add(const Duration(days: 7)),
-                                firstDate: DateTime.now(),
-                                lastDate: DateTime.now().add(const Duration(days: 365)),
-                              );
-                              if (date != null) {
-                                setModalState(() {
-                                  item.estimatedDeliveryDate = date;
-                                });
-                                setState(() {});
-                              }
-                            },
-                            child: Icon(Icons.edit_calendar_outlined, size: 16, color: primaryGreen),
-                          ),
-                        ],
-                      ],
+                    Text(
+                      order.jobEstimatedDeliveryDate != null ? _formatDate(order.jobEstimatedDeliveryDate!) : "Not set",
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -1398,6 +1418,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
       ),
     );
   }
+
 
   void _showCancellationDialog(TailorOrder order, BuildContext context, [VoidCallback? onDone]) {
     final controller = TextEditingController();
@@ -1511,51 +1532,6 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     );
   }
 
-  void _showPriceEditDialog(TailorOrder order, TailorOrderItem item, StateSetter setModalState) {
-    final controller = TextEditingController(text: item.servicePrice > 0 ? item.servicePrice.toInt().toString() : "");
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Edit Stitching Price", style: TextStyle(fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: "Price (Tk)",
-            hintText: "e.g. 1500",
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          ElevatedButton(
-            onPressed: () async {
-              final newPrice = double.tryParse(controller.text) ?? item.servicePrice;
-              try {
-                if (order.status != TailorOrderStatus.pending) {
-                  await _orderService.editStitchingTerms(
-                    order.id,
-                    newPrice, 
-                    item.estimatedDeliveryDate ?? DateTime.now(),
-                  );
-                }
-                setModalState(() {
-                  item.servicePrice = newPrice;
-                });
-                setState(() {});
-                Navigator.pop(context);
-                _showBanner("Price updated", isError: false);
-              } catch (e) {
-                _showBanner("Something went wrong. Please try again.");
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: primaryGreen),
-            child: const Text("Save", style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showMeasurements(Measurement? measurement) {
     if (measurement == null) {
@@ -1680,7 +1656,8 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
   String _getStatusText(TailorOrderStatus status) {
     switch (status) {
       case TailorOrderStatus.pending: return "New Request";
-      case TailorOrderStatus.confirmed: return "Pending Customer";
+      case TailorOrderStatus.quoted: return "Pending Customer"; // #3: tailor quoted, waiting for customer payment
+      case TailorOrderStatus.confirmed: return "Paid – Ready to Start"; // #3: customer paid
       case TailorOrderStatus.inProgress: return "In Progress";
       case TailorOrderStatus.ready: return "Ready";
       case TailorOrderStatus.completed: return "Finished";
@@ -1691,7 +1668,8 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
   Color _getStatusColor(TailorOrderStatus status) {
     switch (status) {
       case TailorOrderStatus.pending: return Colors.orange;
-      case TailorOrderStatus.confirmed: return Colors.blue;
+      case TailorOrderStatus.quoted: return Colors.blue;
+      case TailorOrderStatus.confirmed: return Colors.green;
       case TailorOrderStatus.inProgress: return Colors.purple;
       case TailorOrderStatus.ready: return Colors.teal;
       case TailorOrderStatus.completed: return primaryGreen;
@@ -1922,7 +1900,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
             onPressed: () async {
               final val = controller.text.trim();
               final newMaxOrder = val.isEmpty ? null : int.tryParse(val);
-              
+
               if (newMaxOrder == _tailor.maxOrder) {
                 Navigator.pop(context);
                 return;
@@ -1930,20 +1908,38 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
 
               Navigator.pop(context);
 
-              setState(() {
-                _tailor = _tailor.copyWith(maxOrder: newMaxOrder);
-              });
-
               final uid = UserSession.instance.uid;
               if (uid != null) {
                 try {
                   await _tailorService.updateTailorProfile(uid, {'maxOrder': newMaxOrder});
+                  // #22: copyWith(maxOrder: null) silently keeps the old value
+                  // because null means "leave it alone". Re-read the profile so
+                  // the UI always reflects what the DB actually holds.
+                  final updated = await _tailorService.getTailorProfile(uid);
+                  if (updated != null && mounted) {
+                    setState(() => _tailor = updated);
+                  }
                   _showBanner("Capacity updated successfully!", isError: false);
                 } catch (e) {
                   debugPrint("Error updating maximum order: $e");
                   _showBanner("Couldn't save the change. Please try again.", isError: true);
                 }
               } else {
+                // Offline: rebuild manually so null clears the field locally too
+                setState(() {
+                  _tailor = Tailor(
+                    id: _tailor.id,
+                    name: _tailor.name,
+                    email: _tailor.email,
+                    phone: _tailor.phone,
+                    address: _tailor.address,
+                    rating: _tailor.rating,
+                    location: _tailor.location,
+                    profilePicture: _tailor.profilePicture,
+                    about: _tailor.about,
+                    maxOrder: newMaxOrder, // explicit — not via copyWith
+                  );
+                });
                 _showBanner("Local capacity updated (Not logged in)", isError: false);
               }
             },

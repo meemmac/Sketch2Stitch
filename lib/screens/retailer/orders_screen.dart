@@ -54,8 +54,8 @@ class RetailerOrder {
   bool isDelivered;
   final String? review;
   final double? rating;
-  final String recipientType; // "Customer" or "Tailor"
-  final String deliveryAddress;
+  final String recipientType; // "Customer", "Tailor", or "Pending"
+  final String deliveryAddress; // correct address for the recipient
 
   RetailerOrder({
     required this.id,
@@ -150,7 +150,9 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
           final order = map['order'];
           final customer = map['customer'];
           final items = map['items'] as List<dynamic>;
-          final tailorName = map['tailorName'];
+          final tailorName = map['tailorName'] as String?;
+          final tailorAddress = map['tailorAddress'] as String?;
+          final destination = (subOrder['deliveryDestination'] ?? '').toString().toLowerCase();
 
           return RetailerOrder(
             id: subOrder['id'],
@@ -167,7 +169,15 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
             status: _capitalize(subOrder['status']),
             isDelivered: subOrder['status'] == 'delivered',
             recipientType: _capitalize(subOrder['deliveryDestination']),
-            deliveryAddress: customer['address'] ?? 'No address provided',
+            // #6: When the destination is the tailor, show the tailor's address
+            // not the customer's — otherwise the retailer ships to the wrong place.
+            deliveryAddress: destination == 'tailor'
+                ? (tailorAddress ?? 'Tailor address not available')
+                : customer['address'] ?? 'No address provided',
+            // #23: wire in the customer's review so the star-rating block on
+            // delivered order cards becomes reachable.
+            rating: (map['reviewRating'] as num?)?.toDouble(),
+            review: map['reviewComment'] as String?,
             items: items.map((i) {
               // Products store care labels the way the inventory form writes
               // them ("Washable", "Dry Clean Only", "Iron: High"), so match
@@ -1150,6 +1160,12 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
   }
 
   void _showStatusPicker(RetailerOrder order) {
+    // #12: When the customer hasn't chosen tailor-or-no-tailor yet, the
+    // destination is still 'pending'. Block 'Delivered' at this point so the
+    // retailer can't mark it shipped before that decision is made.
+    final bool isPendingDestination =
+        order.recipientType.toLowerCase() == 'pending';
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1167,17 +1183,50 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-              ...["Preparing", "Packed", "Delivered"].map(
-                (s) => ListTile(
-                  title: Text(s),
-                  onTap: () {
-                    _updateOrderStatus(order, s);
-                    Navigator.pop(context);
-                  },
-                  trailing: order.status == s
-                      ? Icon(Icons.check_circle, color: primaryGreen)
-                      : null,
+              if (isPendingDestination) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange.shade700, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "Waiting for the customer to choose a tailor. \"Delivered\" is unavailable until then.",
+                          style: TextStyle(fontSize: 12, color: Colors.orange.shade800, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(height: 12),
+              ],
+              ...["Preparing", "Packed", "Delivered"].map(
+                (s) {
+                  final isDeliveredOption = s == "Delivered";
+                  final isDisabled = isDeliveredOption && isPendingDestination;
+                  return ListTile(
+                    enabled: !isDisabled,
+                    title: Text(
+                      s,
+                      style: TextStyle(
+                        color: isDisabled ? Colors.grey : null,
+                      ),
+                    ),
+                    onTap: isDisabled ? null : () {
+                      _updateOrderStatus(order, s);
+                      Navigator.pop(context);
+                    },
+                    trailing: order.status == s
+                        ? Icon(Icons.check_circle, color: primaryGreen)
+                        : null,
+                  );
+                },
               ),
             ],
           ),
