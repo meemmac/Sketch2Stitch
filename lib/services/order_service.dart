@@ -11,6 +11,7 @@ import '../models/review.dart';
 import '../models/measurement.dart';
 import '../models/payment.dart';
 import 'Cloudinary_service.dart';
+import 'notification_service.dart';
 
 class OrderService {
   OrderService({FirebaseFirestore? firestore, FirebaseAuth? auth})
@@ -902,9 +903,48 @@ class OrderService {
       }
 
       await batch.commit();
+
+      // Only the customer's own delivery is worth telling them about; a
+      // sub-order handed to the tailor is an internal hop.
+      if (statusLower == 'delivered' && destination == 'customer') {
+        await _notifyCustomerOfDelivery(
+          orderId: orderId,
+          retailerId: subOrderData['retailerId'] as String?,
+        );
+      }
     } catch (e) {
       debugPrint('Error updating order status for $subOrderId: $e');
       rethrow;
+    }
+  }
+
+  /// Best-effort "your order was delivered" notification. The status write
+  /// has already committed, so failures here are logged and swallowed.
+  Future<void> _notifyCustomerOfDelivery({
+    required String orderId,
+    required String? retailerId,
+  }) async {
+    try {
+      final orderSnap =
+          await _db.collection(_ordersCollection).doc(orderId).get();
+      final customerId = orderSnap.data()?['customerId'] as String?;
+      if (customerId == null) return;
+
+      String shopName = 'the shop';
+      if (retailerId != null) {
+        final snap = await _db.collection('Retailer').doc(retailerId).get();
+        final name = (snap.data()?['shopName'] as String?)?.trim();
+        if (name != null && name.isNotEmpty) shopName = name;
+      }
+
+      await NotificationService().notifyCustomerOrderDelivered(
+        customerId,
+        orderId,
+        shopName,
+        'retailer',
+      );
+    } catch (e) {
+      debugPrint('Error sending delivery notification: $e');
     }
   }
 
@@ -1049,6 +1089,16 @@ class OrderService {
       }
 
       await batch.commit();
+
+      // The customer has no other signal that a quote arrived — the
+      // tailoring screen only re-reads the job when it is reopened.
+      if (orderId != null) {
+        await _notifyCustomerAboutTailor(
+          orderId: orderId,
+          tailorId: jobDoc.data()?['tailorId'] as String?,
+          accepted: true,
+        );
+      }
     } catch (e) {
       debugPrint('Error accepting tailor job: $e');
       rethrow;
@@ -1070,17 +1120,90 @@ class OrderService {
         'rejectionReason': reason,
       });
 
-      // 2. Update parent Order
+      // 2. Hand the order back to the customer so they can pick someone
+      // else. 'processing' is TERMINAL — it drops the order out of
+      // OrderService.activeOrderStatuses and therefore off the Running
+      // Orders screen, so one tailor declining used to permanently destroy
+      // the customer's ability to hire ANY tailor for that order. They are
+      // back to choosing a tailor, which is exactly 'awaiting_tailor_search'.
       if (orderId != null) {
         batch.update(_db.collection(_ordersCollection).doc(orderId), {
-          'status': OrderStatus.processing.toValue,
+          'status': OrderStatus.awaitingTailorSearch.toValue,
         });
+
+        // The fabric was pointed at this tailor when the job was created.
+        // They said no, so it has no destination again until the customer
+        // either picks another tailor or opts for direct delivery —
+        // otherwise retailers keep being told to ship to a tailor who
+        // declined the work.
+        final subs = await _db
+            .collection(_subOrdersCollection)
+            .where('orderId', isEqualTo: orderId)
+            .get();
+        for (final doc in subs.docs) {
+          batch.update(doc.reference, {
+            'deliveryDestination': SubOrderDeliveryDestination.pending.name,
+          });
+        }
       }
 
       await batch.commit();
+
+      if (orderId != null) {
+        await _notifyCustomerAboutTailor(
+          orderId: orderId,
+          tailorId: jobDoc.data()?['tailorId'] as String?,
+          accepted: false,
+          reason: reason,
+        );
+      }
     } catch (e) {
       debugPrint('Error declining tailor job: $e');
       rethrow;
+    }
+  }
+
+  /// Tells the customer that a tailor accepted (quoted) or declined their
+  /// job. Best-effort: the status change is already committed, so a failed
+  /// notification must not fail the tailor's action.
+  Future<void> _notifyCustomerAboutTailor({
+    required String orderId,
+    required String? tailorId,
+    required bool accepted,
+    String reason = '',
+  }) async {
+    try {
+      final orderSnap =
+          await _db.collection(_ordersCollection).doc(orderId).get();
+      final customerId = orderSnap.data()?['customerId'] as String?;
+      if (customerId == null) return;
+
+      String tailorName = 'the tailor';
+      if (tailorId != null) {
+        final snap = await _db.collection('Tailor').doc(tailorId).get();
+        final name = (snap.data()?['name'] as String?)?.trim();
+        if (name != null && name.isNotEmpty) tailorName = name;
+      }
+
+      final notifications = NotificationService();
+      if (accepted) {
+        await notifications.notifyCustomerOrderConfirmed(
+          customerId,
+          orderId,
+          tailorName,
+          'tailor',
+        );
+      } else {
+        await notifications.notifyCustomerOrderCancelled(
+          customerId,
+          orderId,
+          tailorName,
+          'tailor',
+          reason.trim().isEmpty ? 'No reason given.' : reason.trim(),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error sending tailor-decision notification: $e');
     }
   }
 
@@ -1356,6 +1479,25 @@ class OrderService {
   }
 
   /// Streams detailed jobs for a specific tailor.
+  /// Maps `Design` document ids to their uploaded `designFile` URLs,
+  /// dropping any id that no longer resolves to a readable image.
+  Future<List<String>> _resolveDesignUrls(List<String> designIds) async {
+    if (designIds.isEmpty) return const [];
+    try {
+      final docs = await Future.wait(
+        designIds.map((id) => _db.collection('Design').doc(id).get()),
+      );
+      return docs
+          .map((d) => d.data()?['designFile'] as String?)
+          .whereType<String>()
+          .where((url) => url.isNotEmpty)
+          .toList();
+    } catch (e) {
+      debugPrint('OrderService: Error resolving design urls: $e');
+      return const [];
+    }
+  }
+
   Stream<List<Map<String, dynamic>>> streamDetailedTailorOrders(String tailorId) {
     return _db
         .collection(_tailorJobsCollection)
@@ -1468,12 +1610,20 @@ class OrderService {
               return null;
             }
 
+            // `Tailor-jobs.designIds` holds Design document ids, not image
+            // URLs — resolve them here so the tailor's screen has something
+            // it can actually render.
+            final designUrls = await _resolveDesignUrls(
+              List<String>.from(jobData['designIds'] ?? []),
+            );
+
             return {
               'job': {...jobData, 'id': jobDoc.id},
               'order': {...orderData, 'id': orderId},
               'customer': customerData,
               'measurement': measurementData,
               'items': allItemsList,
+              'designUrls': designUrls,
             };
           } catch (e) {
             debugPrint("OrderService: Error processing tailor job: $e");

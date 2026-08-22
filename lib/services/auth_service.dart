@@ -1,3 +1,4 @@
+// services/auth_service.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
@@ -9,51 +10,53 @@ import '../models/customer.dart';
 import '../models/tailor.dart';
 import '../models/retailer.dart';
 
-
-
-/// EmailJS Credentials retrieved from environment variables
+/// EmailJS Credentials (used for the welcome email only now)
 final String _emailjsServiceId = dotenv.get('EMAILJS_SERVICE_ID', fallback: '');
-final String _emailjsTemplateId = dotenv.get('EMAILJS_TEMPLATE_ID', fallback: '');
 final String _emailjsPublicKey = dotenv.get('EMAILJS_PUBLIC_KEY', fallback: '');
 final String _emailjsAccessToken = dotenv.get('EMAILJS_ACCESS_TOKEN', fallback: '');
+final String _emailjsWelcomeTemplateId = dotenv.get('EMAILJS_WELCOME_TEMPLATE_ID', fallback: '');
 
+/// Where Firebase's reset-password page sends the user once the new
+/// password is saved. The page itself (public/reset-done.html) offers a
+/// `sketch2stitch://reset-done` deep link back into the app.
+const String _passwordResetContinueUrl =
+    'https://sketch2stitch-276c8.web.app/reset-done.html';
 
 /// Thrown by [AuthService] with an already user-friendly message.
 class AuthServiceException implements Exception {
   AuthServiceException(this.message);
   final String message;
 
-
   @override
   String toString() => message;
 }
 
-
-/// Wraps all Firebase Auth calls. This service handles user authentication
-/// and fetching user profile data from Firestore.
+/// Wraps all Firebase Auth calls.
 class AuthService {
   AuthService({FirebaseAuth? firebaseAuth, FirebaseFirestore? firestore})
       : _auth = firebaseAuth ?? FirebaseAuth.instance,
         _firestore = firestore ?? FirebaseFirestore.instance;
 
-
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
 
-
-  /// Current authenticated user.
   User? get currentUser => _auth.currentUser;
-
-
-  /// Stream of authentication state changes.
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+  Future<void> signOut() async {
+    try {
+      await _auth.signOut();
+    } catch (e) {
+      throw AuthServiceException('Failed to sign out: ${e.toString()}');
+    }
+  }
 
-  /// Authenticate user via Firebase Auth.
+  // ==================== AUTHENTICATION METHODS ====================
+
   Future<UserCredential> signInWithEmailAndPassword(
-      String email,
-      String password,
-      ) async {
+    String email,
+    String password,
+  ) async {
     try {
       return await _auth.signInWithEmailAndPassword(
         email: email.trim(),
@@ -66,21 +69,17 @@ class AuthService {
     }
   }
 
-
-  /// Create new account and save profile data.
-  /// Returns a record with the [UserCredential] and a [bool] indicating if the welcome email was sent.
   Future<({UserCredential credential, bool emailSent})> signUpWithEmailAndPassword(
-      String email,
-      String password,
-      UserRole role,
-      Map<String, dynamic> profileData,
-      ) async {
+    String email,
+    String password,
+    UserRole role,
+    Map<String, dynamic> profileData,
+  ) async {
     try {
       final credential = await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
-
 
       bool emailSent = false;
       if (credential.user != null) {
@@ -90,12 +89,9 @@ class AuthService {
             .doc(credential.user!.uid)
             .set(profileData);
 
-
-        // Send Welcome Email securely via EmailJS
         final name = profileData['name'] ?? profileData['shopName'] ?? 'Member';
         emailSent = await _sendWelcomeEmailViaEmailJS(email: email, name: name, role: role);
       }
-
 
       return (credential: credential, emailSent: emailSent);
     } on FirebaseAuthException catch (e) {
@@ -105,38 +101,161 @@ class AuthService {
     }
   }
 
+  Future<UserRole?> findUserRole(String uid) async {
+    try {
+      final customerDoc = await _firestore.collection('Customer').doc(uid).get();
+      if (customerDoc.exists) return UserRole.customer;
 
-  /// Merges [data] into the existing profile document for [uid] in the
-  /// collection matching [role]. Only the supplied keys are overwritten —
-  /// everything else in the document is left untouched.
-  ///
-  /// Use this from any profile-edit screen (customer/tailor/retailer) to
-  /// persist changes. Throws [AuthServiceException] on failure.
+      final tailorDoc = await _firestore.collection('Tailor').doc(uid).get();
+      if (tailorDoc.exists) return UserRole.tailor;
+
+      final retailerDoc = await _firestore.collection('Retailer').doc(uid).get();
+      if (retailerDoc.exists) return UserRole.retailer;
+
+      return null;
+    } catch (e) {
+      debugPrint('Error finding user role: $e');
+      return null;
+    }
+  }
+
+  Future<dynamic> getUserProfile(String uid, UserRole role) async {
+    try {
+      final collection = _getCollectionForRole(role);
+      final doc = await _firestore.collection(collection).doc(uid).get();
+
+      if (!doc.exists) return null;
+
+      final data = doc.data()!;
+
+      switch (role) {
+        case UserRole.customer:
+          return Customer.fromJson(data);
+        case UserRole.tailor:
+          return Tailor.fromJson(data, id: uid);
+        case UserRole.retailer:
+          return Retailer.fromJson(data, id: uid);
+      }
+    } catch (e) {
+      debugPrint('Error getting user profile: $e');
+      return null;
+    }
+  }
+
+  /// Find email by phone number - HANDLES BOTH STRING AND MAP (credential)
+  Future<String?> findEmailByPhone(dynamic identifier, UserRole role) async {
+    try {
+      String? phoneNumber;
+
+      // Handle different types of input
+      if (identifier is String) {
+        phoneNumber = identifier;
+      } else if (identifier is Map<String, dynamic>) {
+        // Try to extract phone number from credential map
+        phoneNumber = identifier['phone'] as String? ??
+            identifier['phoneNumber'] as String? ??
+            identifier['credential'] as String?;
+
+        // If phone number is not found, check if email field contains a phone number
+        if (phoneNumber == null || phoneNumber.isEmpty) {
+          final email = identifier['email'] as String?;
+          if (email != null && !email.contains('@')) {
+            phoneNumber = email;
+          }
+        }
+      } else {
+        debugPrint('⚠️ findEmailByPhone: Unknown identifier type: ${identifier.runtimeType}');
+        return null;
+      }
+
+      if (phoneNumber == null || phoneNumber.trim().isEmpty) {
+        debugPrint('⚠️ findEmailByPhone: Phone number is empty');
+        return null;
+      }
+
+      debugPrint('📞 Searching for email with phone: $phoneNumber, role: $role');
+
+      final collection = _getCollectionForRole(role);
+      final querySnapshot = await _firestore
+          .collection(collection)
+          .where('phone', isEqualTo: phoneNumber.trim())
+          .limit(1)
+          .get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        final data = querySnapshot.docs.first.data();
+        final email = data['email'] as String?;
+        debugPrint('✅ Found email: $email for phone: $phoneNumber');
+        return email;
+      }
+
+      // If not found, check all collections
+      final allCollections = ['Customer', 'Tailor', 'Retailer'];
+      for (final coll in allCollections) {
+        if (coll == collection) continue;
+        final query = await _firestore
+            .collection(coll)
+            .where('phone', isEqualTo: phoneNumber.trim())
+            .limit(1)
+            .get();
+        if (query.docs.isNotEmpty) {
+          final data = query.docs.first.data();
+          final email = data['email'] as String?;
+          debugPrint('✅ Found email: $email in collection: $coll');
+          return email;
+        }
+      }
+
+      debugPrint('❌ No email found for phone: $phoneNumber');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error finding email by phone: $e');
+      return null;
+    }
+  }
+
+  /// Find email by phone number without role
+  Future<String?> findEmailByPhoneNumber(String phoneNumber) async {
+    try {
+      if (phoneNumber.trim().isEmpty) return null;
+
+      debugPrint('📞 Searching for email with phone: $phoneNumber (no role)');
+
+      final allCollections = ['Customer', 'Tailor', 'Retailer'];
+      for (final coll in allCollections) {
+        final query = await _firestore
+            .collection(coll)
+            .where('phone', isEqualTo: phoneNumber.trim())
+            .limit(1)
+            .get();
+        if (query.docs.isNotEmpty) {
+          final data = query.docs.first.data();
+          final email = data['email'] as String?;
+          debugPrint('✅ Found email: $email in collection: $coll');
+          return email;
+        }
+      }
+      debugPrint('❌ No email found for phone: $phoneNumber');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error finding email by phone: $e');
+      return null;
+    }
+  }
+
   Future<void> updateProfile(
     String uid,
     UserRole role,
-    Map<String, dynamic> data,
+    Map<String, dynamic> updates,
   ) async {
     try {
       final collection = _getCollectionForRole(role);
-      await _firestore.collection(collection).doc(uid).update(data);
-    } on FirebaseException catch (e) {
-      throw AuthServiceException(
-        'Failed to update profile: ${e.message ?? e.code}',
-      );
+      await _firestore.collection(collection).doc(uid).update(updates);
     } catch (e) {
       throw AuthServiceException('Failed to update profile: ${e.toString()}');
     }
   }
 
-
-  /// Changes the signed-in user's password.
-  ///
-  /// Firebase requires a recent login before a password change, so the
-  /// [currentPassword] is used to re-authenticate first. That doubles as the
-  /// "confirm it's really you" check on the change-password form.
-  ///
-  /// Throws [AuthServiceException] with a user-friendly message on failure.
   Future<void> changePassword({
     required String currentPassword,
     required String newPassword,
@@ -172,114 +291,161 @@ class AuthService {
     }
   }
 
+  // ==================== PASSWORD RESET (link-based, Firebase Spark plan) ====================
 
-  /// Handle "Forgot Password" requests.
-  Future<void> sendPasswordResetEmail(String email) async {
+  /// Sends Firebase's built-in password-reset email (a link, not an OTP).
+  /// Works entirely on the client SDK — no Cloud Functions / Blaze plan needed.
+  ///
+  /// Where the link lands depends on the project's **custom action URL**
+  /// (Console → Authentication → Templates → Password reset → Customize
+  /// action URL). Pointed at `public/action.html`, the link bounces into the
+  /// app as `sketch2stitch://reset?oobCode=...` and [ResetPasswordScreen]
+  /// finishes the job in-app. Left unset, Firebase's own web form handles it
+  /// and `_passwordResetContinueUrl` brings the user back afterwards — so
+  /// both paths work and neither breaks the other.
+  Future<void> sendPasswordReset(String email) async {
     try {
-      await _auth.sendPasswordResetEmail(email: email.trim());
+      final trimmedEmail = email.trim();
+
+      final emailExists = await _checkEmailExists(trimmedEmail);
+      if (!emailExists) {
+        throw AuthServiceException(
+          'No account found with this email address.',
+        );
+      }
+
+      final actionCodeSettings = ActionCodeSettings(
+        url: _passwordResetContinueUrl,
+        handleCodeInApp: false,
+      );
+
+      await _auth.sendPasswordResetEmail(
+        email: trimmedEmail,
+        actionCodeSettings: actionCodeSettings,
+      );
+
+      debugPrint('✅ Password reset email sent to $trimmedEmail');
     } on FirebaseAuthException catch (e) {
       throw AuthServiceException(_messageForCode(e.code));
-    } catch (_) {
+    } on AuthServiceException {
+      rethrow;
+    } catch (e) {
+      debugPrint('❌ Error in sendPasswordReset: $e');
       throw AuthServiceException(
-        'Something went wrong sending the reset email. Please try again.',
+        'Failed to send reset email. Please check your internet connection and try again.',
       );
     }
   }
 
-
-  /// Logout user.
-  Future<void> signOut() async {
-    await _auth.signOut();
-  }
-
-
-  /// Probes Firestore to find which role collection the user belongs to.
-  Future<UserRole?> findUserRole(String uid) async {
-    // We check in order of expected frequency
-    final customer = await _firestore.collection('Customer').doc(uid).get();
-    if (customer.exists) return UserRole.customer;
-
-
-    final tailor = await _firestore.collection('Tailor').doc(uid).get();
-    if (tailor.exists) return UserRole.tailor;
-
-
-    final retailer = await _firestore.collection('Retailer').doc(uid).get();
-    if (retailer.exists) return UserRole.retailer;
-
-
-    return null;
-  }
-
-  /// Attempts to find the email associated with a phone number in a specific role collection.
-  Future<String?> findEmailByPhone(String phone, UserRole role) async {
-    final collection = _getCollectionForRole(role);
-    final query = await _firestore
-        .collection(collection)
-        .where('phone', isEqualTo: phone.trim())
-        .limit(1)
-        .get();
-
-    if (query.docs.isNotEmpty) {
-      return query.docs.first.data()['email'] as String?;
-    }
-    return null;
-  }
-
-
-  /// Fetch user profile data from the respective Firestore collection.
-  /// Returns [Customer], [Tailor], or [Retailer] if found, otherwise null.
-  Future<dynamic> getUserProfile(String uid, UserRole role) async {
+  /// Checks that an `oobCode` from a password-reset email is still valid and
+  /// returns the address it belongs to, so the reset screen can show the user
+  /// whose password they're about to change.
+  ///
+  /// Client-SDK only — no Cloud Functions, works on the Spark (free) plan.
+  Future<String> verifyPasswordResetCode(String code) async {
     try {
-      final collection = _getCollectionForRole(role);
-      final doc = await _firestore.collection(collection).doc(uid).get();
-
-      if (!doc.exists || doc.data() == null) {
-        return null;
-      }
-
-      final data = doc.data()!;
-      switch (role) {
-        case UserRole.customer:
-          return Customer.fromJson(data, id: uid);
-        case UserRole.tailor:
-          return Tailor.fromJson(data, id: uid);
-        case UserRole.retailer:
-          return Retailer.fromJson(data, id: uid);
-      }
+      return await _auth.verifyPasswordResetCode(code);
+    } on FirebaseAuthException catch (e) {
+      throw AuthServiceException(_messageForResetCode(e.code));
     } catch (e) {
-      debugPrint('Error fetching user profile: $e');
-      return null;
+      debugPrint('❌ Error verifying reset code: $e');
+      throw AuthServiceException(
+        'Could not open this reset link. Please request a new one.',
+      );
     }
   }
 
+  /// Completes the reset started by the emailed link, entirely inside the app.
+  /// The caller is responsible for enforcing the app's own strength rules
+  /// before calling this — Firebase only rejects passwords under 6 characters.
+  Future<void> confirmPasswordReset({
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      await _auth.confirmPasswordReset(code: code, newPassword: newPassword);
+    } on FirebaseAuthException catch (e) {
+      throw AuthServiceException(_messageForResetCode(e.code));
+    } catch (e) {
+      debugPrint('❌ Error confirming password reset: $e');
+      throw AuthServiceException(
+        'Could not reset your password. Please try again.',
+      );
+    }
+  }
 
+  /// Reset links are single-use and time-limited, so they fail in ways the
+  /// generic sign-in mapping doesn't cover.
+  String _messageForResetCode(String code) {
+    switch (code) {
+      case 'expired-action-code':
+        return 'This reset link has expired. Please request a new one.';
+      case 'invalid-action-code':
+        return 'This reset link is no longer valid — it may have already '
+            'been used. Please request a new one.';
+      case 'user-disabled':
+        return 'This account has been disabled. Please contact support.';
+      case 'user-not-found':
+        return 'No account was found for this reset link.';
+      default:
+        return _messageForCode(code);
+    }
+  }
 
+  // ==================== HELPER METHODS ====================
 
   String _getCollectionForRole(UserRole role) {
     switch (role) {
       case UserRole.customer:
-        return 'Customer'; // Singular per schema
+        return 'Customer';
       case UserRole.tailor:
-        return 'Tailor'; // Singular per schema
+        return 'Tailor';
       case UserRole.retailer:
-        return 'Retailer'; // Singular per schema
+        return 'Retailer';
     }
   }
 
+  Future<bool> _checkEmailExists(String email) async {
+    try {
+      final customerQuery = await _firestore
+          .collection('Customer')
+          .where('email', isEqualTo: email.trim())
+          .limit(1)
+          .get();
 
-  /// Sends a welcome email securely using the EmailJS API.
-  /// The app only uses a Public Key, keeping your SMTP/API credentials safe.
+      if (customerQuery.docs.isNotEmpty) return true;
+
+      final tailorQuery = await _firestore
+          .collection('Tailor')
+          .where('email', isEqualTo: email.trim())
+          .limit(1)
+          .get();
+
+      if (tailorQuery.docs.isNotEmpty) return true;
+
+      final retailerQuery = await _firestore
+          .collection('Retailer')
+          .where('email', isEqualTo: email.trim())
+          .limit(1)
+          .get();
+
+      return retailerQuery.docs.isNotEmpty;
+    } catch (e) {
+      return false;
+    }
+  }
+
   Future<bool> _sendWelcomeEmailViaEmailJS({
     required String email,
     required String name,
     required UserRole role,
   }) async {
-    // If keys aren't configured yet, skip silently
-    if (_emailjsPublicKey == 'YOUR_PUBLIC_KEY' || _emailjsPublicKey.isEmpty) {
+    debugPrint('📧 Sending Welcome email...');
+
+    if (_emailjsServiceId.isEmpty || _emailjsWelcomeTemplateId.isEmpty) {
+      debugPrint('⚠️ EmailJS keys not configured. Skipping welcome email.');
       return false;
     }
-
 
     final url = Uri.parse('https://api.emailjs.com/api/v1.0/email/send');
 
@@ -290,29 +456,26 @@ class AuthService {
         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
       ];
       final formattedDate = " ${now.day} ${months[now.month - 1]} ${now.year}, ";
-      
-      // Format time as HH:mm AM/PM
+
       final hour = now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
       final period = now.hour >= 12 ? 'PM' : 'AM';
       final minute = now.minute.toString().padLeft(2, '0');
       final formattedTime = "$hour:$minute $period";
 
-
-      final payload = jsonEncode({
+      final payload = {
         'service_id': _emailjsServiceId,
-        'template_id': _emailjsTemplateId,
+        'template_id': _emailjsWelcomeTemplateId,
         'user_id': _emailjsPublicKey,
         'accessToken': _emailjsAccessToken,
         'template_params': {
           'user_name': name,
-          'email': email, // Used for the "To Email" field in Dashboard
+          'email': email,
           'user_email': email,
           'join_date': formattedDate,
           'join_time': formattedTime,
           'welcome_message': _getWelcomeMessageForRole(role),
         },
-      });
-
+      };
 
       final response = await http.post(
         url,
@@ -320,9 +483,8 @@ class AuthService {
           'Content-Type': 'application/json',
           'Origin': 'http://localhost',
         },
-        body: payload,
+        body: jsonEncode(payload),
       );
-
 
       return response.statusCode == 200;
     } catch (e) {
@@ -331,18 +493,16 @@ class AuthService {
     }
   }
 
-
   String _getWelcomeMessageForRole(UserRole role) {
     switch (role) {
       case UserRole.customer:
-        return 'Welcome to Sketch2Stitch! We’re delighted to have you with us. Discover beautiful fabrics, connect with skilled tailors, and bring your unique style to life.';
-        case UserRole.tailor:
-          return 'Welcome to Sketch2Stitch! Share your craftsmanship, connect with customers and turn your tailoring expertise into beautiful creations.';
-          case UserRole.retailer:
-            return 'Welcome to Sketch2Stitch! Showcase your quality fabrics and elements, connect with customers and build meaningful connections through our creative marketplace.';
+        return 'Welcome to Sketch2Stitch! We\'re delighted to have you with us. Discover beautiful fabrics, connect with skilled tailors, and bring your unique style to life.';
+      case UserRole.tailor:
+        return 'Welcome to Sketch2Stitch! Share your craftsmanship, connect with customers and turn your tailoring expertise into beautiful creations.';
+      case UserRole.retailer:
+        return 'Welcome to Sketch2Stitch! Showcase your quality fabrics and elements, connect with customers and build meaningful connections through our creative marketplace.';
     }
   }
-
 
   String _messageForCode(String code) {
     switch (code) {

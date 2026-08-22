@@ -105,8 +105,8 @@ class Product {
   final String id;
   final String retailerId;
   final String productName;
+  final String? productCode; // Added productCode
   final String category;
-  final String productCode;
   final List<MaterialBlend> materialType;
   final List<ColorOption> colorOptions;
   final String description;
@@ -119,8 +119,8 @@ class Product {
     required this.id,
     required this.retailerId,
     required this.productName,
+    this.productCode,
     required this.category,
-    required this.productCode,
     required this.materialType,
     required this.colorOptions,
     required this.description,
@@ -154,8 +154,8 @@ class Product {
     String? id,
     String? retailerId,
     String? productName,
-    String? category,
     String? productCode,
+    String? category,
     List<MaterialBlend>? materialType,
     List<ColorOption>? colorOptions,
     String? description,
@@ -166,8 +166,8 @@ class Product {
       id: id ?? this.id,
       retailerId: retailerId ?? this.retailerId,
       productName: productName ?? this.productName,
-      category: category ?? this.category,
       productCode: productCode ?? this.productCode,
+      category: category ?? this.category,
       materialType: materialType ?? this.materialType,
       colorOptions: colorOptions ?? this.colorOptions,
       description: description ?? this.description,
@@ -216,16 +216,32 @@ class Product {
           .toList();
     }
 
+    // Parse careSymbol from Firestore array safely
+    List<String> careSymbols = [];
+    final rawCareSymbol = json['careSymbol'];
+    
+    if (rawCareSymbol != null) {
+      if (rawCareSymbol is List) {
+        for (var item in rawCareSymbol) {
+          if (item != null) {
+            careSymbols.add(item.toString());
+          }
+        }
+      } else if (rawCareSymbol is String) {
+        careSymbols = [rawCareSymbol];
+      }
+    }
+
     return Product(
       id: id ?? json['id'] ?? '',
       retailerId: json['retailerId'] ?? '',
       productName: json['productName'] ?? '',
+      productCode: json['productCode'],
       category: json['category'] ?? '',
-      productCode: json['productCode'] ?? '',
       materialType: materialTypeItems,
       colorOptions: colorOptionsList,
       description: json['description'] ?? '',
-      careSymbol: List<String>.from(json['careSymbol'] ?? []),
+      careSymbol: careSymbols,
     );
   }
 }

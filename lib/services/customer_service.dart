@@ -19,14 +19,18 @@ class CustomerService {
   /// Fetches all tailors from the 'Tailor' collection.
   Stream<List<Tailor>> getTailors() {
     return _firestore.collection('Tailor').snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => Tailor.fromJson(doc.data())).toList();
+      return snapshot.docs
+          .map((doc) => Tailor.fromJson(doc.data(), id: doc.id))
+          .toList();
     });
   }
 
   /// Fetches all retailers from the 'Retailer' collection.
   Stream<List<Retailer>> getRetailers() {
     return _firestore.collection('Retailer').snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => Retailer.fromJson(doc.data())).toList();
+      return snapshot.docs
+          .map((doc) => Retailer.fromJson(doc.data(), id: doc.id))
+          .toList();
     });
   }
 // ─── Profile Management ────────────────────────────────────────────────────
@@ -150,7 +154,7 @@ Stream<Customer?> streamCustomerProfile(String uid) {
 
 
       final products = productsQuery.docs
-          .map((doc) => Product.fromJson(doc.data()))
+          .map((doc) => Product.fromJson(doc.data(), id: doc.id))
           .toList();
 
 

@@ -233,6 +233,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   
   final InventoryService _inventoryService = InventoryService();
   String? _retailerId;
+  StreamSubscription<List<Product>>? _inventorySubscription;
 
   static const List<String> _commonMaterials = <String>[
     "Cotton",
@@ -558,14 +559,12 @@ class _InventoryScreenState extends State<InventoryScreen>
       name: p.productName,
       category: p.category,
       materialType: p.materialType.isNotEmpty ? p.materialType.first.type : 'N/A',
-      sku: p.productCode,
+      sku: p.productCode ?? '',  // ← Fix: add null fallback
       description: p.description,
       variants: p.colorOptions.map((v) {
         final images = v.image.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
         final videos = v.video.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
         
-        // We don't really need a global isAsset flag if we check per-path.
-        // But to keep your model same, we set it if ANY path is a local asset.
         final isAsset = [...images, ...videos].any((path) => path.startsWith('assets/'));
         
         return ProductColorVariant(
@@ -585,14 +584,19 @@ class _InventoryScreenState extends State<InventoryScreen>
       canBleach: p.careSymbol.contains('Bleach Allowed'),
       canDryClean: p.careSymbol.contains('Dry Clean Only'),
       canTumbleDry: p.careSymbol.contains('Tumble Dry'),
-      ironLevel: p.careSymbol.firstWhere((s) => s.startsWith('Iron: '), orElse: () => 'Iron: Medium').replaceFirst('Iron: ', ''),
+      ironLevel: p.careSymbol.firstWhere(
+        (s) => s.startsWith('Iron: '), 
+        orElse: () => 'Iron: Medium'
+      ).replaceFirst('Iron: ', ''),
     );
   }
 
   Future<void> _loadInventory() async {
     if (_retailerId == null) return;
 
-    _inventoryService.streamRetailerProducts(_retailerId!).listen((products) {
+ _inventorySubscription?.cancel();
+    _inventorySubscription =
+        _inventoryService.streamRetailerProducts(_retailerId!).listen((products) {
       if (!mounted) return;
       setState(() {
         items.clear();
@@ -623,6 +627,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   @override
   void dispose() {
     _feedbackTimer?.cancel();
+     _inventorySubscription?.cancel();
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();

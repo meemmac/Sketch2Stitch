@@ -36,7 +36,7 @@ class UserReview {
 
 class RetailerReviewsScreen extends StatefulWidget {
   final String shopName;
-  const RetailerReviewsScreen({super.key, this.shopName = "Bismillah Kacchi House"});
+const RetailerReviewsScreen({super.key, required this.shopName});
 
   @override
   State<RetailerReviewsScreen> createState() => _RetailerReviewsScreenState();
@@ -54,7 +54,7 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
   Map<int, int> _ratingDistribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0};
 
   final Color primaryGreen = const Color(0xFF4F7942);
-  String _selectedFilter = "Top reviews";
+  String _selectedFilter = "Newest";
 
   List<UserReview> _allReviews = [];
 
@@ -74,6 +74,7 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
   void _loadData() {
     final retailerId = _authService.currentUser?.uid;
     if (retailerId == null) {
+       setState(() => _isLoading = false);
       return;
     }
 
@@ -111,16 +112,18 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
         }).toList();
         _isLoading = false;
       });
+       }, onError: (e) {
+      debugPrint('Error loading reviews: $e');
+      if (mounted) setState(() => _isLoading = false);
     });
   }
 
   List<UserReview> get _filteredReviews {
     List<UserReview> sortedList = List.from(_allReviews);
+    // "Top reviews" used to be here as a fourth chip, sorting by rating
+    // exactly like "Highest rating" — two chips, one behaviour. Dropped, and
+    // "Newest" is now the default so fresh feedback lands first.
     switch (_selectedFilter) {
-      case "Top reviews":
-        // Sort by high rating first
-        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
-        break;
       case "Newest":
         sortedList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         break;
@@ -336,7 +339,7 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
   }
 
   Widget _buildFilterChips() {
-    final filters = ["Top reviews", "Newest", "Highest rating", "Lowest rating"];
+    final filters = ["Newest", "Highest rating", "Lowest rating"];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -353,7 +356,7 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
                   setState(() => _selectedFilter = filter);
                 }
               },
-              selectedColor: const Color(0xFF1E232C),
+              selectedColor: const Color(0xFF6B8F71),
               labelStyle: TextStyle(
                 color: isSelected ? Colors.white : Colors.black87,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
