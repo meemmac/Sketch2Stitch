@@ -327,6 +327,11 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                           trailing: const Icon(Icons.chevron_right),
                           onTap: () async {
                             Navigator.pop(context);
+                            
+                            // 🧠 Pre-fill the cache so ChatScreen doesn't show "Loading..."
+                            final String cacheKey = "${user['id']}_${role.name}";
+                            _userCache[cacheKey] = user;
+
                             final existing = await _messagingService.getConversationBetween(
                               widget.customerId, 
                               user['id'],
@@ -358,7 +363,11 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       _showBlockedDialog(conversation);
       return;
     }
-    _messagingService.markConversationReadByConversationId(conversation.id);
+    
+    // 🛡️ REMOVED: Blind unreadCount reset. 
+    // markMessagesRead inside ChatScreen will now handle this safely 
+    // by checking if the user is the actual receiver.
+    
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -468,7 +477,12 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           // Apply UI Filters (Tab Selection)
           final filtered = conversations.where((conv) {
             if (conv.isDeleted) return false;
-            if (_selectedTab == "Unread" && conv.unreadCount == 0) return false;
+            
+            // 🧠 Role-independent Unread Detection (since we removed lastSenderId)
+            final bool isUnread = conv.unreadCount > 0;
+            
+            if (_selectedTab == "Unread") return isUnread;
+            
             if (widget.currentUserRole == UserRole.customer) {
               if (_selectedTab == "Tailors" && conv.otherRole != UserRole.tailor) return false;
               if (_selectedTab == "Retailers" && conv.otherRole != UserRole.retailer) return false;
@@ -496,108 +510,135 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   Widget _buildConversationCard(Conversation conversation) {
     final otherName = _getOtherUserName(conversation);
     final otherAvatar = _getOtherUserAvatar(conversation);
-    final unreadCount = conversation.unreadCount;
+    
+    // 🧠 Unread Detection without lastSenderId
+    final bool isUnread = conversation.unreadCount > 0;
+    
+    // 🆕 Visual feedback variables
+    final Color unreadBg = const Color(0xFFE8F5E9); // Light green background
+    final Color primaryGreen = const Color(0xFF2C5C44);
+    final Color unreadBorder = primaryGreen.withValues(alpha: 0.3);
 
     return GestureDetector(
       onTap: () => _openChat(conversation),
       onLongPress: () => _showConversationOptions(conversation),
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: unreadCount > 0 ? const Color(0xFFE8F0FE) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          color: isUnread ? unreadBg : Colors.white,
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+              color: isUnread ? primaryGreen.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
+          border: isUnread ? Border.all(color: unreadBorder, width: 2) : Border.all(color: Colors.grey.shade100, width: 1),
         ),
         child: Row(
           children: [
             Stack(
               children: [
                 CircleAvatar(
-                  radius: 28,
+                  radius: 30,
                   backgroundColor: Colors.grey[200],
                   backgroundImage: otherAvatar != null ? NetworkImage(otherAvatar) : null,
                   child: otherAvatar == null 
-                      ? Text(otherName.isNotEmpty ? otherName[0].toUpperCase() : '?') 
+                      ? Text(otherName.isNotEmpty ? otherName[0].toUpperCase() : '?', 
+                          style: TextStyle(color: primaryGreen, fontWeight: FontWeight.bold)) 
                       : null,
                 ),
-                if (conversation.isBlocked)
+                if (isUnread)
                   Positioned(
-                    top: 0, right: 0,
+                    right: 0, bottom: 0,
                     child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                      child: const Icon(Icons.block, size: 10, color: Colors.white),
+                      width: 14, height: 14,
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
                     ),
                   ),
               ],
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
                         child: Text(
                           otherName,
                           style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.w600,
+                            fontSize: 17,
+                            fontWeight: isUnread ? FontWeight.w900 : FontWeight.w600,
+                            color: isUnread ? primaryGreen : Colors.black87,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (unreadCount > 0) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2C5C44),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            unreadCount.toString(),
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                      ],
                       Text(
                         _getTimeAgo(conversation.updatedAt),
-                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                        style: TextStyle(
+                          fontSize: 12, 
+                          color: isUnread ? primaryGreen : Colors.grey[500],
+                          fontWeight: isUnread ? FontWeight.bold : FontWeight.normal,
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   StreamBuilder<List<Message>>(
                     stream: _messagingService.getMessagesByConversationId(conversation.id),
                     builder: (context, msgSnap) {
                       final lastMsg = (msgSnap.data != null && msgSnap.data!.isNotEmpty) 
                           ? msgSnap.data!.last 
                           : null;
-                      return Text(
-                        conversation.isBlocked 
-                            ? '🔒 User blocked' 
-                            : (lastMsg?.msgText ?? 'No messages yet'),
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: conversation.isBlocked ? Colors.red : Colors.grey[600],
-                          fontWeight: unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      
+                      final String msgPreview = conversation.isBlocked 
+                            ? '🔒 Blocked' 
+                            : (lastMsg?.msgText ?? 'No messages yet');
+
+                      return Row(
+                        children: [
+                          if (lastMsg != null && lastMsg.senderId == widget.customerId && !conversation.isBlocked)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: Icon(Icons.done_all, size: 14, color: Colors.blue[400]),
+                            ),
+                          Expanded(
+                            child: Text(
+                              msgPreview,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: isUnread ? Colors.black87 : Colors.grey[600],
+                                fontWeight: isUnread ? FontWeight.bold : FontWeight.normal,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isUnread)
+                            Container(
+                              margin: const EdgeInsets.only(left: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: primaryGreen,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                conversation.unreadCount.toString(),
+                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                        ],
                       );
                     },
                   ),

@@ -47,56 +47,36 @@ class MessagingService {
   }
 
   /// Streams all conversations for a user (Customer, Tailor, or Retailer).
-  /// Merges both 'customerId' and 'otherId' streams to ensure all parties see the chat.
   Stream<List<Conversation>> getConversations(String userId) {
-    // 🧠 Multi-Role Stream Merger
-    // Firestore doesn't support "OR" queries across different fields.
-    // We listen to both fields simultaneously and combine them in real-time.
+    final String cleanUserId = userId.trim();
     
-    final Stream<QuerySnapshot> asCustomer = _db
+    // 🧠 Real-time collection listener with local filtering for maximum reliability.
+    return _db
         .collection(_conversations)
-        .where('customerId', isEqualTo: userId)
         .where('isDeleted', isEqualTo: false)
-        .snapshots();
-
-
-    final Stream<QuerySnapshot> asOther = _db
-        .collection(_conversations)
-        .where('otherId', isEqualTo: userId)
-        .where('isDeleted', isEqualTo: false)
-        .snapshots();
-
-
-    // Use asyncExpand to combine the logic of both streams
-    return _db.collection(_conversations).snapshots().asyncMap((_) async {
-      // Fetch both sides
-      final snaps = await Future.wait([
-        _db.collection(_conversations).where('customerId', isEqualTo: userId).where('isDeleted', isEqualTo: false).get(),
-        _db.collection(_conversations).where('otherId', isEqualTo: userId).where('isDeleted', isEqualTo: false).get(),
-      ]);
-
-
-      final allDocs = [...snaps[0].docs, ...snaps[1].docs];
+        .snapshots()
+        .map((snap) {
+      final List<Conversation> results = [];
       
-      // Remove duplicates (if any) and map to models
-      final Map<String, Conversation> uniqueConversations = {};
-      for (var doc in allDocs) {
-        final conv = Conversation.fromJson({...doc.data(), 'id': doc.id});
-        uniqueConversations[conv.id] = conv;
+      for (var doc in snap.docs) {
+        final data = doc.data();
+        final String cId = (data['customerId'] ?? '').toString().trim();
+        final String oId = (data['otherId'] ?? '').toString().trim();
+        
+        // 🛡️ Ensure I only see conversations I am part of
+        if (cId == cleanUserId || oId == cleanUserId) {
+          results.add(Conversation.fromJson({...data, 'id': doc.id}));
+        }
       }
 
-
-      final list = uniqueConversations.values.toList();
-      
-      // Sort: Newest messages at the top
-      list.sort((a, b) {
+      // Sort: Newest activity at the top
+      results.sort((a, b) {
         final dateA = a.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
         final dateB = b.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
         return dateB.compareTo(dateA);
       });
 
-
-      return list;
+      return results;
     });
   }
 
@@ -220,15 +200,46 @@ class MessagingService {
   /// Marks all unread messages as read for a specific user in a conversation.
   Future<void> markMessagesRead(String conversationId, String userId) async {
     try {
+      final cleanUserId = userId.trim();
+      
+      // 🛡️ Step 1: Fetch the most recent message to check who sent it
+      final lastMsgSnap = await _db
+          .collection(_messages)
+          .where('conversationId', isEqualTo: conversationId)
+          .orderBy('sentAt', descending: true)
+          .limit(1)
+          .get();
+
+      if (lastMsgSnap.docs.isNotEmpty) {
+        final lastSenderId = (lastMsgSnap.docs.first.data()['senderId'] ?? '').toString().trim();
+        
+        // 🚫 Step 2: If I am the one who sent the last message, do NOT clear unreadCount.
+        if (lastSenderId == cleanUserId) {
+          debugPrint('[MessagingService] ℹ️ User is the sender. Skipping unread reset.');
+          return;
+        }
+      }
+
+
       final batch = _db.batch();
+      
+      // 3. Reset the unread count only for the receiver
+      batch.update(_db.collection(_conversations).doc(conversationId), {
+        'unreadCount': 0,
+        'lastReadAt': FieldValue.serverTimestamp(),
+      });
+
+
+      // 4. Mark individual messages as read
       final unreadMessages = await _db
           .collection(_messages)
           .where('conversationId', isEqualTo: conversationId)
           .where('isRead', isEqualTo: false)
           .get();
 
+
       for (var doc in unreadMessages.docs) {
-        if (doc.data()['senderId'] != userId) {
+        if (doc.data()['senderId'].toString().trim() != cleanUserId) {
           batch.update(doc.reference, {
             'isRead': true,
             'readAt': FieldValue.serverTimestamp(),
@@ -236,12 +247,9 @@ class MessagingService {
         }
       }
 
-      batch.update(_db.collection(_conversations).doc(conversationId), {
-        'unreadCount': 0,
-        'lastReadAt': FieldValue.serverTimestamp(),
-      });
 
       await batch.commit();
+      debugPrint('[MessagingService] ✅ Receiver read the messages. UI will sync.');
     } catch (e) {
       debugPrint('Error marking messages read: $e');
     }
@@ -326,7 +334,6 @@ class MessagingService {
 
   /// Sends a message and updates the conversation timestamp and unread count.
   Future<void> sendMessage(String conversationId, String senderId, Map<String, dynamic> data) async {
-    debugPrint('[MessagingService] 📤 Attempting direct send in conv: $conversationId');
     try {
       final msgData = {
         ...data,
@@ -338,8 +345,7 @@ class MessagingService {
 
 
       // 1. Add Message document first
-      final docRef = await _db.collection(_messages).add(msgData);
-      debugPrint('[MessagingService] 📥 Message ADDED to Firestore with ID: ${docRef.id}');
+      await _db.collection(_messages).add(msgData);
 
 
       // 2. Update Conversation document separately
