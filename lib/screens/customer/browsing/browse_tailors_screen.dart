@@ -1781,7 +1781,7 @@ int _getRatingCount(double rating) {
 }
 
 Widget _buildFilterChips(StateSetter setState) {
-  final filters = ["All reviews", "5 Star", "4 Star & above", "4 Star & below"];
+  final filters = ["All reviews", "5 Star", "4 Star & above", "Below 4 Star"];
   return SingleChildScrollView(
     scrollDirection: Axis.horizontal,
     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1819,15 +1819,18 @@ Widget _buildFilterChips(StateSetter setState) {
   );
 }
 
-// ✅ CORRECT: Filters by rating with ALL 4 options
+// Buckets are deliberately disjoint at the 4.0 boundary: a 4.0 review used
+// to match BOTH "4 Star & above" (>= 4.0) and "4 Star & below" (<= 4.0), so
+// it was double-counted. "Below 4 Star" is now strictly < 4.0.
+// "5 Star" matches the tailor dashboard's own filter (>= 5.0).
 List<Review> _getFilteredReviews() {
   switch (_selectedFilter) {
     case "5 Star":
-      return _reviews.where((r) => r.rating >= 4.5).toList();
+      return _reviews.where((r) => r.rating >= 5.0).toList();
     case "4 Star & above":
       return _reviews.where((r) => r.rating >= 4.0).toList();
-    case "4 Star & below":
-      return _reviews.where((r) => r.rating <= 4.0).toList();
+    case "Below 4 Star":
+      return _reviews.where((r) => r.rating < 4.0).toList();
     default:
       return List.from(_reviews);  // Shows ALL reviews (1-star to 5-star)
   }
