@@ -337,13 +337,22 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                               user['id'],
                               otherRole: role,
                             );
-                            final conversation = existing ?? await _messagingService.createConversation(
-                              customerId: widget.customerId,
-                              otherId: user['id'],
-                              otherRole: role,
-                              orderId: 'NEW-${DateTime.now().millisecondsSinceEpoch}',
-                            );
-                            _openChat(conversation);
+
+                            if (existing != null) {
+                              _openChat(existing);
+                            } else {
+                              // 🧠 Create a virtual placeholder conversation
+                              // It has an ID but hasn't been saved to Firestore yet.
+                              final placeholder = Conversation(
+                                id: 'TEMP-${widget.customerId}-${user['id']}',
+                                customerId: widget.customerId,
+                                otherId: user['id'],
+                                otherRole: role,
+                                orderId: 'NEW-${DateTime.now().millisecondsSinceEpoch}',
+                                updatedAt: DateTime.now(),
+                              );
+                              _openChat(placeholder);
+                            }
                           },
                         );
                       },
@@ -478,7 +487,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           final filtered = conversations.where((conv) {
             if (conv.isDeleted) return false;
             
-            // 🧠 Role-independent Unread Detection (since we removed lastSenderId)
+            // 🧠 Unread Detection without lastSenderId
             final bool isUnread = conv.unreadCount > 0;
             
             if (_selectedTab == "Unread") return isUnread;

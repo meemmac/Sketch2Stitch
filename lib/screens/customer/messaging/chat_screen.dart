@@ -61,8 +61,12 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   
   bool _isBlocked = false;
   bool _isUploading = false;
-  bool _isSending = false; // 🆕 Added to show loading on button
+  bool _isSending = false;
   Timer? _typingTimer;
+
+  // 🆕 Track if this is a new conversation not yet in Firestore
+  late String _activeConversationId;
+  bool _isNewChat = false;
 
 
   // Overlay notification
@@ -73,10 +77,13 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     super.initState();
     
     _isBlocked = widget.isBlocked ?? false;
-    _messageStream = _messagingService.getMessagesByConversationId(widget.conversationId);
-    _otherUserTypingStream = _messagingService.streamTypingStatus(widget.conversationId, widget.otherUserId);
+    _activeConversationId = widget.conversationId;
+    _isNewChat = _activeConversationId.startsWith('TEMP-');
+
+    _messageStream = _messagingService.getMessagesByConversationId(_activeConversationId);
+    _otherUserTypingStream = _messagingService.streamTypingStatus(_activeConversationId, widget.otherUserId);
     
-    _markAsRead();
+    if (!_isNewChat) _markAsRead();
     
     _typingAnimationController = AnimationController(
       duration: const Duration(milliseconds: 1000),
@@ -100,9 +107,10 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   }
 
   void _markAsRead() {
-    _messagingService.markMessagesRead(widget.conversationId, widget.customerId);
+    if (_isNewChat) return;
+    _messagingService.markMessagesRead(_activeConversationId, widget.customerId);
     if (widget.onConversationRead != null) {
-      widget.onConversationRead!(widget.conversationId);
+      widget.onConversationRead!(_activeConversationId);
     }
   }
 
@@ -184,12 +192,12 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   // ─── Send Message ──────────────────────────────────────────────────
 
   void _onTyping(String text) {
-    if (_typingTimer?.isActive ?? false) return;
+    if (_isNewChat || (_typingTimer?.isActive ?? false)) return;
     
-    _messagingService.setTypingStatus(widget.conversationId, widget.customerId, true);
+    _messagingService.setTypingStatus(_activeConversationId, widget.customerId, true);
     
     _typingTimer = Timer(const Duration(seconds: 3), () {
-      _messagingService.setTypingStatus(widget.conversationId, widget.customerId, false);
+      _messagingService.setTypingStatus(_activeConversationId, widget.customerId, false);
     });
   }
 
@@ -198,40 +206,49 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     if (text.isEmpty) return;
 
 
-    debugPrint('🚀 [SEND] Button pressed. Text: $text');
-
-
     if (_isBlocked) {
       _showTopNotification('You cannot send messages to a blocked user', isError: true);
       return;
     }
 
 
-    final data = {
-      'senderRole': widget.currentUserRole.name, // 🧠 Uses dynamic role
-      'msgText': text,
-      'replyToMessageId': _replyingToMessageId,
-      'replyToText': _replyingToMessageText,
-      'replyToSender': _replyingToSender,
-    };
-
-
     try {
       setState(() => _isSending = true);
-      print('--- CHAT DEBUG: Sending started ---');
-      
-      await _messagingService.sendMessage(widget.conversationId, widget.customerId, data);
-      
-      print('--- CHAT DEBUG: Message sent successfully! ---');
-      _showTopNotification('Message sent successfully!');
+
+      // 🛡️ Create conversation in Firestore if it doesn't exist yet
+      if (_isNewChat) {
+        final newConv = await _messagingService.createConversation(
+          customerId: widget.customerId,
+          otherId: widget.otherUserId,
+          otherRole: widget.otherUserRole,
+          orderId: widget.orderId ?? 'NEW-${DateTime.now().millisecondsSinceEpoch}',
+        );
+        
+        setState(() {
+          _activeConversationId = newConv.id;
+          _isNewChat = false;
+          // Re-initialize streams with the real Firestore ID
+          _messageStream = _messagingService.getMessagesByConversationId(_activeConversationId);
+          _otherUserTypingStream = _messagingService.streamTypingStatus(_activeConversationId, widget.otherUserId);
+        });
+      }
+
+      final data = {
+        'senderRole': widget.currentUserRole.name,
+        'msgText': text,
+        'replyToMessageId': _replyingToMessageId,
+        'replyToText': _replyingToMessageText,
+        'replyToSender': _replyingToSender,
+      };
+
+      await _messagingService.sendMessage(_activeConversationId, widget.customerId, data);
       
       _messageController.clear();
       _clearReply();
-      _messagingService.setTypingStatus(widget.conversationId, widget.customerId, false);
+      _messagingService.setTypingStatus(_activeConversationId, widget.customerId, false);
       _typingTimer?.cancel();
       _scrollToBottom();
     } catch (e) {
-      print('--- CHAT DEBUG: Send failed! Error: $e ---');
       _showTopNotification('Send Error: $e', isError: true);
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -241,8 +258,9 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   // ─── Block Functions ─────────────────────────────────────────────────
 
   Future<void> _blockUser() async {
+    if (_isNewChat) return;
     try {
-      await _messagingService.blockConversationByConversationId(widget.conversationId);
+      await _messagingService.blockConversationByConversationId(_activeConversationId);
       setState(() => _isBlocked = true);
       _showTopNotification('${widget.otherUserName} has been blocked');
       Navigator.pop(context);
@@ -252,8 +270,9 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _unblockUser() async {
+    if (_isNewChat) return;
     try {
-      await _messagingService.unblockConversationByConversationId(widget.conversationId);
+      await _messagingService.unblockConversationByConversationId(_activeConversationId);
       setState(() => _isBlocked = false);
       _showTopNotification('${widget.otherUserName} has been unblocked');
     } catch (e) {
@@ -388,8 +407,10 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
             TextButton(
               onPressed: () async {
                 Navigator.pop(context);
-                await _messagingService.deleteMessageByMessageId(message.id);
-                _showTopNotification('Message deleted');
+                if (!_isNewChat) {
+                  await _messagingService.deleteMessageByMessageId(message.id);
+                  _showTopNotification('Message deleted');
+                }
               },
               child: const Text('Delete', style: TextStyle(color: Colors.red)),
             ),
@@ -426,9 +447,24 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     try {
       final url = await _messagingService.uploadAttachmentFile(file);
       if (url != null) {
-        // 🧠 Detect current user's role from the opposite of otherUserRole 
-        // Or better, we should probably have a role field in this screen too.
-        // For now, let's use a safe logic:
+        // 🛡️ Create conversation in Firestore if it doesn't exist yet
+        if (_isNewChat) {
+          final newConv = await _messagingService.createConversation(
+            customerId: widget.customerId,
+            otherId: widget.otherUserId,
+            otherRole: widget.otherUserRole,
+            orderId: widget.orderId ?? 'NEW-${DateTime.now().millisecondsSinceEpoch}',
+          );
+          
+          setState(() {
+            _activeConversationId = newConv.id;
+            _isNewChat = false;
+            // Re-initialize streams with the real Firestore ID
+            _messageStream = _messagingService.getMessagesByConversationId(_activeConversationId);
+            _otherUserTypingStream = _messagingService.streamTypingStatus(_activeConversationId, widget.otherUserId);
+          });
+        }
+
         final senderRole = (widget.otherUserRole == UserRole.customer) 
             ? (widget.otherUserId.startsWith('t') ? UserRole.retailer : UserRole.tailor)
             : UserRole.customer;
@@ -439,7 +475,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
           'msgText': type == 'document' ? '📄 ${fileName ?? 'Document'}' : '',
           'attachment': url,
         };
-        await _messagingService.sendMessage(widget.conversationId, widget.customerId, data);
+        await _messagingService.sendMessage(_activeConversationId, widget.customerId, data);
         _scrollToBottom();
       }
     } catch (e) {
