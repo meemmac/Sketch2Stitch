@@ -58,6 +58,10 @@ class _CartScreenState extends State<CartScreen> {
   /// instead of firing duplicate updates.
   final Set<String> _busyLineIds = {};
 
+  /// Number of unavailable lines already reported to the customer, so the
+  /// banner fires once per change rather than on every stream rebuild.
+  int _reportedUnavailableCount = 0;
+
   @override
   void initState() {
     super.initState();
@@ -79,6 +83,26 @@ class _CartScreenState extends State<CartScreen> {
       // Checkout surfaces the "no measurements yet" case itself; a failed
       // prefetch shouldn't block the cart from rendering.
     }
+  }
+
+  /// Tells the customer that some lines could not be shown any more. Fires
+  /// after the current frame because it runs from inside build().
+  void _reportUnavailableLines(int count) {
+    if (count == _reportedUnavailableCount) return;
+    _reportedUnavailableCount = count;
+    if (count == 0) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      AppFeedback.show(
+        context,
+        count == 1
+            ? '1 item was removed from your cart — it is no longer sold.'
+            : '$count items were removed from your cart — they are no '
+                'longer sold.',
+        isError: true,
+      );
+    });
   }
 
   void _showError(Object error) {
@@ -201,17 +225,17 @@ class _CartScreenState extends State<CartScreen> {
   /// Always goes to CheckoutScreen for the CURRENT cart. Never redirects
   /// into an existing order — that's what Running Orders is for.
   void _checkout() {
-    // Not just a null check: getOrCreateMeasurement writes an all-zero
-    // document the first time the customer opens the measurement page, so a
-    // record can exist while every field is still 0.
-    if (_measurement == null || !_measurement!.isComplete) {
-      AppFeedback.show(
-        context,
-        'Complete your measurements in your profile before checking out.',
-        isError: true,
-      );
-      return;
-    }
+    // Measurements are NOT required to buy fabric — they only matter if the
+    // customer goes on to hire a tailor, and TailoringSetupScreen asks for
+    // them at that point. Blocking checkout here meant a plain fabric order
+    // was impossible until all 14 body measurements were filled in.
+    //
+    // An incomplete profile is still forwarded as null rather than as a row
+    // of zeros: getOrCreateMeasurement writes an all-zero document the first
+    // time the measurement page is opened, so a record can exist while every
+    // field is still 0.
+    final measurement =
+        (_measurement != null && _measurement!.isComplete) ? _measurement : null;
 
     Navigator.push(
       context,
@@ -220,7 +244,7 @@ class _CartScreenState extends State<CartScreen> {
           cartLines: _cartLines,
           retailers: _retailers,
           grandTotal: _grandTotal,
-          measurement: _measurement!,
+          measurement: measurement,
           subOrders: _subOrders,
           onOrderPlaced: _clearCart,
         ),
@@ -311,6 +335,11 @@ class _CartScreenState extends State<CartScreen> {
           // Cache the latest snapshot so the summary bar, checkout handler
           // and totals all read the same data the list is rendering.
           _snapshot = snapshot.data ?? CartSnapshot.empty;
+
+          // Lines whose product was deleted or whose colour was retired are
+          // dropped during hydration. Say so instead of letting the basket
+          // quietly shrink between visits.
+          _reportUnavailableLines(_snapshot.unavailableCount);
 
           if (_cartLines.isEmpty) return _buildEmptyState();
 

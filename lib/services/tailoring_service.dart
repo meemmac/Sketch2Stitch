@@ -10,6 +10,7 @@ import '../models/sub_order.dart';
 import '../models/tailor_job.dart';
 import 'Cloudinary_service.dart';
 import 'browse_service.dart';
+import 'notification_service.dart';
 
 class TailoringServiceException implements Exception {
   final String message;
@@ -239,6 +240,11 @@ class TailoringService {
       );
       await _commit(batch, 'createTailorJob');
 
+      // Best-effort: the tailor has no other way to learn a job is waiting,
+      // and the retailers need to know the fabric is now going to a tailor
+      // rather than to the customer.
+      await _notifyJobRequested(orderId: orderId, tailorId: tailorId);
+
       return ref.id;
     } on TailoringServiceException {
       rethrow;
@@ -298,8 +304,14 @@ class TailoringService {
           'confirmedAt': Timestamp.now(),
         });
 
+        // The tailor has been paid, but nothing has been stitched yet, so
+        // the ORDER is not finished — it moves into 'processing' and only
+        // reaches 'completed' when the tailor marks the work done
+        // (OrderService.updateWorkProgress). Writing 'completed' here made a
+        // brand-new job read as finished, and then go backwards to
+        // 'processing' the moment the tailor actually started.
         tx.update(_db.collection(_orders).doc(orderId), {
-          'status': OrderStatus.completed.toValue,
+          'status': OrderStatus.processing.toValue,
         });
 
         // Payments.targetType admits 'retailer' or 'tailor'; the retailer
@@ -338,11 +350,100 @@ class TailoringService {
       await jobSnap.reference.update({
         'status': TailorJobStatus.rejected.toValue,
       });
+
+      // The tailor quoted and is waiting on an answer — tell them it was a
+      // no, otherwise the job just goes quiet on their screen forever.
+      final tailorId = jobSnap.data()?['tailorId'] as String?;
+      if (tailorId != null) {
+        await _notifyQuoteRejected(orderId: orderId, tailorId: tailorId);
+      }
     } catch (e) {
       debugPrint('[TailoringService] rejectTailorJob failed: $e');
       throw const TailoringServiceException(
         'Could not decline this quote. Please try again.',
       );
+    }
+  }
+
+  // ─── Notifications ──────────────────────────────────────────────────
+
+  /// Customer's display name, or a neutral fallback. Notification copy only,
+  /// so a missing document must not throw.
+  Future<String> _customerNameForOrder(String orderId) async {
+    try {
+      final orderSnap = await _db.collection(_orders).doc(orderId).get();
+      final customerId = orderSnap.data()?['customerId'] as String?;
+      if (customerId == null) return 'A customer';
+      final snap = await _db.collection('Customer').doc(customerId).get();
+      final name = (snap.data()?['name'] as String?)?.trim();
+      return (name == null || name.isEmpty) ? 'A customer' : name;
+    } catch (_) {
+      return 'A customer';
+    }
+  }
+
+  /// Tells the chosen tailor a request is waiting, and tells every retailer
+  /// on the order that its fabric is now bound for that tailor.
+  ///
+  /// Best-effort throughout: the job is already written by the time this
+  /// runs, so a notification failure must not fail the request.
+  Future<void> _notifyJobRequested({
+    required String orderId,
+    required String tailorId,
+  }) async {
+    try {
+      final notifications = NotificationService();
+      final customerName = await _customerNameForOrder(orderId);
+
+      await notifications.notifyTailorNewOrder(
+        tailorId,
+        orderId,
+        customerName,
+        'a custom stitching job',
+      );
+
+      final tailorSnap = await _db.collection('Tailor').doc(tailorId).get();
+      final tailorName =
+          (tailorSnap.data()?['name'] as String?)?.trim().isNotEmpty == true
+              ? tailorSnap.data()!['name'] as String
+              : 'a tailor';
+
+      final subs = await _db
+          .collection(_subOrders)
+          .where('orderId', isEqualTo: orderId)
+          .get();
+      for (final doc in subs.docs) {
+        final retailerId = doc.data()['retailerId'] as String?;
+        if (retailerId == null) continue;
+        await notifications.notifyRetailerTailorAssigned(
+          retailerId,
+          orderId,
+          customerName,
+          tailorName,
+          DateTime.now(),
+        );
+      }
+    } catch (e) {
+      debugPrint('[TailoringService] job-requested notifications failed: $e');
+    }
+  }
+
+  /// Tells the tailor the customer turned their quote down.
+  Future<void> _notifyQuoteRejected({
+    required String orderId,
+    required String tailorId,
+  }) async {
+    try {
+      final customerName = await _customerNameForOrder(orderId);
+      await NotificationService().notifyTailorOrderCancelled(
+        tailorId,
+        orderId,
+        customerName,
+        'a custom stitching job',
+        'The customer declined your quote.',
+      );
+    } catch (e) {
+      debugPrint('[TailoringService] quote-rejected notification failed: $e');
     }
   }
 

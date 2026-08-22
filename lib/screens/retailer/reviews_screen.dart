@@ -54,7 +54,7 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
   Map<int, int> _ratingDistribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0};
 
   final Color primaryGreen = const Color(0xFF4F7942);
-  String _selectedFilter = "Top reviews";
+  String _selectedFilter = "Newest";
 
   List<UserReview> _allReviews = [];
 
@@ -120,11 +120,10 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
 
   List<UserReview> get _filteredReviews {
     List<UserReview> sortedList = List.from(_allReviews);
+    // "Top reviews" used to be here as a fourth chip, sorting by rating
+    // exactly like "Highest rating" — two chips, one behaviour. Dropped, and
+    // "Newest" is now the default so fresh feedback lands first.
     switch (_selectedFilter) {
-      case "Top reviews":
-        // Sort by high rating first
-        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
-        break;
       case "Newest":
         sortedList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         break;
@@ -340,7 +339,7 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
   }
 
   Widget _buildFilterChips() {
-    final filters = ["Top reviews", "Newest", "Highest rating", "Lowest rating"];
+    final filters = ["Newest", "Highest rating", "Lowest rating"];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16),

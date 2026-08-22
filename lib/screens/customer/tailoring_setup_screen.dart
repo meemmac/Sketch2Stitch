@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -55,7 +56,9 @@ class TailoringSetupCallbacks {
   })
   onCreateTailorJob;
 
-  final Future<void> Function() onConfirmTailorJob;
+  /// [transactionId] is the bKash trxID for the tailor's charge. Optional
+  /// only because the no-amount legacy path confirms without a payment.
+  final Future<void> Function({String? transactionId}) onConfirmTailorJob;
 
   final Future<void> Function() onRejectTailorJob;
 
@@ -194,6 +197,26 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   final List<DesignItem> _designs = [];
 
   DateTime? _tailorSelectionDeadline;
+
+  /// Polls the backend while the customer is waiting on a tailor.
+  ///
+  /// Two jobs, both previously missing:
+  ///  * the tailor's quote arrives on THEIR device, and this screen only
+  ///    read the job once on open — so a waiting customer sat on a stale
+  ///    "waiting for quote" card until they backed out and came back in;
+  ///  * the 72h selection deadline shown on the banner was never enforced
+  ///    by anything, so an order with no tailor chosen stayed frozen
+  ///    forever instead of falling back to direct delivery.
+  ///
+  /// Deliberately a poll rather than a snapshot listener: it reuses the
+  /// existing `onFetchResumeState` callback, so no new backend plumbing
+  /// and no scheduled server job (which this project can't use) is needed.
+  Timer? _pollTimer;
+
+  static const Duration _pollInterval = Duration(seconds: 20);
+
+  /// Guards against a slow poll overlapping the next tick.
+  bool _polling = false;
 
   /// ONE tailor job for the whole order — null until a tailor is
   /// requested. Covers every sub-order listed below.
@@ -350,6 +373,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     for (final c in _measurementControllers.values) {
       c.dispose();
     }
@@ -407,6 +431,108 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     } finally {
       if (mounted) setState(() => _resuming = false);
     }
+
+    _startPolling();
+  }
+
+  // ─── Waiting-state polling ─────────────────────────────────────────
+
+  /// Only worth running while the order is still undecided. Once it is
+  /// resolved (paid, or expired to direct delivery) there is nothing left
+  /// to watch for.
+  void _startPolling() {
+    _pollTimer?.cancel();
+    if (!mounted || _isResolved) return;
+    _pollTimer = Timer.periodic(_pollInterval, (_) => _poll());
+  }
+
+  Future<void> _poll() async {
+    if (!mounted || _polling) return;
+
+    if (_isResolved) {
+      _pollTimer?.cancel();
+      return;
+    }
+
+    _polling = true;
+    try {
+      // The deadline has to be checked before re-reading, because expiring
+      // the search is itself a write that changes what we would read.
+      if (await _maybeExpireTailorSearch()) return;
+
+      final resume = await widget.callbacks.onFetchResumeState();
+      if (!mounted || resume == null) return;
+
+      // Only the job and the deadline are refreshed here — NOT _currentStep.
+      // The customer may be part-way through editing designs or
+      // measurements, and yanking them to another step mid-poll would lose
+      // that work.
+      if (!mounted) return;
+      setState(() {
+        if (resume.tailorSelectionDeadline != null) {
+          _tailorSelectionDeadline = resume.tailorSelectionDeadline;
+        }
+        if (resume.tailorJobId != null && resume.status != null) {
+          _tailorJob = TailorJob(
+            id: resume.tailorJobId!,
+            orderId: widget.orderId,
+            tailorId: resume.tailorId ?? '',
+            measurementId: _selectedMeasurement?.id ?? '',
+            status: TailorJobStatus.fromValue(resume.status!),
+            requestedAt: resume.requestedAt,
+            quoteAmount: resume.quoteAmount,
+            deliveryCharge: resume.deliverCharge,
+            estimatedDeliveryDate: resume.estimatedDeliveryDate,
+            rejectionReason: resume.rejectionReason,
+            quoteStatus: QuoteStatus.notSent,
+            tailorPaymentStatus: resume.tailorPaymentStatus != null
+                ? TailorPaymentStatus.fromValue(resume.tailorPaymentStatus!)
+                : TailorPaymentStatus.unpaid,
+          );
+        }
+      });
+
+      if (_isResolved) {
+        _pollTimer?.cancel();
+        _checkResolvedAndMaybeComplete();
+      }
+    } catch (e) {
+      // A failed poll is not worth interrupting the customer over — the
+      // next tick will try again.
+      debugPrint('[TailoringSetup] poll failed: $e');
+    } finally {
+      _polling = false;
+    }
+  }
+
+  /// Fires the expiry the deadline banner has always promised: once the
+  /// window closes with no confirmed tailor, the order falls back to direct
+  /// delivery. Returns true if it expired the search.
+  Future<bool> _maybeExpireTailorSearch() async {
+    final deadline = _tailorSelectionDeadline;
+    if (deadline == null || DateTime.now().isBefore(deadline)) return false;
+
+    // A job the customer already paid for is resolved, not expired — and
+    // one still being quoted has beaten the deadline.
+    final job = _tailorJob;
+    if (job != null &&
+        (job.status == TailorJobStatus.confirmed ||
+            job.status == TailorJobStatus.quoted)) {
+      return false;
+    }
+
+    await widget.callbacks.onTailorSearchExpired();
+    if (!mounted) return true;
+
+    setState(() {
+      _tailorJob = job?.copyWith(status: TailorJobStatus.expired);
+    });
+    _pollTimer?.cancel();
+    _showOrderCompleteDialog(
+      'No tailor was confirmed in time, so your order was sent for direct '
+      'delivery.',
+    );
+    return true;
   }
 
   // ─── Step 1 actions ────────────────────────────────────────────────
@@ -705,11 +831,17 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
 
     // Step 4: execute payment + mark confirmed.
     await _withLoading(() async {
-      await BkashService.instance.executePayment(
+      final executed = await BkashService.instance.executePayment(
         paymentID: paymentID,
         idToken: idToken,
       );
-      await widget.callbacks.onConfirmTailorJob();
+      // Carry the real bKash trxID onto the tailor's Payments row. Without
+      // it that row was written with a null transactionId, so a tailor
+      // payment could not be matched back to bKash in a dispute — the
+      // retailer rows have recorded it since checkout.
+      await widget.callbacks.onConfirmTailorJob(
+        transactionId: executed.trxID,
+      );
       await widget.callbacks.onPayTailor();
     });
 
@@ -795,8 +927,10 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(context); // close dialog only
-              Navigator.of(context).pop(); // leave setup screen
+              // Close the dialog ONLY — the button says "Stay Here", so
+              // popping the setup screen as well made it behave exactly like
+              // "Track Order" minus the tracking screen.
+              Navigator.pop(context);
             },
             child: const Text("Stay Here"),
           ),

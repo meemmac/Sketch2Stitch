@@ -21,6 +21,7 @@ import 'notification_screen.dart';
 import 'package:sketch2stitch/screens/retailer/inventory_screen.dart';
 import 'package:sketch2stitch/screens/tailor/orders_screen.dart';
 import 'order_list_screen.dart';
+import 'track_order.dart';
 
 import 'package:sketch2stitch/services/auth_service.dart';
 import 'package:sketch2stitch/services/notification_service.dart';
@@ -249,7 +250,24 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => UnifiedNotificationScreen(role: _currentRole),
+        builder: (_) => UnifiedNotificationScreen(
+          role: _currentRole,
+          // Without this the notification cards marked themselves read and
+          // did nothing else — every notification is about an order, so a
+          // tap should open that order's tracking timeline.
+          onNotificationTap: (orderId, subOrderId) {
+            if (orderId.isEmpty) return;
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => OrderTrackScreen(
+                  orderId: orderId,
+                  userRole: _currentRole,
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
