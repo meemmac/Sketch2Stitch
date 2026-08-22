@@ -13,6 +13,8 @@ import 'reviews_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../widgets/top_feedback_banner.dart';
 import 'package:sketch2stitch/services/user_session.dart';
+import '../tailoring_setup_screen.dart';
+import '../tailoring_callbacks.dart';
 
 enum OrderDeliveryDestination { retailer, tailor }
 
@@ -89,6 +91,7 @@ class CustomerOrder {
   final String? tailorName;
   final String? tailorId;
   final List<OrderItem> items;
+  final List<db.SubOrder> rawSubOrders;
   final double amount;
   final DateTime orderDate;
   DateTime? deliveryDate;
@@ -109,6 +112,7 @@ class CustomerOrder {
     this.tailorName,
     this.tailorId,
     required this.items,
+    required this.rawSubOrders,
     required this.amount,
     required this.orderDate,
     required this.status,
@@ -213,8 +217,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       final List<Map<String, dynamic>> subOrdersData = data['subOrders'] ?? [];
       final List<Map<String, dynamic>> tailorJobsData = data['tailorJobs'] ?? [];
 
+      final List<db.SubOrder> subOrdersList = subOrdersData.map((s) => s['subOrder'] as db.SubOrder).toList();
       final db.Order orderWithDetails = order.copyWith(
-        subOrders: subOrdersData.map((s) => s['subOrder'] as db.SubOrder).toList(),
+        subOrders: subOrdersList,
         tailorJobs: tailorJobsData.map((t) => t['job'] as db.TailorJob).toList(),
       );
 
@@ -229,6 +234,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       
       final Map<String, String> currentRetailerIds = {};
       String? tailorIdStr;
+      bool isTailorRejected = false;
 
       for (var soData in subOrdersData) {
         final db.SubOrder so = soData['subOrder'];
@@ -282,10 +288,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         tailorIdStr = tj.tailorId;
         charges[artisanName] = tj.deliveryCharge ?? 0;
         
-        if (tj.status == db.TailorJobStatus.cancelled || tj.status == db.TailorJobStatus.tailorDeclined) {
-          tailorCancellationReason = tj.rejectionReason ?? "Unavailable";
-        }
-
         for (int i = 0; i < items.length; i++) {
           if (items[i].destination == OrderDeliveryDestination.tailor) {
             items[i] = OrderItem(
@@ -299,17 +301,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               canBleach: items[i].canBleach,
               canDryClean: items[i].canDryClean,
               canTumbleDry: items[i].canTumbleDry,
-              ironLevel: items[i].ironLevel,
               retailerName: items[i].retailerName,
               destination: items[i].destination,
               tailorPrice: tj.quoteAmount,
-              tailorInstructions: tj.specialInstructions,
               tailorStatus: _mapTailorStatus(tj.status),
               tailorDeliveryDate: tj.estimatedDeliveryDate,
-              measurementRefImages: tj.designIds,
               tailorJobId: tj.id,
             );
           }
+        }
+
+        if (tj.status == db.TailorJobStatus.cancelled || tj.status == db.TailorJobStatus.tailorDeclined || tj.status == db.TailorJobStatus.rejected) {
+          tailorCancellationReason = tj.rejectionReason;
+          isTailorRejected = true;
         }
       }
 
@@ -319,7 +323,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       double? tailorRatingVal;
 
       for (var r in reviews) {
-        if (r.targetRole == db.ReviewTargetRole.tailor) {
+        if (r.targetRole == db.ReviewTargetRole.tailor && r.targetId == tailorIdStr) {
           tailorReviewStr = r.comment;
           tailorRatingVal = r.rating;
         } else if (r.targetRole == db.ReviewTargetRole.retailer) {
@@ -335,6 +339,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         }
       }
 
+      String mappedStatus = _mapStatusToFrontend(orderWithDetails.statusText);
+      if (isTailorRejected && mappedStatus == 'Order Preparing') {
+        mappedStatus = 'Tailor Rejected';
+      }
+
       results.add(CustomerOrder(
         id: order.id,
         retailerName: retailerNames.join(", "),
@@ -342,9 +351,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         tailorName: order.tailorName,
         tailorId: tailorIdStr,
         items: items,
+        rawSubOrders: subOrdersList,
         amount: retailerAmount,
         orderDate: order.orderDate,
-        status: _mapStatusToFrontend(orderWithDetails.statusText),
+        status: mappedStatus,
         isDelivered: order.status == db.OrderStatus.completed,
         deliveryAddress: deliveryAddress,
         deliveryCharges: charges,
@@ -1010,17 +1020,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text("Order Details", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                          Text("ID: ${currentOrder.id}", style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
-                        ],
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text("Order Details", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                            Text("ID: ${currentOrder.id}", style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
                       ),
-                      _infoBadge(
-                        currentOrder.status,
-                        _getOrderStatusColor(currentOrder.status, currentOrder.isDelivered).withValues(alpha: 0.1),
-                        _getOrderStatusColor(currentOrder.status, currentOrder.isDelivered),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: _infoBadge(
+                          currentOrder.status,
+                          _getOrderStatusColor(currentOrder.status, currentOrder.isDelivered).withValues(alpha: 0.1),
+                          _getOrderStatusColor(currentOrder.status, currentOrder.isDelivered),
+                        ),
                       ),
                     ],
                   ),
@@ -1055,7 +1070,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     const SizedBox(height: 30),
                     const Text("Tailor Customization Details", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
-                    ...currentOrder.items.where((i) => i.destination == OrderDeliveryDestination.tailor).map((item) => _tailorCustomizationCard(item, currentOrder.isDelivered)),
+                    ...currentOrder.items.where((i) => i.destination == OrderDeliveryDestination.tailor).map((item) => _tailorCustomizationCard(item, currentOrder)),
                   ],
                   const SizedBox(height: 30),
                   const Text("Order Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -1270,7 +1285,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  Widget _tailorCustomizationCard(OrderItem item, bool isDelivered) {
+  Widget _tailorCustomizationCard(OrderItem item, CustomerOrder currentOrder) {
+    final bool isDelivered = currentOrder.isDelivered;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -1359,49 +1375,32 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ),
                     if (item.tailorStatus == TailorStatus.quoted) ...[
                       const Divider(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () async {
-                                if (item.tailorJobId == null) return;
-                                try {
-                                  await OrderService().updateWorkProgress(item.tailorJobId!, db.TailorJobStatus.rejected);
-                                } catch (e) {
-                                  if (context.mounted) AppFeedback.show(context, "Error updating status", isError: true);
-                                }
-                              },
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.red.shade700,
-                                side: BorderSide(color: Colors.red.shade200),
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => TailoringSetupScreen(
+                                orderId: currentOrder.id,
+                                orderDate: currentOrder.orderDate,
+                                savedMeasurements: const [],
+                                subOrders: currentOrder.rawSubOrders,
+                                callbacks: buildTailoringCallbacks(currentOrder.id),
                               ),
-                              child: const Text("Reject", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            ),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                const TextSpan(text: "If you want to confirm or reject ", style: TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w600)),
+                                TextSpan(text: "go to Checkout", style: TextStyle(color: Colors.green.shade800, fontSize: 13, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                if (item.tailorJobId == null) return;
-                                try {
-                                  await OrderService().updateWorkProgress(item.tailorJobId!, db.TailorJobStatus.confirmed);
-                                } catch (e) {
-                                  if (context.mounted) AppFeedback.show(context, "Error updating status", isError: true);
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: primaryGreen,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              child: const Text("Accept", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ],
                   ],
@@ -1576,7 +1575,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
-      child: Text(label, style: TextStyle(color: text, fontSize: 12, fontWeight: FontWeight.bold)),
+      child: Text(label, style: TextStyle(color: text, fontSize: 12, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
     );
   }
 
