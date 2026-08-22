@@ -9,6 +9,7 @@ import '../models/payment.dart';
 import '../models/sub_order.dart';
 import '../models/tailor_job.dart';
 import 'Cloudinary_service.dart';
+import 'browse_service.dart';
 
 class TailoringServiceException implements Exception {
   final String message;
@@ -202,6 +203,12 @@ class TailoringService {
     String instructions = '',
   }) async {
     try {
+      // Capacity guard. The browse screens already hide tailors who are at
+      // their maxOrder, but the customer may be acting on a stale list — or
+      // two customers may go for the same last slot at once — so re-check
+      // against live data before writing the job.
+      await _assertTailorHasCapacity(tailorId);
+
       final ref = _db.collection(_tailorJobs).doc();
       final job = TailorJob(
         id: ref.id,
@@ -340,6 +347,32 @@ class TailoringService {
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────
+
+  /// Throws if [tailorId] has already filled every slot their `maxOrder`
+  /// allows. A null `maxOrder` is "Not Set" — unlimited.
+  Future<void> _assertTailorHasCapacity(String tailorId) async {
+    final snap = await _db.collection('Tailor').doc(tailorId).get();
+    final capacity = (snap.data()?['maxOrder'] as num?)?.toInt();
+    if (capacity == null) return;
+
+    if (capacity <= 0) {
+      throw const TailoringServiceException(
+        'This tailor is not accepting new orders right now.',
+      );
+    }
+
+    final running = await _db
+        .collection(_tailorJobs)
+        .where('tailorId', isEqualTo: tailorId)
+        .where('status', whereIn: BrowseService.runningJobStatuses)
+        .get();
+
+    if (running.docs.length >= capacity) {
+      throw const TailoringServiceException(
+        'This tailor is fully booked right now. Please choose another one.',
+      );
+    }
+  }
 
   /// Points every sub-order in this order at its final destination. Left
   /// as 'pending' by `CheckoutService.placeOrder`, because at payment time

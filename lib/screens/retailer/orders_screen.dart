@@ -135,7 +135,10 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
 
   void _listenToOrders() {
     final retailerId = _authService.currentUser?.uid;
-    if (retailerId == null) return;
+ if (retailerId == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
 
     _ordersSubscription = _orderService
         .streamDetailedRetailerOrders(retailerId)
@@ -166,7 +169,12 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
             recipientType: _capitalize(subOrder['deliveryDestination']),
             deliveryAddress: customer['address'] ?? 'No address provided',
             items: items.map((i) {
+              // Products store care labels the way the inventory form writes
+              // them ("Washable", "Dry Clean Only", "Iron: High"), so match
+              // on those rather than camelCase keys.
               final careSymbols = List<String>.from(i['careSymbol'] ?? []);
+              final careLower =
+                  careSymbols.map((s) => s.toLowerCase()).toList();
               return OrderItem(
                 name: i['name'],
                 quantity: i['quantity'],
@@ -174,14 +182,17 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 color: i['color'],
                 price: (i['price'] ?? 0).toDouble(),
                 description: i['description'] ?? '',
-                canWash: careSymbols.contains('wash'),
-                canBleach: careSymbols.contains('bleach'),
-                canDryClean: careSymbols.contains('dryClean'),
-                canTumbleDry: careSymbols.contains('tumbleDry'),
-                ironLevel: careSymbols.firstWhere(
-                  (s) => s.startsWith('iron'),
-                  orElse: () => "Medium",
-                ),
+                canWash: careLower.any((s) => s.contains('wash')),
+                canBleach: careLower.any((s) => s.contains('bleach')),
+                canDryClean: careLower.any((s) => s.contains('dry clean')),
+                canTumbleDry: careLower.any((s) => s.contains('tumble dry')),
+                ironLevel: careSymbols
+                    .firstWhere(
+                      (s) => s.toLowerCase().startsWith('iron'),
+                      orElse: () => "Iron: Medium",
+                    )
+                    .replaceFirst(
+                        RegExp(r'^iron:\s*', caseSensitive: false), ''),
               );
             }).toList(),
           );
@@ -196,7 +207,9 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
 
   DateTime _parseDateTime(dynamic value) {
     if (value is Timestamp) return value.toDate();
-    if (value is String) return DateTime.parse(value);
+    // tryParse, not parse: a malformed date string would otherwise throw
+    // inside the stream's map and blank the whole screen.
+    if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
     return DateTime.now();
   }
 

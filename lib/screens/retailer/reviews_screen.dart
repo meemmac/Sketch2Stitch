@@ -36,7 +36,7 @@ class UserReview {
 
 class RetailerReviewsScreen extends StatefulWidget {
   final String shopName;
-  const RetailerReviewsScreen({super.key, this.shopName = "Bismillah Kacchi House"});
+const RetailerReviewsScreen({super.key, required this.shopName});
 
   @override
   State<RetailerReviewsScreen> createState() => _RetailerReviewsScreenState();
@@ -74,6 +74,7 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
   void _loadData() {
     final retailerId = _authService.currentUser?.uid;
     if (retailerId == null) {
+       setState(() => _isLoading = false);
       return;
     }
 
@@ -111,6 +112,9 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
         }).toList();
         _isLoading = false;
       });
+       }, onError: (e) {
+      debugPrint('Error loading reviews: $e');
+      if (mounted) setState(() => _isLoading = false);
     });
   }
 
@@ -353,7 +357,7 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
                   setState(() => _selectedFilter = filter);
                 }
               },
-              selectedColor: const Color(0xFF1E232C),
+              selectedColor: const Color(0xFF6B8F71),
               labelStyle: TextStyle(
                 color: isSelected ? Colors.white : Colors.black87,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,

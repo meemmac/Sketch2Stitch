@@ -1,8 +1,8 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Distance helper for rule-based delivery charge calculation.
-/// Not wired into any live calc yet — backend isn't connected.
+/// Distance helper used for rule-based delivery charge calculation
+/// (see CartService.deliveryChargeFor and its callers).
 class GeoUtils {
   /// Returns the great-circle distance in kilometers between two GeoPoints.
   static double distanceKm(GeoPoint a, GeoPoint b) {

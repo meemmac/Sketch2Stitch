@@ -37,6 +37,22 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="sketch2stitch" android:host="bkash"/>
             </intent-filter>
+            <intent-filter>
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+    <data android:scheme="sketch2stitch" android:host="reset-done" />
+</intent-filter>
+            <!-- In-app password reset. public/action.html (the project's
+                 custom action URL) bounces Firebase's emailed link here as
+                 sketch2stitch://reset?oobCode=..., so the new password is
+                 typed inside the app instead of on Firebase's web page. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="sketch2stitch" android:host="reset" />
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

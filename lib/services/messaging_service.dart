@@ -1,3 +1,4 @@
+// lib/services/messaging_service.dart
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
@@ -49,24 +50,12 @@ class MessagingService {
   /// Streams all conversations for a user.
   /// Handles both 'customerId' and 'otherId' fields to ensure all roles see their chats.
   Stream<List<Conversation>> getConversations(String userId) {
-    // We query where the user is either the customer OR the 'otherId'.
-    // Note: Firestore doesn't support logical OR across different fields easily in a single query
-    // without multiple queries or using 'whereIn' (if fields were the same).
-    // For simplicity and matching current schema:
     final customerStream = _db
         .collection(_conversations)
         .where('customerId', isEqualTo: userId)
         .where('isDeleted', isEqualTo: false)
         .snapshots();
 
-    final otherStream = _db
-        .collection(_conversations)
-        .where('otherId', isEqualTo: userId)
-        .where('isDeleted', isEqualTo: false)
-        .snapshots();
-
-    // We combine the snapshots and merge them client-side.
-    // In a production app, you might use RxDart's CombineLatest or similar.
     return customerStream.asyncMap((customerSnap) async {
       final otherSnap = await _db
           .collection(_conversations)
@@ -349,14 +338,12 @@ class MessagingService {
   // ─── User Search ──────────────────────────────────────────────────────────
 
   /// Searches for users across Customers, Tailors, and Retailers by name or phone.
-  /// Note: Firestore doesn't support cross-collection queries. This performs three queries.
   Future<List<Map<String, dynamic>>> searchUsersByNameOrPhone(String query) async {
     if (query.isEmpty) return [];
     
     try {
       final List<Map<String, dynamic>> results = [];
       
-      // We search by name or phone. For simplicity, we search for prefix match.
       final collections = [_customers, _tailors, _retailers];
       
       for (var col in collections) {
@@ -373,7 +360,7 @@ class MessagingService {
           'role': col == _customers ? 'customer' : (col == _tailors ? 'tailor' : 'retailer')
         }));
 
-        // Search by phone (if not enough results)
+        // Search by phone
         if (results.length < 10) {
           final phoneSnap = await _db.collection(col)
               .where('phone', isGreaterThanOrEqualTo: query)
@@ -393,6 +380,33 @@ class MessagingService {
     } catch (e) {
       debugPrint('Error searching users: $e');
       return [];
+    }
+  }
+
+  // ─── User Profile ─────────────────────────────────────────────────────────
+
+  /// Get user profile by ID and role
+  Future<Map<String, dynamic>?> getUserProfile(String userId, UserRole role) async {
+    try {
+      final collection = _getCollectionForRole(role);
+      final doc = await _db.collection(collection).doc(userId).get();
+      if (!doc.exists) return null;
+      return doc.data();
+    } catch (e) {
+      debugPrint('Error getting user profile: $e');
+      return null;
+    }
+  }
+
+  /// Get collection name for role
+  String _getCollectionForRole(UserRole role) {
+    switch (role) {
+      case UserRole.customer:
+        return _customers;
+      case UserRole.tailor:
+        return _tailors;
+      case UserRole.retailer:
+        return _retailers;
     }
   }
 }

@@ -1162,6 +1162,25 @@ class OrderService {
   }
 
   /// Streams detailed jobs for a specific tailor.
+  /// Maps `Design` document ids to their uploaded `designFile` URLs,
+  /// dropping any id that no longer resolves to a readable image.
+  Future<List<String>> _resolveDesignUrls(List<String> designIds) async {
+    if (designIds.isEmpty) return const [];
+    try {
+      final docs = await Future.wait(
+        designIds.map((id) => _db.collection('Design').doc(id).get()),
+      );
+      return docs
+          .map((d) => d.data()?['designFile'] as String?)
+          .whereType<String>()
+          .where((url) => url.isNotEmpty)
+          .toList();
+    } catch (e) {
+      debugPrint('OrderService: Error resolving design urls: $e');
+      return const [];
+    }
+  }
+
   Stream<List<Map<String, dynamic>>> streamDetailedTailorOrders(String tailorId) {
     return _db
         .collection(_tailorJobsCollection)
@@ -1274,12 +1293,20 @@ class OrderService {
               return null;
             }
 
+            // `Tailor-jobs.designIds` holds Design document ids, not image
+            // URLs — resolve them here so the tailor's screen has something
+            // it can actually render.
+            final designUrls = await _resolveDesignUrls(
+              List<String>.from(jobData['designIds'] ?? []),
+            );
+
             return {
               'job': {...jobData, 'id': jobDoc.id},
               'order': {...orderData, 'id': orderId},
               'customer': customerData,
               'measurement': measurementData,
               'items': allItemsList,
+              'designUrls': designUrls,
             };
           } catch (e) {
             debugPrint("OrderService: Error processing tailor job: $e");

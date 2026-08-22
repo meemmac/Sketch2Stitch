@@ -2,8 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
-import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
+import 'package:sketch2stitch/services/browse_service.dart';
+import 'package:sketch2stitch/services/favorite_service.dart';
+import 'package:sketch2stitch/services/customer_service.dart';
+import 'package:sketch2stitch/services/cart_service.dart';
+import 'package:sketch2stitch/utils/geo_utils.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ─── Material Blend Class ─────────────────────────────────────────────
 
@@ -28,6 +34,15 @@ class FabricMaterialBlend {
     return FabricMaterialBlend(
       material: map['material'] as String? ?? '',
       blend: map['blend'] as String? ?? '',
+    );
+  }
+
+  factory FabricMaterialBlend.fromMaterialType(Map<String, dynamic> materialType) {
+    final type = materialType['type'] as String? ?? '';
+    final blend = materialType['blend'] as int? ?? 0;
+    return FabricMaterialBlend(
+      material: type,
+      blend: blend > 0 ? '$blend%' : '',
     );
   }
 }
@@ -63,301 +78,27 @@ class FabricProductData {
         .where((text) => text.trim().isNotEmpty)
         .toList();
   }
+
+  factory FabricProductData.fromProduct(Product product) {
+    List<FabricMaterialBlend> blends = [];
+    
+    if (product.materialType.isNotEmpty) {
+      for (final materialType in product.materialType) {
+        blends.add(FabricMaterialBlend(
+          material: materialType.type,
+          blend: materialType.blend > 0 
+              ? '${materialType.blend.toInt()}%' 
+              : '',
+        ));
+      }
+    }
+    
+    return FabricProductData(
+      product: product,
+      materialBlends: blends,
+    );
+  }
 }
-
-/// Hardcoded sample fabrics
-final List<FabricProductData> kHardcodedFabricData = [
-  FabricProductData(
-    product: Product(
-      id: 'p1',
-      retailerId: 'r1',
-      productName: 'Premium Egyptian Cotton',
-      category: 'Cotton',
-      productCode: 'COT-P-01',
-      materialType: [MaterialBlend(type: 'Cotton', blend: 100)],
-      colorOptions: [
-        ColorOption(optionId: 1, color: 'White', image: ['assets/images/fab.jpg'], video: ['assets/images/Videos/vid1.mp4'], price: 650, stock: 40),
-        ColorOption(optionId: 2, color: 'Beige', image: ['assets/images/fab2.jpg'], video: ['assets/images/Videos/vid2.mp4'], price: 650, stock: 25),
-        ColorOption(optionId: 3, color: 'Blue', image: ['assets/images/fabric_waves.jpg'], video: ['assets/images/Videos/vid3.mp4'], price: 700, stock: 15),
-        ColorOption(optionId: 4, color: 'Black', image: ['assets/images/textile.jpg'], video: [], price: 700, stock: 0),
-      ],
-      description: 'Soft, breathable Egyptian cotton perfect for shirts and casual wear.',
-      careSymbol: ['Machine wash cold', 'Do not bleach', 'Tumble dry low'],
-    ),
-    materialBlends: [
-      FabricMaterialBlend(material: 'Cotton', blend: '100%'),
-    ],
-  ),
-  FabricProductData(
-    product: Product(
-      id: 'p2',
-      retailerId: 'r1',
-      productName: 'Pure Mulberry Silk',
-      category: 'Silk',
-      productCode: 'SLK-P-01',
-      materialType: [MaterialBlend(type: 'Silk', blend: 70), MaterialBlend(type: 'Viscose', blend: 30)],
-      colorOptions: [
-        ColorOption(optionId: 1, color: 'Gold', image: ['assets/images/silk.jpg'], video: ['assets/images/Videos/vid2.mp4'], price: 1800, stock: 10),
-        ColorOption(optionId: 2, color: 'Pink', image: ['assets/images/saree.jpg'], video: ['assets/images/Videos/vid3.mp4'], price: 1750, stock: 8),
-        ColorOption(optionId: 3, color: 'Green', image: ['assets/images/gorgeous.jpg'], video: ['assets/images/Videos/vid1.mp4'], price: 1750, stock: 5),
-        ColorOption(optionId: 4, color: 'White', image: ['assets/images/gorgette.jpg'], video: [], price: 1700, stock: 12),
-      ],
-      description: 'Luxurious mulberry silk with a natural sheen.',
-      careSymbol: ['Dry clean only', 'Iron on low heat'],
-    ),
-    materialBlends: [
-      FabricMaterialBlend(material: 'Silk', blend: '70%'),
-      FabricMaterialBlend(material: 'Viscose', blend: '30%'),
-    ],
-  ),
-  FabricProductData(
-    product: Product(
-      id: 'p3',
-      retailerId: 'r2',
-      productName: 'Merino Wool Blend',
-      category: 'Wool',
-      productCode: 'WOL-P-01',
-      materialType: [MaterialBlend(type: 'Wool', blend: 85), MaterialBlend(type: 'Nylon', blend: 15)],
-      colorOptions: [
-        ColorOption(optionId: 1, color: 'Brown', image: ['assets/images/drawing_fabric.jpg'], video: ['assets/images/Videos/vid3.mp4'], price: 950, stock: 18),
-        ColorOption(optionId: 2, color: 'Black', image: ['assets/images/textile.jpg'], video: ['assets/images/Videos/vid2.mp4'], price: 950, stock: 20),
-        ColorOption(optionId: 3, color: 'Beige', image: ['assets/images/fabric_waves.jpg'], video: [], price: 900, stock: 0),
-      ],
-      description: 'Warm merino wool blend suited for winter jackets and blazers.',
-      careSymbol: ['Hand wash cold', 'Dry flat'],
-    ),
-    materialBlends: [
-      FabricMaterialBlend(material: 'Wool', blend: '85%'),
-      FabricMaterialBlend(material: 'Nylon', blend: '15%'),
-    ],
-  ),
-  FabricProductData(
-    product: Product(
-      id: 'p4',
-      retailerId: 'r2',
-      productName: 'Irish Linen Weave',
-      category: 'Linen',
-      productCode: 'LIN-P-01',
-      materialType: [MaterialBlend(type: 'Linen', blend: 100)],
-      colorOptions: [
-        ColorOption(optionId: 1, color: 'White', image: ['assets/images/fabrics_rolled.jpg'], video: ['assets/images/Videos/vid1.mp4'], price: 780, stock: 30),
-        ColorOption(optionId: 2, color: 'Beige', image: ['assets/images/fab.jpg'], video: ['assets/images/Videos/vid2.mp4'], price: 780, stock: 22),
-        ColorOption(optionId: 3, color: 'Blue', image: ['assets/images/fabric_waves.jpg'], video: [], price: 820, stock: 14),
-      ],
-      description: 'Classic Irish linen with a crisp hand-feel.',
-      careSymbol: ['Machine wash cold', 'Iron while damp'],
-    ),
-    materialBlends: [
-      FabricMaterialBlend(material: 'Linen', blend: '100%'),
-    ],
-  ),
-  FabricProductData(
-    product: Product(
-      id: 'p5',
-      retailerId: 'r3',
-      productName: 'French Chantilly Lace',
-      category: 'Lace',
-      productCode: 'LAC-P-01',
-      materialType: [MaterialBlend(type: 'Polyester', blend: 100)],
-      colorOptions: [
-        ColorOption(optionId: 1, color: 'White', image: ['assets/images/lace.jpg'], video: [], price: 1200, stock: 6),
-        ColorOption(optionId: 2, color: 'Black', image: ['assets/images/lace2.jpg'], video: [], price: 1200, stock: 4),
-        ColorOption(optionId: 3, color: 'Pink', image: ['assets/images/embroidery.jpg'], video: [], price: 1250, stock: 0),
-      ],
-      description: 'Delicate floral Chantilly lace, hand-finished scalloped edges.',
-      careSymbol: ['Dry clean only', 'Do not bleach'],
-    ),
-    materialBlends: [
-      FabricMaterialBlend(material: 'Polyester', blend: '100%'),
-    ],
-  ),
-  FabricProductData(
-    product: Product(
-      id: 'p6',
-      retailerId: 'r3',
-      productName: 'Zardozi Embroidered Panel',
-      category: 'Embroidery',
-      productCode: 'EMB-P-01',
-      materialType: [MaterialBlend(type: 'Silk', blend: 60), MaterialBlend(type: 'Cotton', blend: 40)],
-      colorOptions: [
-        ColorOption(optionId: 1, color: 'Gold', image: ['assets/images/embroidery.jpg'], video: [], price: 3200, stock: 3),
-        ColorOption(optionId: 2, color: 'Green', image: ['assets/images/design.jpg'], video: [], price: 3200, stock: 2),
-        ColorOption(optionId: 3, color: 'Blue', image: ['assets/images/crochet.jpg'], video: [], price: 3400, stock: 0),
-      ],
-      description: 'Hand-embroidered zardozi work with metallic thread and sequins.',
-      careSymbol: ['Dry clean only'],
-    ),
-    materialBlends: [
-      FabricMaterialBlend(material: 'Silk', blend: '60%'),
-      FabricMaterialBlend(material: 'Cotton', blend: '40%'),
-    ],
-  ),
-  FabricProductData(
-    product: Product(
-      id: 'p7',
-      retailerId: 'r1',
-      productName: 'Premium Tassel Fabric',
-      category: 'Cotton',
-      productCode: 'TAS-P-01',
-      materialType: [MaterialBlend(type: 'Cotton', blend: 100)],
-      colorOptions: [
-        ColorOption(optionId: 1, color: 'White', image: ['assets/images/tassel.jpg'], video: [], price: 550, stock: 35),
-        ColorOption(optionId: 2, color: 'Blue', image: ['assets/images/drawing_fabric.jpg'], video: [], price: 600, stock: 20),
-      ],
-      description: 'Beautiful tassel fabric with intricate detailing.',
-      careSymbol: ['Dry clean only', 'Do not iron directly'],
-    ),
-    materialBlends: [
-      FabricMaterialBlend(material: 'Cotton', blend: '100%'),
-    ],
-  ),
-  FabricProductData(
-    product: Product(
-      id: 'p8',
-      retailerId: 'r2',
-      productName: 'Handwoven Textile',
-      category: 'Cotton',
-      productCode: 'TEX-P-01',
-      materialType: [MaterialBlend(type: 'Cotton', blend: 100)],
-      colorOptions: [
-        ColorOption(optionId: 1, color: 'White', image: ['assets/images/textile.jpg'], video: [], price: 850, stock: 15),
-        ColorOption(optionId: 2, color: 'Beige', image: ['assets/images/fabric_waves.jpg'], video: [], price: 850, stock: 10),
-      ],
-      description: 'Handwoven textile with traditional patterns.',
-      careSymbol: ['Hand wash', 'Do not bleach', 'Air dry'],
-    ),
-    materialBlends: [
-      FabricMaterialBlend(material: 'Cotton', blend: '100%'),
-    ],
-  ),
-  FabricProductData(
-    product: Product(
-      id: 'p9',
-      retailerId: 'r3',
-      productName: 'Designer Silk Blend',
-      category: 'Silk',
-      productCode: 'SLK-P-02',
-      materialType: [MaterialBlend(type: 'Silk', blend: 80), MaterialBlend(type: 'Cotton', blend: 20)],
-      colorOptions: [
-        ColorOption(optionId: 1, color: 'Gold', image: ['assets/images/gorgeous.jpg'], video: [], price: 2500, stock: 5),
-        ColorOption(optionId: 2, color: 'Blue', image: ['assets/images/design.jpg'], video: [], price: 2800, stock: 3),
-      ],
-      description: 'Luxurious designer silk blend with a unique texture.',
-      careSymbol: ['Dry clean only', 'Store in a cool place'],
-    ),
-    materialBlends: [
-      FabricMaterialBlend(material: 'Silk', blend: '80%'),
-      FabricMaterialBlend(material: 'Cotton', blend: '20%'),
-    ],
-  ),
-  FabricProductData(
-    product: Product(
-      id: 'p10',
-      retailerId: 'r1',
-      productName: 'Classic Cotton Weave',
-      category: 'Cotton',
-      productCode: 'COT-P-02',
-      materialType: [MaterialBlend(type: 'Cotton', blend: 100)],
-      colorOptions: [
-        ColorOption(optionId: 1, color: 'White', image: ['assets/images/fab.jpg'], video: [], price: 450, stock: 50),
-        ColorOption(optionId: 2, color: 'Blue', image: ['assets/images/fab2.jpg'], video: [], price: 500, stock: 30),
-        ColorOption(optionId: 3, color: 'Green', image: ['assets/images/fabric_waves.jpg'], video: [], price: 550, stock: 20),
-      ],
-      description: 'Classic cotton weave fabric with a soft, comfortable feel.',
-      careSymbol: ['Machine wash warm', 'Tumble dry', 'Iron medium'],
-    ),
-    materialBlends: [
-      FabricMaterialBlend(material: 'Cotton', blend: '100%'),
-    ],
-  ),
-];
-
-/// Hardcoded sample elements
-final List<Product> kHardcodedElements = [
-  Product(
-    id: 'e2',
-    retailerId: 'r1',
-    productName: 'Decorative Buttons Set',
-    category: 'Buttons',
-    productCode: 'BTN-E-01',
-    materialType: [MaterialBlend(type: 'Plastic', blend: 100)],
-    colorOptions: [
-      ColorOption(optionId: 1, color: 'White', image: ['assets/images/buttons.jpg'], video: [], price: 80, stock: 200),
-      ColorOption(optionId: 2, color: 'Black', image: ['assets/images/buttons.jpg'], video: [], price: 80, stock: 150),
-      ColorOption(optionId: 3, color: 'Gold', image: ['assets/images/buttons.jpg'], video: [], price: 100, stock: 100),
-    ],
-    description: 'Elegant button sets in various sizes and finishes.',
-    careSymbol: ['Hand wash', 'Do not bleach'],
-  ),
-  Product(
-    id: 'e3',
-    retailerId: 'r2',
-    productName: 'Sewing Thread Collection',
-    category: 'Threads',
-    productCode: 'THR-E-01',
-    materialType: [MaterialBlend(type: 'Cotton', blend: 100)],
-    colorOptions: [
-      ColorOption(optionId: 1, color: 'White', image: ['assets/images/thread.jpg'], video: [], price: 45, stock: 300),
-      ColorOption(optionId: 2, color: 'Black', image: ['assets/images/thread.jpg'], video: [], price: 45, stock: 250),
-      ColorOption(optionId: 3, color: 'Beige', image: ['assets/images/thread.jpg'], video: [], price: 45, stock: 200),
-    ],
-    description: 'Premium quality sewing thread in essential colors.',
-    careSymbol: ['Store in cool dry place'],
-  ),
-  Product(
-    id: 'e4',
-    retailerId: 'r2',
-    productName: 'Pearl Embellishments',
-    category: 'Embellishments',
-    productCode: 'PRL-E-01',
-    materialType: [MaterialBlend(type: 'Glass', blend: 100)],
-    colorOptions: [
-      ColorOption(optionId: 1, color: 'White', image: ['assets/images/pearls.jpg'], video: [], price: 200, stock: 80),
-      ColorOption(optionId: 2, color: 'Pink', image: ['assets/images/pearls.jpg'], video: [], price: 220, stock: 60),
-    ],
-    description: 'Beautiful pearl embellishments for bridal and formal wear.',
-    careSymbol: ['Dry clean only', 'Handle with care'],
-  ),
-  Product(
-    id: 'e5',
-    retailerId: 'r3',
-    productName: 'Lace Trim',
-    category: 'Trims',
-    productCode: 'TRM-E-01',
-    materialType: [MaterialBlend(type: 'Lace', blend: 100)],
-    colorOptions: [
-      ColorOption(optionId: 1, color: 'White', image: ['assets/images/lace_trim.jpg'], video: [], price: 180, stock: 40),
-      ColorOption(optionId: 2, color: 'Black', image: ['assets/images/lace_trim.jpg'], video: [], price: 180, stock: 35),
-    ],
-    description: 'Fine lace trim with delicate patterns.',
-    careSymbol: ['Hand wash', 'Do not bleach'],
-  ),
-  Product(
-    id: 'e6',
-    retailerId: 'r3',
-    productName: 'Ribbon Collection',
-    category: 'Ribbons',
-    productCode: 'RIB-E-01',
-    materialType: [MaterialBlend(type: 'Satin', blend: 100)],
-    colorOptions: [
-      ColorOption(optionId: 1, color: 'White', image: ['assets/images/ribbon.jpg'], video: [], price: 60, stock: 150),
-      ColorOption(optionId: 2, color: 'Gold', image: ['assets/images/ribbon.jpg'], video: [], price: 70, stock: 120),
-      ColorOption(optionId: 3, color: 'Blue', image: ['assets/images/ribbon.jpg'], video: [], price: 65, stock: 100),
-    ],
-    description: 'Versatile satin ribbons in various colors and widths.',
-    careSymbol: ['Iron on low heat', 'Do not bleach'],
-  ),
-];
-
-// ─── Retailer Name Mapping ─────────────────────────────────────────────
-
-final Map<String, String> retailerNameMap = {
-  'r1': 'Dhaka Fabric House',
-  'r2': 'Chowdhury Textiles',
-  'r3': 'Silk & Lace Emporium',
-  'r4': 'Bengal Cotton Co.',
-  'r5': 'Heritage Weaves',
-};
 
 // ─── FabricsPageBody ────────────────────────────────────────────────────
 
@@ -384,87 +125,248 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
   @override
   bool get wantKeepAlive => true;
 
-  final List<FabricProductData> _fabrics = kHardcodedFabricData;
-  final List<Product> _elements = kHardcodedElements;
+  final BrowseService _browseService = BrowseService();
+  final FavoriteService _favoriteService = FavoriteService();
+  final CustomerService _customerService = CustomerService();
+  
+  String? _currentUserId;
+  Map<String, String> _retailerNames = {};
+  Map<String, GeoPoint?> _retailerLocations = {};
+  GeoPoint? _customerLocation;
+
+  // Categories that are considered "Elements" (non-fabric items).
+  // Must match the retailer inventory form, which stores "Fabric"/"Element".
+  final List<String> _elementCategories = [
+    'Element',
+  ];
+
+  // Categories that are considered "Fabrics"
+  final List<String> _fabricCategories = [
+    'Fabric',
+  ];
+
+  bool _isElement(Product product) =>
+      _elementCategories.contains(product.category);
+  
+  bool _isFabric(Product product) =>
+      _fabricCategories.contains(product.category);
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentUser();
+    _loadRetailerNames();
+    _loadCustomerLocation();
+  }
+
+  void _getCurrentUser() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _currentUserId = user.uid;
+    }
+  }
+
+  Future<void> _loadCustomerLocation() async {
+    if (_currentUserId == null) return;
+    try {
+      final customer =
+          await _customerService.streamCustomerProfile(_currentUserId!).first;
+      if (mounted) setState(() => _customerLocation = customer?.location);
+    } catch (e) {
+      // Delivery badge just falls back to the base charge if this fails.
+    }
+  }
+
+  /// Same base + per-km delivery estimate used at checkout
+  /// (CartService.deliveryChargeFor), formatted for card display.
+  String _deliveryChargeLabel(GeoPoint? target) {
+    final distanceKm = (_customerLocation != null && target != null)
+        ? GeoUtils.distanceKm(_customerLocation!, target)
+        : null;
+    return 'Tk ${CartService.deliveryChargeFor(distanceKm).toStringAsFixed(0)}';
+  }
+
+  Future<void> _loadRetailerNames() async {
+    try {
+      final retailersSnapshot = await FirebaseFirestore.instance
+          .collection('Retailer')
+          .get();
+      
+      final Map<String, String> names = {};
+      final Map<String, GeoPoint?> locations = {};
+      for (final doc in retailersSnapshot.docs) {
+        final data = doc.data();
+        names[doc.id] = data['shopName'] as String? ?? 'Unknown Retailer';
+        locations[doc.id] = data['location'] is GeoPoint ? data['location'] as GeoPoint : null;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _retailerNames = names;
+        _retailerLocations = locations;
+      });
+    } catch (e) {
+      // retailer names/locations stay empty; getters fall back per-id
+    }
+  }
+
+  String _getRetailerName(String retailerId) {
+    return _retailerNames[retailerId] ?? 'Unknown Retailer';
+  }
+
+  GeoPoint? _getRetailerLocation(String retailerId) {
+    return _retailerLocations[retailerId];
+  }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    
     return ValueListenableBuilder<String>(
       valueListenable: widget.searchQuery,
       builder: (context, searchQuery, _) {
-        if (widget.showFabrics) {
-          final filteredFabrics = _fabrics.where((fabricData) {
-            final product = fabricData.product;
-            final matchesSearch = product.productName
-                .toLowerCase()
-                .contains(searchQuery.toLowerCase());
-            final productMinPrice = product.minPrice;
-            final matchesPrice = productMinPrice >= widget.filterData.minPrice &&
-                productMinPrice <= widget.filterData.maxPrice;
+        // The material chips are multi-select, so the selection can't be
+        // expressed by the service's single `materialType` argument; it is
+        // applied client-side below instead.
+        final selectedMaterials = widget.filterData.materialTypes.contains('All')
+            ? const <String>[]
+            : widget.filterData.materialTypes;
+        
+        final selectedColors = widget.filterData.colors.contains('All')
+            ? null
+            : widget.filterData.colors;
+        
+        final searchTerm = searchQuery.isNotEmpty ? searchQuery : null;
+
+        return StreamBuilder<List<Product>>(
+          stream: _browseService.getProductsByFilter(
+            category: null,
+            materialType: null,
+            minPrice: widget.filterData.minPrice > 0 ? widget.filterData.minPrice : null,
+            maxPrice: widget.filterData.maxPrice < 5000 ? widget.filterData.maxPrice : null,
+            colors: selectedColors,
+            sortBy: widget.filterData.sortBy,
+            search: searchTerm,
+          ),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Colors.red[300],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Error loading products',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      snapshot.error?.toString() ?? 'Unknown error',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[500],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            if (snapshot.connectionState == ConnectionState.waiting && 
+                !snapshot.hasData) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  color: kSage,
+                ),
+              );
+            }
+
+            final products = snapshot.data ?? [];
             
-            final productColors = product.colorOptions.map((c) => c.color).toList();
-            final matchesColor = widget.filterData.matchesColor(productColors);
+            List<Product> filteredProducts;
+            if (widget.showFabrics) {
+              filteredProducts = products.where((p) => _isFabric(p)).toList();
+            } else {
+              filteredProducts = products.where((p) => _isElement(p)).toList();
+            }
+
+            // A product matches if ANY of its material blends matches ANY of
+            // the selected material chips.
+            if (selectedMaterials.isNotEmpty) {
+              filteredProducts = filteredProducts.where((p) {
+                return p.materialType.any(
+                  (m) => selectedMaterials.any(
+                    (selected) => m.type
+                        .toLowerCase()
+                        .contains(selected.toLowerCase()),
+                  ),
+                );
+              }).toList();
+            }
             
-            final matchesMaterial = widget.filterData.matchesMaterial(
-              product.materialType.isNotEmpty ? product.materialType.first.type : "",
-              fabricData.materialBlendList,
+            final fabricDataList = filteredProducts
+                .map((product) => FabricProductData.fromProduct(product))
+                .toList();
+
+            if (fabricDataList.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.search_off_rounded,
+                      size: 64,
+                      color: Colors.grey[400],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      widget.showFabrics ? 'No Fabrics found' : 'No Elements found',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Try adjusting your filters or search terms',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            if (widget.filterData.sortBy == 'lowToHigh') {
+              fabricDataList.sort((a, b) => a.product.minPrice.compareTo(b.product.minPrice));
+            } else if (widget.filterData.sortBy == 'highToLow') {
+              fabricDataList.sort((a, b) => b.product.minPrice.compareTo(a.product.minPrice));
+            }
+
+            return Column(
+              children: [
+                _buildHeroSection(widget.showFabrics ? 'Fabrics' : 'Elements'),
+                Expanded(
+                  child: _buildFabricGrid(fabricDataList),
+                ),
+              ],
             );
-            
-            return matchesSearch && matchesPrice && 
-                   matchesColor && matchesMaterial;
-          }).toList();
-
-          if (widget.filterData.sortBy == 'lowToHigh') {
-            filteredFabrics.sort((a, b) => a.product.minPrice.compareTo(b.product.minPrice));
-          } else if (widget.filterData.sortBy == 'highToLow') {
-            filteredFabrics.sort((a, b) => b.product.minPrice.compareTo(a.product.minPrice));
-          }
-
-          return Column(
-            children: [
-              _buildHeroSection('Fabrics'),
-              Expanded(
-                child: _buildFabricGrid(filteredFabrics),
-              ),
-            ],
-          );
-        } else {
-          final filteredElements = _elements.where((product) {
-            final matchesSearch = product.productName
-                .toLowerCase()
-                .contains(searchQuery.toLowerCase());
-            final productMinPrice = product.minPrice;
-            final matchesPrice = productMinPrice >= widget.filterData.minPrice &&
-                productMinPrice <= widget.filterData.maxPrice;
-            
-            final productColors = product.colorOptions.map((c) => c.color).toList();
-            final matchesColor = widget.filterData.matchesColor(productColors);
-            
-            final matchesMaterial = widget.filterData.materialTypes.isEmpty ||
-                widget.filterData.materialTypes.contains('All') ||
-                widget.filterData.materialTypes.any((type) =>
-                    product.materialType.isNotEmpty && product.materialType.first.type.toLowerCase().contains(type.toLowerCase()));
-            
-            return matchesSearch && matchesPrice && 
-                   matchesColor && matchesMaterial;
-          }).toList();
-
-          if (widget.filterData.sortBy == 'lowToHigh') {
-            filteredElements.sort((a, b) => a.minPrice.compareTo(b.minPrice));
-          } else if (widget.filterData.sortBy == 'highToLow') {
-            filteredElements.sort((a, b) => b.minPrice.compareTo(a.minPrice));
-          }
-
-          return Column(
-            children: [
-              _buildHeroSection('Elements'),
-              Expanded(
-                child: _buildElementGrid(filteredElements),
-              ),
-            ],
-          );
-        }
+          },
+        );
       },
     );
   }
@@ -478,7 +380,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       padding: EdgeInsets.all(isSmallScreen ? 14 : 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [kSageDark, kSage],
+          colors: [Color(0xFF4A7C59), kSage],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -501,7 +403,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
             'High-quality materials for your style',
             style: TextStyle(
               fontSize: 13,
-              color: Colors.white.withValues(alpha: 0.9),
+              color: Colors.white.withOpacity(0.9),
             ),
           ),
           const SizedBox(height: 10),
@@ -521,7 +423,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
     return Container(
       padding: EdgeInsets.symmetric(horizontal: isSmall ? 10 : 12, vertical: isSmall ? 4 : 5),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.2),
+        color: Colors.white.withOpacity(0.2),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -578,10 +480,13 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
 
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-
     final isSmallScreen = screenWidth < 400;
     final spacing = isSmallScreen ? 10.0 : 12.0;
     final cardAspectRatio = screenHeight < 700 ? 0.72 : 0.78;
+
+    // Check if user is Tailor or Retailer
+    final bool isTailorOrRetailer = widget.userRole == UserRole.tailor || 
+                                     widget.userRole == UserRole.retailer;
 
     return GridView.builder(
       padding: EdgeInsets.all(spacing),
@@ -604,16 +509,23 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         final retailerName = _getRetailerName(product.retailerId);
         final materialDisplay = fabricData.materialDisplay;
 
+        // Check if this is an element (Material category) - don't show material blend for elements
+        final bool isElement = _isElement(product);
+        // Show material badge ONLY for Fabrics (not for Elements)
+        final bool showMaterialBadge = widget.showFabrics && !isElement && materialDisplay != "N/A";
+
         return GestureDetector(
-          onTap: () => _showFabricDetailOverlay(context, fabricData),
+          onTap: () => isElement
+              ? _showElementDetailOverlay(context, product)
+              : _showFabricDetailOverlay(context, fabricData),
           child: Container(
             decoration: BoxDecoration(
-              color: kCardBg,
+              color: Colors.white,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: kBorder, width: 0.5),
+              border: Border.all(color: const Color(0xFFE8ECF0), width: 0.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: Colors.black.withOpacity(0.05),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -632,7 +544,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                         child: SizedBox(
                           width: double.infinity,
                           height: double.infinity,
-                          child: coverImage != null
+                          child: coverImage != null && coverImage.isNotEmpty
                               ? (coverImage.startsWith('http')
                                   ? Image.network(
                                       coverImage,
@@ -647,7 +559,8 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                               : _imageFallback(isSmallScreen),
                         ),
                       ),
-                      if (materialDisplay != "N/A")
+                      // Show material badge ONLY for Fabrics (not for Elements)
+                      if (showMaterialBadge)
                         Positioned(
                           top: 8,
                           right: 8,
@@ -657,10 +570,10 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                               vertical: isSmallScreen ? 3 : 4
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.75),
+                              color: Colors.black.withOpacity(0.75),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.2),
+                                color: Colors.white.withOpacity(0.2),
                                 width: 0.3,
                               ),
                             ),
@@ -687,10 +600,10 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                               vertical: isSmallScreen ? 4 : 5
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.85),
+                              color: Colors.red.withOpacity(0.85),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.2),
+                                color: Colors.white.withOpacity(0.2),
                                 width: 0.3,
                               ),
                             ),
@@ -747,7 +660,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: kSageDark,
+                            color: const Color(0xFF4A7C59),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -771,247 +684,23 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                                           .toList(),
                                     ),
                             ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.directions_bike, size: isSmallScreen ? 14 : 16, color: const Color.fromARGB(255, 107, 106, 106)),
-                                const SizedBox(width: 2),
-                                Text(
-                                  'Tk 50',
-                                  style: TextStyle(
-                                    fontSize: isSmallScreen ? 12 : 14,
-                                    color: const Color.fromARGB(255, 107, 106, 106),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildElementGrid(List<Product> elements) {
-    if (elements.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.search_off_rounded,
-              size: 64,
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No Elements found',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Try adjusting your filters or search terms',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey[500],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    final isSmallScreen = screenWidth < 400;
-    final spacing = isSmallScreen ? 10.0 : 12.0;
-    final cardAspectRatio = screenHeight < 700 ? 0.72 : 0.78;
-
-    return GridView.builder(
-      padding: EdgeInsets.all(spacing),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: cardAspectRatio,
-        crossAxisSpacing: spacing,
-        mainAxisSpacing: spacing,
-      ),
-      itemCount: elements.length,
-      itemBuilder: (context, index) {
-        final product = elements[index];
-        final coverImage = product.colorOptions.isNotEmpty && product.colorOptions.first.image.isNotEmpty
-            ? product.colorOptions.first.image.first
-            : null;
-        final bool outOfStock =
-            product.colorOptions.every((c) => c.stock <= 0);
-
-        final retailerName = _getRetailerName(product.retailerId);
-
-        return GestureDetector(
-          onTap: () => _showElementDetailOverlay(context, product),
-          child: Container(
-            decoration: BoxDecoration(
-              color: kCardBg,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: kBorder, width: 0.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  flex: 5,
-                  child: Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: double.infinity,
-                          child: coverImage != null
-                              ? (coverImage.startsWith('http')
-                                  ? Image.network(
-                                      coverImage,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) => _elementFallback(isSmallScreen),
-                                    )
-                                  : Image.asset(
-                                      coverImage,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) => _elementFallback(isSmallScreen),
-                                    ))
-                              : _elementFallback(isSmallScreen),
-                        ),
-                      ),
-                      if (outOfStock)
-                        Positioned(
-                          top: 8,
-                          left: 8,
-                          child: Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: isSmallScreen ? 8 : 10, 
-                              vertical: isSmallScreen ? 4 : 5
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.85),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                width: 0.3,
-                              ),
-                            ),
-                            child: Text(
-                              'Out of Stock',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                Flexible(
-                  flex: 4,
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      isSmallScreen ? 10 : 12,
-                      isSmallScreen ? 8 : 10,
-                      isSmallScreen ? 10 : 12,
-                      isSmallScreen ? 10 : 12,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          product.productName,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            height: 1.2,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        SizedBox(height: isSmallScreen ? 2 : 3),
-                        Text(
-                          retailerName,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        SizedBox(height: isSmallScreen ? 4 : 6),
-                        Text(
-                          product.priceRange,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: kSageDark,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        SizedBox(height: isSmallScreen ? 6 : 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Expanded(
-                              child: outOfStock
-                                  ? const SizedBox.shrink()
-                                  : Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: product.colorOptions
-                                          .take(4)
-                                          .map((option) => Padding(
-                                                padding: EdgeInsets.only(right: isSmallScreen ? 3 : 4),
-                                                child: _colorDot(option.color, isSmallScreen),
-                                              ))
-                                          .toList(),
+                            // Only show delivery info for customers
+                            if (!isTailorOrRetailer)
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.directions_bike, size: isSmallScreen ? 14 : 16, color: const Color.fromARGB(255, 107, 106, 106)),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    _deliveryChargeLabel(_getRetailerLocation(product.retailerId)),
+                                    style: TextStyle(
+                                      fontSize: isSmallScreen ? 12 : 14,
+                                      color: const Color.fromARGB(255, 107, 106, 106),
+                                      fontWeight: FontWeight.w600,
                                     ),
-                            ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.directions_bike, size: isSmallScreen ? 14 : 16, color: const Color.fromARGB(255, 107, 106, 106)),
-                                const SizedBox(width: 2),
-                                Text(
-                                  'Tk 50',
-                                  style: TextStyle(
-                                    fontSize: isSmallScreen ? 12 : 14,
-                                    color: const Color.fromARGB(255, 107, 106, 106),
-                                    fontWeight: FontWeight.w600,
                                   ),
-                                ),
-                              ],
-                            ),
+                                ],
+                              ),
                           ],
                         ),
                       ],
@@ -1035,7 +724,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
-        border: Border.all(color: kBorder, width: 0.5),
+        border: Border.all(color: const Color(0xFFE8ECF0), width: 0.5),
       ),
     );
   }
@@ -1046,6 +735,8 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         return Colors.white;
       case 'black':
         return Colors.black;
+      case 'red':
+        return Colors.red;
       case 'pink':
         return Colors.pink[200]!;
       case 'blue':
@@ -1067,7 +758,21 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
     }
   }
 
+  Widget _imageFallback(bool isSmall) {
+    return Container(
+      color: kSage.withOpacity(0.12),
+      child: Icon(
+        Icons.texture,
+        size: isSmall ? 36 : 40,
+        color: const Color(0xFF4A7C59),
+      ),
+    );
+  }
+
   void _showFabricDetailOverlay(BuildContext context, FabricProductData fabricData) {
+    if (_currentUserId != null) {
+      _customerService.addToLastViewed(_currentUserId!, fabricData.product.id);
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1076,13 +781,19 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         product: fabricData.product,
         isFabric: true,
         retailerName: _getRetailerName(fabricData.product.retailerId),
+        retailerLocation: _getRetailerLocation(fabricData.product.retailerId),
         materialBlends: fabricData.materialBlendList,
         userRole: widget.userRole,
+        customerId: _currentUserId,
+        favoriteService: _favoriteService,
       ),
     );
   }
 
   void _showElementDetailOverlay(BuildContext context, Product product) {
+    if (_currentUserId != null) {
+      _customerService.addToLastViewed(_currentUserId!, product.id);
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1091,33 +802,10 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         product: product,
         isFabric: false,
         retailerName: _getRetailerName(product.retailerId),
+        retailerLocation: _getRetailerLocation(product.retailerId),
         userRole: widget.userRole,
-      ),
-    );
-  }
-
-  String _getRetailerName(String retailerId) {
-    return retailerNameMap[retailerId] ?? 'Unknown Retailer';
-  }
-
-  Widget _imageFallback(bool isSmall) {
-    return Container(
-      color: kSage.withValues(alpha: 0.12),
-      child: Icon(
-        Icons.texture,
-        size: isSmall ? 36 : 40,
-        color: kSageDark,
-      ),
-    );
-  }
-
-  Widget _elementFallback(bool isSmall) {
-    return Container(
-      color: kSage.withValues(alpha: 0.12),
-      child: Icon(
-        Icons.category,
-        size: isSmall ? 36 : 40,
-        color: kSageDark,
+        customerId: _currentUserId,
+        favoriteService: _favoriteService,
       ),
     );
   }
