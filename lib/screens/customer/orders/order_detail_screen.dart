@@ -16,7 +16,7 @@ import 'package:sketch2stitch/services/user_session.dart';
 
 enum OrderDeliveryDestination { retailer, tailor }
 
-enum TailorStatus { notAssigned, pending, cancelled, confirmed }
+enum TailorStatus { notAssigned, pending, quoted, cancelled, confirmed }
 
 class OrderItem {
   final String name;
@@ -41,6 +41,7 @@ class OrderItem {
   final String? tailorInstructions;
   final TailorStatus? tailorStatus;
   final DateTime? tailorDeliveryDate;
+  final String? tailorJobId;
 
   const OrderItem({
     required this.name,
@@ -63,7 +64,22 @@ class OrderItem {
     this.tailorInstructions,
     this.tailorStatus,
     this.tailorDeliveryDate,
+    this.tailorJobId,
   });
+}
+
+Widget _buildSmartImage(
+  String path, {
+  double? width,
+  double? height,
+  BoxFit? fit,
+  Widget Function(BuildContext, Object, StackTrace?)? errorBuilder,
+}) {
+  if (path.startsWith('http')) {
+    return Image.network(path, width: width, height: height, fit: fit, errorBuilder: errorBuilder);
+  } else {
+    return Image.asset(path, width: width, height: height, fit: fit, errorBuilder: errorBuilder);
+  }
 }
 
 class CustomerOrder {
@@ -120,19 +136,32 @@ class CustomerOrder {
 
   double get totalGrandAmount {
     double totalRetailer = amount;
-    double totalTailor = items.where((item) => item.destination == OrderDeliveryDestination.tailor).fold(0.0, (sum, item) => sum + (item.tailorPrice ?? 0.0));
+    double totalTailor = items.where((item) => item.destination == OrderDeliveryDestination.tailor && item.tailorStatus == TailorStatus.confirmed).fold(0.0, (sum, item) => sum + (item.tailorPrice ?? 0.0));
     double delivery = deliveryCharges.values.fold(0.0, (sum, val) => sum + val);
     return totalRetailer + totalTailor + delivery;
   }
 
   double get totalOngoingAmount {
     double totalRetailer = amount;
-    // Only include retailer delivery charges for ongoing orders
+    
+    // Only include tailor price if confirmed
+    double totalTailor = items
+        .where((item) => item.destination == OrderDeliveryDestination.tailor && item.tailorStatus == TailorStatus.confirmed)
+        .fold(0.0, (sum, item) => sum + (item.tailorPrice ?? 0.0));
+        
+    // Include retailer delivery charges, and tailor delivery charges ONLY if confirmed
     double delivery = 0;
+    bool hasConfirmedTailor = items.any((item) => item.tailorStatus == TailorStatus.confirmed);
+    
     deliveryCharges.forEach((key, value) {
-      if (key != tailorName) delivery += value;
+      if (key == tailorName) {
+        if (hasConfirmedTailor) delivery += value;
+      } else {
+        delivery += value;
+      }
     });
-    return totalRetailer + delivery;
+    
+    return totalRetailer + totalTailor + delivery;
   }
 
   int get totalQuantity => items.fold(0, (sum, item) => sum + item.quantity);
@@ -183,6 +212,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       final db.Order order = data['order'];
       final List<Map<String, dynamic>> subOrdersData = data['subOrders'] ?? [];
       final List<Map<String, dynamic>> tailorJobsData = data['tailorJobs'] ?? [];
+
+      final db.Order orderWithDetails = order.copyWith(
+        subOrders: subOrdersData.map((s) => s['subOrder'] as db.SubOrder).toList(),
+        tailorJobs: tailorJobsData.map((t) => t['job'] as db.TailorJob).toList(),
+      );
 
       final List<OrderItem> items = [];
       final Map<String, double> charges = {};
@@ -272,7 +306,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               tailorInstructions: tj.specialInstructions,
               tailorStatus: _mapTailorStatus(tj.status),
               tailorDeliveryDate: tj.estimatedDeliveryDate,
-              measurementRefImages: tj.designIds, 
+              measurementRefImages: tj.designIds,
+              tailorJobId: tj.id,
             );
           }
         }
@@ -309,8 +344,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         items: items,
         amount: retailerAmount,
         orderDate: order.orderDate,
-        // status: order.statusText,
-        status: _mapStatusToFrontend(order.statusText),
+        status: _mapStatusToFrontend(orderWithDetails.statusText),
         isDelivered: order.status == db.OrderStatus.completed,
         deliveryAddress: deliveryAddress,
         deliveryCharges: charges,
@@ -327,6 +361,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   TailorStatus _mapTailorStatus(db.TailorJobStatus status) {
     switch (status) {
       case db.TailorJobStatus.pending: return TailorStatus.pending;
+      case db.TailorJobStatus.quoted: return TailorStatus.quoted;
       case db.TailorJobStatus.cancelled:
       case db.TailorJobStatus.tailorDeclined:
       case db.TailorJobStatus.rejected: return TailorStatus.cancelled;
@@ -349,11 +384,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       case 'Processing':
         return 'Order Preparing';
       case 'Tailor Confirmed — Stitching Started':
-        return 'Tailor Confirmed';
+        return 'Shipping to Tailor';
       case 'Quote Received from Tailor':
+        return 'Need Confirmation';
       case 'Requested Tailor':
       case 'Awaiting Tailor Selection':
-      case 'Tailor Pending':
         return 'Waiting for Tailor Confirmation';
       case 'Stitching Completed':
         return 'Out for Delivery';
@@ -659,10 +694,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     runSpacing: 8,
                     children: [
                       "All",
-                      // "Sent to Artisan",
-                      // "Confirmed",
-                      // "Processing",
-                      "Tailor Confirmed",
+                      "Need Confirmation",
                       "Tailor Rejected",
                       "Order Preparing",
                       "Order Packed",
@@ -848,7 +880,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: Image.asset(
+                    child: _buildSmartImage(
                       item.imagePath, width: 44, height: 44, fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) => Container(width: 44, height: 44, color: Colors.green.shade50, child: Icon(Icons.shopping_bag, color: primaryGreen, size: 20)),
                     ),
@@ -1197,12 +1229,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.asset(
+                child: _buildSmartImage(
                   item.imagePath,
-                  width: 60,
-                  height: 60,
+                  width: 90,
+                  height: 90,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(width: 60, height: 60, color: Colors.green.shade50, child: Icon(Icons.shopping_bag, color: primaryGreen)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -1299,7 +1330,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ],
                 ),
               )
-            else if (item.tailorStatus == TailorStatus.confirmed)
+            else if (item.tailorStatus == TailorStatus.quoted || item.tailorStatus == TailorStatus.confirmed)
               Container(
                 margin: const EdgeInsets.only(top: 16),
                 padding: const EdgeInsets.all(12),
@@ -1326,23 +1357,53 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         Text(item.tailorDeliveryDate != null ? _formatDate(item.tailorDeliveryDate!) : "TBD", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: primaryGreen)),
                       ],
                     ),
-                    const Divider(height: 20),
-                    RichText(
-                      text: TextSpan(
-                        style: const TextStyle(color: Colors.black87, fontSize: 13, height: 1.4, fontWeight: FontWeight.w600),
+                    if (item.tailorStatus == TailorStatus.quoted) ...[
+                      const Divider(height: 20),
+                      Row(
                         children: [
-                          const TextSpan(text: "If you want to confirm or reject "),
-                          TextSpan(
-                            text: "go to Checkout",
-                            style: TextStyle(
-                              color: primaryGreen,
-                              fontWeight: FontWeight.w900,
-                              decoration: TextDecoration.underline,
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () async {
+                                if (item.tailorJobId == null) return;
+                                try {
+                                  await OrderService().updateWorkProgress(item.tailorJobId!, db.TailorJobStatus.rejected);
+                                } catch (e) {
+                                  if (context.mounted) AppFeedback.show(context, "Error updating status", isError: true);
+                                }
+                              },
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.red.shade700,
+                                side: BorderSide(color: Colors.red.shade200),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: const Text("Reject", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                if (item.tailorJobId == null) return;
+                                try {
+                                  await OrderService().updateWorkProgress(item.tailorJobId!, db.TailorJobStatus.confirmed);
+                                } catch (e) {
+                                  if (context.mounted) AppFeedback.show(context, "Error updating status", isError: true);
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: primaryGreen,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: const Text("Accept", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                             ),
                           ),
                         ],
                       ),
-                    ),
+                    ],
                   ],
                 ),
               )
@@ -1417,7 +1478,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   onTap: () => _showFullScreenImage(imgPath),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.asset(
+                    child: _buildSmartImage(
                       imgPath,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
@@ -1471,7 +1532,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           children: [
             Center(
               child: InteractiveViewer(
-                child: Image.asset(imagePath, fit: BoxFit.contain),
+                child: _buildSmartImage(imagePath, fit: BoxFit.contain),
               ),
             ),
             Positioned(
@@ -1571,6 +1632,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       case TailorStatus.notAssigned:
       case TailorStatus.pending:
       case TailorStatus.cancelled: return "Sent to Tailor";
+      case TailorStatus.quoted: return "Need Confirmation";
       case TailorStatus.confirmed: return "Confirmed";
     }
   }
@@ -1580,6 +1642,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       case TailorStatus.notAssigned: return Colors.grey.shade600;
       case TailorStatus.pending: return Colors.orange.shade800;
       case TailorStatus.cancelled: return Colors.red.shade800;
+      case TailorStatus.quoted: return Colors.orange.shade800;
       case TailorStatus.confirmed: return primaryGreen;
     }
   }
