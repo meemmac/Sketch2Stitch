@@ -36,7 +36,7 @@ class UserReview {
 
 class RetailerReviewsScreen extends StatefulWidget {
   final String shopName;
-  const RetailerReviewsScreen({super.key, required this.shopName});
+const RetailerReviewsScreen({super.key, required this.shopName});
 
   @override
   State<RetailerReviewsScreen> createState() => _RetailerReviewsScreenState();
@@ -112,7 +112,7 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
         }).toList();
         _isLoading = false;
       });
-    }, onError: (e) {
+      }, onError: (e) {
       debugPrint('Error loading reviews: $e');
       if (mounted) setState(() => _isLoading = false);
     });
@@ -137,6 +137,50 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
     }
     return sortedList;
   }
+
+/*
+  final List<UserReview> _dummyReviews = [
+    UserReview(
+      userName: "Tasphia",
+      rating: 4.0,
+      dateLabel: "2 months ago",
+      createdAt: DateTime.now().subtract(const Duration(days: 60)),
+      comment: "Denim quality was good but a little too expensive.",
+      products: const [
+        ReviewProduct(name: "Premium Egyptian Cotton", image: "assets/images/fabrics_rolled.jpg", price: 3250),
+        ReviewProduct(name: "Denim Patchwork", image: "assets/images/denim.jpg", price: 1950),
+      ],
+    ),
+    UserReview(
+      userName: "Nishat",
+      rating: 5.0,
+      dateLabel: "Today",
+      createdAt: DateTime.now(),
+      comment: "great",
+      products: const [],
+    ),
+    UserReview(
+      userName: "Israt",
+      rating: 4.5,
+      dateLabel: "2 days ago",
+      createdAt: DateTime.now().subtract(const Duration(days: 2)),
+      comment: "Excellent quality and fast delivery. Very satisfied!",
+      products: const [
+        ReviewProduct(name: "Golden Silk Blend", image: "assets/images/silk.jpg", price: 5400),
+      ],
+    ),
+    UserReview(
+      userName: "Riya",
+      rating: 2.0,
+      dateLabel: "1 week ago",
+      createdAt: DateTime.now().subtract(const Duration(days: 7)),
+      comment: "The color was slightly different than the photo.",
+      products: const [
+        ReviewProduct(name: "Printed Scarf", image: "assets/images/gorgeous.jpg", price: 3000),
+      ],
+    ),
+  ];
+*/
 
   @override
   Widget build(BuildContext context) {
@@ -313,7 +357,7 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
                   setState(() => _selectedFilter = filter);
                 }
               },
-              selectedColor: const Color(0xFF6B8F71),
+               selectedColor: const Color(0xFF6B8F71),
               labelStyle: TextStyle(
                 color: isSelected ? Colors.white : Colors.black87,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,

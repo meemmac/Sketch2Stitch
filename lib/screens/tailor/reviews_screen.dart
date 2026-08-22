@@ -69,7 +69,10 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
     }
 
     // Always fetch tailor profile to ensure the name is correct and dynamic
-    final profile = await _authService.getUserProfile(tailorId, UserRole.tailor);
+    final profile = await _authService.getUserProfile(
+      tailorId,
+      UserRole.tailor,
+    );
     if (profile != null && profile is Tailor && mounted) {
       setState(() {
         _currentTailorName = profile.name;
@@ -77,37 +80,46 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
     }
 
     // Listen to stats
-    _statsSubscription = _reviewService.streamTailorReviewStats(tailorId).listen((stats) {
-      if (!mounted) return;
-      setState(() {
-        _averageRating = stats['average'] ?? 0.0;
-        _totalRatings = stats['total'] ?? 0;
-        _ratingDistribution = Map<int, int>.from(stats['distribution'] ?? {});
-      });
-    });
+    _statsSubscription = _reviewService
+        .streamTailorReviewStats(tailorId)
+        .listen((stats) {
+          if (!mounted) return;
+          setState(() {
+            _averageRating = stats['average'] ?? 0.0;
+            _totalRatings = stats['total'] ?? 0;
+            _ratingDistribution = Map<int, int>.from(
+              stats['distribution'] ?? {},
+            );
+          });
+        });
 
     // Listen to reviews
-    _reviewsSubscription = _reviewService.streamDetailedTailorReviews(tailorId).listen((data) {
-      if (!mounted) return;
-      setState(() {
-        _allReviews = data.map((item) {
-          final reviewMap = item['review'];
-          final review = Review.fromJson(reviewMap);
+    _reviewsSubscription = _reviewService
+        .streamDetailedTailorReviews(tailorId)
+        .listen(
+          (data) {
+            if (!mounted) return;
+            setState(() {
+              _allReviews = data.map((item) {
+                final reviewMap = item['review'];
+                final review = Review.fromJson(reviewMap);
 
-          return TailorReview(
-            customerName: item['userName'] ?? 'Anonymous',
-            rating: review.rating,
-            dateLabel: review.timeAgo,
-            createdAt: review.createdAt,
-            comment: review.comment,
-          );
-        }).toList();
-        _isLoading = false;
-      });
-    }, onError: (e) {
-      debugPrint('Error loading reviews: $e');
-      if (mounted) setState(() => _isLoading = false);
-    });
+                return TailorReview(
+                  customerName: item['userName'] ?? 'Anonymous',
+                  rating: review.rating,
+                  dateLabel: review.timeAgo,
+                  createdAt: review.createdAt,
+                  comment: review.comment,
+                );
+              }).toList();
+              _isLoading = false;
+            });
+          },
+          onError: (e) {
+            debugPrint('Error loading reviews: $e');
+            if (mounted) setState(() => _isLoading = false);
+          },
+        );
   }
 
   List<TailorReview> get _filteredReviews {
@@ -121,6 +133,32 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
         return list;
     }
   }
+
+  /*
+  final List<TailorReview> _dummyReviews = [
+    TailorReview(
+      customerName: "Maria Doe",
+      rating: 4.8,
+      dateLabel: "1 week ago",
+      createdAt: DateTime.now().subtract(const Duration(days: 7)),
+      comment: "The stitching is perfect and fits me exactly as I wanted. Highly recommended!",
+    ),
+    TailorReview(
+      customerName: "Nishat Tasnim",
+      rating: 5.0,
+      dateLabel: "2 months ago",
+      createdAt: DateTime.now().subtract(const Duration(days: 60)),
+      comment: "Best tailor experience ever. The fit is top-notch.",
+    ),
+    TailorReview(
+      customerName: "Israt Jahan",
+      rating: 4.5,
+      dateLabel: "3 months ago",
+      createdAt: DateTime.now().subtract(const Duration(days: 90)),
+      comment: "Good work, but took a bit longer to deliver.",
+    ),
+  ];
+  */
 
   @override
   Widget build(BuildContext context) {
@@ -140,7 +178,11 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
           children: [
             const Text(
               "Customer Reviews",
-              style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             Text(
               _currentTailorName,
@@ -149,34 +191,39 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
           ],
         ),
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildReviewSummary(),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
-              child: Text(
-                "Feedback from Customers",
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildReviewSummary(),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
+                    child: Text(
+                      "Feedback from Customers",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  _buildFilterChips(),
+                  const SizedBox(height: 16),
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: filtered.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 16),
+                    itemBuilder: (context, index) =>
+                        _buildReviewItem(filtered[index]),
+                  ),
+                  const SizedBox(height: 32),
+                ],
               ),
             ),
-            _buildFilterChips(),
-            const SizedBox(height: 16),
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: filtered.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 16),
-              itemBuilder: (context, index) => _buildReviewItem(filtered[index]),
-            ),
-            const SizedBox(height: 32),
-          ],
-        ),
-      ),
     );
   }
 
@@ -198,28 +245,24 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
               children: [
                 Text(
                   _averageRating.toStringAsFixed(1),
-                  style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w900),
+                  style: const TextStyle(
+                    fontSize: 42,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 Row(
-                  children: List.generate(
-                    5,
-                        (index) {
-                          double starVal = index + 1;
-                          IconData icon;
-                          if (_averageRating >= starVal) {
-                            icon = Icons.star;
-                          } else if (_averageRating >= starVal - 0.5) {
-                            icon = Icons.star_half;
-                          } else {
-                            icon = Icons.star_border;
-                          }
-                          return Icon(
-                            icon,
-                            color: Colors.orange,
-                            size: 18,
-                          );
-                        },
-                  ),
+                  children: List.generate(5, (index) {
+                    double starVal = index + 1;
+                    IconData icon;
+                    if (_averageRating >= starVal) {
+                      icon = Icons.star;
+                    } else if (_averageRating >= starVal - 0.5) {
+                      icon = Icons.star_half;
+                    } else {
+                      icon = Icons.star_border;
+                    }
+                    return Icon(icon, color: Colors.orange, size: 18);
+                  }),
                 ),
                 const SizedBox(height: 4),
                 const Text(
@@ -239,11 +282,36 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                _ratingBar(5, _totalRatings == 0 ? 0 : (_ratingDistribution[5] ?? 0) / _totalRatings),
-                _ratingBar(4, _totalRatings == 0 ? 0 : (_ratingDistribution[4] ?? 0) / _totalRatings),
-                _ratingBar(3, _totalRatings == 0 ? 0 : (_ratingDistribution[3] ?? 0) / _totalRatings),
-                _ratingBar(2, _totalRatings == 0 ? 0 : (_ratingDistribution[2] ?? 0) / _totalRatings),
-                _ratingBar(1, _totalRatings == 0 ? 0 : (_ratingDistribution[1] ?? 0) / _totalRatings),
+                _ratingBar(
+                  5,
+                  _totalRatings == 0
+                      ? 0
+                      : (_ratingDistribution[5] ?? 0) / _totalRatings,
+                ),
+                _ratingBar(
+                  4,
+                  _totalRatings == 0
+                      ? 0
+                      : (_ratingDistribution[4] ?? 0) / _totalRatings,
+                ),
+                _ratingBar(
+                  3,
+                  _totalRatings == 0
+                      ? 0
+                      : (_ratingDistribution[3] ?? 0) / _totalRatings,
+                ),
+                _ratingBar(
+                  2,
+                  _totalRatings == 0
+                      ? 0
+                      : (_ratingDistribution[2] ?? 0) / _totalRatings,
+                ),
+                _ratingBar(
+                  1,
+                  _totalRatings == 0
+                      ? 0
+                      : (_ratingDistribution[1] ?? 0) / _totalRatings,
+                ),
               ],
             ),
           ),
@@ -257,7 +325,10 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          Text("$star", style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+          Text(
+            "$star",
+            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(width: 4),
           const Icon(Icons.star, color: Colors.orange, size: 10),
           const SizedBox(width: 8),
@@ -303,7 +374,9 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
-                side: BorderSide(color: isSelected ? Colors.transparent : Colors.grey.shade300),
+                side: BorderSide(
+                  color: isSelected ? Colors.transparent : Colors.grey.shade300,
+                ),
               ),
             ),
           );
@@ -328,7 +401,10 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
             children: [
               Text(
                 review.customerName,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
               Text(
                 review.dateLabel,
@@ -340,7 +416,7 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
           Row(
             children: List.generate(
               5,
-                  (index) => Icon(
+              (index) => Icon(
                 index < review.rating.floor() ? Icons.star : Icons.star_border,
                 color: Colors.orange,
                 size: 14,
@@ -350,7 +426,11 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
           const SizedBox(height: 12),
           Text(
             "\"${review.comment}\"",
-            style: const TextStyle(fontSize: 14, height: 1.5, fontStyle: FontStyle.italic),
+            style: const TextStyle(
+              fontSize: 14,
+              height: 1.5,
+              fontStyle: FontStyle.italic,
+            ),
           ),
         ],
       ),
