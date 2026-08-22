@@ -135,7 +135,10 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
 
   void _listenToOrders() {
     final retailerId = _authService.currentUser?.uid;
-    if (retailerId == null) return;
+    if (retailerId == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
 
     _ordersSubscription = _orderService
         .streamDetailedRetailerOrders(retailerId)
@@ -207,128 +210,6 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
 
   List<RetailerOrder> _orders = [];
 
-  /*
-  late final List<RetailerOrder> _dummyOrders = <RetailerOrder>[
-    RetailerOrder(
-      id: "ORD-1087",
-      customerName: "Nazia Tasphia",
-      customerPhone: "+8801722334455",
-      tailorName: "Fine Cut Tailors",
-      amount: 5200,
-      orderDate: DateTime.now().subtract(const Duration(days: 12)),
-      status: "Preparing",
-      isDelivered: false,
-      recipientType: "Tailor",
-      deliveryAddress: "123 Stitch St, Dhaka Fashion District",
-      items: [
-        OrderItem(
-          name: "Premium Egyptian Cotton",
-          quantity: 5,
-          price: 3250,
-          imagePath: "assets/images/fabrics_rolled.jpg",
-          color: "White",
-          description:
-              "Soft, breathable Egyptian cotton perfect for high-end shirts.",
-          itemComment: "The cotton texture is incredibly smooth.",
-          ironLevel: "High",
-        ),
-        OrderItem(
-          name: "Denim Patchwork",
-          quantity: 3,
-          price: 1950,
-          imagePath: "assets/images/denim.jpg",
-          color: "Blue",
-          canBleach: true,
-        ),
-      ],
-    ),
-    RetailerOrder(
-      id: "ORD-1083",
-      customerName: "Israt Jahan",
-      customerPhone: "+8801822334455",
-      amount: 5400,
-      orderDate: DateTime.now().subtract(const Duration(days: 28)),
-      status: "Packed",
-      isDelivered: false,
-      recipientType: "Customer",
-      deliveryAddress: "House 45, Road 12, Banani, Dhaka",
-      items: [
-        OrderItem(
-          name: "Golden Silk Blend",
-          quantity: 3,
-          price: 5400,
-          imagePath: "assets/images/silk.jpg",
-          color: "Gold",
-          description: "Luxurious silk blend with a natural sheen.",
-          itemComment: "Exactly the shade of gold I needed.",
-          canWash: false,
-          canTumbleDry: false,
-          ironLevel: "Low",
-        ),
-      ],
-    ),
-    RetailerOrder(
-      id: "ORD-1076",
-      customerName: "Nishat Tasnim",
-      customerPhone: "+8801922334455",
-      amount: 8600,
-      orderDate: DateTime.now().subtract(const Duration(days: 43)),
-      deliveryDate: DateTime.now().subtract(const Duration(days: 35)),
-      status: "Delivered",
-      isDelivered: true,
-      recipientType: "Customer",
-      deliveryAddress: "Dhanmondi 27, Dhaka",
-      review: "Amazing quality fabric! The selection was perfect.",
-      rating: 4.8,
-      items: [
-        OrderItem(
-          name: "Linen Summer Fabric",
-          quantity: 5,
-          price: 5600,
-          imagePath: "assets/images/fab2.jpg",
-          color: "Light Blue",
-          description: "Lightweight linen fabric, highly breathable.",
-          itemComment: "The linen is so soft and cool.",
-          canTumbleDry: false,
-        ),
-        OrderItem(
-          name: "Printed Scarf",
-          quantity: 5,
-          price: 3000,
-          imagePath: "assets/images/gorgeous.jpg",
-          color: "Multi",
-        ),
-      ],
-    ),
-    RetailerOrder(
-      id: "ORD-1051",
-      customerName: "Farzana Yasmin",
-      customerPhone: "+8801522334455",
-      tailorName: "Royal Stitch",
-      amount: 4560,
-      orderDate: DateTime.now().subtract(const Duration(days: 96)),
-      deliveryDate: DateTime.now().subtract(const Duration(days: 89)),
-      status: "Delivered",
-      isDelivered: true,
-      recipientType: "Tailor",
-      deliveryAddress: "Shop 12, Gulshan Market, Dhaka",
-      review: "Very soft and beautiful patterns. Delivery was fast.",
-      rating: 4.5,
-      items: [
-        OrderItem(
-          name: "Printed Scarf",
-          quantity: 12,
-          price: 4560,
-          imagePath: "assets/images/gorgeous.jpg",
-          color: "Multi",
-          description: "Vibrant seasonal patterns on soft material.",
-          canDryClean: false,
-          ironLevel: "Low",
-        ),
-      ],
-    ),
-  ];
-  */
 
   DateTime get _startDate {
     final today = DateTime.now();

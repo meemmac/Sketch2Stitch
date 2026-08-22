@@ -8,7 +8,6 @@ import 'package:sketch2stitch/services/user_session.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';
 import 'package:sketch2stitch/utils/geo_utils.dart';
 import '../../../widgets/video_preview_player.dart';
-import '../../../widgets/care_info_tooltip.dart';
 import '../../../widgets/top_feedback_banner.dart';
 
 class ProductDetailOverlay extends StatefulWidget {

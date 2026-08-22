@@ -4,7 +4,6 @@ import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/review.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/models/portfolio.dart';
-import 'package:sketch2stitch/models/customer.dart';
 import 'package:sketch2stitch/services/browse_service.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';
 import 'package:sketch2stitch/services/customer_service.dart';
@@ -533,13 +532,13 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                         style: TextStyle(
                           fontSize: isSmall ? 13 : 15,
                           fontWeight: FontWeight.w700,
-                          height: 1.1,
+                          height: 1.2,
                           color: isFull ? Colors.grey.shade700 : Colors.black,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      SizedBox(height: isSmall ? 2 : 4),
+                      SizedBox(height: isSmall ? 4 : 6),
                       Row(
                         children: [
                           Icon(
@@ -547,7 +546,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                             size: isSmall ? 12 : 14,
                             color: isFull ? Colors.grey.shade400 : Colors.grey[600],
                           ),
-                          const SizedBox(width: 2),
+                          const SizedBox(width: 4),
                           Expanded(
                             child: Text(
                               tailor.generalArea,
@@ -559,10 +558,31 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          if (!isTailorOrRetailer && _distanceKmTo(tailor.location) != null) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '${_distanceKmTo(tailor.location)!.toStringAsFixed(1)} km',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: Colors.green.shade800,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                       if (!isTailorOrRetailer) ...[
-                        const SizedBox(height: 2),
+                        SizedBox(height: isSmall ? 2 : 4),
                         Row(
                           children: [
                             Icon(
@@ -571,17 +591,12 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                               color: isFull ? Colors.grey.shade400 : Colors.grey[600],
                             ),
                             const SizedBox(width: 2),
-                            Expanded(
-                              child: Text(
-                                _distanceKmTo(tailor.location) != null
-                                    ? '${_distanceKmTo(tailor.location)!.toStringAsFixed(1)} km • ${_deliveryChargeLabel(tailor.location)}'
-                                    : _deliveryChargeLabel(tailor.location),
-                                style: TextStyle(
-                                  fontSize: isSmall ? 9 : 10,
-                                  color: isFull ? Colors.grey.shade400 : Colors.grey[600],
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                            Text(
+                              _deliveryChargeLabel(tailor.location),
+                              style: TextStyle(
+                                fontSize: isSmall ? 9 : 10,
+                                color: isFull ? Colors.grey.shade400 : Colors.grey[600],
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
@@ -623,7 +638,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   bool _isFavorite = false;
   bool _showAllPortfolio = false;
   List<Review> _reviews = [];
-  bool _isLoading = true;
   bool _isLoadingReviews = true;
   double _averageRating = 0.0;
   String _selectedFilter = "All reviews";
@@ -734,7 +748,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
 
   void _loadReviewsUsingStream() {
     setState(() {
-      _isLoading = true;
       _isLoadingReviews = true;
     });
     
@@ -763,7 +776,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
           setState(() {
             _reviews = reviews;
             _customerNameCache.addAll(customerNames);
-            _isLoading = false;
             _isLoadingReviews = false;
             
             if (_reviews.isNotEmpty) {
@@ -777,7 +789,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         onError: (error) {
           if (mounted) {
             setState(() {
-              _isLoading = false;
               _isLoadingReviews = false;
               _reviews = [];
               _averageRating = 0.0;
@@ -788,7 +799,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       
     } catch (e) {
       setState(() {
-        _isLoading = false;
         _isLoadingReviews = false;
         _reviews = [];
         _averageRating = 0.0;
@@ -1609,7 +1619,6 @@ Widget _buildReviewsPage() {
           icon: const Icon(Icons.refresh, color: Colors.grey),
           onPressed: () {
             setState(() {
-              _isLoading = true;
               _isLoadingReviews = true;
             });
             _loadReviewsUsingStream();

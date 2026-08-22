@@ -4,7 +4,6 @@ import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/review.dart';
 import 'package:sketch2stitch/models/user_role.dart';
-import 'package:sketch2stitch/models/customer.dart';
 import 'package:sketch2stitch/services/review_service.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';
 import 'package:sketch2stitch/services/browse_service.dart';
@@ -610,7 +609,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   bool _showAllProducts = false;
   bool _showFabrics = true;
   List<Review> _reviews = [];
-  bool _isLoading = true;
   bool _isLoadingReviews = true;
   double _averageRating = 0.0;
   String _selectedFilter = "Top reviews";
@@ -731,7 +729,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   // ✅ Load reviews using stream that includes customer names and products
   void _loadReviewsUsingStream() {
     setState(() {
-      _isLoading = true;
       _isLoadingReviews = true;
     });
     
@@ -771,7 +768,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
             _reviews = reviews;
             _customerNameCache.addAll(customerNames);
             _reviewProductsCache.addAll(reviewProducts);
-            _isLoading = false;
             _isLoadingReviews = false;
             
             if (_reviews.isNotEmpty) {
@@ -785,7 +781,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         onError: (error) {
           if (mounted) {
             setState(() {
-              _isLoading = false;
               _isLoadingReviews = false;
               _reviews = [];
               _averageRating = 0.0;
@@ -796,7 +791,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
       
     } catch (e) {
       setState(() {
-        _isLoading = false;
         _isLoadingReviews = false;
         _reviews = [];
         _averageRating = 0.0;
@@ -841,11 +835,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
       
       if (retailerProducts.isEmpty && widget.retailer.products != null) {
         retailerProducts = widget.retailer.products!;
-      }
-      
-      if (retailerProducts.isNotEmpty) {
-        for (final product in retailerProducts) {
-        }
       }
       
       setState(() {
@@ -1381,9 +1370,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     final displayProducts = _showAllProducts
         ? products
         : (products.length > 6 ? products.take(6).toList() : products);
-    final screenWidth = MediaQuery.of(context).size.width;
     final spacing = isSmallScreen ? 8.0 : 10.0;
-    final imageHeight = isSmallScreen ? 100.0 : 120.0;
     final contentPadding = isSmallScreen ? 6.0 : 8.0;
     final fontSize = isSmallScreen ? 10.0 : 11.0;
 
@@ -1422,112 +1409,113 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
               children: [
-                Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                      child: Container(
-                        width: double.infinity,
-                        height: imageHeight,
-                        color: Colors.grey[100],
-                        child: coverImage != null && coverImage.isNotEmpty
-                            ? (coverImage.startsWith('http')
-                                ? Image.network(
-                                    coverImage,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) =>
-                                        Container(
-                                          color: const Color(0xFF6B8F71).withOpacity(0.12),
-                                          child: Icon(
-                                            isElement ? Icons.category : Icons.texture,
-                                            size: isSmallScreen ? 28 : 32,
-                                            color: const Color(0xFF4A7C59),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                        child: Container(
+                          width: double.infinity,
+                          height: double.infinity,
+                          color: Colors.grey[100],
+                          child: coverImage != null && coverImage.isNotEmpty
+                              ? (coverImage.startsWith('http')
+                                  ? Image.network(
+                                      coverImage,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) =>
+                                          Container(
+                                            color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                            child: Icon(
+                                              isElement ? Icons.category : Icons.texture,
+                                              size: isSmallScreen ? 28 : 32,
+                                              color: const Color(0xFF4A7C59),
+                                            ),
                                           ),
-                                        ),
-                                  )
-                                : Image.asset(
-                                    coverImage,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) =>
-                                        Container(
-                                          color: const Color(0xFF6B8F71).withOpacity(0.12),
-                                          child: Icon(
-                                            isElement ? Icons.category : Icons.texture,
-                                            size: isSmallScreen ? 28 : 32,
-                                            color: const Color(0xFF4A7C59),
+                                    )
+                                  : Image.asset(
+                                      coverImage,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) =>
+                                          Container(
+                                            color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                            child: Icon(
+                                              isElement ? Icons.category : Icons.texture,
+                                              size: isSmallScreen ? 28 : 32,
+                                              color: const Color(0xFF4A7C59),
+                                            ),
                                           ),
-                                        ),
-                                  ))
-                            : Container(
-                                color: const Color(0xFF6B8F71).withOpacity(0.12),
-                                child: Icon(
-                                  isElement ? Icons.category : Icons.texture,
-                                  size: isSmallScreen ? 28 : 32,
-                                  color: const Color(0xFF4A7C59),
+                                    ))
+                              : Container(
+                                  color: const Color(0xFF6B8F71).withOpacity(0.12),
+                                  child: Icon(
+                                    isElement ? Icons.category : Icons.texture,
+                                    size: isSmallScreen ? 28 : 32,
+                                    color: const Color(0xFF4A7C59),
+                                  ),
                                 ),
+                        ),
+                      ),
+                      if (!isElement)
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isSmallScreen ? 4 : 6,
+                              vertical: isSmallScreen ? 2 : 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.7),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.2),
+                                width: 0.3,
                               ),
-                      ),
-                    ),
-                    if (!isElement)
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isSmallScreen ? 4 : 6,
-                            vertical: isSmallScreen ? 2 : 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.7),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.2),
-                              width: 0.3,
                             ),
-                          ),
-                          child: Text(
-                            _materialBadgeText(product),
-                            style: TextStyle(
-                              fontSize: isSmallScreen ? 7 : 8,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.3,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        ),
-                      ),
-                    if (outOfStock)
-                      Positioned(
-                        top: 4,
-                        left: 4,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isSmallScreen ? 4 : 6,
-                            vertical: isSmallScreen ? 2 : 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.85),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.2),
-                              width: 0.3,
-                            ),
-                          ),
-                          child: Text(
-                            'Out of Stock',
-                            style: TextStyle(
-                              fontSize: isSmallScreen ? 7 : 8,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
+                            child: Text(
+                              _materialBadgeText(product),
+                              style: TextStyle(
+                                fontSize: isSmallScreen ? 7 : 8,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.3,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
                           ),
                         ),
-                      ),
-                  ],
+                      if (outOfStock)
+                        Positioned(
+                          top: 4,
+                          left: 4,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isSmallScreen ? 4 : 6,
+                              vertical: isSmallScreen ? 2 : 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.85),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.2),
+                                width: 0.3,
+                              ),
+                            ),
+                            child: Text(
+                              'Out of Stock',
+                              style: TextStyle(
+                                fontSize: isSmallScreen ? 7 : 8,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
                 Padding(
                   padding: EdgeInsets.all(contentPadding),
@@ -1667,7 +1655,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
             icon: const Icon(Icons.refresh, color: Colors.grey),
             onPressed: () {
               setState(() {
-                _isLoading = true;
                 _isLoadingReviews = true;
               });
               _loadReviewsUsingStream();

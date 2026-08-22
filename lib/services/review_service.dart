@@ -152,7 +152,7 @@ class ReviewService {
         snapshot.docs.map((doc) async {
           try {
             final data = doc.data() as Map<String, dynamic>;
-            final String customerId = data['customerId'] as String;
+            final String customerId = (data['customerId'] ?? '').toString();
             final String? orderId = data['orderId'] as String?;
 
             if (!customerNameCache.containsKey(customerId)) {
@@ -182,15 +182,16 @@ class ReviewService {
                   final subOrderProducts = await Future.wait(
                     itemsSnap.docs.map((itemDoc) async {
                       final itemData = itemDoc.data() as Map<String, dynamic>;
-                      final productId = itemData['productId'] as String;
-                      final optionId = itemData['optionId'] as int;
+                      final productId = (itemData['productId'] ?? '').toString();
+                      final optionId = (itemData['optionId'] as num?)?.toInt();
+                      if (productId.isEmpty) return null;
 
                       final productDoc = await _db.collection('Products').doc(productId).get();
                       if (productDoc.exists) {
                         final productData = productDoc.data() as Map<String, dynamic>;
                         final List<dynamic> colorOptions = productData['colorOptions'] ?? [];
                         final option = colorOptions.firstWhere(
-                          (o) => o['optionId'] == optionId,
+                          (o) => (o['optionId'] as num?)?.toInt() == optionId,
                           orElse: () => null,
                         );
 
@@ -527,7 +528,7 @@ class ReviewService {
         snapshot.docs.map((doc) async {
           try {
             final data = doc.data() as Map<String, dynamic>;
-            final String customerId = data['customerId'] as String;
+            final String customerId = (data['customerId'] ?? '').toString();
 
             if (!customerNameCache.containsKey(customerId)) {
               final customerDoc = await _db.collection('Customer').doc(customerId).get();

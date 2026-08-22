@@ -68,7 +68,7 @@ class CartService {
   /// retailer's saved locations. The base fee applies when either side has
   /// no location on record yet.
   static const double baseDeliveryCharge = 60;
-  static const double deliveryChargePerKm = 8;
+  static const double deliveryChargePerKm = 4;
   static const double maxDeliveryCharge = 300;
 
   // ── streamCart ─────────────────────────────────────────────────────────────

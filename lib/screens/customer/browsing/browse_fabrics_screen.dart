@@ -6,6 +6,8 @@ import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
 import 'package:sketch2stitch/services/browse_service.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';
 import 'package:sketch2stitch/services/customer_service.dart';
+import 'package:sketch2stitch/services/cart_service.dart';
+import 'package:sketch2stitch/utils/geo_utils.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -130,6 +132,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
   String? _currentUserId;
   Map<String, String> _retailerNames = {};
   Map<String, GeoPoint?> _retailerLocations = {};
+  GeoPoint? _customerLocation;
 
   // Categories that are considered "Elements" (non-fabric items)
   final List<String> _elementCategories = [
@@ -152,6 +155,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
     super.initState();
     _getCurrentUser();
     _loadRetailerNames();
+    _loadCustomerLocation();
   }
 
   void _getCurrentUser() {
@@ -159,6 +163,26 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
     if (user != null) {
       _currentUserId = user.uid;
     }
+  }
+
+  Future<void> _loadCustomerLocation() async {
+    if (_currentUserId == null) return;
+    try {
+      final customer =
+          await _customerService.streamCustomerProfile(_currentUserId!).first;
+      if (mounted) setState(() => _customerLocation = customer?.location);
+    } catch (e) {
+      // Delivery badge just falls back to the base charge if this fails.
+    }
+  }
+
+  /// Same base + per-km delivery estimate used at checkout
+  /// (CartService.deliveryChargeFor), formatted for card display.
+  String _deliveryChargeLabel(GeoPoint? target) {
+    final distanceKm = (_customerLocation != null && target != null)
+        ? GeoUtils.distanceKm(_customerLocation!, target)
+        : null;
+    return 'Tk ${CartService.deliveryChargeFor(distanceKm).toStringAsFixed(0)}';
   }
 
   Future<void> _loadRetailerNames() async {
@@ -649,7 +673,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
                                   Icon(Icons.directions_bike, size: isSmallScreen ? 14 : 16, color: const Color.fromARGB(255, 107, 106, 106)),
                                   const SizedBox(width: 2),
                                   Text(
-                                    'Tk 50',
+                                    _deliveryChargeLabel(_getRetailerLocation(product.retailerId)),
                                     style: TextStyle(
                                       fontSize: isSmallScreen ? 12 : 14,
                                       color: const Color.fromARGB(255, 107, 106, 106),
