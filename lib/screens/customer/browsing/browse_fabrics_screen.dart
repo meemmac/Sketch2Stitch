@@ -5,6 +5,7 @@ import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.d
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
 import 'package:sketch2stitch/services/browse_service.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';
+import 'package:sketch2stitch/services/customer_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -124,6 +125,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
 
   final BrowseService _browseService = BrowseService();
   final FavoriteService _favoriteService = FavoriteService();
+  final CustomerService _customerService = CustomerService();
   
   String? _currentUserId;
   Map<String, String> _retailerNames = {};
@@ -715,6 +717,9 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
   }
 
   void _showFabricDetailOverlay(BuildContext context, FabricProductData fabricData) {
+    if (_currentUserId != null) {
+      _customerService.addToLastViewed(_currentUserId!, fabricData.product.id);
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -732,6 +737,9 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
   }
 
   void _showElementDetailOverlay(BuildContext context, Product product) {
+    if (_currentUserId != null) {
+      _customerService.addToLastViewed(_currentUserId!, product.id);
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,

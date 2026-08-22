@@ -11,6 +11,7 @@ import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.d
 import 'package:sketch2stitch/widgets/cart_icon_button.dart';
 import 'package:sketch2stitch/services/browse_service.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';
+import 'package:sketch2stitch/services/customer_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../widgets/dashboard_drawer.dart';
@@ -52,6 +53,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   // ─── Services ──────────────────────────────────────────────────────────
   final BrowseService _browseService = BrowseService();
   final FavoriteService _favoriteService = FavoriteService();
+  final CustomerService _customerService = CustomerService();
   String? _currentUserId;
 
   // ─── Data State ──────────────────────────────────────────────────────
@@ -78,19 +80,6 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   // ─── Getters ──────────────────────────────────────────────────────────
   List<Product> get _allFabricProducts => _allProducts.where((p) => !_isElement(p)).toList();
   List<Product> get _allElementProducts => _allProducts.where((p) => _isElement(p)).toList();
-
-  List<Product> get _lastViewedProducts {
-    final fabrics = _allFabricProducts;
-    return fabrics.isNotEmpty ? fabrics.take(3).toList() : [];
-  }
-
-  List<Product> get _favoriteFabricProducts {
-    final fabrics = _allFabricProducts;
-    return fabrics.length > 3 ? fabrics.skip(2).take(3).toList() : fabrics.take(3).toList();
-  }
-
-  List<Tailor> get _favoriteTailors => _allTailors.take(3).toList();
-  List<Retailer> get _favoriteRetailers => _allRetailers.take(3).toList();
 
   List<Product> get _fabricSectionProducts {
     final fabrics = _allFabricProducts;
@@ -262,6 +251,10 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         }
         return m.type;
       }).toList();
+    }
+
+    if (_currentUserId != null) {
+      _customerService.addToLastViewed(_currentUserId!, product.id);
     }
 
     showModalBottomSheet(
@@ -958,19 +951,27 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   }
 
   Widget _buildLastViewedSection() {
-    final items = _lastViewedProducts;
-    if (items.isEmpty) return const SizedBox.shrink();
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionHeader('Your last viewed'),
-        const SizedBox(height: 12),
-        _buildFabricRow(items),
-        _buildSeeAllButton(
-          () => _openSeeAllProducts('Your Last Viewed', items),
-        ),
-      ],
+    final customerId = _currentUserId;
+    if (customerId == null) return const SizedBox.shrink();
+
+    return StreamBuilder<List<Product>>(
+      stream: _customerService.streamLastViewed(customerId),
+      builder: (context, snapshot) {
+        final items = snapshot.data ?? [];
+        if (items.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSectionHeader('Your last viewed'),
+            const SizedBox(height: 12),
+            _buildFabricRow(items),
+            _buildSeeAllButton(
+              () => _openSeeAllProducts('Your Last Viewed', items),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -988,39 +989,57 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   }
 
   Widget _buildFavoritesContent() {
+    final customerId = _currentUserId;
+    if (customerId == null) return const SizedBox.shrink();
+
     switch (_favoritesFilter) {
       case 'Retailers':
-        final items = _favoriteRetailers;
-        if (items.isEmpty) return const SizedBox.shrink();
-        return Column(
-          children: [
-            _buildRetailerRow(items),
-            _buildSeeAllButton(
-              () => _openSeeAllRetailers('Wish-listed Retailers', items),
-            ),
-          ],
+        return StreamBuilder<List<Retailer>>(
+          stream: _favoriteService.getFavoriteRetailers(customerId),
+          builder: (context, snapshot) {
+            final items = snapshot.data ?? [];
+            if (items.isEmpty) return const SizedBox.shrink();
+            return Column(
+              children: [
+                _buildRetailerRow(items),
+                _buildSeeAllButton(
+                  () => _openSeeAllRetailers('Wish-listed Retailers', items),
+                ),
+              ],
+            );
+          },
         );
       case 'Tailors':
-        final items = _favoriteTailors;
-        if (items.isEmpty) return const SizedBox.shrink();
-        return Column(
-          children: [
-            _buildTailorRow(items),
-            _buildSeeAllButton(
-              () => _openSeeAllTailors('Wish-listed Tailors', items),
-            ),
-          ],
+        return StreamBuilder<List<Tailor>>(
+          stream: _favoriteService.getFavoriteTailors(customerId),
+          builder: (context, snapshot) {
+            final items = snapshot.data ?? [];
+            if (items.isEmpty) return const SizedBox.shrink();
+            return Column(
+              children: [
+                _buildTailorRow(items),
+                _buildSeeAllButton(
+                  () => _openSeeAllTailors('Wish-listed Tailors', items),
+                ),
+              ],
+            );
+          },
         );
       default:
-        final items = _favoriteFabricProducts;
-        if (items.isEmpty) return const SizedBox.shrink();
-        return Column(
-          children: [
-            _buildFabricRow(items),
-            _buildSeeAllButton(
-              () => _openSeeAllProducts('Wish-listed Fabrics & Elements', items),
-            ),
-          ],
+        return StreamBuilder<List<Product>>(
+          stream: _favoriteService.getFavoriteProducts(customerId),
+          builder: (context, snapshot) {
+            final items = snapshot.data ?? [];
+            if (items.isEmpty) return const SizedBox.shrink();
+            return Column(
+              children: [
+                _buildFabricRow(items),
+                _buildSeeAllButton(
+                  () => _openSeeAllProducts('Wish-listed Fabrics & Elements', items),
+                ),
+              ],
+            );
+          },
         );
     }
   }
