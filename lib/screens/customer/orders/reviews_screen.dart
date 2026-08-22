@@ -367,6 +367,11 @@ class _CustomerReviewsScreenState extends State<CustomerReviewsScreen> {
               ),
               const SizedBox(width: 8),
               Text(
+                review.rating.toStringAsFixed(1),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+              const SizedBox(width: 8),
+              Text(
                 "• ${review.dateLabel}",
                 style: const TextStyle(color: Colors.grey, fontSize: 12),
               ),

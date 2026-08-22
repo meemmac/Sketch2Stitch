@@ -376,14 +376,23 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
           ),
           const SizedBox(height: 8),
           Row(
-            children: List.generate(
-              5,
-                  (index) => Icon(
-                index < review.rating.floor() ? Icons.star : Icons.star_border,
-                color: Colors.orange,
-                size: 14,
+            children: [
+              Row(
+                children: List.generate(
+                  5,
+                      (index) => Icon(
+                    index < review.rating.floor() ? Icons.star : Icons.star_border,
+                    color: Colors.orange,
+                    size: 14,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              Text(
+                review.rating.toStringAsFixed(1),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Text(

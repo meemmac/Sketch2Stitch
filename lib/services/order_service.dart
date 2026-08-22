@@ -752,6 +752,9 @@ class OrderService {
       final Map<String, Map<String, dynamic>> customerCache = {};
       final Map<String, Map<String, dynamic>> productCache = {};
       final Map<String, String?> tailorNameCache = {};
+      final Map<String, String?> tailorAddressCache = {}; // #6: tailor's physical address
+      // #23: cache reviews keyed by "orderId_retailerId" to avoid re-fetching
+      final Map<String, Map<String, dynamic>?> reviewCache = {};
 
       // Process all sub-orders in parallel
       final List<Map<String, dynamic>?> results = await Future.wait(
@@ -793,8 +796,11 @@ class OrderService {
                       final tId = jobSnap.docs.first.data()['tailorId'];
                       final tDoc = await _db.collection('Tailor').doc(tId).get();
                       tailorNameCache[orderId] = tDoc.data()?['name'];
+                      // #6: capture address at the same time — zero extra reads
+                      tailorAddressCache[orderId] = tDoc.data()?['address'];
                     } else {
                       tailorNameCache[orderId] = null;
+                      tailorAddressCache[orderId] = null;
                     }
                   }
                   return tailorNameCache[orderId];
@@ -847,12 +853,38 @@ class OrderService {
 
             if (itemsList.isEmpty) return null;
 
+            // #23: for delivered orders, look up the customer's review so
+            // the retailer card can show the star rating.
+            Map<String, dynamic>? reviewData;
+            if ((subOrderData['status'] ?? '') == 'delivered') {
+              final cacheKey = '${orderId}_$retailerId';
+              if (!reviewCache.containsKey(cacheKey)) {
+                final reviewSnap = await _db
+                    .collection('Reviews')
+                    .where('targetId', isEqualTo: retailerId)
+                    .where('targetRole', isEqualTo: 'retailer')
+                    .where('orderId', isEqualTo: orderId)
+                    .limit(1)
+                    .get();
+                reviewCache[cacheKey] = reviewSnap.docs.isNotEmpty
+                    ? reviewSnap.docs.first.data()
+                    : null;
+              }
+              reviewData = reviewCache[cacheKey];
+            }
+
             return {
               'subOrder': {...subOrderData, 'id': subOrderId},
               'order': {...orderData, 'id': orderId},
               'customer': customerData,
               'items': itemsList,
               'tailorName': tailorName,
+              // #6: include tailor's address so the screen can display it
+              // when deliveryDestination == 'tailor'
+              'tailorAddress': tailorAddressCache[orderId],
+              // #23: customer's review for this retailer on this order
+              'reviewRating': reviewData?['rating'],
+              'reviewComment': reviewData?['comment'],
             };
           } catch (e) {
             debugPrint("OrderService: Error processing sub-order: $e");
