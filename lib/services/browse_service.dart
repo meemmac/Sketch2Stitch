@@ -22,16 +22,10 @@ class BrowseService {
     String sortBy = 'default',
     String? search,
   }) {
-    print('🔍 getProductsByFilter called');
-    print('📊 category: $category, materialType: $materialType');
-    print('📊 minPrice: $minPrice, maxPrice: $maxPrice');
-    print('📊 colors: $colors, sortBy: $sortBy, search: $search');
-    
     Query query = _db.collection('Products');
 
     if (category != null && category != 'All' && category != 'Elements') {
       query = query.where('category', isEqualTo: category);
-      print('🔍 Filtering by category: $category');
     }
 
     // Apply sorting logic
@@ -42,19 +36,15 @@ class BrowseService {
     }
 
     return query.snapshots().map((snapshot) {
-      print('📦 Received ${snapshot.docs.length} documents from Firestore');
-      
       if (snapshot.docs.isEmpty) {
-        print('⚠️ No documents found in Products collection');
         return <Product>[];
       }
-      
+
       var products = snapshot.docs.map((doc) {
         try {
           final data = doc.data() as Map<String, dynamic>;
           return Product.fromJson(data, id: doc.id);
         } catch (e) {
-          print('❌ Error parsing product ${doc.id}: $e');
           return Product(
             id: doc.id,
             retailerId: '',
@@ -70,7 +60,7 @@ class BrowseService {
       }).toList();
 
       // Client-side filtering for more complex logic
-      
+
       // Filter by material type - updated for MaterialBlend
       if (materialType != null && materialType != 'All') {
         products = products.where((p) {
@@ -79,17 +69,15 @@ class BrowseService {
             (m) => m.type.toLowerCase().contains(materialType.toLowerCase())
           );
         }).toList();
-        print('📊 After material filter: ${products.length} products');
       }
 
       // Filter by price
       if (minPrice != null || maxPrice != null) {
         products = products.where((p) {
           final price = p.minPrice;
-          return (minPrice == null || price >= minPrice) && 
+          return (minPrice == null || price >= minPrice) &&
                  (maxPrice == null || price <= maxPrice);
         }).toList();
-        print('📊 After price filter: ${products.length} products');
       }
 
       // Filter by colors
@@ -100,7 +88,6 @@ class BrowseService {
               .toList();
           return colors.any((c) => productColors.contains(c.toLowerCase()));
         }).toList();
-        print('📊 After color filter: ${products.length} products');
       }
 
       // Filter by search
@@ -110,10 +97,8 @@ class BrowseService {
           return p.productName.toLowerCase().contains(lowerSearch) ||
                  p.description.toLowerCase().contains(lowerSearch);
         }).toList();
-        print('📊 After search filter: ${products.length} products');
       }
 
-      print('✅ Returning ${products.length} products');
       return products;
     });
   }
@@ -121,12 +106,12 @@ class BrowseService {
   /// Performs a prefix search on product names.
   Future<List<Product>> searchProductsByQuery(String query) async {
     if (query.isEmpty) return [];
-    
+
     try {
       final normalizedQuery = query.toLowerCase();
       final snapshot = await _db.collection('Products')
           .where('productNameLower', isGreaterThanOrEqualTo: normalizedQuery)
-          .where('productNameLower', isLessThanOrEqualTo: '$normalizedQuery\uf8ff')
+          .where('productNameLower', isLessThanOrEqualTo: '$normalizedQuery')
           .limit(20)
           .get();
 
@@ -134,7 +119,6 @@ class BrowseService {
         try {
           return Product.fromJson(doc.data(), id: doc.id);
         } catch (e) {
-          print('❌ Error parsing product in search: $e');
           return Product(
             id: doc.id,
             retailerId: '',
@@ -148,7 +132,6 @@ class BrowseService {
         }
       }).toList();
     } catch (e) {
-      print('❌ Error in searchProductsByQuery: $e');
       return [];
     }
   }
@@ -162,14 +145,10 @@ class BrowseService {
     String sortBy = 'default',
     String? search,
   }) {
-    print('🔍 getTailorsByFilter called');
-    print('📊 minRating: $minRating, location: $location, sortBy: $sortBy, search: $search');
-    
     Query query = _db.collection('Tailor');
 
     if (minRating != null && minRating > 0) {
       query = query.where('rating', isGreaterThanOrEqualTo: minRating);
-      print('🔍 Filtering by minRating: $minRating');
     }
 
     if (sortBy == 'ratingHighToLow') {
@@ -177,14 +156,11 @@ class BrowseService {
     }
 
     return query.snapshots().map((snapshot) {
-      print('📦 Received ${snapshot.docs.length} tailors from Firestore');
-      
       var tailors = snapshot.docs.map((doc) {
         try {
           final data = doc.data() as Map<String, dynamic>;
           return Tailor.fromJson(data, id: doc.id);
         } catch (e) {
-          print('❌ Error parsing tailor ${doc.id}: $e');
           return Tailor(
             id: doc.id,
             name: 'Error',
@@ -202,20 +178,23 @@ class BrowseService {
               (t) => t.address.toLowerCase().contains(location.toLowerCase()),
             )
             .toList();
-        print('📊 After location filter: ${tailors.length} tailors');
       }
 
       if (search != null && search.isNotEmpty) {
         final lowerSearch = search.toLowerCase();
-        tailors = tailors.where((t) => 
+        tailors = tailors.where((t) =>
           t.name.toLowerCase().contains(lowerSearch) ||
           t.address.toLowerCase().contains(lowerSearch)
         ).toList();
-        print('📊 After search filter: ${tailors.length} tailors');
       }
 
-      print('✅ Returning ${tailors.length} tailors');
-      return tailors;
+      // Fully-booked tailors (maxOrder == 0) always sort below available
+      // ones; a stable partition keeps the existing order (e.g. rating
+      // sort) within each group.
+      return [
+        ...tailors.where((t) => t.maxOrder != 0),
+        ...tailors.where((t) => t.maxOrder == 0),
+      ];
     });
   }
 
@@ -225,7 +204,7 @@ class BrowseService {
       final normalizedQuery = query.toLowerCase();
       final snapshot = await _db.collection('Tailor')
           .where('nameLower', isGreaterThanOrEqualTo: normalizedQuery)
-          .where('nameLower', isLessThanOrEqualTo: '$normalizedQuery\uf8ff')
+          .where('nameLower', isLessThanOrEqualTo: '$normalizedQuery')
           .get();
 
       return snapshot.docs.map((doc) {
@@ -233,7 +212,6 @@ class BrowseService {
         return Tailor.fromJson(data, id: doc.id);
       }).toList();
     } catch (e) {
-      print('❌ Error in searchTailorsByQuery: $e');
       return [];
     }
   }
@@ -247,14 +225,10 @@ class BrowseService {
     String sortBy = 'default',
     String? search,
   }) {
-    print('🔍 getRetailersByFilter called');
-    print('📊 minRating: $minRating, location: $location, sortBy: $sortBy, search: $search');
-    
     Query query = _db.collection('Retailer');
 
     if (minRating != null && minRating > 0) {
       query = query.where('rating', isGreaterThanOrEqualTo: minRating);
-      print('🔍 Filtering by minRating: $minRating');
     }
 
     if (sortBy == 'ratingHighToLow') {
@@ -262,14 +236,11 @@ class BrowseService {
     }
 
     return query.snapshots().map((snapshot) {
-      print('📦 Received ${snapshot.docs.length} retailers from Firestore');
-      
       var retailers = snapshot.docs.map((doc) {
         try {
           final data = doc.data() as Map<String, dynamic>;
           return Retailer.fromJson(data, id: doc.id);
         } catch (e) {
-          print('❌ Error parsing retailer ${doc.id}: $e');
           return Retailer(
             id: doc.id,
             shopName: 'Error',
@@ -287,19 +258,16 @@ class BrowseService {
               (r) => r.address.toLowerCase().contains(location.toLowerCase()),
             )
             .toList();
-        print('📊 After location filter: ${retailers.length} retailers');
       }
 
       if (search != null && search.isNotEmpty) {
         final lowerSearch = search.toLowerCase();
-        retailers = retailers.where((r) => 
+        retailers = retailers.where((r) =>
           r.shopName.toLowerCase().contains(lowerSearch) ||
           r.address.toLowerCase().contains(lowerSearch)
         ).toList();
-        print('📊 After search filter: ${retailers.length} retailers');
       }
 
-      print('✅ Returning ${retailers.length} retailers');
       return retailers;
     });
   }
@@ -310,7 +278,7 @@ class BrowseService {
       final normalizedQuery = query.toLowerCase();
       final snapshot = await _db.collection('Retailer')
           .where('shopNameLower', isGreaterThanOrEqualTo: normalizedQuery)
-          .where('shopNameLower', isLessThanOrEqualTo: '$normalizedQuery\uf8ff')
+          .where('shopNameLower', isLessThanOrEqualTo: '$normalizedQuery')
           .get();
 
       return snapshot.docs.map((doc) {
@@ -318,7 +286,6 @@ class BrowseService {
         return Retailer.fromJson(data, id: doc.id);
       }).toList();
     } catch (e) {
-      print('❌ Error in searchRetailersByQuery: $e');
       return [];
     }
   }

@@ -116,7 +116,14 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
               );
             }
 
-            final tailors = snapshot.data ?? [];
+            // Fully-booked tailors (maxOrder == 0) always sort below available
+            // ones; a stable partition keeps the existing order (e.g. rating
+            // sort) within each group.
+            final rawTailors = snapshot.data ?? [];
+            final tailors = [
+              ...rawTailors.where((t) => t.maxOrder != 0),
+              ...rawTailors.where((t) => t.maxOrder == 0),
+            ];
 
             if (tailors.isEmpty) {
               return Center(
@@ -958,7 +965,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                                      widget.userRole == UserRole.retailer;
 
     return Scaffold(
-      bottomNavigationBar: (_isCustomer && !isUnavailable)
+      bottomNavigationBar: (_isCustomer && !isUnavailable && widget.onTailorSelected != null)
           ? _buildBookButton()
           : null,
       body: Column(
