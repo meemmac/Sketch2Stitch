@@ -11,7 +11,7 @@ import 'package:sketch2stitch/models/user_role.dart';
 // Shared green used across all "Browse" screens — Fabrics, Elements, Tailors,
 // Retailers — so they read as one consistent design language.
 // ─────────────────────────────────────────────────────────────────────────────
-const kSage = kSage;
+const kSage = Color(0xFF6B8F71);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Filter Data Classes
@@ -364,11 +364,14 @@ class _BrowseShellState extends State<BrowseShell> {
     });
   }
 
+  // Filter values are read straight from the fields below on every build, so
+  // closing the overlay via setState is all that's needed to re-run the
+  // queries. (Re-assigning _searchNotifier to its current value would notify
+  // nobody — ValueNotifier only fires when the value actually changes.)
   void _applyFilters() {
     setState(() {
       _showFilterOverlay = false;
     });
-    _searchNotifier.value = _searchNotifier.value;
   }
 
   void _resetFilters() {
@@ -394,7 +397,6 @@ class _BrowseShellState extends State<BrowseShell> {
 
       _showFilterOverlay = false;
     });
-    _searchNotifier.value = _searchNotifier.value;
   }
 
   bool get _hasActiveFilters {

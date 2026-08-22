@@ -822,57 +822,17 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       );
       
       
+      if (!mounted) return;
       setState(() {
         _portfolioItems = result.items;
         _isLoadingPortfolio = false;
       });
-      
-      if (_portfolioItems.isEmpty) {
-        await _loadPortfolioFallback();
-      }
     } catch (e) {
-      await _loadPortfolioFallback();
-    }
-  }
-
-  Future<void> _loadPortfolioFallback() async {
-    try {
-      final allPortfolioSnapshot = await FirebaseFirestore.instance
-          .collection('Portfolio')
-          .get();
-      
-      final List<Portfolio> foundItems = [];
-      
-      for (final doc in allPortfolioSnapshot.docs) {
-        final data = doc.data();
-        final tailorId = data['tailorId'] as String?;
-        
-        if (tailorId != null) {
-          final tailorDoc = await FirebaseFirestore.instance
-              .collection('Tailor')
-              .doc(tailorId)
-              .get();
-          
-          if (tailorDoc.exists) {
-            final tailorData = tailorDoc.data();
-            final name = tailorData?['name'] as String?;
-            if (name == widget.tailor.name) {
-              foundItems.add(Portfolio.fromJson({...data, 'id': doc.id}));
-            }
-          }
-        }
-      }
-      
-      if (foundItems.isNotEmpty) {
-        setState(() {
-          _portfolioItems = foundItems;
-          _isLoadingPortfolio = false;
-        });
-      } else {
-        setState(() => _isLoadingPortfolio = false);
-      }
-    } catch (e) {
-      setState(() => _isLoadingPortfolio = false);
+      if (!mounted) return;
+      setState(() {
+        _portfolioItems = [];
+        _isLoadingPortfolio = false;
+      });
     }
   }
 

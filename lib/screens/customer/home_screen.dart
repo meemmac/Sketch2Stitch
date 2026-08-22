@@ -1007,6 +1007,24 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     );
   }
 
+  Widget _buildFavoritesEmpty(String message) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+      child: Row(
+        children: [
+          Icon(Icons.favorite_border, size: 18, color: Colors.grey[400]),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFavoritesContent() {
     final customerId = _currentUserId;
     if (customerId == null) return const SizedBox.shrink();
@@ -1017,7 +1035,11 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           stream: _favoriteService.getFavoriteRetailers(customerId),
           builder: (context, snapshot) {
             final items = snapshot.data ?? [];
-            if (items.isEmpty) return const SizedBox.shrink();
+            if (items.isEmpty) {
+              return _buildFavoritesEmpty(
+                'No wish-listed retailers yet. Tap the heart on a retailer to save it here.',
+              );
+            }
             return Column(
               children: [
                 _buildRetailerRow(items),
@@ -1033,7 +1055,11 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           stream: _favoriteService.getFavoriteTailors(customerId),
           builder: (context, snapshot) {
             final items = snapshot.data ?? [];
-            if (items.isEmpty) return const SizedBox.shrink();
+            if (items.isEmpty) {
+              return _buildFavoritesEmpty(
+                'No wish-listed tailors yet. Tap the heart on a tailor to save it here.',
+              );
+            }
             return Column(
               children: [
                 _buildTailorRow(items),
@@ -1049,7 +1075,11 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
           stream: _favoriteService.getFavoriteProducts(customerId),
           builder: (context, snapshot) {
             final items = snapshot.data ?? [];
-            if (items.isEmpty) return const SizedBox.shrink();
+            if (items.isEmpty) {
+              return _buildFavoritesEmpty(
+                'No wish-listed fabrics or elements yet. Tap the heart on a product to save it here.',
+              );
+            }
             return Column(
               children: [
                 _buildFabricRow(items),
@@ -1082,9 +1112,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                     decoration: BoxDecoration(
                       border: Border(
                         bottom: BorderSide(
-                          color: active
-                              ? Colors.green.shade600
-                              : Colors.transparent,
+                          color: active ? kSage : Colors.transparent,
                           width: 2,
                         ),
                       ),
@@ -1094,7 +1122,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                        color: active ? Colors.green.shade800 : Colors.black45,
+                        color: active ? kSage : Colors.black45,
                       ),
                     ),
                   ),

@@ -24,7 +24,7 @@ class BrowseService {
   }) {
     Query query = _db.collection('Products');
 
-    if (category != null && category != 'All' && category != 'Elements') {
+    if (category != null && category != 'All') {
       query = query.where('category', isEqualTo: category);
     }
 
@@ -84,7 +84,11 @@ class BrowseService {
           final productColors = p.colorOptions
               .map((c) => c.color.toLowerCase())
               .toList();
-          return colors.any((c) => productColors.contains(c.toLowerCase()));
+          // Substring match, matching ColorFilterOptions.matchesSelectedColors,
+          // so "Navy Blue" is still found by the "Blue" chip.
+          return colors.any(
+            (c) => productColors.any((pc) => pc.contains(c.toLowerCase())),
+          );
         }).toList();
       }
 
@@ -99,39 +103,6 @@ class BrowseService {
 
       return products;
     });
-  }
-
-  /// Performs a prefix search on product names.
-  Future<List<Product>> searchProductsByQuery(String query) async {
-    if (query.isEmpty) return [];
-
-    try {
-      final normalizedQuery = query.toLowerCase();
-      final snapshot = await _db.collection('Products')
-          .where('productNameLower', isGreaterThanOrEqualTo: normalizedQuery)
-          .where('productNameLower', isLessThanOrEqualTo: '$normalizedQuery')
-          .limit(20)
-          .get();
-
-      return snapshot.docs.map((doc) {
-        try {
-          return Product.fromJson(doc.data(), id: doc.id);
-        } catch (e) {
-          return Product(
-            id: doc.id,
-            retailerId: '',
-            productName: 'Error',
-            category: '',
-            materialType: [],
-            colorOptions: [],
-            description: '',
-            careSymbol: [],
-          );
-        }
-      }).toList();
-    } catch (e) {
-      return [];
-    }
   }
 
   // ─── Tailors ──────────────────────────────────────────────────────────────
@@ -198,24 +169,6 @@ class BrowseService {
     });
   }
 
-  /// Searches for tailors by name.
-  Future<List<Tailor>> searchTailorsByQuery(String query) async {
-    try {
-      final normalizedQuery = query.toLowerCase();
-      final snapshot = await _db.collection('Tailor')
-          .where('nameLower', isGreaterThanOrEqualTo: normalizedQuery)
-          .where('nameLower', isLessThanOrEqualTo: '$normalizedQuery')
-          .get();
-
-      return snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        return Tailor.fromJson(data, id: doc.id);
-      }).toList();
-    } catch (e) {
-      return [];
-    }
-  }
-
   // ─── Retailers ────────────────────────────────────────────────────────────
 
   /// Filters retailers based on rating, location, and search terms.
@@ -272,24 +225,6 @@ class BrowseService {
 
       return retailers;
     });
-  }
-
-  /// Searches for retailers by shop name.
-  Future<List<Retailer>> searchRetailersByQuery(String query) async {
-    try {
-      final normalizedQuery = query.toLowerCase();
-      final snapshot = await _db.collection('Retailer')
-          .where('shopNameLower', isGreaterThanOrEqualTo: normalizedQuery)
-          .where('shopNameLower', isLessThanOrEqualTo: '$normalizedQuery')
-          .get();
-
-      return snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        return Retailer.fromJson(data, id: doc.id);
-      }).toList();
-    } catch (e) {
-      return [];
-    }
   }
 
   // ─── Orders ───────────────────────────────────────────────────────────────
