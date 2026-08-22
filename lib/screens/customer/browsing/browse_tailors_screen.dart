@@ -50,14 +50,25 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
   String? _currentUserId;
   GeoPoint? _customerLocation;
 
+  /// Running job count per tailor, used with BrowseService.isTailorFull to
+  /// decide which cards read as fully booked. Empty until the first load,
+  /// which just means nobody shows as full for that first frame.
+  Map<String, int> _runningJobCounts = const {};
+
   @override
   void initState() {
     super.initState();
+    _loadRunningJobCounts();
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       _currentUserId = user.uid;
       _loadCustomerLocation();
     }
+  }
+
+  Future<void> _loadRunningJobCounts() async {
+    final counts = await _browseService.fetchRunningJobCounts();
+    if (mounted) setState(() => _runningJobCounts = counts);
   }
 
   Future<void> _loadCustomerLocation() async {
@@ -144,13 +155,15 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
               );
             }
 
-            // Fully-booked tailors (maxOrder == 0) always sort below available
-            // ones; a stable partition keeps the existing order (e.g. rating
-            // sort) within each group.
+            // Fully-booked tailors (at their maxOrder capacity) always sort
+            // below available ones; a stable partition keeps the existing
+            // order (e.g. rating sort) within each group.
             final rawTailors = snapshot.data ?? [];
             final tailors = [
-              ...rawTailors.where((t) => t.maxOrder != 0),
-              ...rawTailors.where((t) => t.maxOrder == 0),
+              ...rawTailors.where(
+                  (t) => !BrowseService.isTailorFull(t, _runningJobCounts)),
+              ...rawTailors.where(
+                  (t) => BrowseService.isTailorFull(t, _runningJobCounts)),
             ];
 
             if (tailors.isEmpty) {
@@ -338,7 +351,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
 
   Widget _buildTailorCard(Tailor tailor, bool isSmall) {
     final bool isTopRated = tailor.rating >= 4.8;
-    final bool isFull = tailor.maxOrder == 0;
+    final bool isFull = BrowseService.isTailorFull(tailor, _runningJobCounts);
     String imageUrl = tailor.profilePicture ?? 'assets/images/fab.jpg';
     
     final bool isTailorOrRetailer = widget.userRole == UserRole.tailor || 
@@ -647,8 +660,12 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   final FavoriteService _favoriteService = FavoriteService();
   final PortfolioService _portfolioService = PortfolioService();
   final CustomerService _customerService = CustomerService();
+  final BrowseService _browseService = BrowseService();
   String? _currentUserId;
   GeoPoint? _customerLocation;
+
+  /// Running job count per tailor — see BrowseService.isTailorFull.
+  Map<String, int> _runningJobCounts = const {};
 
   List<Portfolio> _portfolioItems = [];
   bool _isLoadingPortfolio = true;
@@ -660,16 +677,23 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   StreamSubscription? _reviewSubscription;
 
   bool get _isCustomer => widget.userRole == UserRole.customer;
-  bool get isUnavailable => widget.tailor.maxOrder == 0;
+  bool get isUnavailable =>
+      BrowseService.isTailorFull(widget.tailor, _runningJobCounts);
 
   @override
   void initState() {
     super.initState();
     _getCurrentUser();
+    _loadRunningJobCounts();
     _loadReviewsUsingStream();
     _loadPortfolio();
     _checkFavoriteStatus();
     _loadCustomerLocation();
+  }
+
+  Future<void> _loadRunningJobCounts() async {
+    final counts = await _browseService.fetchRunningJobCounts();
+    if (mounted) setState(() => _runningJobCounts = counts);
   }
 
   Future<void> _loadCustomerLocation() async {

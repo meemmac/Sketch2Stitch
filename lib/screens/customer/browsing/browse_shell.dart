@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_fabrics_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_tailors_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.dart';
-import 'package:sketch2stitch/screens/customer/cart_screen.dart';
 import 'package:sketch2stitch/models/user_role.dart';
+import 'package:sketch2stitch/widgets/cart_icon_button.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared green used across all "Browse" screens — Fabrics, Elements, Tailors,
@@ -630,20 +630,12 @@ class _BrowseShellState extends State<BrowseShell> {
           ),
           if (isCustomer) ...[
             const SizedBox(width: 8),
-            IconButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CartScreen()),
-                );
-              },
-              icon: const Icon(
-                Icons.shopping_cart_outlined,
-                color: Colors.black87,
-                size: 24,
-              ),
+            // Same badged control as the home screen's app bar, so the live
+            // item count is visible from browsing too.
+            const CartIconButton(
+              iconSize: 24,
               padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
+              constraints: BoxConstraints(),
             ),
           ],
         ],

@@ -201,10 +201,13 @@ class _CartScreenState extends State<CartScreen> {
   /// Always goes to CheckoutScreen for the CURRENT cart. Never redirects
   /// into an existing order — that's what Running Orders is for.
   void _checkout() {
-    if (_measurement == null) {
+    // Not just a null check: getOrCreateMeasurement writes an all-zero
+    // document the first time the customer opens the measurement page, so a
+    // record can exist while every field is still 0.
+    if (_measurement == null || !_measurement!.isComplete) {
       AppFeedback.show(
         context,
-        'Add your measurements in your profile before checking out.',
+        'Complete your measurements in your profile before checking out.',
         isError: true,
       );
       return;

@@ -107,6 +107,54 @@ class BrowseService {
 
   // ─── Tailors ──────────────────────────────────────────────────────────────
 
+  /// `Tailor-jobs.status` values that still occupy one of a tailor's
+  /// `maxOrder` slots — anything awaiting their response, awaiting the
+  /// customer's, or actively being worked on. Finished/abandoned jobs
+  /// (completed, rejected, expired, cancelled, tailor_declined) free the
+  /// slot again.
+  static const List<String> runningJobStatuses = [
+    'pending',
+    'quoted',
+    'confirmed',
+    'in_progress',
+  ];
+
+  /// How many jobs each tailor currently has in flight, keyed by tailorId.
+  /// Tailors with no running jobs are simply absent from the map.
+  Future<Map<String, int>> fetchRunningJobCounts() async {
+    try {
+      final snap = await _db
+          .collection('Tailor-jobs')
+          .where('status', whereIn: runningJobStatuses)
+          .get();
+
+      final counts = <String, int>{};
+      for (final doc in snap.docs) {
+        final id = doc.data()['tailorId'];
+        if (id is String && id.isNotEmpty) {
+          counts[id] = (counts[id] ?? 0) + 1;
+        }
+      }
+      return counts;
+    } catch (e) {
+      // On failure nobody is treated as full — better to show a tailor who
+      // turns out to be busy than to hide every tailor in the app.
+      return const {};
+    }
+  }
+
+  /// Whether [tailor] has hit the capacity they set on their own dashboard.
+  ///
+  /// `maxOrder == null` means "Not Set" — unlimited. `maxOrder == 0` is an
+  /// explicit "not taking work". Anything higher is compared against the
+  /// tailor's running job count from [fetchRunningJobCounts].
+  static bool isTailorFull(Tailor tailor, Map<String, int> runningJobCounts) {
+    final capacity = tailor.maxOrder;
+    if (capacity == null) return false;
+    if (capacity <= 0) return true;
+    return (runningJobCounts[tailor.id] ?? 0) >= capacity;
+  }
+
   /// Filters tailors based on rating, location, and search terms.
   Stream<List<Tailor>> getTailorsByFilter({
     double? minRating,
@@ -126,7 +174,7 @@ class BrowseService {
       query = query.orderBy('rating', descending: false);
     }
 
-    return query.snapshots().map((snapshot) {
+    return query.snapshots().asyncMap((snapshot) async {
       var tailors = snapshot.docs.map((doc) {
         try {
           final data = doc.data() as Map<String, dynamic>;
@@ -159,12 +207,13 @@ class BrowseService {
         ).toList();
       }
 
-      // Fully-booked tailors (maxOrder == 0) always sort below available
-      // ones; a stable partition keeps the existing order (e.g. rating
-      // sort) within each group.
+      // Fully-booked tailors (at their maxOrder capacity) always sort below
+      // available ones; a stable partition keeps the existing order (e.g.
+      // rating sort) within each group.
+      final counts = await fetchRunningJobCounts();
       return [
-        ...tailors.where((t) => t.maxOrder != 0),
-        ...tailors.where((t) => t.maxOrder == 0),
+        ...tailors.where((t) => !isTailorFull(t, counts)),
+        ...tailors.where((t) => isTailorFull(t, counts)),
       ];
     });
   }

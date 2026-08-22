@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:gal/gal.dart';
+import 'package:http/http.dart' as http;
 import '../../../models/measurement.dart';
 import '../../../models/tailor.dart';
 import 'reviews_screen.dart';
@@ -164,7 +166,12 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
             deliveryAddress: customer['address'] ?? 'N/A',
             measurement: measurementMap != null ? Measurement.fromJson({...measurementMap, 'id': job['measurementId']}) : null,
             items: items.map((i) {
+              // Products store care labels the way the retailer inventory
+              // form writes them ("Washable", "Dry Clean Only",
+              // "Iron: High"), so match on those rather than camelCase keys.
               final careSymbols = List<String>.from(i['careSymbol'] ?? []);
+              final careLower =
+                  careSymbols.map((s) => s.toLowerCase()).toList();
               return TailorOrderItem(
                 name: i['name'],
                 quantity: i['quantity'],
@@ -174,11 +181,15 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 servicePrice: (job['quoteAmount'] ?? 0).toDouble(),
                 tailorInstructions: job['specialInstructions'] ?? i['instructions'],
                 estimatedDeliveryDate: _parseDateTime(job['estimatedDeliveryDate']),
-                measurementRefImages: job['designIds'] != null ? List<String>.from(job['designIds']) : [],
-                canWash: careSymbols.contains('wash'),
-                canBleach: careSymbols.contains('bleach'),
-                canDryClean: careSymbols.contains('dryClean'),
-                ironLevel: careSymbols.firstWhere((s) => s.startsWith('iron'), orElse: () => "Medium"),
+                measurementRefImages: List<String>.from(map['designUrls'] ?? []),
+                canWash: careLower.any((s) => s.contains('wash')),
+                canBleach: careLower.any((s) => s.contains('bleach')),
+                canDryClean: careLower.any((s) => s.contains('dry clean')),
+                ironLevel: careSymbols
+                    .firstWhere((s) => s.toLowerCase().startsWith('iron'),
+                        orElse: () => "Iron: Medium")
+                    .replaceFirst(
+                        RegExp(r'^iron:\s*', caseSensitive: false), ''),
               );
             }).toList(),
           ));
@@ -1792,6 +1803,44 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     );
   }
 
+  /// Saves a reference/product image to the device gallery. Same flow as the
+  /// virtual-trial screen: ask for gallery access, then hand the bytes to Gal.
+  Future<void> _downloadImage(String imagePath) async {
+    if (!imagePath.startsWith('http')) {
+      _showBanner("This image can't be downloaded.");
+      return;
+    }
+
+    _showBanner("Reference image download started...", isError: false);
+    try {
+      if (!await Gal.hasAccess()) {
+        if (!await Gal.requestAccess()) {
+          if (mounted) {
+            _showBanner(
+              "Gallery permission denied. Please enable it to save images.",
+            );
+          }
+          return;
+        }
+      }
+
+      final response = await http.get(Uri.parse(imagePath));
+      if (response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+
+      await Gal.putImageBytes(response.bodyBytes);
+      if (mounted) {
+        _showBanner("Saved to your photo gallery.", isError: false);
+      }
+    } catch (e) {
+      debugPrint("TailorOrdersScreen: image download failed: $e");
+      if (mounted) {
+        _showBanner("Couldn't save the image. Please try again.");
+      }
+    }
+  }
+
   void _showFullScreenImage(String imagePath) {
     showDialog(
       context: context,
@@ -1817,9 +1866,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
               right: 20,
               child: IconButton(
                 icon: const Icon(Icons.download, color: Colors.white, size: 30),
-                onPressed: () {
-                  _showBanner("Reference image download started...", isError: false);
-                },
+                onPressed: () => _downloadImage(imagePath),
               ),
             ),
           ],

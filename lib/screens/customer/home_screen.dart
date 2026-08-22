@@ -160,12 +160,15 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         products = [];
       }
 
-      // Load tailors. Fully-booked tailors (maxOrder == 0) are excluded on
-      // the home screen entirely, not just sorted last.
+      // Load tailors. Fully-booked tailors (at their maxOrder capacity) are
+      // excluded on the home screen entirely, not just sorted last.
       List<Tailor> tailors = [];
       try {
         final loadedTailors = await _browseService.getTailorsByFilter().first;
-        tailors = loadedTailors.where((t) => t.maxOrder != 0).toList();
+        final runningJobCounts = await _browseService.fetchRunningJobCounts();
+        tailors = loadedTailors
+            .where((t) => !BrowseService.isTailorFull(t, runningJobCounts))
+            .toList();
       } catch (e) {
         tailors = [];
       }
