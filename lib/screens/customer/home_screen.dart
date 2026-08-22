@@ -4,7 +4,6 @@ import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_fabrics_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_tailors_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
@@ -12,6 +11,8 @@ import 'package:sketch2stitch/widgets/cart_icon_button.dart';
 import 'package:sketch2stitch/services/browse_service.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';
 import 'package:sketch2stitch/services/customer_service.dart';
+import 'package:sketch2stitch/services/cart_service.dart';
+import 'package:sketch2stitch/utils/geo_utils.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../widgets/dashboard_drawer.dart';
@@ -61,6 +62,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   List<Tailor> _allTailors = [];
   List<Retailer> _allRetailers = [];
   Map<String, String> _retailerNames = {};
+  GeoPoint? _customerLocation;
   bool _isLoading = true;
   bool _hasError = false;
   String _errorMessage = '';
@@ -100,6 +102,19 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
       if (retailer.id == retailerId) return retailer.location;
     }
     return null;
+  }
+
+  /// Great-circle distance from the customer's saved location to [target],
+  /// or null if either location is unavailable.
+  double? _distanceKmTo(GeoPoint? target) {
+    if (_customerLocation == null || target == null) return null;
+    return GeoUtils.distanceKm(_customerLocation!, target);
+  }
+
+  /// Same base + per-km delivery estimate used at checkout
+  /// (CartService.deliveryChargeFor), formatted for card display.
+  String _deliveryChargeLabel(GeoPoint? target) {
+    return 'Tk ${CartService.deliveryChargeFor(_distanceKmTo(target)).toStringAsFixed(0)}';
   }
 
   @override
@@ -155,6 +170,19 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         retailers = [];
       }
 
+      // Load the customer's saved location, used to estimate delivery
+      // charge/distance on tailor, retailer and product cards.
+      GeoPoint? customerLocation;
+      if (_currentUserId != null) {
+        try {
+          final customer =
+              await _customerService.streamCustomerProfile(_currentUserId!).first;
+          customerLocation = customer?.location;
+        } catch (e) {
+          customerLocation = null;
+        }
+      }
+
       // Load retailer names
       Map<String, String> names = {};
       try {
@@ -189,6 +217,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         _allTailors = tailors;
         _allRetailers = retailers;
         _retailerNames = names;
+        _customerLocation = customerLocation;
         _isLoading = false;
         _hasError = false;
       });
@@ -1464,7 +1493,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                               ),
                               const SizedBox(width: 2),
                               Text(
-                                'Tk 50',
+                                _deliveryChargeLabel(_getRetailerLocation(product.retailerId)),
                                 style: TextStyle(
                                   fontSize: 10,
                                   color: Colors.grey[600],
@@ -1491,7 +1520,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                             ),
                             const SizedBox(width: 2),
                             Text(
-                              'Tk 50',
+                              _deliveryChargeLabel(_getRetailerLocation(product.retailerId)),
                               style: TextStyle(
                                 fontSize: 10,
                                 color: Colors.grey[600],
@@ -1744,7 +1773,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                         ),
                       ),
                       // Only show distance for customers
-                      if (!isTailorOrRetailer) ...[
+                      if (!isTailorOrRetailer && _distanceKmTo(tailor.location) != null) ...[
                         const SizedBox(width: 4),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -1756,7 +1785,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            '1.8 km',
+                            '${_distanceKmTo(tailor.location)!.toStringAsFixed(1)} km',
                             style: TextStyle(
                               fontSize: 9,
                               color: Colors.green.shade800,
@@ -1782,7 +1811,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                           ),
                           const SizedBox(width: 2),
                           Text(
-                            'Tk 50',
+                            _deliveryChargeLabel(tailor.location),
                             style: TextStyle(
                               fontSize: 10,
                               color: Colors.grey[600],
@@ -1965,7 +1994,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                         ),
                       ),
                       // Only show distance for customers
-                      if (!isTailorOrRetailer) ...[
+                      if (!isTailorOrRetailer && _distanceKmTo(retailer.location) != null) ...[
                         const SizedBox(width: 4),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -1977,7 +2006,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            '2.5 km',
+                            '${_distanceKmTo(retailer.location)!.toStringAsFixed(1)} km',
                             style: TextStyle(
                               fontSize: 9,
                               color: Colors.green.shade800,
@@ -2003,7 +2032,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                           ),
                           const SizedBox(width: 2),
                           Text(
-                            'Tk 50',
+                            _deliveryChargeLabel(retailer.location),
                             style: TextStyle(
                               fontSize: 10,
                               color: Colors.grey[600],
