@@ -18,12 +18,13 @@ class ReviewService {
       final snapshot = await _db
           .collection(_reviewsCollection)
           .where('customerId', isEqualTo: customerId)
-          .orderBy('createdAt', descending: true)
           .get();
 
-      return snapshot.docs
-          .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
+      final reviews = snapshot.docs
+          .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
           .toList();
+      reviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return reviews;
     } catch (e) {
       debugPrint('Error fetching review history: $e');
       return [];
@@ -68,18 +69,117 @@ class ReviewService {
           .collection(_reviewsCollection)
           .where('customerId', isEqualTo: customerId)
           .where('targetRole', isEqualTo: recipientType.name)
-          .orderBy('createdAt', descending: true)
           .get();
 
-      return snapshot.docs
-          .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
+      final reviews = snapshot.docs
+          .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
           .toList();
+      reviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return reviews;
     } catch (e) {
       debugPrint('Error filtering reviews: $e');
       return [];
     }
   }
 
+  /// Streams real-time reviews for a specific customer with joined details.
+  /// Uses memory cache and parallel fetching to optimize performance.
+  Stream<List<Map<String, dynamic>>> streamDetailedCustomerReviews(String customerId) {
+    return _db
+        .collection(_reviewsCollection)
+        .where('customerId', isEqualTo: customerId)
+        .snapshots()
+        .asyncMap((snap) async {
+      final Map<String, Future<Map<String, dynamic>>> retailerCache = {};
+      final Map<String, Future<Map<String, dynamic>>> tailorCache = {};
+      final Map<String, Future<Map<String, dynamic>>> productCache = {};
+
+      Future<Map<String, dynamic>> getRetailer(String id) {
+        return retailerCache.putIfAbsent(id, () async {
+          final doc = await _db.collection('Retailer').doc(id).get();
+          return doc.data() ?? {'shopName': 'Supplier'};
+        });
+      }
+
+      Future<Map<String, dynamic>> getTailor(String id) {
+        return tailorCache.putIfAbsent(id, () async {
+          final doc = await _db.collection('Tailor').doc(id).get();
+          return doc.data() ?? {'name': 'Artisan'};
+        });
+      }
+
+      Future<Map<String, dynamic>> getProduct(String id) {
+        return productCache.putIfAbsent(id, () async {
+          final doc = await _db.collection('Products').doc(id).get();
+          return doc.data() ?? {};
+        });
+      }
+
+      final List<Map<String, dynamic>> results = await Future.wait(snap.docs.map((doc) async {
+        final data = doc.data();
+        final String targetId = data['targetId'] ?? '';
+        final String targetRole = data['targetRole'] ?? '';
+        final String? orderId = data['orderId'];
+
+        String recipientName = 'Recipient';
+        if (targetRole == ReviewTargetRole.retailer.name) {
+          final rData = await getRetailer(targetId);
+          recipientName = rData['shopName'] ?? 'Supplier';
+        } else if (targetRole == ReviewTargetRole.tailor.name) {
+          final tData = await getTailor(targetId);
+          recipientName = tData['name'] ?? 'Artisan';
+        }
+
+        List<Map<String, dynamic>> products = [];
+        if (orderId != null && targetRole == ReviewTargetRole.retailer.name) {
+          // Fetch products associated with this supplier in this order.
+          final subSnap = await _db.collection('Sub-orders')
+              .where('orderId', isEqualTo: orderId)
+              .where('retailerId', isEqualTo: targetId)
+              .get();
+          
+          for (var sDoc in subSnap.docs) {
+            final iSnap = await _db.collection('Order-Items')
+                .where('subOrderId', isEqualTo: sDoc.id)
+                .get();
+            
+            final List<Map<String, dynamic>?> subOrderProducts = await Future.wait(iSnap.docs.map((iDoc) async {
+              final productId = iDoc.data()['productId'];
+              final optionId = iDoc.data()['optionId'];
+              
+              final pData = await getProduct(productId);
+              if (pData.isEmpty) return null;
+
+              final options = pData['colorOptions'] as List?;
+              final option = options?.firstWhere((o) => o['optionId'] == optionId, orElse: () => null);
+              
+              final rawImages = (option?['image'] as List?)?.map((e) => e.toString()).toList() ?? [];
+              final resolvedImages = _resolveImageUrls(rawImages);
+
+              return {
+                'name': pData['productName'] ?? 'Product',
+                'image': resolvedImages.isNotEmpty ? resolvedImages.first : '',
+                'price': (option?['price'] ?? 0).toDouble(),
+              };
+            }).toList());
+            
+            products.addAll(subOrderProducts.whereType<Map<String, dynamic>>());
+          }
+        }
+
+        return {
+          'review': Review.fromJson({...data, 'id': doc.id}),
+          'recipientName': recipientName,
+          'products': products,
+        };
+      }));
+
+      results.sort((a, b) => (b['review'] as Review).createdAt.compareTo((a['review'] as Review).createdAt));
+      return results;
+    });
+  }
+
+  /// Submits a general review for an order recipient.
   Future<void> submitReview({
     required String orderId,
     required String customerId,
@@ -99,11 +199,124 @@ class ReviewService {
         'createdAt': DateTime.now().toIso8601String(),
       };
 
-      await _db.collection(_reviewsCollection).add(data);
+      // One review per (order, recipient). The screens hide the form once a
+      // review exists, but that check runs against a stream that has not
+      // refreshed yet during the submit round-trip — so a double tap wrote
+      // two documents, and both then counted towards the recipient's
+      // average. Overwrite the existing one instead of adding a second.
+      final existing = await _db
+          .collection(_reviewsCollection)
+          .where('orderId', isEqualTo: orderId)
+          .where('targetId', isEqualTo: recipientId)
+          .where('targetRole', isEqualTo: type.name)
+          .limit(1)
+          .get();
+
+      if (existing.docs.isNotEmpty) {
+        await existing.docs.first.reference.update(data);
+      } else {
+        await _db.collection(_reviewsCollection).add(data);
+      }
+
+      // A review only counts for something once it moves the number the
+      // rest of the app ranks and filters on. Best-effort: the review is
+      // already saved, so a failure here must not read as a failed
+      // submission — the next review, or the recipient opening their own
+      // reviews screen, recomputes it anyway.
+      try {
+        await recalculateTargetRating(recipientId, type);
+      } catch (e) {
+        debugPrint('Error syncing rating after review: $e');
+      }
     } catch (e) {
       debugPrint('Error submitting review: $e');
       rethrow;
     }
+  }
+
+  // ─── Rating write-back ───────────────────────────────────────────────────
+
+  /// Profile collection whose `rating` field [role] is ranked by, or null
+  /// for roles that have no profile document to write back to.
+  static String? _profileCollectionFor(ReviewTargetRole role) {
+    switch (role) {
+      case ReviewTargetRole.tailor:
+        return 'Tailor';
+      case ReviewTargetRole.retailer:
+        return 'Retailer';
+      case ReviewTargetRole.product:
+        return null;
+    }
+  }
+
+  /// Recomputes [targetId]'s average from every review they have received
+  /// and writes it onto their profile document.
+  ///
+  /// `Tailor.rating` / `Retailer.rating` are what BrowseService sorts and
+  /// filters on (`minRating`, `ratingHighToLow`) and what the "Top rated"
+  /// badge tests at >= 4.8. Reviews used to land in `Reviews` and never
+  /// reach either field, so every account kept the 5.0 stamped on it at
+  /// registration no matter what customers actually said.
+  Future<void> recalculateTargetRating(
+    String targetId,
+    ReviewTargetRole role,
+  ) async {
+    final collection = _profileCollectionFor(role);
+    if (collection == null || targetId.isEmpty) return;
+
+    final snap = await _db
+        .collection(_reviewsCollection)
+        .where('targetId', isEqualTo: targetId)
+        .where('targetRole', isEqualTo: role.name)
+        .get();
+
+    final ratings = snap.docs
+        .map((d) => (d.data()['rating'] as num?)?.toDouble())
+        .whereType<double>()
+        .toList();
+
+    await _writeRating(
+      collection,
+      targetId,
+      ratings.isEmpty ? 0.0 : ratings.reduce((a, b) => a + b) / ratings.length,
+    );
+  }
+
+  /// Writes [average] onto the profile doc, rounded to 2dp and skipped when
+  /// the stored value already matches — the stat streams below call this on
+  /// every snapshot, and an unconditional write would loop each listener
+  /// against its own update.
+  Future<void> _writeRating(
+    String collection,
+    String id,
+    double average,
+  ) async {
+    final rounded = double.parse(average.toStringAsFixed(2));
+    final ref = _db.collection(collection).doc(id);
+    final current = (await ref.get()).data()?['rating'];
+    if (current is num && (current.toDouble() - rounded).abs() < 0.005) return;
+    await ref.update({'rating': rounded});
+  }
+
+  /// Fire-and-forget write-back for the owner-scoped stat streams, which
+  /// have already computed the exact average the profile field should hold.
+  /// The recipient is the only one allowed to write their own profile, so
+  /// letting them heal it on sight also corrects accounts that collected
+  /// reviews before [recalculateTargetRating] existed — no migration needed.
+  ///
+  /// Skips empty snapshots: a stream can briefly deliver zero docs while a
+  /// query warms up, and zeroing a real rating on that would be worse than
+  /// leaving it one snapshot stale.
+  void _syncRatingFromStats(
+    String collection,
+    String id,
+    int total,
+    double average,
+  ) {
+    if (total == 0) return;
+    _writeRating(collection, id, average).catchError((Object e) {
+      debugPrint('Error syncing $collection/$id rating: $e');
+    });
   }
 
   Future<void> submitTailorReview(
@@ -130,11 +343,14 @@ class ReviewService {
         .collection(_reviewsCollection)
         .where('targetId', isEqualTo: retailerId)
         .where('targetRole', isEqualTo: ReviewTargetRole.retailer.name)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
-            .toList());
+        .map((snap) {
+      final list = snap.docs
+          .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
+          .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    });
   }
 
   Stream<List<Map<String, dynamic>>> streamDetailedShopReviews(String retailerId) {
@@ -156,8 +372,16 @@ class ReviewService {
             final String? orderId = data['orderId'] as String?;
 
             if (!customerNameCache.containsKey(customerId)) {
-              final customerDoc = await _db.collection('Customer').doc(customerId).get();
-              customerNameCache[customerId] = customerDoc.exists ? (customerDoc.data()?['name'] ?? 'Anonymous') : 'Anonymous';
+              // `.doc('')` throws rather than returning a missing document,
+              // and the catch below drops the whole review — so a review with
+              // no customerId vanished from the list instead of simply
+              // showing as "Anonymous".
+              if (customerId.isEmpty) {
+                customerNameCache[customerId] = 'Anonymous';
+              } else {
+                final customerDoc = await _db.collection('Customer').doc(customerId).get();
+                customerNameCache[customerId] = customerDoc.exists ? (customerDoc.data()?['name'] ?? 'Anonymous') : 'Anonymous';
+              }
             }
             final customerName = customerNameCache[customerId]!;
 
@@ -228,7 +452,13 @@ class ReviewService {
         }),
       );
 
-      return results.whereType<Map<String, dynamic>>().toList();
+      final validResults = results.whereType<Map<String, dynamic>>().toList();
+      validResults.sort((a, b) {
+        final dateA = (a['review'] as Map<String, dynamic>)['createdAt']?.toString() ?? '';
+        final dateB = (b['review'] as Map<String, dynamic>)['createdAt']?.toString() ?? '';
+        return dateB.compareTo(dateA);
+      });
+      return validResults;
     });
   }
 
@@ -258,6 +488,8 @@ class ReviewService {
         int star = r.rating.floor().clamp(1, 5);
         distribution[star] = (distribution[star] ?? 0) + 1;
       }
+
+      _syncRatingFromStats('Retailer', retailerId, total, avg);
 
       return {
         'total': total,
@@ -347,12 +579,18 @@ class ReviewService {
         query = query.where('rating', isGreaterThanOrEqualTo: ratingFilter.toDouble());
       }
 
-      query = query.orderBy(sortBy, descending: descending);
-
       final snapshot = await query.get();
-      return snapshot.docs
+      final reviews = snapshot.docs
           .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
           .toList();
+          
+      reviews.sort((a, b) {
+        if (sortBy == 'rating') {
+           return descending ? b.rating.compareTo(a.rating) : a.rating.compareTo(b.rating);
+        }
+        return descending ? b.createdAt.compareTo(a.createdAt) : a.createdAt.compareTo(b.createdAt);
+      });
+      return reviews;
     } catch (e) {
       debugPrint('Error fetching tailor reviews: $e');
       return [];
@@ -409,51 +647,34 @@ class ReviewService {
         query = query.where('rating', isGreaterThanOrEqualTo: filter.toDouble());
       }
 
-      query = query.orderBy('createdAt', descending: true).limit(limit);
-
-      if (startAfter != null) {
-        query = query.startAfterDocument(startAfter);
-      }
-
       final snapshot = await query.get();
-
-      List<Review> reviews = snapshot.docs
+      final reviews = snapshot.docs
           .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
           .toList();
-      
-      // If reviews found, return them
+
+      reviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       if (reviews.isNotEmpty) {
-        return reviews;
+        return reviews.take(limit).toList();
       }
-      
+
       // FALLBACK: Try case-insensitive match
-      
       final allReviewsSnapshot = await _db
           .collection(_reviewsCollection)
           .where('targetRole', isEqualTo: targetRole.name)
           .get();
-      
-      
-      List<Review> matchedReviews = [];
+
+      final List<Review> matchedReviews = [];
       for (var doc in allReviewsSnapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
         final String? docTargetId = data['targetId'] as String?;
-        
+
         if (docTargetId != null && docTargetId.toLowerCase() == targetId.toLowerCase()) {
           matchedReviews.add(Review.fromJson({...data, 'id': doc.id}));
         }
       }
-      
-      if (matchedReviews.isNotEmpty) {
-        matchedReviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        if (matchedReviews.length > limit) {
-          return matchedReviews.sublist(0, limit);
-        }
-        return matchedReviews;
-      }
-      
-      return [];
-      
+
+      matchedReviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return matchedReviews.take(limit).toList();
     } catch (e) {
       debugPrint('Error fetching reviews by target: $e');
       debugPrint('Stack trace: ${StackTrace.current}');
@@ -507,11 +728,14 @@ class ReviewService {
         .collection(_reviewsCollection)
         .where('targetId', isEqualTo: tailorId)
         .where('targetRole', isEqualTo: ReviewTargetRole.tailor.name)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
-            .toList());
+        .map((snap) {
+      final list = snap.docs
+          .map((doc) => Review.fromJson({...doc.data(), 'id': doc.id}))
+          .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    });
   }
 
   Stream<List<Map<String, dynamic>>> streamDetailedTailorReviews(String tailorId) {
@@ -519,7 +743,6 @@ class ReviewService {
         .collection(_reviewsCollection)
         .where('targetId', isEqualTo: tailorId)
         .where('targetRole', isEqualTo: ReviewTargetRole.tailor.name)
-        .orderBy('createdAt', descending: true)
         .snapshots()
         .asyncMap((snapshot) async {
       final Map<String, String> customerNameCache = {};
@@ -531,8 +754,16 @@ class ReviewService {
             final String customerId = (data['customerId'] ?? '').toString();
 
             if (!customerNameCache.containsKey(customerId)) {
-              final customerDoc = await _db.collection('Customer').doc(customerId).get();
-              customerNameCache[customerId] = customerDoc.exists ? (customerDoc.data()?['name'] ?? 'Anonymous') : 'Anonymous';
+              // `.doc('')` throws rather than returning a missing document,
+              // and the catch below drops the whole review — so a review with
+              // no customerId vanished from the list instead of simply
+              // showing as "Anonymous".
+              if (customerId.isEmpty) {
+                customerNameCache[customerId] = 'Anonymous';
+              } else {
+                final customerDoc = await _db.collection('Customer').doc(customerId).get();
+                customerNameCache[customerId] = customerDoc.exists ? (customerDoc.data()?['name'] ?? 'Anonymous') : 'Anonymous';
+              }
             }
             final customerName = customerNameCache[customerId]!;
 
@@ -547,7 +778,13 @@ class ReviewService {
         }),
       );
 
-      return results.whereType<Map<String, dynamic>>().toList();
+      final validResults = results.whereType<Map<String, dynamic>>().toList();
+      validResults.sort((a, b) {
+        final dateA = (a['review'] as Map<String, dynamic>)['createdAt']?.toString() ?? '';
+        final dateB = (b['review'] as Map<String, dynamic>)['createdAt']?.toString() ?? '';
+        return dateB.compareTo(dateA);
+      });
+      return validResults;
     });
   }
 
@@ -577,6 +814,8 @@ class ReviewService {
         int star = r.rating.floor().clamp(1, 5);
         distribution[star] = (distribution[star] ?? 0) + 1;
       }
+
+      _syncRatingFromStats('Tailor', tailorId, total, avg);
 
       return {
         'total': total,

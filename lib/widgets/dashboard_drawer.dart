@@ -18,7 +18,7 @@ import '../screens/shared/location_picker_screen.dart';
 import '../screens/tailor/portfolio_screen.dart';
 import '../screens/tailor/orders_screen.dart';
 import '../screens/customer/cart_screen.dart';
-import '../screens/customer/order_list_screen.dart';
+import '../screens/customer/orders/order_detail_screen.dart';
 import '../screens/customer/messaging/conversations_screen.dart';
 import '../utils/validation_utils.dart';
 import 'top_feedback_banner.dart';
@@ -557,7 +557,8 @@ class DrawerNavigationSection extends StatelessWidget {
                   context,
                   MaterialPageRoute(builder: (_) => const VirtualTrialScreen()),
                 );
-              } else if (item['title'] == 'My Orders') {
+              } else if (item['title'] == 'My Orders' ||
+                  item['title'] == 'Order History') {
                 if (role == UserRole.retailer) {
                   Navigator.push(
                     context,
@@ -569,7 +570,7 @@ class DrawerNavigationSection extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const OrderListScreen(),
+                      builder: (_) => const OrderDetailScreen(),
                     ),
                   );
                 } else if (role == UserRole.tailor) {
@@ -646,7 +647,7 @@ class DrawerNavigationSection extends StatelessWidget {
           {'title': 'Measurements', 'icon': Icons.straighten_rounded},
           {'title': 'Cart', 'icon': Icons.shopping_bag_outlined},
           {'title': 'Messages', 'icon': Icons.chat_bubble_outline_rounded},
-          {'title': 'My Orders', 'icon': Icons.receipt_long_rounded},
+          {'title': 'Order History', 'icon': Icons.receipt_long_rounded},
         ];
       case UserRole.tailor:
         return [

@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../models/order.dart';
 import '../../models/sub_order.dart';
 import '../../models/tailor_job.dart';
 import 'package:sketch2stitch/models/user_role.dart';
@@ -17,7 +18,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/bkash_service.dart';
 import '../../widgets/top_feedback_banner.dart';
 import '../../services/measurement_service.dart';
+import '../../services/retailer_service.dart';
 import '../../services/tailor_service.dart';
+import '../../services/tailoring_service.dart';
 import '../../services/user_session.dart';
 import 'bkash_payment_screen.dart';
 
@@ -63,9 +66,23 @@ class TailoringSetupCallbacks {
   final Future<void> Function() onRejectTailorJob;
 
   final Future<void> Function() onPayTailor;
+
+  /// The 72h selection window closed with no confirmed tailor — the order
+  /// falls back to direct retailer → customer delivery. Terminal.
   final Future<void> Function() onTailorSearchExpired;
 
+  /// The tailor let their 12h response window lapse without quoting. NOT
+  /// terminal: the job dies but the order goes back to
+  /// `awaiting_tailor_search` so another tailor can be hired inside
+  /// whatever is left of the 72h window.
+  final Future<void> Function() onQuoteRequestExpired;
+
   final Future<OrderResumeState?> Function() onFetchResumeState;
+
+  /// Live version of [onFetchResumeState]. The quote is written on the
+  /// tailor's device, so this screen has to hear about it from Firestore
+  /// rather than re-asking on a timer.
+  final Stream<OrderResumeState?> Function() onWatchResumeState;
 
   const TailoringSetupCallbacks({
     required this.onSkipTailoring,
@@ -75,7 +92,9 @@ class TailoringSetupCallbacks {
     required this.onRejectTailorJob,
     required this.onPayTailor,
     required this.onTailorSearchExpired,
+    required this.onQuoteRequestExpired,
     required this.onFetchResumeState,
+    required this.onWatchResumeState,
   });
 }
 
@@ -109,6 +128,16 @@ class OrderResumeState {
   final String? rejectionReason;
   final String? tailorPaymentStatus;
 
+  /// `Orders.status`. An 'expired' job means two different things depending
+  /// on this: the 72h selection window closed (order 'processing' — direct
+  /// delivery, nothing left to do) or the tailor let their 12h response
+  /// window lapse (order back to 'awaiting_tailor_search' — pick someone
+  /// else). Without it the screen showed "order complete" for both.
+  final String? orderStatus;
+
+  /// When the current tailor's 12h window to answer with a quote closes.
+  final DateTime? quoteResponseDeadline;
+
   const OrderResumeState({
     this.tailorSelectionDeadline,
     this.tailorJobId,
@@ -120,6 +149,8 @@ class OrderResumeState {
     this.estimatedDeliveryDate,
     this.rejectionReason,
     this.tailorPaymentStatus,
+    this.orderStatus,
+    this.quoteResponseDeadline,
   });
 }
 
@@ -198,25 +229,30 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
 
   DateTime? _tailorSelectionDeadline;
 
-  /// Polls the backend while the customer is waiting on a tailor.
-  ///
-  /// Two jobs, both previously missing:
-  ///  * the tailor's quote arrives on THEIR device, and this screen only
-  ///    read the job once on open — so a waiting customer sat on a stale
-  ///    "waiting for quote" card until they backed out and came back in;
-  ///  * the 72h selection deadline shown on the banner was never enforced
-  ///    by anything, so an order with no tailor chosen stayed frozen
-  ///    forever instead of falling back to direct delivery.
-  ///
-  /// Deliberately a poll rather than a snapshot listener: it reuses the
-  /// existing `onFetchResumeState` callback, so no new backend plumbing
-  /// and no scheduled server job (which this project can't use) is needed.
-  Timer? _pollTimer;
+  /// When the current tailor's 12h window to answer with a quote closes.
+  DateTime? _quoteResponseDeadline;
 
-  static const Duration _pollInterval = Duration(seconds: 20);
+  /// Latest known `Orders.status`. Needed to tell the two kinds of expiry
+  /// apart — see [OrderResumeState.orderStatus].
+  String? _orderStatus;
 
-  /// Guards against a slow poll overlapping the next tick.
-  bool _polling = false;
+  /// Live job/deadline updates. The tailor's quote is written on THEIR
+  /// device, so the only way this screen learns about it is Firestore.
+  ///
+  /// This used to be a 20-second poll re-running `onFetchResumeState`,
+  /// which meant a quote could sit unseen for most of a minute while the
+  /// screen spent two reads per tick discovering nothing had changed.
+  StreamSubscription<OrderResumeState?>? _resumeSub;
+
+  /// Deadlines still need a clock: nothing is written to Firestore at the
+  /// moment a window closes, so no snapshot fires. This ticks only to check
+  /// the two deadlines — it does not re-read the job.
+  Timer? _deadlineTimer;
+
+  static const Duration _deadlineCheckInterval = Duration(seconds: 30);
+
+  /// Guards against a slow expiry write overlapping the next tick.
+  bool _checkingDeadlines = false;
 
   /// ONE tailor job for the whole order — null until a tailor is
   /// requested. Covers every sub-order listed below.
@@ -231,7 +267,13 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
       final resolvedViaTailor =
           job.status == TailorJobStatus.confirmed &&
           job.tailorPaymentStatus == TailorPaymentStatus.paid;
-      final resolvedViaExpiry = job.status == TailorJobStatus.expired;
+      // An 'expired' job only ends the order when the ORDER went to direct
+      // delivery with it. A job expired by the 12h quote window leaves the
+      // order in awaiting_tailor_search with the customer free to hire
+      // someone else — treating that as "resolved" popped the
+      // order-complete dialog over a search that was still very much open.
+      final resolvedViaExpiry = job.status == TailorJobStatus.expired &&
+          _orderStatus == OrderStatus.processing.toValue;
       if (resolvedViaTailor || resolvedViaExpiry) return true;
     }
     // No job at all, and every sub-order is direct-to-customer anyway.
@@ -339,6 +381,44 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     } catch (_) {}
   }
 
+  /// Shop names for `widget.subOrders`, keyed by retailerId. Without this
+  /// the order summary on the Find Tailor step printed the raw Firestore
+  /// document id at the customer ("Retailer: 8kJx2mQp...").
+  final Map<String, String> _retailerNames = {};
+
+  Future<void> _loadRetailerNames() async {
+    final ids = widget.subOrders.map((s) => s.retailerId).toSet()
+      ..removeWhere((id) => id.isEmpty);
+    if (ids.isEmpty) return;
+
+    final service = RetailerService();
+    for (final id in ids) {
+      try {
+        final retailer = await service.getRetailerProfile(id);
+        final name = retailer?.shopName.trim();
+        if (name != null && name.isNotEmpty) _retailerNames[id] = name;
+      } catch (e) {
+        debugPrint('[TailoringSetup] retailer name lookup failed for $id: $e');
+      }
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _loadMeasurementFallback() async {
+    final customerId = UserSession.instance.uid;
+    if (customerId == null) return;
+    try {
+      final m = await MeasurementService().getMeasurement(customerId);
+      if (!mounted || m == null) return;
+      setState(() {
+        _savedMeasurements = [m];
+        _selectedMeasurement = m;
+      });
+    } catch (_) {
+      // Step 2 still offers to create one, so a failed read is not fatal.
+    }
+  }
+
   Future<void> _loadLocalProgress() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -366,14 +446,22 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     super.initState();
     if (_savedMeasurements.isNotEmpty) {
       _selectedMeasurement = _savedMeasurements.first;
+    } else {
+      // Not every entry point has one to hand over — OrderDetailScreen passes
+      // `const []`. Without this the customer reached the tailor step with no
+      // measurement selected and the job was created with an empty
+      // measurementId, so the tailor opened it and saw nothing to sew to.
+      _loadMeasurementFallback();
     }
     _initMeasurementControllers();
+    _loadRetailerNames();
     _resumeFromBackend();
   }
 
   @override
   void dispose() {
-    _pollTimer?.cancel();
+    _deadlineTimer?.cancel();
+    _resumeSub?.cancel();
     for (final c in _measurementControllers.values) {
       c.dispose();
     }
@@ -390,29 +478,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
 
       setState(() {
         if (resume != null) {
-          if (resume.tailorSelectionDeadline != null) {
-            _tailorSelectionDeadline = resume.tailorSelectionDeadline;
-          }
-
-          if (resume.tailorJobId != null && resume.status != null) {
-            _tailorJob = TailorJob(
-              id: resume.tailorJobId!,
-              orderId: widget.orderId,
-              tailorId: resume.tailorId ?? '',
-              measurementId: _selectedMeasurement?.id ?? '',
-              status: TailorJobStatus.fromValue(resume.status!),
-              requestedAt: resume.requestedAt,
-              quoteAmount: resume.quoteAmount,
-              deliveryCharge: resume.deliverCharge,
-              estimatedDeliveryDate: resume.estimatedDeliveryDate,
-              rejectionReason: resume.rejectionReason,
-              quoteStatus: QuoteStatus.notSent,
-              tailorPaymentStatus: resume.tailorPaymentStatus != null
-                  ? TailorPaymentStatus.fromValue(resume.tailorPaymentStatus!)
-                  : TailorPaymentStatus.unpaid,
-            );
-          }
-
+          _applyResume(resume);
           if (_tailorJob != null) {
             _currentStep = 3; // a job exists → jump to Find Tailor step
           }
@@ -432,76 +498,105 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
       if (mounted) setState(() => _resuming = false);
     }
 
-    _startPolling();
+    _startWatching();
+
+    // Both windows may have closed while the app was shut. Settle them
+    // now rather than waiting a full tick for the first timer fire.
+    await _checkDeadlines();
   }
 
-  // ─── Waiting-state polling ─────────────────────────────────────────
+  // ─── Waiting-state updates ─────────────────────────────────────────
 
-  /// Only worth running while the order is still undecided. Once it is
+  /// Subscribes to live job/deadline changes and starts the deadline clock.
+  /// Only worth running while the order is still undecided — once it is
   /// resolved (paid, or expired to direct delivery) there is nothing left
   /// to watch for.
-  void _startPolling() {
-    _pollTimer?.cancel();
+  void _startWatching() {
     if (!mounted || _isResolved) return;
-    _pollTimer = Timer.periodic(_pollInterval, (_) => _poll());
+
+    _resumeSub?.cancel();
+    _resumeSub = widget.callbacks.onWatchResumeState().listen(
+      (resume) {
+        if (!mounted || resume == null) return;
+        // Only the job and the deadlines are refreshed here — NOT
+        // _currentStep. The customer may be part-way through editing
+        // designs or measurements, and yanking them to another step
+        // mid-update would lose that work.
+        setState(() => _applyResume(resume));
+
+        if (_isResolved) {
+          _stopWatching();
+          _checkResolvedAndMaybeComplete();
+        }
+      },
+      onError: (Object e) {
+        // Not worth interrupting the customer over — the deadline timer
+        // still runs, and reopening the screen re-reads everything.
+        debugPrint('[TailoringSetup] resume stream failed: \$e');
+      },
+    );
+
+    _deadlineTimer?.cancel();
+    _deadlineTimer =
+        Timer.periodic(_deadlineCheckInterval, (_) => _checkDeadlines());
   }
 
-  Future<void> _poll() async {
-    if (!mounted || _polling) return;
+  void _stopWatching() {
+    _deadlineTimer?.cancel();
+    _resumeSub?.cancel();
+    _resumeSub = null;
+  }
+
+  /// Copies a resume payload onto the screen's state. Call inside setState.
+  void _applyResume(OrderResumeState resume) {
+    _orderStatus = resume.orderStatus ?? _orderStatus;
+    if (resume.tailorSelectionDeadline != null) {
+      _tailorSelectionDeadline = resume.tailorSelectionDeadline;
+    }
+    _quoteResponseDeadline = resume.quoteResponseDeadline;
+
+    if (resume.tailorJobId != null && resume.status != null) {
+      _tailorJob = TailorJob(
+        id: resume.tailorJobId!,
+        orderId: widget.orderId,
+        tailorId: resume.tailorId ?? '',
+        measurementId: _selectedMeasurement?.id ?? '',
+        status: TailorJobStatus.fromValue(resume.status!),
+        requestedAt: resume.requestedAt,
+        quoteAmount: resume.quoteAmount,
+        deliveryCharge: resume.deliverCharge,
+        estimatedDeliveryDate: resume.estimatedDeliveryDate,
+        rejectionReason: resume.rejectionReason,
+        quoteResponseDeadline: resume.quoteResponseDeadline,
+        quoteStatus: QuoteStatus.notSent,
+        tailorPaymentStatus: resume.tailorPaymentStatus != null
+            ? TailorPaymentStatus.fromValue(resume.tailorPaymentStatus!)
+            : TailorPaymentStatus.unpaid,
+      );
+    }
+  }
+
+  /// Nothing is written to Firestore at the instant a window closes, so no
+  /// snapshot can announce it — a clock has to notice. On the free tier
+  /// there is no scheduled server job either, which makes the customer's
+  /// own device the scheduler for their own order.
+  Future<void> _checkDeadlines() async {
+    if (!mounted || _checkingDeadlines) return;
 
     if (_isResolved) {
-      _pollTimer?.cancel();
+      _stopWatching();
       return;
     }
 
-    _polling = true;
+    _checkingDeadlines = true;
     try {
-      // The deadline has to be checked before re-reading, because expiring
-      // the search is itself a write that changes what we would read.
+      // 72h first — it is the terminal one and outranks the 12h window.
       if (await _maybeExpireTailorSearch()) return;
-
-      final resume = await widget.callbacks.onFetchResumeState();
-      if (!mounted || resume == null) return;
-
-      // Only the job and the deadline are refreshed here — NOT _currentStep.
-      // The customer may be part-way through editing designs or
-      // measurements, and yanking them to another step mid-poll would lose
-      // that work.
-      if (!mounted) return;
-      setState(() {
-        if (resume.tailorSelectionDeadline != null) {
-          _tailorSelectionDeadline = resume.tailorSelectionDeadline;
-        }
-        if (resume.tailorJobId != null && resume.status != null) {
-          _tailorJob = TailorJob(
-            id: resume.tailorJobId!,
-            orderId: widget.orderId,
-            tailorId: resume.tailorId ?? '',
-            measurementId: _selectedMeasurement?.id ?? '',
-            status: TailorJobStatus.fromValue(resume.status!),
-            requestedAt: resume.requestedAt,
-            quoteAmount: resume.quoteAmount,
-            deliveryCharge: resume.deliverCharge,
-            estimatedDeliveryDate: resume.estimatedDeliveryDate,
-            rejectionReason: resume.rejectionReason,
-            quoteStatus: QuoteStatus.notSent,
-            tailorPaymentStatus: resume.tailorPaymentStatus != null
-                ? TailorPaymentStatus.fromValue(resume.tailorPaymentStatus!)
-                : TailorPaymentStatus.unpaid,
-          );
-        }
-      });
-
-      if (_isResolved) {
-        _pollTimer?.cancel();
-        _checkResolvedAndMaybeComplete();
-      }
+      await _maybeExpireQuoteRequest();
     } catch (e) {
-      // A failed poll is not worth interrupting the customer over — the
-      // next tick will try again.
-      debugPrint('[TailoringSetup] poll failed: $e');
+      debugPrint('[TailoringSetup] deadline check failed: \$e');
     } finally {
-      _polling = false;
+      _checkingDeadlines = false;
     }
   }
 
@@ -512,12 +607,14 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     final deadline = _tailorSelectionDeadline;
     if (deadline == null || DateTime.now().isBefore(deadline)) return false;
 
-    // A job the customer already paid for is resolved, not expired — and
-    // one still being quoted has beaten the deadline.
+    // A job the customer already paid for is settled, not expired. A quote
+    // sitting unanswered is NOT exempt — the banner's whole promise is that
+    // an order with no confirmed tailor ships direct.
     final job = _tailorJob;
     if (job != null &&
         (job.status == TailorJobStatus.confirmed ||
-            job.status == TailorJobStatus.quoted)) {
+            job.status == TailorJobStatus.inProgress ||
+            job.status == TailorJobStatus.jobCompleted)) {
       return false;
     }
 
@@ -525,14 +622,44 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     if (!mounted) return true;
 
     setState(() {
+      _orderStatus = OrderStatus.processing.toValue;
       _tailorJob = job?.copyWith(status: TailorJobStatus.expired);
     });
-    _pollTimer?.cancel();
+    _stopWatching();
     _showOrderCompleteDialog(
       'No tailor was confirmed in time, so your order was sent for direct '
       'delivery.',
     );
     return true;
+  }
+
+  /// The tailor let their 12h window lapse without quoting. The job dies but
+  /// the order does NOT — the customer is handed back to the tailor search
+  /// with whatever is left of their 72h.
+  Future<void> _maybeExpireQuoteRequest() async {
+    final job = _tailorJob;
+    if (job == null || job.status != TailorJobStatus.pending) return;
+
+    final deadline = _quoteResponseDeadline ??
+        job.requestedAt?.add(TailoringService.tailorQuoteWindow);
+    if (deadline == null || DateTime.now().isBefore(deadline)) return;
+
+    await widget.callbacks.onQuoteRequestExpired();
+    if (!mounted) return;
+
+    setState(() {
+      _orderStatus = OrderStatus.awaitingTailorSearch.toValue;
+      _quoteResponseDeadline = null;
+      _tailorJob = job.copyWith(
+        status: TailorJobStatus.expired,
+        rejectionReason: 'The tailor did not respond in time.',
+      );
+    });
+    AppFeedback.show(
+      context,
+      "This tailor didn't respond in time. You can request another one.",
+      isError: true,
+    );
   }
 
   // ─── Step 1 actions ────────────────────────────────────────────────
@@ -546,7 +673,16 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   }
 
   Future<void> _continueToTailor() async {
-    final deadline = widget.orderDate.add(const Duration(hours: 72));
+    // Anchored to NOW, not to orderDate. An order sits in
+    // 'awaiting_confirmation' until the customer opens this screen, so a
+    // customer who came back two days after checking out was handed a
+    // deadline that had already passed — the very next poll expired their
+    // search and shipped the fabric direct before they could pick anyone.
+    // An existing deadline is reused so re-entering this step can't quietly
+    // extend a window that is already running — and since placeOrder() now
+    // stamps one at checkout, that is the normal path.
+    final deadline = _tailorSelectionDeadline ??
+        DateTime.now().add(TailoringService.tailorSelectionWindow);
     await _withLoading(() async {
       await widget.callbacks.onContinueToTailor(deadline);
     });
@@ -658,6 +794,18 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   }
 
   Future<void> _requestTailorJob({required String tailorId}) async {
+    // An empty measurementId reaches the tailor as "no measurements at all",
+    // which they cannot sew from — better to stop here than to create a job
+    // that has to be cancelled.
+    if (_selectedMeasurement == null) {
+      AppFeedback.show(
+        context,
+        "Add your measurement profile before requesting a tailor.",
+        isError: true,
+      );
+      return;
+    }
+
     String? jobId;
     await _withLoading(() async {
       jobId = await widget.callbacks.onCreateTailorJob(
@@ -1744,7 +1892,12 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
         return _buildTailorDeclinedCard(job);
       case TailorJobStatus.expired:
       case TailorJobStatus.cancelled:
-        return _buildExpiredCard();
+        // A job expired because its tailor never answered leaves the order
+        // open — the customer keeps whatever is left of their 72h and can
+        // hire someone else. Only a closed SELECTION window is terminal.
+        return _orderStatus == OrderStatus.processing.toValue
+            ? _buildExpiredCard()
+            : _buildQuoteTimedOutCard();
     }
   }
 
@@ -1769,13 +1922,30 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              "Retailer: ${subOrder.retailerId}",
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Retailer: ${_retailerNames[subOrder.retailerId] ?? 'Loading…'}",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                // Broken out of the row total so the customer can see what
+                // this retailer's delivery actually costs them.
+                Text(
+                  "Items Tk ${subOrder.itemsSubtotal.toStringAsFixed(0)}  •  "
+                  "Delivery Tk ${subOrder.deliveryCharge.toStringAsFixed(0)}",
+                  style: const TextStyle(color: Colors.black54, fontSize: 11),
+                ),
+              ],
             ),
           ),
+          const SizedBox(width: 8),
           Text(
-            "Tk ${(subOrder.itemsSubtotal + subOrder.deliveryCharge).toStringAsFixed(0)}",
+            "Tk ${subOrder.total.toStringAsFixed(0)}",
             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           ),
         ],
@@ -1909,6 +2079,9 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   }
 
   Widget _buildPendingCard(TailorJob job) {
+    final deadline = _quoteResponseDeadline ??
+        job.requestedAt?.add(TailoringService.tailorQuoteWindow);
+
     return _statusCard(
       icon: Icons.hourglass_top_rounded,
       iconBg: Colors.blue.shade50,
@@ -1917,6 +2090,25 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
       subtitle:
           "Requested ${job.requestedAt != null ? _formatDateTime(job.requestedAt!) : ''}. "
           "You'll be able to review a quote here once your tailor responds.",
+      children: deadline == null
+          ? const []
+          : [
+              const SizedBox(height: 16),
+              _infoRow(
+                icon: Icons.timer_outlined,
+                label: "Responds by",
+                value: _formatDateTime(deadline),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "If they haven't quoted by then you can pick another tailor.",
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                  height: 1.4,
+                ),
+              ),
+            ],
     );
   }
 
@@ -2100,6 +2292,62 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
       iconColor: Colors.black54,
       title: "Tailor selection window closed",
       subtitle: "This order will be delivered directly to you instead.",
+    );
+  }
+
+  /// The tailor let their 12h response window lapse. Same recovery options
+  /// as an outright decline — the order is still open.
+  Widget _buildQuoteTimedOutCard() {
+    return _statusCard(
+      icon: Icons.timer_off_outlined,
+      iconBg: Colors.orange.shade50,
+      iconColor: Colors.orange.shade800,
+      title: "Tailor didn't respond in time",
+      subtitle:
+          "They had ${TailoringService.tailorQuoteWindow.inHours} hours to send "
+          "a quote and didn't. Request another tailor before your selection "
+          "window closes.",
+      children: [
+        const SizedBox(height: 22),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _findTailor,
+            icon: const Icon(Icons.storefront_rounded),
+            label: const Text(
+              "Find Another Tailor",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade800,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: _skipTailoring,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.black87,
+              side: BorderSide(color: Colors.grey.shade300),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+            ),
+            child: const Text(
+              "Skip Tailoring",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

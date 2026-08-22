@@ -23,6 +23,7 @@ class UserReview {
   final DateTime createdAt;
   final String comment;
   final List<ReviewProduct> products;
+  final String? orderId;
 
   const UserReview({
     required this.userName,
@@ -31,6 +32,7 @@ class UserReview {
     required this.createdAt,
     required this.comment,
     required this.products,
+    this.orderId,
   });
 }
 
@@ -108,6 +110,7 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
               image: p['image'],
               price: p['price'],
             )).toList(),
+            orderId: review.orderId,
           );
         }).toList();
         _isLoading = false;
@@ -384,9 +387,19 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            review.userName,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                review.userName,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              if (review.orderId != null)
+                Text(
+                  "Order #${review.orderId}",
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+            ],
           ),
           const SizedBox(height: 8),
           Row(
@@ -400,6 +413,11 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
                     size: 14,
                   ),
                 ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                review.rating.toStringAsFixed(1),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
               ),
               const SizedBox(width: 8),
               Text(

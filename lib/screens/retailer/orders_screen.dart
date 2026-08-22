@@ -48,14 +48,20 @@ class RetailerOrder {
   final String? tailorName;
   final List<OrderItem> items;
   final double amount;
+  /// The two halves of [amount], kept apart so the summary can show what the
+  /// grand total is actually made of. Folding them together up front was why
+  /// the total never matched the product prices listed above it and why the
+  /// delivery charge had nowhere to appear.
+  final double itemsSubtotal;
+  final double deliveryCharge;
   final DateTime orderDate;
   DateTime? deliveryDate;
   String status;
   bool isDelivered;
   final String? review;
   final double? rating;
-  final String recipientType; // "Customer" or "Tailor"
-  final String deliveryAddress;
+  final String recipientType; // "Customer", "Tailor", or "Pending"
+  final String deliveryAddress; // correct address for the recipient
 
   RetailerOrder({
     required this.id,
@@ -65,6 +71,8 @@ class RetailerOrder {
     this.tailorName,
     required this.items,
     required this.amount,
+    this.itemsSubtotal = 0,
+    this.deliveryCharge = 0,
     required this.orderDate,
     required this.status,
     required this.isDelivered,
@@ -150,7 +158,9 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
           final order = map['order'];
           final customer = map['customer'];
           final items = map['items'] as List<dynamic>;
-          final tailorName = map['tailorName'];
+          final tailorName = map['tailorName'] as String?;
+          final tailorAddress = map['tailorAddress'] as String?;
+          final destination = (subOrder['deliveryDestination'] ?? '').toString().toLowerCase();
 
           return RetailerOrder(
             id: subOrder['id'],
@@ -160,6 +170,8 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
             tailorName: tailorName,
             amount: (subOrder['itemsSubtotal'] ?? 0).toDouble() +
                 (subOrder['deliveryCharge'] ?? 0).toDouble(),
+            itemsSubtotal: (subOrder['itemsSubtotal'] ?? 0).toDouble(),
+            deliveryCharge: (subOrder['deliveryCharge'] ?? 0).toDouble(),
             orderDate: _parseDateTime(order['orderDate']),
             deliveryDate: subOrder['deliveryDate'] != null
                 ? _parseDateTime(subOrder['deliveryDate'])
@@ -167,14 +179,18 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
             status: _capitalize(subOrder['status']),
             isDelivered: subOrder['status'] == 'delivered',
             recipientType: _capitalize(subOrder['deliveryDestination']),
-            deliveryAddress: customer['address'] ?? 'No address provided',
+            // #6: When the destination is the tailor, show the tailor's address
+            // not the customer's — otherwise the retailer ships to the wrong place.
+            deliveryAddress: destination == 'tailor'
+                ? (tailorAddress ?? 'Tailor address not available')
+                : customer['address'] ?? 'No address provided',
+            // #23: wire in the customer's review so the star-rating block on
+            // delivered order cards becomes reachable.
+            rating: (map['reviewRating'] as num?)?.toDouble(),
+            review: map['reviewComment'] as String?,
             items: items.map((i) {
-              // Products store care labels the way the inventory form writes
-              // them ("Washable", "Dry Clean Only", "Iron: High"), so match
-              // on those rather than camelCase keys.
               final careSymbols = List<String>.from(i['careSymbol'] ?? []);
-              final careLower =
-                  careSymbols.map((s) => s.toLowerCase()).toList();
+              final careKeys = careSymbols.map(_careKey).toList();
               return OrderItem(
                 name: i['name'],
                 quantity: i['quantity'],
@@ -182,17 +198,11 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 color: i['color'],
                 price: (i['price'] ?? 0).toDouble(),
                 description: i['description'] ?? '',
-                canWash: careLower.any((s) => s.contains('wash')),
-                canBleach: careLower.any((s) => s.contains('bleach')),
-                canDryClean: careLower.any((s) => s.contains('dry clean')),
-                canTumbleDry: careLower.any((s) => s.contains('tumble dry')),
-                ironLevel: careSymbols
-                    .firstWhere(
-                      (s) => s.toLowerCase().startsWith('iron'),
-                      orElse: () => "Iron: Medium",
-                    )
-                    .replaceFirst(
-                        RegExp(r'^iron:\s*', caseSensitive: false), ''),
+                canWash: careKeys.any((s) => s.contains('wash')),
+                canBleach: careKeys.any((s) => s.contains('bleach')),
+                canDryClean: careKeys.any((s) => s.contains('dryclean')),
+                canTumbleDry: careKeys.any((s) => s.contains('tumbledry')),
+                ironLevel: _ironLevelLabel(careSymbols),
               );
             }).toList(),
           );
@@ -1150,6 +1160,12 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
   }
 
   void _showStatusPicker(RetailerOrder order) {
+    // #12: When the customer hasn't chosen tailor-or-no-tailor yet, the
+    // destination is still 'pending'. Block 'Delivered' at this point so the
+    // retailer can't mark it shipped before that decision is made.
+    final bool isPendingDestination =
+        order.recipientType.toLowerCase() == 'pending';
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1167,17 +1183,50 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-              ...["Preparing", "Packed", "Delivered"].map(
-                (s) => ListTile(
-                  title: Text(s),
-                  onTap: () {
-                    _updateOrderStatus(order, s);
-                    Navigator.pop(context);
-                  },
-                  trailing: order.status == s
-                      ? Icon(Icons.check_circle, color: primaryGreen)
-                      : null,
+              if (isPendingDestination) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange.shade700, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "Waiting for the customer to choose a tailor. \"Delivered\" is unavailable until then.",
+                          style: TextStyle(fontSize: 12, color: Colors.orange.shade800, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(height: 12),
+              ],
+              ...["Preparing", "Packed", "Delivered"].map(
+                (s) {
+                  final isDeliveredOption = s == "Delivered";
+                  final isDisabled = isDeliveredOption && isPendingDestination;
+                  return ListTile(
+                    enabled: !isDisabled,
+                    title: Text(
+                      s,
+                      style: TextStyle(
+                        color: isDisabled ? Colors.grey : null,
+                      ),
+                    ),
+                    onTap: isDisabled ? null : () {
+                      _updateOrderStatus(order, s);
+                      Navigator.pop(context);
+                    },
+                    trailing: order.status == s
+                        ? Icon(Icons.check_circle, color: primaryGreen)
+                        : null,
+                  );
+                },
               ),
             ],
           ),
@@ -1366,6 +1415,18 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                 ),
               ),
               const Divider(height: 32),
+              // Spelled out rather than a single figure: the products listed
+              // above only add up to the items subtotal, so a grand total
+              // that silently folded delivery in read as simply wrong.
+              _detailRow(
+                "Items Subtotal",
+                "Tk ${order.itemsSubtotal.toInt()}",
+              ),
+              _detailRow(
+                "Delivery Charge",
+                "Tk ${order.deliveryCharge.toInt()}",
+              ),
+              const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -1488,8 +1549,11 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                   ],
                 ),
               ),
+              // Line total, not unit price: the subtotal below sums price ×
+              // quantity, so showing 1500 against "Qty: 3" made the summary
+              // look like it had invented money.
               Text(
-                "Tk ${item.price.toInt()}",
+                "Tk ${(item.price * item.quantity).toInt()}",
                 style: TextStyle(
                   color: Colors.green.shade800,
                   fontWeight: FontWeight.w900,
@@ -1671,4 +1735,23 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
 
     return "${date.day} ${months[date.month - 1]} ${date.year}";
   }
+}
+
+/// Care labels reach us in two shapes: the inventory form writes them spaced
+/// and capitalised ("Dry Clean Only", "Iron: High"), while older seeded
+/// products use camelCase keys ("dryCleanOnly", "ironMedium"). Flattening to
+/// bare letters lets one check match both.
+String _careKey(String symbol) =>
+    symbol.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+
+/// The ironing level as something worth showing a person: "ironMedium" and
+/// "Iron: Medium" both come back as "Medium".
+String _ironLevelLabel(List<String> careSymbols) {
+  final raw = careSymbols
+      .firstWhere((s) => s.toLowerCase().trimLeft().startsWith('iron'),
+          orElse: () => 'Iron: Medium')
+      .replaceFirst(RegExp(r'^\s*iron[:\s]*', caseSensitive: false), '')
+      .trim();
+  if (raw.isEmpty) return 'Medium';
+  return raw[0].toUpperCase() + raw.substring(1);
 }
