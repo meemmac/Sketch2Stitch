@@ -106,36 +106,26 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
 
   Future<void> _toggleFavorite() async {
     if (widget.customerId == null || widget.favoriteService == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please login to add favorites'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      AppFeedback.show(context, 'Please sign in to add favorites.',
+          isError: true);
       return;
     }
 
     try {
       await widget.favoriteService!
           .toggleFavoriteProduct(widget.customerId!, widget.product.id);
+      if (!mounted) return;
       setState(() {
         _isFavorite = !_isFavorite;
       });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isFavorite ? 'Added to favorites' : 'Removed from favorites'),
-          backgroundColor: _isFavorite ? const Color(0xFF4E8B6F) : Colors.grey,
-          duration: const Duration(seconds: 1),
-        ),
+      AppFeedback.show(
+        context,
+        _isFavorite ? 'Added to favorites.' : 'Removed from favorites.',
       );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    } catch (_) {
+      if (!mounted) return;
+      AppFeedback.show(context, "Couldn't update favorites. Please try again.",
+          isError: true);
     }
   }
 

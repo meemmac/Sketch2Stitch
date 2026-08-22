@@ -11,6 +11,7 @@ import 'package:sketch2stitch/services/customer_service.dart';
 import 'package:sketch2stitch/services/cart_service.dart';
 import 'package:sketch2stitch/utils/geo_utils.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
+import 'package:sketch2stitch/widgets/top_feedback_banner.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
@@ -423,16 +424,16 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                   ),
                   if (isTopRated)
                     Positioned(
-                      top: 8,
-                      right: 8,
+                      top: 6,
+                      right: 6,
                       child: Container(
                         padding: EdgeInsets.symmetric(
-                          horizontal: isSmall ? 8 : 10,
-                          vertical: isSmall ? 4 : 5,
+                          horizontal: isSmall ? 6 : 8,
+                          vertical: isSmall ? 3 : 4,
                         ),
                         decoration: BoxDecoration(
                           color: const Color(0xFF6B8F71),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: Colors.white.withOpacity(0.2),
                             width: 0.3,
@@ -441,7 +442,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                         child: Text(
                           '⭐ Top Rated',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: isSmall ? 9 : 10,
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
                           ),
@@ -449,16 +450,16 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                       ),
                     ),
                   Positioned(
-                    bottom: 8,
-                    right: 8,
+                    bottom: 6,
+                    right: 6,
                     child: Container(
                       padding: EdgeInsets.symmetric(
-                        horizontal: isSmall ? 6 : 8,
-                        vertical: isSmall ? 3 : 4,
+                        horizontal: isSmall ? 5 : 6,
+                        vertical: isSmall ? 2 : 3,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.7),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -466,14 +467,14 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                           Icon(
                             Icons.star,
                             color: Colors.amber,
-                            size: isSmall ? 10 : 12,
+                            size: isSmall ? 8 : 10,
                           ),
-                          const SizedBox(width: 3),
+                          const SizedBox(width: 2),
                           Text(
                             retailer.rating.toStringAsFixed(1),
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 11,
+                              fontSize: isSmall ? 9 : 10,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -488,10 +489,10 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
               flex: 4,
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
-                  isSmall ? 10 : 12,
                   isSmall ? 8 : 10,
-                  isSmall ? 10 : 12,
-                  isSmall ? 10 : 12,
+                  isSmall ? 6 : 8,
+                  isSmall ? 8 : 10,
+                  isSmall ? 8 : 10,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -699,12 +700,8 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
 
   Future<void> _toggleFavorite() async {
     if (_currentUserId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please login to add favorites'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      AppFeedback.show(context, 'Please sign in to add favorites.',
+          isError: true);
       return;
     }
 
@@ -713,16 +710,18 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         _currentUserId!, 
         widget.retailer.id
       );
+      if (!mounted) return;
       setState(() {
         _isFavorite = !_isFavorite;
       });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
+      AppFeedback.show(
+        context,
+        _isFavorite ? 'Added to favorites.' : 'Removed from favorites.',
       );
+    } catch (_) {
+      if (!mounted) return;
+      AppFeedback.show(context, "Couldn't update favorites. Please try again.",
+          isError: true);
     }
   }
 

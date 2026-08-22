@@ -12,6 +12,7 @@ import 'package:sketch2stitch/services/review_service.dart';
 import 'package:sketch2stitch/services/portfolio_service.dart';
 import 'package:sketch2stitch/utils/geo_utils.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
+import 'package:sketch2stitch/widgets/top_feedback_banner.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -515,7 +516,7 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                 ),
               ),
               Flexible(
-                flex: 3,
+                flex: 4,
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(
                     isSmall ? 8 : 10,
@@ -722,27 +723,25 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
 
   Future<void> _toggleFavorite() async {
     if (_currentUserId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please login to add favorites'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      AppFeedback.show(context, 'Please sign in to add favorites.',
+          isError: true);
       return;
     }
 
     try {
       await _favoriteService.toggleFavoriteTailor(_currentUserId!, widget.tailor.id);
+      if (!mounted) return;
       setState(() {
         _isFavorite = !_isFavorite;
       });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
+      AppFeedback.show(
+        context,
+        _isFavorite ? 'Added to favorites.' : 'Removed from favorites.',
       );
+    } catch (_) {
+      if (!mounted) return;
+      AppFeedback.show(context, "Couldn't update favorites. Please try again.",
+          isError: true);
     }
   }
 
@@ -1369,11 +1368,9 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
             if (widget.onTailorSelected != null) {
               widget.onTailorSelected!(widget.tailor.id);
             } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Booking feature coming soon!'),
-                  backgroundColor: Colors.orange,
-                ),
+              AppFeedback.show(
+                context,
+                'Start an order from your cart to book this tailor.',
               );
             }
           },
