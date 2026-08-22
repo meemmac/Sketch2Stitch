@@ -64,7 +64,7 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
   void _loadData() async {
     final tailorId = _authService.currentUser?.uid;
     if (tailorId == null) {
-      setState(() => _isLoading = false);
+       setState(() => _isLoading = false);
       return;
     }
 
@@ -104,7 +104,7 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
         }).toList();
         _isLoading = false;
       });
-    }, onError: (e) {
+        }, onError: (e) {
       debugPrint('Error loading reviews: $e');
       if (mounted) setState(() => _isLoading = false);
     });
@@ -121,6 +121,32 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
         return list;
     }
   }
+
+  /*
+  final List<TailorReview> _dummyReviews = [
+    TailorReview(
+      customerName: "Maria Doe",
+      rating: 4.8,
+      dateLabel: "1 week ago",
+      createdAt: DateTime.now().subtract(const Duration(days: 7)),
+      comment: "The stitching is perfect and fits me exactly as I wanted. Highly recommended!",
+    ),
+    TailorReview(
+      customerName: "Nishat Tasnim",
+      rating: 5.0,
+      dateLabel: "2 months ago",
+      createdAt: DateTime.now().subtract(const Duration(days: 60)),
+      comment: "Best tailor experience ever. The fit is top-notch.",
+    ),
+    TailorReview(
+      customerName: "Israt Jahan",
+      rating: 4.5,
+      dateLabel: "3 months ago",
+      createdAt: DateTime.now().subtract(const Duration(days: 90)),
+      comment: "Good work, but took a bit longer to deliver.",
+    ),
+  ];
+  */
 
   @override
   Widget build(BuildContext context) {
