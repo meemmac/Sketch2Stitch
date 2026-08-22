@@ -8,6 +8,9 @@ import 'package:sketch2stitch/models/customer.dart';
 import 'package:sketch2stitch/services/review_service.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';
 import 'package:sketch2stitch/services/browse_service.dart';
+import 'package:sketch2stitch/services/customer_service.dart';
+import 'package:sketch2stitch/services/cart_service.dart';
+import 'package:sketch2stitch/utils/geo_utils.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
@@ -57,8 +60,9 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
   bool get wantKeepAlive => true;
 
   final BrowseService _browseService = BrowseService();
-  final FavoriteService _favoriteService = FavoriteService();
+  final CustomerService _customerService = CustomerService();
   String? _currentUserId;
+  GeoPoint? _customerLocation;
 
   @override
   void initState() {
@@ -66,7 +70,31 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       _currentUserId = user.uid;
+      _loadCustomerLocation();
     }
+  }
+
+  Future<void> _loadCustomerLocation() async {
+    try {
+      final customer =
+          await _customerService.streamCustomerProfile(_currentUserId!).first;
+      if (mounted) setState(() => _customerLocation = customer?.location);
+    } catch (e) {
+      // Distance/delivery badges just stay hidden if this fails.
+    }
+  }
+
+  /// Great-circle distance from the customer's saved location to [target],
+  /// or null if either location is unavailable.
+  double? _distanceKmTo(GeoPoint? target) {
+    if (_customerLocation == null || target == null) return null;
+    return GeoUtils.distanceKm(_customerLocation!, target);
+  }
+
+  /// Same base + per-km delivery estimate used at checkout
+  /// (CartService.deliveryChargeFor), formatted for card display.
+  String _deliveryChargeLabel(GeoPoint? target) {
+    return 'Tk ${CartService.deliveryChargeFor(_distanceKmTo(target)).toStringAsFixed(0)}';
   }
 
   @override
@@ -500,7 +528,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (!isTailorOrRetailer) ...[
+                        if (!isTailorOrRetailer && _distanceKmTo(retailer.location) != null) ...[
                           const SizedBox(width: 4),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -512,7 +540,7 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              '2.5 km',
+                              '${_distanceKmTo(retailer.location)!.toStringAsFixed(1)} km',
                               style: TextStyle(
                                 fontSize: 9,
                                 color: Colors.green.shade800,
@@ -523,6 +551,27 @@ class _RetailersPageBodyState extends State<RetailersPageBody>
                         ],
                       ],
                     ),
+                    if (!isTailorOrRetailer) ...[
+                      SizedBox(height: isSmall ? 2 : 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.directions_bike_outlined,
+                            size: isSmall ? 10 : 12,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            _deliveryChargeLabel(retailer.location),
+                            style: TextStyle(
+                              fontSize: isSmall ? 9 : 10,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -569,7 +618,9 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   final ReviewService _reviewService = ReviewService();
   final FavoriteService _favoriteService = FavoriteService();
   final BrowseService _browseService = BrowseService();
+  final CustomerService _customerService = CustomerService();
   String? _currentUserId;
+  GeoPoint? _customerLocation;
 
   List<Product> _products = [];
   bool _isLoadingProducts = true;
@@ -596,7 +647,29 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     _loadReviewsUsingStream();
     _loadProducts();
     _checkFavoriteStatus();
+    _loadCustomerLocation();
   }
+
+  Future<void> _loadCustomerLocation() async {
+    if (_currentUserId == null) return;
+    try {
+      final customer =
+          await _customerService.streamCustomerProfile(_currentUserId!).first;
+      if (mounted) setState(() => _customerLocation = customer?.location);
+    } catch (e) {
+      // Delivery/distance badge just stays hidden if this fails.
+    }
+  }
+
+  /// Great-circle distance from the customer's saved location to the
+  /// retailer's, or null if either location is unavailable.
+  double? get _distanceKm => (_customerLocation != null && widget.retailer.location != null)
+      ? GeoUtils.distanceKm(_customerLocation!, widget.retailer.location!)
+      : null;
+
+  /// Same base + per-km delivery estimate used at checkout
+  /// (CartService.deliveryChargeFor).
+  double get _deliveryCharge => CartService.deliveryChargeFor(_distanceKm);
 
   @override
   void dispose() {
@@ -1026,7 +1099,9 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
-                                      '2.5 km • Tk 50',
+                                      _distanceKm != null
+                                          ? '${_distanceKm!.toStringAsFixed(1)} km • Tk ${_deliveryCharge.toStringAsFixed(0)}'
+                                          : 'Tk ${_deliveryCharge.toStringAsFixed(0)}',
                                       style: TextStyle(
                                         fontSize: 10,
                                         color: Colors.white,

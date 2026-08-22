@@ -7,8 +7,11 @@ import 'package:sketch2stitch/models/portfolio.dart';
 import 'package:sketch2stitch/models/customer.dart';
 import 'package:sketch2stitch/services/browse_service.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';
+import 'package:sketch2stitch/services/customer_service.dart';
+import 'package:sketch2stitch/services/cart_service.dart';
 import 'package:sketch2stitch/services/review_service.dart';
 import 'package:sketch2stitch/services/portfolio_service.dart';
+import 'package:sketch2stitch/utils/geo_utils.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -43,8 +46,9 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
   bool get wantKeepAlive => true;
 
   final BrowseService _browseService = BrowseService();
-  final FavoriteService _favoriteService = FavoriteService();
+  final CustomerService _customerService = CustomerService();
   String? _currentUserId;
+  GeoPoint? _customerLocation;
 
   @override
   void initState() {
@@ -52,7 +56,31 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       _currentUserId = user.uid;
+      _loadCustomerLocation();
     }
+  }
+
+  Future<void> _loadCustomerLocation() async {
+    try {
+      final customer =
+          await _customerService.streamCustomerProfile(_currentUserId!).first;
+      if (mounted) setState(() => _customerLocation = customer?.location);
+    } catch (e) {
+      // Distance/delivery badges just stay hidden if this fails.
+    }
+  }
+
+  /// Great-circle distance from the customer's saved location to [target],
+  /// or null if either location is unavailable.
+  double? _distanceKmTo(GeoPoint? target) {
+    if (_customerLocation == null || target == null) return null;
+    return GeoUtils.distanceKm(_customerLocation!, target);
+  }
+
+  /// Same base + per-km delivery estimate used at checkout
+  /// (CartService.deliveryChargeFor), formatted for card display.
+  String _deliveryChargeLabel(GeoPoint? target) {
+    return 'Tk ${CartService.deliveryChargeFor(_distanceKmTo(target)).toStringAsFixed(0)}';
   }
 
   @override
@@ -545,7 +573,9 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                             const SizedBox(width: 2),
                             Expanded(
                               child: Text(
-                                "1.8 km",
+                                _distanceKmTo(tailor.location) != null
+                                    ? '${_distanceKmTo(tailor.location)!.toStringAsFixed(1)} km • ${_deliveryChargeLabel(tailor.location)}'
+                                    : _deliveryChargeLabel(tailor.location),
                                 style: TextStyle(
                                   fontSize: isSmall ? 9 : 10,
                                   color: isFull ? Colors.grey.shade400 : Colors.grey[600],
@@ -601,8 +631,10 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   final ReviewService _reviewService = ReviewService();
   final FavoriteService _favoriteService = FavoriteService();
   final PortfolioService _portfolioService = PortfolioService();
+  final CustomerService _customerService = CustomerService();
   String? _currentUserId;
-  
+  GeoPoint? _customerLocation;
+
   List<Portfolio> _portfolioItems = [];
   bool _isLoadingPortfolio = true;
 
@@ -622,7 +654,29 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     _loadReviewsUsingStream();
     _loadPortfolio();
     _checkFavoriteStatus();
+    _loadCustomerLocation();
   }
+
+  Future<void> _loadCustomerLocation() async {
+    if (_currentUserId == null) return;
+    try {
+      final customer =
+          await _customerService.streamCustomerProfile(_currentUserId!).first;
+      if (mounted) setState(() => _customerLocation = customer?.location);
+    } catch (e) {
+      // Delivery/distance badge just stays hidden if this fails.
+    }
+  }
+
+  /// Great-circle distance from the customer's saved location to the
+  /// tailor's, or null if either location is unavailable.
+  double? get _distanceKm => (_customerLocation != null && widget.tailor.location != null)
+      ? GeoUtils.distanceKm(_customerLocation!, widget.tailor.location!)
+      : null;
+
+  /// Same base + per-km delivery estimate used at checkout
+  /// (CartService.deliveryChargeFor).
+  double get _deliveryCharge => CartService.deliveryChargeFor(_distanceKm);
 
   @override
   void dispose() {
@@ -1175,7 +1229,9 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
-                                      '1.8 km • Tk 40',
+                                      _distanceKm != null
+                                          ? '${_distanceKm!.toStringAsFixed(1)} km • Tk ${_deliveryCharge.toStringAsFixed(0)}'
+                                          : 'Tk ${_deliveryCharge.toStringAsFixed(0)}',
                                       style: TextStyle(
                                         fontSize: 10,
                                         color: Colors.white,
