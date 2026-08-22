@@ -142,65 +142,59 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
 
     _ordersSubscription = _orderService
         .streamDetailedRetailerOrders(retailerId)
-        .listen(
-          (data) {
-            if (!mounted) return;
-            setState(() {
-              _orders = data.map((map) {
-                final subOrder = map['subOrder'];
-                final order = map['order'];
-                final customer = map['customer'];
-                final items = map['items'] as List<dynamic>;
-                final tailorName = map['tailorName'];
+        .listen((data) {
+      if (!mounted) return;
+      setState(() {
+        _orders = data.map((map) {
+          final subOrder = map['subOrder'];
+          final order = map['order'];
+          final customer = map['customer'];
+          final items = map['items'] as List<dynamic>;
+          final tailorName = map['tailorName'];
 
-                return RetailerOrder(
-                  id: subOrder['id'],
-                  orderId: subOrder['orderId'] ?? order['id'] ?? 'N/A',
-                  customerName: customer['name'] ?? 'N/A',
-                  customerPhone: customer['phone'] ?? 'N/A',
-                  tailorName: tailorName,
-                  amount:
-                      (subOrder['itemsSubtotal'] ?? 0).toDouble() +
-                      (subOrder['deliveryCharge'] ?? 0).toDouble(),
-                  orderDate: _parseDateTime(order['orderDate']),
-                  deliveryDate: subOrder['deliveryDate'] != null
-                      ? _parseDateTime(subOrder['deliveryDate'])
-                      : null,
-                  status: _capitalize(subOrder['status']),
-                  isDelivered: subOrder['status'] == 'delivered',
-                  recipientType: _capitalize(subOrder['deliveryDestination']),
-                  deliveryAddress: customer['address'] ?? 'No address provided',
-                  items: items.map((i) {
-                    final careSymbols = List<String>.from(
-                      i['careSymbol'] ?? [],
-                    );
-                    return OrderItem(
-                      name: i['name'],
-                      quantity: i['quantity'],
-                      imagePath: i['imagePath'],
-                      color: i['color'],
-                      price: (i['price'] ?? 0).toDouble(),
-                      description: i['description'] ?? '',
-                      canWash: careSymbols.contains('wash'),
-                      canBleach: careSymbols.contains('bleach'),
-                      canDryClean: careSymbols.contains('dryClean'),
-                      canTumbleDry: careSymbols.contains('tumbleDry'),
-                      ironLevel: careSymbols.firstWhere(
-                        (s) => s.startsWith('iron'),
-                        orElse: () => "Medium",
-                      ),
-                    );
-                  }).toList(),
-                );
-              }).toList();
-              _isLoading = false;
-            });
-          },
-          onError: (error) {
-            debugPrint("Error listening to orders: $error");
-            if (mounted) setState(() => _isLoading = false);
-          },
-        );
+          return RetailerOrder(
+            id: subOrder['id'],
+            orderId: subOrder['orderId'] ?? order['id'] ?? 'N/A',
+            customerName: customer['name'] ?? 'N/A',
+            customerPhone: customer['phone'] ?? 'N/A',
+            tailorName: tailorName,
+            amount: (subOrder['itemsSubtotal'] ?? 0).toDouble() +
+                (subOrder['deliveryCharge'] ?? 0).toDouble(),
+            orderDate: _parseDateTime(order['orderDate']),
+            deliveryDate: subOrder['deliveryDate'] != null
+                ? _parseDateTime(subOrder['deliveryDate'])
+                : null,
+            status: _capitalize(subOrder['status']),
+            isDelivered: subOrder['status'] == 'delivered',
+            recipientType: _capitalize(subOrder['deliveryDestination']),
+            deliveryAddress: customer['address'] ?? 'No address provided',
+            items: items.map((i) {
+              final careSymbols = List<String>.from(i['careSymbol'] ?? []);
+              return OrderItem(
+                name: i['name'],
+                quantity: i['quantity'],
+                imagePath: i['imagePath'],
+                color: i['color'],
+                price: (i['price'] ?? 0).toDouble(),
+                description: i['description'] ?? '',
+                canWash: careSymbols.contains('wash'),
+                canBleach: careSymbols.contains('bleach'),
+                canDryClean: careSymbols.contains('dryClean'),
+                canTumbleDry: careSymbols.contains('tumbleDry'),
+                ironLevel: careSymbols.firstWhere(
+                  (s) => s.startsWith('iron'),
+                  orElse: () => "Medium",
+                ),
+              );
+            }).toList(),
+          );
+        }).toList();
+        _isLoading = false;
+      });
+    }, onError: (error) {
+      debugPrint("Error listening to orders: $error");
+      if(mounted) setState(() => _isLoading = false);
+    });
   }
 
   DateTime _parseDateTime(dynamic value) {
@@ -216,128 +210,6 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
 
   List<RetailerOrder> _orders = [];
 
-  /*
-  late final List<RetailerOrder> _dummyOrders = <RetailerOrder>[
-    RetailerOrder(
-      id: "ORD-1087",
-      customerName: "Nazia Tasphia",
-      customerPhone: "+8801722334455",
-      tailorName: "Fine Cut Tailors",
-      amount: 5200,
-      orderDate: DateTime.now().subtract(const Duration(days: 12)),
-      status: "Preparing",
-      isDelivered: false,
-      recipientType: "Tailor",
-      deliveryAddress: "123 Stitch St, Dhaka Fashion District",
-      items: [
-        OrderItem(
-          name: "Premium Egyptian Cotton",
-          quantity: 5,
-          price: 3250,
-          imagePath: "assets/images/fabrics_rolled.jpg",
-          color: "White",
-          description:
-              "Soft, breathable Egyptian cotton perfect for high-end shirts.",
-          itemComment: "The cotton texture is incredibly smooth.",
-          ironLevel: "High",
-        ),
-        OrderItem(
-          name: "Denim Patchwork",
-          quantity: 3,
-          price: 1950,
-          imagePath: "assets/images/denim.jpg",
-          color: "Blue",
-          canBleach: true,
-        ),
-      ],
-    ),
-    RetailerOrder(
-      id: "ORD-1083",
-      customerName: "Israt Jahan",
-      customerPhone: "+8801822334455",
-      amount: 5400,
-      orderDate: DateTime.now().subtract(const Duration(days: 28)),
-      status: "Packed",
-      isDelivered: false,
-      recipientType: "Customer",
-      deliveryAddress: "House 45, Road 12, Banani, Dhaka",
-      items: [
-        OrderItem(
-          name: "Golden Silk Blend",
-          quantity: 3,
-          price: 5400,
-          imagePath: "assets/images/silk.jpg",
-          color: "Gold",
-          description: "Luxurious silk blend with a natural sheen.",
-          itemComment: "Exactly the shade of gold I needed.",
-          canWash: false,
-          canTumbleDry: false,
-          ironLevel: "Low",
-        ),
-      ],
-    ),
-    RetailerOrder(
-      id: "ORD-1076",
-      customerName: "Nishat Tasnim",
-      customerPhone: "+8801922334455",
-      amount: 8600,
-      orderDate: DateTime.now().subtract(const Duration(days: 43)),
-      deliveryDate: DateTime.now().subtract(const Duration(days: 35)),
-      status: "Delivered",
-      isDelivered: true,
-      recipientType: "Customer",
-      deliveryAddress: "Dhanmondi 27, Dhaka",
-      review: "Amazing quality fabric! The selection was perfect.",
-      rating: 4.8,
-      items: [
-        OrderItem(
-          name: "Linen Summer Fabric",
-          quantity: 5,
-          price: 5600,
-          imagePath: "assets/images/fab2.jpg",
-          color: "Light Blue",
-          description: "Lightweight linen fabric, highly breathable.",
-          itemComment: "The linen is so soft and cool.",
-          canTumbleDry: false,
-        ),
-        OrderItem(
-          name: "Printed Scarf",
-          quantity: 5,
-          price: 3000,
-          imagePath: "assets/images/gorgeous.jpg",
-          color: "Multi",
-        ),
-      ],
-    ),
-    RetailerOrder(
-      id: "ORD-1051",
-      customerName: "Farzana Yasmin",
-      customerPhone: "+8801522334455",
-      tailorName: "Royal Stitch",
-      amount: 4560,
-      orderDate: DateTime.now().subtract(const Duration(days: 96)),
-      deliveryDate: DateTime.now().subtract(const Duration(days: 89)),
-      status: "Delivered",
-      isDelivered: true,
-      recipientType: "Tailor",
-      deliveryAddress: "Shop 12, Gulshan Market, Dhaka",
-      review: "Very soft and beautiful patterns. Delivery was fast.",
-      rating: 4.5,
-      items: [
-        OrderItem(
-          name: "Printed Scarf",
-          quantity: 12,
-          price: 4560,
-          imagePath: "assets/images/gorgeous.jpg",
-          color: "Multi",
-          description: "Vibrant seasonal patterns on soft material.",
-          canDryClean: false,
-          ironLevel: "Low",
-        ),
-      ],
-    ),
-  ];
-  */
 
   DateTime get _startDate {
     final today = DateTime.now();
@@ -400,21 +272,14 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
 
   void _updateOrderStatus(RetailerOrder order, String newStatus) async {
     try {
-      await _orderService.updateOrderStatus(
-        order.id,
-        newStatus,
-        parentOrderId: order.orderId,
-      );
+      await _orderService.updateOrderStatus(order.id, newStatus, parentOrderId: order.orderId);
       if (!mounted) return;
       setState(() {
         order.status = newStatus;
         if (newStatus == "Delivered") {
           order.isDelivered = true;
           order.deliveryDate = DateTime.now();
-          _showBanner(
-            "Order ${order.orderId} marked as Delivered",
-            isError: false,
-          );
+          _showBanner("Order ${order.orderId} marked as Delivered", isError: false);
         } else {
           _showBanner("Status updated to $newStatus", isError: false);
         }
@@ -870,8 +735,9 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          RetailerReviewsScreen(shopName: _shopName),
+                      builder: (_) => RetailerReviewsScreen(
+                        shopName: _shopName,
+                      ),
                     ),
                   );
                 },
@@ -971,9 +837,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        order.orderId.startsWith('ORD-')
-                            ? order.orderId
-                            : "ORD-${order.orderId}",
+                        order.orderId.startsWith('ORD-') ? order.orderId : "ORD-${order.orderId}",
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -1628,9 +1492,7 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
         height: height,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
-          debugPrint(
-            "OrdersScreen: Error loading network image: $path - $error",
-          );
+          debugPrint("OrdersScreen: Error loading network image: $path - $error");
           return _imagePlaceholder(width, height);
         },
       );

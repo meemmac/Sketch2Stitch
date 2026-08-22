@@ -39,16 +39,14 @@ class ProductColorVariant {
     List<String> images = [];
     if (map['imagePaths'] is List) {
       images = List<String>.from(map['imagePaths'] as List);
-    } else if (map['imagePath'] is String &&
-        (map['imagePath'] as String).isNotEmpty) {
+    } else if (map['imagePath'] is String && (map['imagePath'] as String).isNotEmpty) {
       images = [map['imagePath'] as String];
     }
 
     List<String> videos = [];
     if (map['videoPaths'] is List) {
       videos = List<String>.from(map['videoPaths'] as List);
-    } else if (map['videoPath'] is String &&
-        (map['videoPath'] as String).isNotEmpty) {
+    } else if (map['videoPath'] is String && (map['videoPath'] as String).isNotEmpty) {
       videos = [map['videoPath'] as String];
     }
 
@@ -125,8 +123,8 @@ class InventoryItem {
   // Helpers
   String get mainImagePath =>
       variants.isNotEmpty && variants.first.imagePaths.isNotEmpty
-      ? variants.first.imagePaths.first
-      : "";
+          ? variants.first.imagePaths.first
+          : "";
   bool get mainIsAsset => variants.isNotEmpty ? variants.first.isAsset : false;
   List<String> get colorNames => variants.map((v) => v.colorName).toList();
 
@@ -155,20 +153,20 @@ class InventoryItem {
   }
 
   Map<String, dynamic> toMap() => {
-    'id': id,
-    'name': name,
-    'category': category,
-    'materialType': materialType,
-    'sku': sku,
-    'description': description,
-    'variants': variants.map((v) => v.toMap()).toList(),
-    'materialBlends': materialBlends.map((b) => b.toMap()).toList(),
-    'canWash': canWash,
-    'canBleach': canBleach,
-    'canDryClean': canDryClean,
-    'canTumbleDry': canTumbleDry,
-    'ironLevel': ironLevel,
-  };
+  'id': id,
+  'name': name,
+  'category': category,
+  'materialType': materialType,
+  'sku': sku,
+  'description': description,
+  'variants': variants.map((v) => v.toMap()).toList(),
+  'materialBlends': materialBlends.map((b) => b.toMap()).toList(),
+  'canWash': canWash,
+  'canBleach': canBleach,
+  'canDryClean': canDryClean,
+  'canTumbleDry': canTumbleDry,
+  'ironLevel': ironLevel,
+};
 
   factory InventoryItem.fromMap(Map<String, dynamic> map) {
     final rawVariants = map['variants'];
@@ -227,15 +225,16 @@ class _InventoryScreenState extends State<InventoryScreen>
   String _searchQuery = "";
   int _gridAnimationSeed = 0;
   final Map<String, int> _selectedVariantIndexes = <String, int>{};
-
+  
   // Feedback state
   String? _feedbackMessage;
   bool _isFeedbackError = false;
   Timer? _feedbackTimer;
-
+  
   final InventoryService _inventoryService = InventoryService();
   String? _retailerId;
   StreamSubscription<List<Product>>? _inventorySubscription;
+
   static const List<String> _commonMaterials = <String>[
     "Cotton",
     "Linen",
@@ -253,224 +252,6 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   final List<InventoryItem> items = <InventoryItem>[];
 
-  /*
-  List<InventoryItem> _seedItems() {
-    return <InventoryItem>[
-      InventoryItem(
-        id: "seed-1",
-        name: "Premium Egyptian Cotton",
-        category: "Fabric",
-        materialType: "Cotton",
-        sku: "COT-001",
-        description: "Soft, breathable Egyptian cotton perfect for shirts.",
-        materialBlends: [
-          FabricMaterialBlend(material: "Cotton", blend: "100%"),
-        ],
-        variants: [
-          ProductColorVariant(
-            colorName: "White",
-            imagePaths: ['assets/images/fab.jpg'],
-            videoPaths: ['assets/images/Videos/vid1.mp4'],
-            isAsset: true,
-            price: 650,
-            stock: 45,
-          ),
-          ProductColorVariant(
-            colorName: "Beige",
-            imagePaths: ['assets/images/fab2.jpg'],
-            videoPaths: ['assets/images/Videos/vid2.mp4'],
-            isAsset: true,
-            price: 680,
-            stock: 30,
-          ),
-          ProductColorVariant(
-            colorName: "Ivory",
-            imagePaths: ['assets/images/fab.jpg'],
-            videoPaths: ['assets/images/Videos/vid3.mp4'],
-            isAsset: true,
-            price: 720,
-            stock: 6,
-          ),
-        ],
-        canWash: true,
-        canBleach: false,
-        canDryClean: true,
-        canTumbleDry: true,
-        ironLevel: "High",
-      ),
-      InventoryItem(
-        id: "seed-2",
-        name: "Denim Shirt",
-        category: "Fabric",
-        materialType: "Denim",
-        sku: "DEN-006",
-        description: "Classic navy blue denim fabric, heavy-duty and stylish.",
-        materialBlends: [
-          FabricMaterialBlend(material: "Cotton", blend: "100%"),
-        ],
-        variants: [
-          ProductColorVariant(
-            colorName: "Navy Blue",
-            imagePaths: ['assets/images/denim.jpg'],
-            videoPaths: [],
-            isAsset: true,
-            price: 1200,
-            stock: 25,
-          ),
-        ],
-        canWash: true,
-        canBleach: false,
-        canDryClean: false,
-        canTumbleDry: true,
-        ironLevel: "Medium",
-      ),
-      InventoryItem(
-        id: "seed-3",
-        name: "Golden Silk Blend",
-        category: "Fabric",
-        materialType: "Silk",
-        sku: "SLK-002",
-        description: "Luxurious silk blend with a natural sheen.",
-        materialBlends: [
-          FabricMaterialBlend(material: "Silk", blend: "70%"),
-          FabricMaterialBlend(material: "Viscose", blend: "30%"),
-        ],
-        variants: [
-          ProductColorVariant(
-            colorName: "Gold",
-            imagePaths: ['assets/images/silk.jpg'],
-            videoPaths: ['assets/images/Videos/vid2.mp4'],
-            isAsset: true,
-            price: 1800,
-            stock: 12,
-          ),
-          ProductColorVariant(
-            colorName: "Pink",
-            imagePaths: ['assets/images/saree.jpg'],
-            videoPaths: ['assets/images/Videos/vid3.mp4'],
-            isAsset: true,
-            price: 1750,
-            stock: 8,
-          ),
-          ProductColorVariant(
-            colorName: "Emerald",
-            imagePaths: ['assets/images/gorgeous.jpg'],
-            videoPaths: ['assets/images/Videos/vid1.mp4'],
-            isAsset: true,
-            price: 1950,
-            stock: 5,
-          ),
-        ],
-        canWash: false,
-        canBleach: false,
-        canDryClean: true,
-        canTumbleDry: false,
-        ironLevel: "Low",
-      ),
-      InventoryItem(
-        id: "seed-4",
-        name: "Tassel",
-        category: "Element",
-        materialType: "N/A",
-        sku: "ACC-003",
-        description: "Decorative element to enhance the outfit.",
-        materialBlends: [
-          FabricMaterialBlend(material: "Cotton", blend: "98%"),
-          FabricMaterialBlend(
-            material: "Spandex (Lycra/Elastane)",
-            blend: "2%",
-          ),
-        ],
-        variants: [
-          ProductColorVariant(
-            colorName: "Multi",
-            imagePaths: ['assets/images/tassel.jpg'],
-            videoPaths: [],
-            isAsset: true,
-            price: 220,
-            stock: 28,
-          ),
-          ProductColorVariant(
-            colorName: "Blue",
-            imagePaths: ['assets/images/Tassel2.jpg'],
-            videoPaths: [],
-            isAsset: true,
-            price: 180,
-            stock: 7,
-          ),
-        ],
-      ),
-      InventoryItem(
-        id: "seed-5",
-        name: "Linen Summer Fabric",
-        category: "Fabric",
-        materialType: "Linen",
-        sku: "LIN-004",
-        description: "Lightweight linen fabric for summer wear.",
-        materialBlends: [
-          FabricMaterialBlend(material: "Linen", blend: "85%"),
-          FabricMaterialBlend(material: "Cotton", blend: "15%"),
-        ],
-        variants: [
-          ProductColorVariant(
-            colorName: "Natural",
-            imagePaths: ['assets/images/fab2.jpg'],
-            videoPaths: ['assets/images/Videos/vid1.mp4'],
-            isAsset: true,
-            price: 1120,
-            stock: 18,
-          ),
-          ProductColorVariant(
-            colorName: "Sage",
-            imagePaths: ['assets/images/fabrics_rolled.jpg'],
-            videoPaths: ['assets/images/Videos/vid2.mp4'],
-            isAsset: true,
-            price: 1180,
-            stock: 9,
-          ),
-        ],
-        canWash: true,
-        canBleach: false,
-        canDryClean: true,
-        canTumbleDry: false,
-        ironLevel: "Medium",
-      ),
-      InventoryItem(
-        id: "seed-6",
-        name: "Printed Scarf",
-        category: "Element",
-        materialType: "N/A",
-        sku: "SCF-005",
-        description: "Light scarf with vibrant seasonal prints.",
-        materialBlends: [
-          FabricMaterialBlend(material: "Polyester", blend: "95%"),
-          FabricMaterialBlend(
-            material: "Spandex (Lycra/Elastane)",
-            blend: "5%",
-          ),
-        ],
-        variants: [
-          ProductColorVariant(
-            colorName: "Multi",
-            imagePaths: ['assets/images/saree.jpg'],
-            videoPaths: [],
-            isAsset: true,
-            price: 380,
-            stock: 64,
-          ),
-          ProductColorVariant(
-            colorName: "Black",
-            imagePaths: ['assets/images/lace.jpg'],
-            videoPaths: [],
-            isAsset: true,
-            price: 420,
-            stock: 4,
-          ),
-        ],
-      ),
-    ];
-  }
-  */
 
   String _itemKey(InventoryItem item) {
     return item.id;
@@ -503,6 +284,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   bool _hasLowStockColor(InventoryItem item) {
     return item.variants.any((variant) => variant.stock < 5);
   }
+
 
   List<FabricMaterialBlend> _initialMaterialBlendsFor(InventoryItem? item) {
     if (item == null) {
@@ -553,75 +335,61 @@ class _InventoryScreenState extends State<InventoryScreen>
     _loadInventory();
   }
 
-  InventoryItem _mapProductToItem(Product p) {
-    return InventoryItem(
-      id: p.id,
-      name: p.productName,
-      category: p.category,
-      materialType: p.materialType.isNotEmpty
-          ? p.materialType.first.type
-          : 'N/A',
-      sku: p.productCode ?? '', // ← Fix: add null fallback
-      description: p.description,
-      variants: p.colorOptions.map((v) {
-        final images = v.image
-            .map((p) => p.trim())
-            .where((p) => p.isNotEmpty)
-            .toList();
-        final videos = v.video
-            .map((p) => p.trim())
-            .where((p) => p.isNotEmpty)
-            .toList();
+  // In inventory_screen.dart, find the _mapProductToItem method and update:
 
-        final isAsset = [
-          ...images,
-          ...videos,
-        ].any((path) => path.startsWith('assets/'));
-
-        return ProductColorVariant(
-          colorName: v.color,
-          imagePaths: images,
-          videoPaths: videos,
-          isAsset: isAsset,
-          price: v.price,
-          stock: v.stock,
-        );
-      }).toList(),
-      materialBlends: p.materialType
-          .map(
-            (m) => FabricMaterialBlend(
-              material: m.type,
-              blend: "${m.blend.toInt()}%",
-            ),
-          )
-          .toList(),
-      canWash: p.careSymbol.contains('Washable'),
-      canBleach: p.careSymbol.contains('Bleach Allowed'),
-      canDryClean: p.careSymbol.contains('Dry Clean Only'),
-      canTumbleDry: p.careSymbol.contains('Tumble Dry'),
-      ironLevel: p.careSymbol
-          .firstWhere(
-            (s) => s.startsWith('Iron: '),
-            orElse: () => 'Iron: Medium',
-          )
-          .replaceFirst('Iron: ', ''),
-    );
-  }
-
+InventoryItem _mapProductToItem(Product p) {
+  return InventoryItem(
+    id: p.id,
+    name: p.productName,
+    category: p.category,
+    materialType: p.materialType.isNotEmpty ? p.materialType.first.type : 'N/A',
+    sku: p.productCode ?? '',  // ← Fix: add null fallback
+    description: p.description,
+    variants: p.colorOptions.map((v) {
+      final images = v.image.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+      final videos = v.video.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+      
+      final isAsset = [...images, ...videos].any((path) => path.startsWith('assets/'));
+      
+      return ProductColorVariant(
+        colorName: v.color,
+        imagePaths: images,
+        videoPaths: videos,
+        isAsset: isAsset,
+        price: v.price,
+        stock: v.stock,
+      );
+    }).toList(),
+    materialBlends: p.materialType.map((m) => FabricMaterialBlend(
+      material: m.type,
+      blend: "${m.blend.toInt()}%",
+    )).toList(),
+    canWash: p.careSymbol.contains('Washable'),
+    canBleach: p.careSymbol.contains('Bleach Allowed'),
+    canDryClean: p.careSymbol.contains('Dry Clean Only'),
+    canTumbleDry: p.careSymbol.contains('Tumble Dry'),
+    ironLevel: p.careSymbol.firstWhere(
+      (s) => s.startsWith('Iron: '), 
+      orElse: () => 'Iron: Medium'
+    ).replaceFirst('Iron: ', ''),
+  );
+}
   Future<void> _loadInventory() async {
     if (_retailerId == null) return;
+
     _inventorySubscription?.cancel();
-    _inventorySubscription = _inventoryService
-        .streamRetailerProducts(_retailerId!)
-        .listen((products) {
-          if (!mounted) return;
-          setState(() {
-            items.clear();
-            items.addAll(products.map((p) => _mapProductToItem(p)));
-            _gridAnimationSeed++;
-          });
-        });
+    _inventorySubscription =
+        _inventoryService.streamRetailerProducts(_retailerId!).listen((products) {
+      if (!mounted) return;
+      setState(() {
+        items.clear();
+        items.addAll(products.map((p) => _mapProductToItem(p)));
+        _gridAnimationSeed++;
+      });
+    });
   }
+
+
 
   void _showFeedback(String message, {bool isError = false}) {
     _feedbackTimer?.cancel();
@@ -650,11 +418,8 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   Future<void> _showProductPreview(InventoryItem item) async {
     if (item.variants.isEmpty) {
-      AppFeedback.show(
-        context,
-        "This item has no color variants yet",
-        isError: true,
-      );
+      AppFeedback.show(context, "This item has no color variants yet",
+          isError: true);
       return;
     }
 
@@ -703,17 +468,12 @@ class _InventoryScreenState extends State<InventoryScreen>
                         children: [
                           ...selectedVariant.imagePaths.map((path) {
                             final cleanPath = path.trim();
-                            if (cleanPath.isEmpty)
-                              return const SizedBox.shrink();
-
+                            if (cleanPath.isEmpty) return const SizedBox.shrink();
+                            
                             final uri = Uri.tryParse(cleanPath);
-                            final bool isNetwork =
-                                uri != null &&
-                                (uri.scheme == 'http' || uri.scheme == 'https');
-                            final bool isAssetPath =
-                                cleanPath.toLowerCase().startsWith('assets/') ||
-                                selectedVariant.isAsset;
-
+                            final bool isNetwork = uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
+                            final bool isAssetPath = cleanPath.toLowerCase().startsWith('assets/') || selectedVariant.isAsset;
+                            
                             return Padding(
                               padding: const EdgeInsets.only(right: 12),
                               child: ClipRRect(
@@ -722,60 +482,41 @@ class _InventoryScreenState extends State<InventoryScreen>
                                     ? Image.network(
                                         cleanPath,
                                         height: 250,
-                                        width:
-                                            MediaQuery.of(context).size.width *
-                                            0.7,
+                                        width: MediaQuery.of(context).size.width * 0.7,
                                         fit: BoxFit.cover,
-                                        errorBuilder:
-                                            (context, error, stackTrace) =>
-                                                _imageError(cleanPath),
+                                        errorBuilder: (context, error, stackTrace) => _imageError(cleanPath),
                                       )
                                     : isAssetPath
-                                    ? Image.asset(
-                                        cleanPath,
-                                        height: 250,
-                                        width:
-                                            MediaQuery.of(context).size.width *
-                                            0.7,
-                                        fit: BoxFit.cover,
-                                        errorBuilder:
-                                            (context, error, stackTrace) =>
-                                                _imageError(cleanPath),
-                                      )
-                                    : Image.file(
-                                        File(cleanPath),
-                                        height: 250,
-                                        width:
-                                            MediaQuery.of(context).size.width *
-                                            0.7,
-                                        fit: BoxFit.cover,
-                                        errorBuilder:
-                                            (context, error, stackTrace) =>
-                                                _imageError(cleanPath),
-                                      ),
+                                        ? Image.asset(
+                                            cleanPath,
+                                            height: 250,
+                                            width: MediaQuery.of(context).size.width * 0.7,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => _imageError(cleanPath),
+                                          )
+                                        : Image.file(
+                                            File(cleanPath),
+                                            height: 250,
+                                            width: MediaQuery.of(context).size.width * 0.7,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => _imageError(cleanPath),
+                                          ),
                               ),
                             );
                           }),
                           ...selectedVariant.videoPaths.map((path) {
-                            final cleanPath = path
-                                .trim()
-                                .replaceAll("'", "")
-                                .replaceAll('"', "");
-                            if (cleanPath.isEmpty)
-                              return const SizedBox.shrink();
-
+                            final cleanPath = path.trim().replaceAll("'", "").replaceAll('"', "");
+                            if (cleanPath.isEmpty) return const SizedBox.shrink();
+                            
                             return Padding(
                               padding: const EdgeInsets.only(right: 12),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(20),
                                 child: VideoPreviewPlayer(
                                   videoPath: cleanPath,
-                                  isAsset: cleanPath.toLowerCase().startsWith(
-                                    'assets/',
-                                  ),
+                                  isAsset: cleanPath.toLowerCase().startsWith('assets/'),
                                   height: 250,
-                                  width:
-                                      MediaQuery.of(context).size.width * 0.7,
+                                  width: MediaQuery.of(context).size.width * 0.7,
                                 ),
                               ),
                             );
@@ -805,25 +546,6 @@ class _InventoryScreenState extends State<InventoryScreen>
                             color: Colors.green.shade800,
                           ),
                         ),
-                        /*
-                        const SizedBox(width: 12),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.directions_bike,
-                                size: 18, color: Colors.grey[600]),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Tk 50 delivery',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        */
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -967,37 +689,32 @@ class _InventoryScreenState extends State<InventoryScreen>
                         Icons.wash,
                         "Machine Washable",
                         item.canWash,
-                        info:
-                            "Indicates whether the garment can be safely washed in a washing machine and the recommended washing conditions. Following these instructions helps maintain the fabric's quality, color, and shape.",
+                        info: "Indicates whether the garment can be safely washed in a washing machine and the recommended washing conditions. Following these instructions helps maintain the fabric's quality, color, and shape.",
                       ),
                       _careInfoRow(
                         Icons.biotech,
                         "Bleach Allowed",
                         item.canBleach,
-                        info:
-                            "Indicates whether bleach can be safely used on the fabric. Some materials may fade, weaken, or become damaged when exposed to bleach.",
+                        info: "Indicates whether bleach can be safely used on the fabric. Some materials may fade, weaken, or become damaged when exposed to bleach.",
                       ),
                       _careInfoRow(
                         Icons.dry_cleaning,
                         "Dry Clean Only",
                         item.canDryClean,
-                        info:
-                            "Indicates whether the garment should be professionally cleaned using special solvents instead of water. This method is recommended for delicate fabrics or garments with special finishes.",
+                        info: "Indicates whether the garment should be professionally cleaned using special solvents instead of water. This method is recommended for delicate fabrics or garments with special finishes.",
                       ),
                       _careInfoRow(
                         Icons.settings_input_component,
                         "Tumble Dry",
                         item.canTumbleDry,
-                        info:
-                            "Tumble drying is the process of drying clothes in a clothes dryer (dryer machine) instead of hanging them to air dry. It indicates whether the garment is suitable for tumble drying and the recommended heat setting. Using the wrong drying method may cause shrinking or fabric damage.",
+                        info: "Tumble drying is the process of drying clothes in a clothes dryer (dryer machine) instead of hanging them to air dry. It indicates whether the garment is suitable for tumble drying and the recommended heat setting. Using the wrong drying method may cause shrinking or fabric damage.",
                       ),
                       _careInfoRow(
                         Icons.iron,
                         "Iron Level",
                         true,
                         trailing: item.ironLevel,
-                        info:
-                            "Indicates the maximum ironing temperature that is safe for the fabric. Using excessive heat may damage, shrink, or burn the material.",
+                        info: "Indicates the maximum ironing temperature that is safe for the fabric. Using excessive heat may damage, shrink, or burn the material.",
                       ),
                     ],
                     const SizedBox(height: 30),
@@ -1052,11 +769,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           if (info != null)
             GestureDetector(
               onTap: () => _showInfoDialog(label, info),
-              child: Icon(
-                Icons.info_outline,
-                size: 16,
-                color: Colors.blue.shade300,
-              ),
+              child: Icon(Icons.info_outline, size: 16, color: Colors.blue.shade300),
             ),
           const SizedBox(width: 8),
           Expanded(
@@ -1101,18 +814,11 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  Widget _buildMediaThumbnail(
-    String path,
-    bool isImage,
-    bool isAsset,
-    VoidCallback onRemove,
-  ) {
+  Widget _buildMediaThumbnail(String path, bool isImage, bool isAsset, VoidCallback onRemove) {
     final cleanPath = path.trim();
     final uri = Uri.tryParse(cleanPath);
-    final bool isNetwork =
-        uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
-    final bool isAssetPath =
-        cleanPath.toLowerCase().startsWith('assets/') || isAsset;
+    final bool isNetwork = uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
+    final bool isAssetPath = cleanPath.toLowerCase().startsWith('assets/') || isAsset;
 
     return Stack(
       children: [
@@ -1129,31 +835,13 @@ class _InventoryScreenState extends State<InventoryScreen>
             borderRadius: BorderRadius.circular(7),
             child: isImage
                 ? (isNetwork
-                      ? Image.network(
-                          cleanPath,
-                          fit: BoxFit.cover,
-                          errorBuilder: (c, e, s) => _imageError(cleanPath),
-                        )
-                      : (isAssetPath
-                            ? Image.asset(
-                                cleanPath,
-                                fit: BoxFit.cover,
-                                errorBuilder: (c, e, s) =>
-                                    _imageError(cleanPath),
-                              )
-                            : Image.file(
-                                File(cleanPath),
-                                fit: BoxFit.cover,
-                                errorBuilder: (c, e, s) =>
-                                    _imageError(cleanPath),
-                              )))
+                    ? Image.network(cleanPath, fit: BoxFit.cover, errorBuilder: (c, e, s) => _imageError(cleanPath))
+                    : (isAssetPath 
+                        ? Image.asset(cleanPath, fit: BoxFit.cover, errorBuilder: (c, e, s) => _imageError(cleanPath)) 
+                        : Image.file(File(cleanPath), fit: BoxFit.cover, errorBuilder: (c, e, s) => _imageError(cleanPath))))
                 : Container(
                     color: Colors.black87,
-                    child: const Icon(
-                      Icons.videocam,
-                      color: Colors.white,
-                      size: 20,
-                    ),
+                    child: const Icon(Icons.videocam, color: Colors.white, size: 20),
                   ),
           ),
         ),
@@ -1164,10 +852,7 @@ class _InventoryScreenState extends State<InventoryScreen>
             onTap: onRemove,
             child: Container(
               padding: const EdgeInsets.all(2),
-              decoration: const BoxDecoration(
-                color: Colors.red,
-                shape: BoxShape.circle,
-              ),
+              decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
               child: const Icon(Icons.close, size: 10, color: Colors.white),
             ),
           ),
@@ -1366,9 +1051,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                 Container(
                   decoration: const BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(30),
-                    ),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
                   ),
                   padding: EdgeInsets.only(
                     left: 20,
@@ -1390,780 +1073,662 @@ class _InventoryScreenState extends State<InventoryScreen>
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
-                        Text(
-                          item == null ? "Add New Item" : "Edit Item",
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
+                    Text(
+                      item == null ? "Add New Item" : "Edit Item",
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    
+                    if (formError != null)
+                      Container(
+                        margin: const EdgeInsets.only(top: 15),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                formError!,
+                                style: TextStyle(
+                                  color: Colors.red.shade900,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    
+                    const SizedBox(height: 25),
+
+                    // 🏷 Category Selection
+                    if (item == null)
+                      Align(
+                        alignment: Alignment.center,
+                        child: SizedBox(
+                          width: 250,
+                          child: DropdownButtonFormField<String>(
+                            initialValue: category,
+                            style: TextStyle(
+                              color: Colors.green.shade900,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                            iconEnabledColor: Colors.green.shade800,
+                            decoration: InputDecoration(
+                              labelText: "Category",
+                              labelStyle: TextStyle(color: Colors.green.shade800),
+                              prefixIcon: Icon(
+                                Icons.category_outlined,
+                                color: Colors.green.shade700,
+                              ),
+                              filled: true,
+                              fillColor: Colors.green.shade50,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                borderSide: BorderSide(color: Colors.green.shade300),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                borderSide: BorderSide(color: Colors.green.shade100),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                borderSide: BorderSide(
+                                  color: Colors.green.shade800,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                            items: ["Fabric", "Element"]
+                                .map(
+                                  (cat) => DropdownMenuItem(
+                                    value: cat,
+                                    child: Text(cat),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) => setM(() => category = v!),
                           ),
                         ),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: Colors.green.shade100),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.category, color: Colors.green.shade700, size: 20),
+                            const SizedBox(width: 10),
+                            Text(
+                              "Category: $category",
+                              style: TextStyle(
+                                color: Colors.green.shade900,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 25),
 
-                        if (formError != null)
-                          Container(
-                            margin: const EdgeInsets.only(top: 15),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
+                    // 🌈 Multi-Color Variants Section
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Color Variants",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green.shade900,
                             ),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.red.shade200),
+                          ),
+                          TextButton.icon(
+                            onPressed: () => setM(
+                              () => workingVariants.add(
+                                ProductColorVariant(
+                                  colorName: "",
+                                  imagePaths: [],
+                                  videoPaths: [],
+                                ),
+                              ),
                             ),
-                            child: Row(
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text("Add Color"),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Variants List
+                    ...workingVariants.map((variant) {
+                      int idx = workingVariants.indexOf(variant);
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 15),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
                               children: [
-                                Icon(
-                                  Icons.error_outline,
-                                  color: Colors.red.shade700,
-                                  size: 20,
+                                GestureDetector(
+                                  onTap: () async {
+                                    final List<XFile> medias = await _picker.pickMultipleMedia();
+                                    if (medias.isNotEmpty) {
+                                      setM(() {
+                                        variant.isAsset = false;
+                                        for (var file in medias) {
+                                          final path = file.path.toLowerCase();
+                                          if (path.endsWith('.mp4') ||
+                                              path.endsWith('.mov') ||
+                                              path.endsWith('.avi')) {
+                                            variant.videoPaths.add(file.path);
+                                          } else {
+                                            variant.imagePaths.add(file.path);
+                                          }
+                                        }
+                                      });
+                                    }
+                                  },
+                                  child: Container(
+                                    width: 60,
+                                    height: 60,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: Colors.green.shade100,
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.collections,
+                                      size: 30,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  flex: 2,
+                                  child: SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: Row(
+                                      children: [
+                                        ...variant.imagePaths.map(
+                                          (path) => _buildMediaThumbnail(
+                                            path,
+                                            true,
+                                            variant.isAsset,
+                                            () => setM(() => variant.imagePaths.remove(path)),
+                                          ),
+                                        ),
+                                        ...variant.videoPaths.map(
+                                          (path) => _buildMediaThumbnail(
+                                            path,
+                                            false,
+                                            variant.isAsset,
+                                            () => setM(() => variant.videoPaths.remove(path)),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
-                                  child: Text(
-                                    formError!,
-                                    style: TextStyle(
-                                      color: Colors.red.shade900,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                        const SizedBox(height: 25),
-
-                        // 🏷 Category Selection
-                        if (item == null)
-                          Align(
-                            alignment: Alignment.center,
-                            child: SizedBox(
-                              width: 250,
-                              child: DropdownButtonFormField<String>(
-                                initialValue: category,
-                                style: TextStyle(
-                                  color: Colors.green.shade900,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                                iconEnabledColor: Colors.green.shade800,
-                                decoration: InputDecoration(
-                                  labelText: "Category",
-                                  labelStyle: TextStyle(
-                                    color: Colors.green.shade800,
-                                  ),
-                                  prefixIcon: Icon(
-                                    Icons.category_outlined,
-                                    color: Colors.green.shade700,
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.green.shade50,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(15),
-                                    borderSide: BorderSide(
-                                      color: Colors.green.shade300,
-                                    ),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(15),
-                                    borderSide: BorderSide(
-                                      color: Colors.green.shade100,
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(15),
-                                    borderSide: BorderSide(
-                                      color: Colors.green.shade800,
-                                      width: 2,
-                                    ),
-                                  ),
-                                ),
-                                items: ["Fabric", "Element"]
-                                    .map(
-                                      (cat) => DropdownMenuItem(
-                                        value: cat,
-                                        child: Text(cat),
-                                      ),
-                                    )
-                                    .toList(),
-                                onChanged: (v) => setM(() => category = v!),
-                              ),
-                            ),
-                          )
-                        else
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 12,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(15),
-                              border: Border.all(color: Colors.green.shade100),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.category,
-                                  color: Colors.green.shade700,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  "Category: $category",
-                                  style: TextStyle(
-                                    color: Colors.green.shade900,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        const SizedBox(height: 25),
-
-                        // 🌈 Multi-Color Variants Section
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                "Color Variants",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.green.shade900,
-                                ),
-                              ),
-                              TextButton.icon(
-                                onPressed: () => setM(
-                                  () => workingVariants.add(
-                                    ProductColorVariant(
-                                      colorName: "",
-                                      imagePaths: [],
-                                      videoPaths: [],
-                                    ),
-                                  ),
-                                ),
-                                icon: const Icon(Icons.add, size: 18),
-                                label: const Text("Add Color"),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-
-                        // Variants List
-                        ...workingVariants.map((variant) {
-                          int idx = workingVariants.indexOf(variant);
-
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 15),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade50,
-                              borderRadius: BorderRadius.circular(15),
-                              border: Border.all(color: Colors.grey.shade200),
-                            ),
-                            child: Column(
-                              children: [
-                                Row(
-                                  children: [
-                                    GestureDetector(
-                                      onTap: () async {
-                                        final List<XFile> medias = await _picker
-                                            .pickMultipleMedia();
-                                        if (medias.isNotEmpty) {
-                                          setM(() {
-                                            variant.isAsset = false;
-                                            for (var file in medias) {
-                                              final path = file.path
-                                                  .toLowerCase();
-                                              if (path.endsWith('.mp4') ||
-                                                  path.endsWith('.mov') ||
-                                                  path.endsWith('.avi')) {
-                                                variant.videoPaths.add(
-                                                  file.path,
-                                                );
-                                              } else {
-                                                variant.imagePaths.add(
-                                                  file.path,
-                                                );
-                                              }
-                                            }
-                                          });
-                                        }
-                                      },
-                                      child: Container(
-                                        width: 60,
-                                        height: 60,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(
-                                            10,
-                                          ),
-                                          border: Border.all(
-                                            color: Colors.green.shade100,
+                                  flex: 3,
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextField(
+                                          onChanged: (v) =>
+                                              variant.colorName = v,
+                                          controller:
+                                              TextEditingController(
+                                                  text: variant.colorName,
+                                                )
+                                                ..selection =
+                                                    TextSelection.fromPosition(
+                                                      TextPosition(
+                                                        offset: variant
+                                                            .colorName
+                                                            .length,
+                                                      ),
+                                                    ),
+                                          decoration: const InputDecoration(
+                                            hintText: "Color",
+                                            border: InputBorder.none,
+                                            isDense: true,
+                                            contentPadding: EdgeInsets.symmetric(vertical: 8),
                                           ),
                                         ),
-                                        child: const Icon(
-                                          Icons.collections,
-                                          size: 30,
-                                          color: Colors.green,
-                                        ),
                                       ),
+                                      const SizedBox(width: 4),
+                                      _buildColorPicker(variant, setM),
+                                    ],
+                                  ),
+                                ),
+                                if (workingVariants.length > 1)
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline,
+                                      color: Colors.red,
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      flex: 2,
-                                      child: SingleChildScrollView(
-                                        scrollDirection: Axis.horizontal,
-                                        child: Row(
-                                          children: [
-                                            ...variant.imagePaths.map(
-                                              (path) => _buildMediaThumbnail(
-                                                path,
-                                                true,
-                                                variant.isAsset,
-                                                () => setM(
-                                                  () => variant.imagePaths
-                                                      .remove(path),
+                                    onPressed: () => setM(
+                                      () => workingVariants.removeAt(idx),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    onChanged: (v) =>
+                                        variant.price = double.tryParse(v) ?? 0,
+                                    controller:
+                                        TextEditingController(
+                                            text: variant.price > 0
+                                                ? variant.price.toString()
+                                                : "",
+                                          )
+                                          ..selection =
+                                              TextSelection.fromPosition(
+                                                TextPosition(
+                                                  offset:
+                                                      (variant.price > 0
+                                                              ? variant.price
+                                                                    .toString()
+                                                              : "")
+                                                          .length,
                                                 ),
                                               ),
-                                            ),
-                                            ...variant.videoPaths.map(
-                                              (path) => _buildMediaThumbnail(
-                                                path,
-                                                false,
-                                                variant.isAsset,
-                                                () => setM(
-                                                  () => variant.videoPaths
-                                                      .remove(path),
+                                    keyboardType: TextInputType.number,
+                                    decoration: const InputDecoration(
+                                      labelText: "Price (Tk)",
+                                      prefixText: "Tk ",
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 15),
+                                Expanded(
+                                  child: TextField(
+                                    onChanged: (v) =>
+                                        variant.stock = int.tryParse(v) ?? 0,
+                                    controller:
+                                        TextEditingController(
+                                            text: variant.stock > 0
+                                                ? variant.stock.toString()
+                                                : "",
+                                          )
+                                          ..selection =
+                                              TextSelection.fromPosition(
+                                                TextPosition(
+                                                  offset:
+                                                      (variant.stock > 0
+                                                              ? variant.stock
+                                                                    .toString()
+                                                              : "")
+                                                          .length,
                                                 ),
                                               ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                                    keyboardType: TextInputType.number,
+                                    decoration: const InputDecoration(
+                                      labelText: "Stock",
                                     ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      flex: 3,
-                                      child: Row(
-                                        children: [
-                                          Expanded(
-                                            child: TextField(
-                                              onChanged: (v) =>
-                                                  variant.colorName = v,
-                                              controller:
-                                                  TextEditingController(
-                                                      text: variant.colorName,
-                                                    )
-                                                    ..selection =
-                                                        TextSelection.fromPosition(
-                                                          TextPosition(
-                                                            offset: variant
-                                                                .colorName
-                                                                .length,
-                                                          ),
-                                                        ),
-                                              decoration: const InputDecoration(
-                                                hintText: "Color",
-                                                border: InputBorder.none,
-                                                isDense: true,
-                                                contentPadding:
-                                                    EdgeInsets.symmetric(
-                                                      vertical: 8,
-                                                    ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          _buildColorPicker(variant, setM),
-                                        ],
-                                      ),
-                                    ),
-                                    if (workingVariants.length > 1)
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.remove_circle_outline,
-                                          color: Colors.red,
-                                        ),
-                                        onPressed: () => setM(
-                                          () => workingVariants.removeAt(idx),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: TextField(
-                                        onChanged: (v) => variant.price =
-                                            double.tryParse(v) ?? 0,
-                                        controller:
-                                            TextEditingController(
-                                                text: variant.price > 0
-                                                    ? variant.price.toString()
-                                                    : "",
-                                              )
-                                              ..selection =
-                                                  TextSelection.fromPosition(
-                                                    TextPosition(
-                                                      offset:
-                                                          (variant.price > 0
-                                                                  ? variant
-                                                                        .price
-                                                                        .toString()
-                                                                  : "")
-                                                              .length,
-                                                    ),
-                                                  ),
-                                        keyboardType: TextInputType.number,
-                                        decoration: const InputDecoration(
-                                          labelText: "Price (Tk)",
-                                          prefixText: "Tk ",
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 15),
-                                    Expanded(
-                                      child: TextField(
-                                        onChanged: (v) => variant.stock =
-                                            int.tryParse(v) ?? 0,
-                                        controller:
-                                            TextEditingController(
-                                                text: variant.stock > 0
-                                                    ? variant.stock.toString()
-                                                    : "",
-                                              )
-                                              ..selection =
-                                                  TextSelection.fromPosition(
-                                                    TextPosition(
-                                                      offset:
-                                                          (variant.stock > 0
-                                                                  ? variant
-                                                                        .stock
-                                                                        .toString()
-                                                                  : "")
-                                                              .length,
-                                                    ),
-                                                  ),
-                                        keyboardType: TextInputType.number,
-                                        decoration: const InputDecoration(
-                                          labelText: "Stock",
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               ],
                             ),
-                          );
-                        }),
-
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: name,
-                          decoration: const InputDecoration(
-                            labelText: "Product Name (e.g. Pure Silk Saree)",
-                          ),
+                          ],
                         ),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: desc,
-                          maxLines: 2,
-                          decoration: const InputDecoration(
-                            labelText: "Description",
-                          ),
-                        ),
+                      );
+                    }),
 
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: sku,
-                          enabled: item == null,
-                          decoration: InputDecoration(
-                            labelText: "Product Code (SKU)",
-                            helperText: item == null
-                                ? null
-                                : "SKU cannot be changed after creation",
-                          ),
-                        ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: name,
+                      decoration: const InputDecoration(
+                        labelText: "Product Name (e.g. Pure Silk Saree)",
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: desc,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: "Description",
+                      ),
+                    ),
 
-                        if (category == "Fabric") ...[
-                          const SizedBox(height: 20),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  "Material Composition",
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green.shade900,
-                                  ),
-                                ),
-                                TextButton.icon(
-                                  onPressed: () => setM(
-                                    () => workingMaterialBlends.add(
-                                      FabricMaterialBlend(material: ""),
-                                    ),
-                                  ),
-                                  icon: const Icon(Icons.add, size: 18),
-                                  label: const Text("Add Material"),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          ...workingMaterialBlends.asMap().entries.map((entry) {
-                            return _buildMaterialBlendRow(
-                              entry.value,
-                              entry.key,
-                              workingMaterialBlends,
-                              setM,
-                            );
-                          }),
-                        ],
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: sku,
+                      enabled: item == null,
+                      decoration: InputDecoration(
+                        labelText: "Product Code (SKU)",
+                        helperText: item == null
+                            ? null
+                            : "SKU cannot be changed after creation",
+                      ),
+                    ),
 
-                        if (category == "Fabric") ...[
-                          const SizedBox(height: 25),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              "Care Instructions",
+                    if (category == "Fabric") ...[
+                      const SizedBox(height: 20),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "Material Composition",
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.green.shade900,
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 10),
-                          _buildCareSwitch(
-                            "Machine Washable",
-                            canWash,
-                            (v) => setM(() => canWash = v),
-                            info:
-                                "Indicates whether the garment can be safely washed in a washing machine and the recommended washing conditions. Following these instructions helps maintain the fabric's quality, color, and shape.",
-                          ),
-                          _buildCareSwitch(
-                            "Bleach Allowed",
-                            canBleach,
-                            (v) => setM(() => canBleach = v),
-                            info:
-                                "Indicates whether bleach can be safely used on the fabric. Some materials may fade, weaken, or become damaged when exposed to bleach.",
-                          ),
-                          _buildCareSwitch(
-                            "Dry Clean Only",
-                            canDryClean,
-                            (v) => setM(() => canDryClean = v),
-                            info:
-                                "Indicates whether the garment should be professionally cleaned using special solvents instead of water. This method is recommended for delicate fabrics or garments with special finishes.",
-                          ),
-                          _buildCareSwitch(
-                            "Tumble Dry",
-                            canTumbleDry,
-                            (v) => setM(() => canTumbleDry = v),
-                            info:
-                                "Tumble drying is the process of drying clothes in a clothes dryer (dryer machine) instead of hanging them to air dry. It indicates whether the garment is suitable for tumble drying and the recommended heat setting. Using the wrong drying method may cause shrinking or fabric damage.",
-                          ),
-                          const SizedBox(height: 10),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: SizedBox(
-                              width: 260,
-                              child: Row(
-                                children: [
-                                  GestureDetector(
-                                    onTap: () => _showInfoDialog(
-                                      "Iron Level",
-                                      "Indicates the maximum ironing temperature that is safe for the fabric. Using excessive heat may damage, shrink, or burn the material.",
-                                    ),
-                                    child: Icon(
-                                      Icons.info_outline,
-                                      size: 20,
-                                      color: Colors.blue.shade300,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: DropdownButtonFormField(
-                                      initialValue: ironLevel,
-                                      items: ["None", "Low", "Medium", "High"]
-                                          .map(
-                                            (e) => DropdownMenuItem(
-                                              value: e,
-                                              child: Text("Iron Level: $e"),
-                                            ),
-                                          )
-                                          .toList(),
-                                      onChanged: (v) =>
-                                          setM(() => ironLevel = v.toString()),
-                                      decoration: const InputDecoration(
-                                        labelText: "Ironing",
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                            TextButton.icon(
+                              onPressed: () => setM(
+                                () => workingMaterialBlends.add(
+                                  FabricMaterialBlend(material: ""),
+                                ),
                               ),
+                              icon: const Icon(Icons.add, size: 18),
+                              label: const Text("Add Material"),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ...workingMaterialBlends.asMap().entries.map((entry) {
+                        return _buildMaterialBlendRow(
+                          entry.value,
+                          entry.key,
+                          workingMaterialBlends,
+                          setM,
+                        );
+                      }),
+                    ],
 
-                        const SizedBox(height: 40),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 55,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green.shade800,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              disabledBackgroundColor: Colors.grey,
-                            ),
-                            onPressed: isSaving
-                                ? null
-                                : () async {
-                                    if (_retailerId == null) return;
-
-                                    // Form Validation
-                                    String? error;
-                                    if (name.text.trim().isEmpty) {
-                                      error = "Product Name is required";
-                                    } else if (desc.text.trim().isEmpty) {
-                                      error = "Description is required";
-                                    } else if (item == null &&
-                                        sku.text.trim().isEmpty) {
-                                      error = "Product Code (SKU) is required";
-                                    } else if (workingVariants.isEmpty) {
-                                      error =
-                                          "At least one color variant is required";
-                                    } else {
-                                      for (var v in workingVariants) {
-                                        if (v.colorName.trim().isEmpty) {
-                                          error =
-                                              "Color name is required for all variants";
-                                          break;
-                                        }
-                                        if (v.imagePaths.isEmpty &&
-                                            v.videoPaths.isEmpty) {
-                                          error =
-                                              "Media is required for all variants";
-                                          break;
-                                        }
-                                        if (v.price <= 0) {
-                                          error =
-                                              "Price must be greater than 0";
-                                          break;
-                                        }
-                                        if (v.stock < 0) {
-                                          error = "Stock cannot be negative";
-                                          break;
-                                        }
-                                      }
-                                    }
-
-                                    if (category == "Fabric" && error == null) {
-                                      if (workingMaterialBlends.isEmpty ||
-                                          workingMaterialBlends.every(
-                                            (b) => b.material.trim().isEmpty,
-                                          )) {
-                                        error =
-                                            "Material composition is required for fabrics";
-                                      }
-                                    }
-
-                                    if (error != null) {
-                                      setM(() => formError = error);
-                                      // Scroll to top to see error
-                                      scrollController.animateTo(
-                                        0,
-                                        duration: const Duration(
-                                          milliseconds: 300,
-                                        ),
-                                        curve: Curves.easeOut,
-                                      );
-                                      return;
-                                    }
-
-                                    // Clear previous error if any
-                                    setM(() {
-                                      formError = null;
-                                      isSaving = true;
-                                    });
-
-                                    // 🔄 Show a loading overlay or state if needed
-                                    // For simplicity, we'll just disable the button or use a local isSaving if we had one.
-                                    // But to keep UI same, we just proceed.
-
-                                    try {
-                                      List<ColorOption> finalColorOptions = [];
-                                      for (
-                                        int i = 0;
-                                        i < workingVariants.length;
-                                        i++
-                                      ) {
-                                        final v = workingVariants[i];
-                                        // Upload new media to Cloudinary
-                                        final imageUrls =
-                                            await _inventoryService.uploadMedia(
-                                              v.imagePaths,
-                                              folder: 'products/images',
-                                            );
-                                        final videoUrls =
-                                            await _inventoryService.uploadMedia(
-                                              v.videoPaths,
-                                              folder: 'products/videos',
-                                            );
-
-                                        finalColorOptions.add(
-                                          ColorOption(
-                                            optionId: i + 1,
-                                            color: v.colorName,
-                                            image: imageUrls,
-                                            video: videoUrls,
-                                            price: v.price,
-                                            stock: v.stock,
-                                          ),
-                                        );
-                                      }
-
-                                      List<String> careSymbols = [];
-                                      if (canWash) careSymbols.add("Washable");
-                                      if (canBleach)
-                                        careSymbols.add("Bleach Allowed");
-                                      if (canDryClean)
-                                        careSymbols.add("Dry Clean Only");
-                                      if (canTumbleDry)
-                                        careSymbols.add("Tumble Dry");
-                                      careSymbols.add("Iron: $ironLevel");
-
-                                      final product = Product(
-                                        id: item?.id ?? "",
-                                        retailerId: _retailerId!,
-                                        productName: name.text,
-                                        category: category,
-                                        productCode: sku.text,
-                                        materialType: category == "Fabric"
-                                            ? workingMaterialBlends
-                                                  .where(
-                                                    (b) =>
-                                                        b.material.isNotEmpty,
-                                                  )
-                                                  .map(
-                                                    (b) => MaterialBlend(
-                                                      type: b.material,
-                                                      blend:
-                                                          double.tryParse(
-                                                            b.blend.replaceAll(
-                                                              '%',
-                                                              '',
-                                                            ),
-                                                          ) ??
-                                                          0,
-                                                    ),
-                                                  )
-                                                  .toList()
-                                            : [],
-                                        colorOptions: finalColorOptions,
-                                        description: desc.text,
-                                        careSymbol: careSymbols,
-                                      );
-
-                                      if (item == null) {
-                                        await _inventoryService.createProduct(
-                                          product.toJson(),
-                                        );
-                                      } else {
-                                        await _inventoryService.updateProduct(
-                                          item.id,
-                                          product.toJson(),
-                                        );
-                                      }
-
-                                      if (context.mounted)
-                                        Navigator.of(context).pop();
-
-                                      if (item == null) {
-                                        _showFeedback(
-                                          "Product added successfully!",
-                                        );
-                                      } else {
-                                        _showFeedback(
-                                          "Product updated successfully!",
-                                        );
-                                      }
-                                    } catch (e) {
-                                      debugPrint("Error saving product: $e");
-                                      setM(() {
-                                        isSaving = false;
-                                        formError = "Error saving product: $e";
-                                      });
-                                    }
-                                  },
-                            child: Text(
-                              item == null ? "Add Item" : "Save Changes",
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                              ),
-                            ),
+                    if (category == "Fabric") ...[
+                      const SizedBox(height: 25),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          "Care Instructions",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green.shade900,
                           ),
                         ),
-                      ],
+                      ),
+                      const SizedBox(height: 10),
+                      _buildCareSwitch(
+                        "Machine Washable",
+                        canWash,
+                        (v) => setM(() => canWash = v),
+                        info: "Indicates whether the garment can be safely washed in a washing machine and the recommended washing conditions. Following these instructions helps maintain the fabric's quality, color, and shape.",
+                      ),
+                      _buildCareSwitch(
+                        "Bleach Allowed",
+                        canBleach,
+                        (v) => setM(() => canBleach = v),
+                        info: "Indicates whether bleach can be safely used on the fabric. Some materials may fade, weaken, or become damaged when exposed to bleach.",
+                      ),
+                      _buildCareSwitch(
+                        "Dry Clean Only",
+                        canDryClean,
+                        (v) => setM(() => canDryClean = v),
+                        info: "Indicates whether the garment should be professionally cleaned using special solvents instead of water. This method is recommended for delicate fabrics or garments with special finishes.",
+                      ),
+                      _buildCareSwitch(
+                        "Tumble Dry",
+                        canTumbleDry,
+                        (v) => setM(() => canTumbleDry = v),
+                        info: "Tumble drying is the process of drying clothes in a clothes dryer (dryer machine) instead of hanging them to air dry. It indicates whether the garment is suitable for tumble drying and the recommended heat setting. Using the wrong drying method may cause shrinking or fabric damage.",
+                      ),
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: SizedBox(
+                          width: 260,
+                          child: Row(
+                            children: [
+                              GestureDetector(
+                                onTap: () => _showInfoDialog("Iron Level", "Indicates the maximum ironing temperature that is safe for the fabric. Using excessive heat may damage, shrink, or burn the material."),
+                                child: Icon(Icons.info_outline, size: 20, color: Colors.blue.shade300),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: DropdownButtonFormField(
+                                  initialValue: ironLevel,
+                                  items: ["None", "Low", "Medium", "High"]
+                                      .map(
+                                        (e) => DropdownMenuItem(
+                                          value: e,
+                                          child: Text("Iron Level: $e"),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (v) => setM(() => ironLevel = v.toString()),
+                                  decoration: const InputDecoration(labelText: "Ironing"),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 40),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 55,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade800,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          disabledBackgroundColor: Colors.grey,
+                        ),
+                        onPressed: isSaving ? null : () async {
+                          if (_retailerId == null) return;
+                          
+                          // Form Validation
+                          String? error;
+                          if (name.text.trim().isEmpty) {
+                            error = "Product Name is required";
+                          } else if (desc.text.trim().isEmpty) {
+                            error = "Description is required";
+                          } else if (item == null && sku.text.trim().isEmpty) {
+                            error = "Product Code (SKU) is required";
+                          } else if (workingVariants.isEmpty) {
+                            error = "At least one color variant is required";
+                          } else {
+                            for (var v in workingVariants) {
+                              if (v.colorName.trim().isEmpty) {
+                                error = "Color name is required for all variants";
+                                break;
+                              }
+                              if (v.imagePaths.isEmpty && v.videoPaths.isEmpty) {
+                                error = "Media is required for all variants";
+                                break;
+                              }
+                              if (v.price <= 0) {
+                                error = "Price must be greater than 0";
+                                break;
+                              }
+                              if (v.stock < 0) {
+                                error = "Stock cannot be negative";
+                                break;
+                              }
+                            }
+                          }
+
+                          if (category == "Fabric" && error == null) {
+                            if (workingMaterialBlends.isEmpty || workingMaterialBlends.every((b) => b.material.trim().isEmpty)) {
+                              error = "Material composition is required for fabrics";
+                            }
+                          }
+
+                          if (error != null) {
+                            setM(() => formError = error);
+                            // Scroll to top to see error
+                            scrollController.animateTo(
+                              0, 
+                              duration: const Duration(milliseconds: 300), 
+                              curve: Curves.easeOut,
+                            );
+                            return;
+                          }
+
+                          // Clear previous error if any
+                          setM(() {
+                            formError = null;
+                            isSaving = true;
+                          });
+
+                          // 🔄 Show a loading overlay or state if needed
+                          // For simplicity, we'll just disable the button or use a local isSaving if we had one.
+                          // But to keep UI same, we just proceed.
+
+                          try {
+                            List<ColorOption> finalColorOptions = [];
+                            for (int i = 0; i < workingVariants.length; i++) {
+                              final v = workingVariants[i];
+                              // Upload new media to Cloudinary
+                              final imageUrls = await _inventoryService.uploadMedia(v.imagePaths, folder: 'products/images');
+                              final videoUrls = await _inventoryService.uploadMedia(v.videoPaths, folder: 'products/videos');
+                              
+                              finalColorOptions.add(ColorOption(
+                                optionId: i + 1,
+                                color: v.colorName,
+                                image: imageUrls,
+                                video: videoUrls,
+                                price: v.price,
+                                stock: v.stock,
+                              ));
+                            }
+
+                            List<String> careSymbols = [];
+                            if (canWash) careSymbols.add("Washable");
+                            if (canBleach) careSymbols.add("Bleach Allowed");
+                            if (canDryClean) careSymbols.add("Dry Clean Only");
+                            if (canTumbleDry) careSymbols.add("Tumble Dry");
+                            careSymbols.add("Iron: $ironLevel");
+
+                            final product = Product(
+                              id: item?.id ?? "",
+                              retailerId: _retailerId!,
+                              productName: name.text,
+                              category: category,
+                              productCode: sku.text,
+                              materialType: category == "Fabric" 
+                                ? workingMaterialBlends.where((b) => b.material.isNotEmpty).map((b) => MaterialBlend(type: b.material, blend: double.tryParse(b.blend.replaceAll('%', '')) ?? 0)).toList()
+                                : [],
+                              colorOptions: finalColorOptions,
+                              description: desc.text,
+                              careSymbol: careSymbols,
+                            );
+
+                            if (item == null) {
+                              await _inventoryService.createProduct(product.toJson());
+                            } else {
+                              await _inventoryService.updateProduct(item.id, product.toJson());
+                            }
+
+                            if (context.mounted) Navigator.of(context).pop();
+
+                            if (item == null) {
+                              _showFeedback("Product added successfully!");
+                            } else {
+                              _showFeedback("Product updated successfully!");
+                            }
+                          } catch (e) {
+                            debugPrint("Error saving product: $e");
+                            setM(() {
+                              isSaving = false;
+                              formError = "Error saving product: $e";
+                            });
+                          }
+                        },
+                        child: Text(
+                          item == null ? "Add Item" : "Save Changes",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-                if (isSaving)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(30),
-                      ),
-                    ),
-                    child: const Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircularProgressIndicator(color: Colors.green),
-                          SizedBox(height: 20),
-                          Text(
-                            "Saving Product...",
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            "Please wait, uploading media",
-                            style: TextStyle(color: Colors.black54),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
+              ),
             ),
-          );
-        },
+          if (isSaving)
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.8),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+              ),
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: Colors.green),
+                    SizedBox(height: 20),
+                    Text(
+                      "Saving Product...",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      "Please wait, uploading media",
+                      style: TextStyle(color: Colors.black54),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
-  }
+  },
+),
+);
+}
 
-  Widget _buildCareSwitch(
-    String label,
-    bool value,
-    Function(bool) onChanged, {
-    String? info,
-  }) {
+
+  Widget _buildCareSwitch(String label, bool value, Function(bool) onChanged, {String? info}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -2175,11 +1740,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                 onTap: () => _showInfoDialog(label, info),
                 child: Padding(
                   padding: const EdgeInsets.only(right: 8.0),
-                  child: Icon(
-                    Icons.info_outline,
-                    size: 20,
-                    color: Colors.blue.shade300,
-                  ),
+                  child: Icon(Icons.info_outline, size: 20, color: Colors.blue.shade300),
                 ),
               ),
             Text(
@@ -2238,10 +1799,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                   },
                   decoration: InputDecoration(
                     hintText: "Search your products by name or code",
-                    hintStyle: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey,
-                    ),
+                    hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
                     prefixIcon: const Icon(Icons.search),
                     filled: true,
                     fillColor: Colors.white,
@@ -2291,20 +1849,14 @@ class _InventoryScreenState extends State<InventoryScreen>
               left: 0,
               right: 0,
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: SafeArea(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(18),
                     child: BackdropFilter(
                       filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         decoration: BoxDecoration(
                           color: _isFeedbackError
                               ? const Color(0xFFFFEBEE).withValues(alpha: 0.92)
@@ -2319,12 +1871,8 @@ class _InventoryScreenState extends State<InventoryScreen>
                           boxShadow: [
                             BoxShadow(
                               color: _isFeedbackError
-                                  ? const Color(
-                                      0xFFD32F2F,
-                                    ).withValues(alpha: 0.10)
-                                  : const Color(
-                                      0xFF2E7D32,
-                                    ).withValues(alpha: 0.10),
+                                  ? const Color(0xFFD32F2F).withValues(alpha: 0.10)
+                                  : const Color(0xFF2E7D32).withValues(alpha: 0.10),
                               blurRadius: 20,
                               spreadRadius: 1,
                               offset: const Offset(0, 6),
@@ -2349,9 +1897,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                                 ),
                               ),
                               child: Icon(
-                                _isFeedbackError
-                                    ? Icons.close_rounded
-                                    : Icons.check_rounded,
+                                _isFeedbackError ? Icons.close_rounded : Icons.check_rounded,
                                 color: Colors.white,
                                 size: 20,
                               ),
@@ -2370,8 +1916,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                             ),
                             const SizedBox(width: 8),
                             GestureDetector(
-                              onTap: () =>
-                                  setState(() => _feedbackMessage = null),
+                              onTap: () => setState(() => _feedbackMessage = null),
                               child: Container(
                                 width: 28,
                                 height: 28,
@@ -2471,21 +2016,15 @@ class _InventoryScreenState extends State<InventoryScreen>
                                 context: context,
                                 builder: (ctx) => AlertDialog(
                                   title: const Text("Delete Product"),
-                                  content: Text(
-                                    "Are you sure you want to delete ${item.name}?",
-                                  ),
+                                  content: Text("Are you sure you want to delete ${item.name}?"),
                                   actions: [
                                     TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(ctx, false),
+                                      onPressed: () => Navigator.pop(ctx, false),
                                       child: const Text("Cancel"),
                                     ),
                                     TextButton(
                                       onPressed: () => Navigator.pop(ctx, true),
-                                      child: const Text(
-                                        "Delete",
-                                        style: TextStyle(color: Colors.red),
-                                      ),
+                                      child: const Text("Delete", style: TextStyle(color: Colors.red)),
                                     ),
                                   ],
                                 ),
@@ -2493,17 +2032,12 @@ class _InventoryScreenState extends State<InventoryScreen>
 
                               if (confirm == true) {
                                 try {
-                                  await _inventoryService.deleteProduct(
-                                    item.id,
-                                  );
-                                  _showFeedback(
-                                    "Product deleted successfully!",
-                                  );
+                                  await _inventoryService.deleteProduct(item.id);
+                                  _showFeedback("Product deleted successfully!");
                                 } catch (_) {
                                   _showFeedback(
-                                    "Couldn't delete the product. Please try again.",
-                                    isError: true,
-                                  );
+                                      "Couldn't delete the product. Please try again.",
+                                      isError: true);
                                 }
                               }
                             }),
@@ -2738,7 +2272,7 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   Widget _buildVariantImage(ProductColorVariant? variant) {
     if (variant == null) return _imagePlaceholder();
-
+    
     if (variant.imagePaths.isEmpty) {
       if (variant.videoPaths.isNotEmpty) {
         return Container(
@@ -2754,27 +2288,26 @@ class _InventoryScreenState extends State<InventoryScreen>
 
     // Use Uri to reliably check for network scheme
     final uri = Uri.tryParse(path);
-    final bool isNetwork =
-        uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
+    final bool isNetwork = uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
 
     if (isNetwork) {
       return Image.network(
-        path,
+        path, 
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) => _imageError(path),
       );
     }
-
+    
     if (variant.isAsset || path.toLowerCase().startsWith('assets/')) {
       return Image.asset(
-        path,
+        path, 
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) => _imageError(path),
       );
     }
 
     return Image.file(
-      File(path),
+      File(path), 
       fit: BoxFit.cover,
       errorBuilder: (context, error, stackTrace) => _imageError(path),
     );
