@@ -30,10 +30,18 @@ class CartSnapshot {
   /// can be audited later. Null when the customer has no saved location.
   final GeoPoint? customerLocation;
 
+  /// How many `Cart-Items` rows were dropped while building this snapshot
+  /// because their product was deleted, or their colour option retired, by
+  /// the retailer since they were added. They used to vanish with no
+  /// explanation; the cart screen surfaces this so the customer knows why
+  /// their basket shrank. Not persisted anywhere — purely per-render.
+  final int unavailableCount;
+
   const CartSnapshot({
     required this.lines,
     required this.retailers,
     this.customerLocation,
+    this.unavailableCount = 0,
   });
 
   static const empty = CartSnapshot(lines: [], retailers: {});
@@ -270,14 +278,21 @@ class CartService {
     final products = await _fetchProducts(productIds);
 
     final lines = <CartLine>[];
+    var unavailable = 0;
     for (final item in items) {
       final product = products[item.productId];
-      if (product == null) continue; // product deleted since it was added
+      if (product == null) {
+        unavailable++; // product deleted since it was added
+        continue;
+      }
 
       final option = product.colorOptions
           .cast<ColorOption?>()
           .firstWhere((o) => o?.optionId == item.optionId, orElse: () => null);
-      if (option == null) continue; // colour option retired since it was added
+      if (option == null) {
+        unavailable++; // colour option retired since it was added
+        continue;
+      }
 
       final fullImage = _resolveOptionImage(option);
       final image = _thumbnail(fullImage);
@@ -306,6 +321,7 @@ class CartService {
       lines: lines,
       retailers: retailers,
       customerLocation: customer?.location,
+      unavailableCount: unavailable,
     );
   }
 

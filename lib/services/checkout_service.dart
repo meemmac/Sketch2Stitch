@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
+import 'package:flutter/foundation.dart';
 import '../models/order.dart';
 import '../models/order_item.dart';
 import '../models/payment.dart';
 import '../models/product.dart';
 import '../models/sub_order.dart';
+import 'notification_service.dart';
 
 /// Thrown by [CheckoutService] with a user-friendly message so callers
 /// can surface `e.message` directly without knowing Firestore error codes.
@@ -278,6 +280,11 @@ class CheckoutService {
         for (final s in subOrders) s.retailerId: _db.collection(_subOrders).doc()
       };
 
+      // Product names, filled in during the transaction below so the
+      // "new order" notifications can name what was bought without a second
+      // round of reads after the commit.
+      final productNames = <String, String>{};
+
       final wanted = _totalsByProductOption(allItems);
       final productRefs = {
         for (final id in wanted.keys.map((k) => k.productId).toSet())
@@ -307,6 +314,7 @@ class CheckoutService {
           }
 
           final product = Product.fromJson({...snap.data()!, 'id': snap.id});
+          productNames[key.productId] = product.productName;
           final option = _optionOf(product, key.optionId);
 
           if (option == null) {
@@ -396,6 +404,16 @@ class CheckoutService {
           });
         }
       });
+
+      // Best-effort, after the order is safely committed: tell each retailer
+      // a paid order is waiting for them. These were the notifications the
+      // retailer dashboard was built to show but nothing ever created.
+      await _notifyRetailersOfNewOrder(
+        customerId: customerId,
+        orderId: orderRef.id,
+        subOrders: subOrders,
+        productNames: productNames,
+      );
 
       return PlacedOrder(
         order: Order(
@@ -699,6 +717,52 @@ class CheckoutService {
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
+
+  /// Fires one `notifyRetailerNewOrder` per retailer in a freshly placed
+  /// order.
+  ///
+  /// Deliberately best-effort: the order is already committed and paid by
+  /// the time this runs, so a notification failure must never surface as a
+  /// checkout failure.
+  Future<void> _notifyRetailersOfNewOrder({
+    required String customerId,
+    required String orderId,
+    required List<SubOrderInput> subOrders,
+    required Map<String, String> productNames,
+  }) async {
+    try {
+      final notifications = NotificationService();
+
+      final customerSnap =
+          await _db.collection('Customer').doc(customerId).get();
+      final customerName =
+          (customerSnap.data()?['name'] as String?)?.trim().isNotEmpty == true
+              ? customerSnap.data()!['name'] as String
+              : 'A customer';
+
+      for (final sub in subOrders) {
+        final names = sub.items
+            .map((i) => productNames[i.productId])
+            .whereType<String>()
+            .toSet()
+            .toList();
+        final itemName = names.isEmpty
+            ? '${sub.items.length} item(s)'
+            : names.length == 1
+                ? names.first
+                : '${names.first} +${names.length - 1} more';
+
+        await notifications.notifyRetailerNewOrder(
+          sub.retailerId,
+          orderId,
+          customerName,
+          itemName,
+        );
+      }
+    } catch (e) {
+      debugPrint('[CheckoutService] new-order notifications failed: $e');
+    }
+  }
 
   ColorOption? _optionOf(Product product, int optionId) =>
       product.colorOptions.cast<ColorOption?>().firstWhere(

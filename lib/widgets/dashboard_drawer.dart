@@ -915,6 +915,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   void _save() {
+    // The photo picker sets _profilePicturePath to the on-device file path
+    // first and swaps in the Cloudinary URL when the upload lands. Saving in
+    // between would persist a local path that no other device can open.
+    if (_isUploadingPhoto) {
+      _showFeedback(
+        'Your photo is still uploading. Please wait a moment.',
+        isError: true,
+      );
+      return;
+    }
+
     final isRetailer = widget.role == UserRole.retailer;
     final displayName = isRetailer
         ? _shopNameController.text.trim()
@@ -1328,7 +1339,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               Expanded(
                 flex: 2,
                 child: ElevatedButton(
-                  onPressed: _save,
+                  onPressed: _isUploadingPhoto ? null : _save,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: themeColor,
                     foregroundColor: Colors.white,

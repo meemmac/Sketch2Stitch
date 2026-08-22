@@ -60,7 +60,8 @@ TailoringSetupCallbacks buildTailoringCallbacks(
     // own screen. The customer is only locking in what's already on the
     // job, and confirmTailorJob re-reads it inside a transaction so a
     // withdrawn or never-quoted job can't be accepted from stale state.
-    onConfirmTailorJob: () => backend.confirmTailorJob(orderId),
+    onConfirmTailorJob: ({String? transactionId}) =>
+        backend.confirmTailorJob(orderId, transactionId: transactionId),
 
     // No reason required — the customer can simply decline the tailor's
     // quote without justifying it.
