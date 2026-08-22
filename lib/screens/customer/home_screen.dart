@@ -73,11 +73,22 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     'Element',
   ];
 
+  // Categories that are considered "Fabrics"
+  final List<String> _fabricCategories = [
+    'Fabric',
+  ];
+
   bool _isElement(Product product) =>
       _elementCategories.contains(product.category);
 
+  bool _isFabric(Product product) =>
+      _fabricCategories.contains(product.category);
+
   // ─── Getters ──────────────────────────────────────────────────────────
-  List<Product> get _allFabricProducts => _allProducts.where((p) => !_isElement(p)).toList();
+  // Matched to the Browse Fabrics tab: only an explicit "Fabric" category
+  // counts, so a product with a missing/unknown category is not silently
+  // listed here while being absent from browsing.
+  List<Product> get _allFabricProducts => _allProducts.where((p) => _isFabric(p)).toList();
   List<Product> get _allElementProducts => _allProducts.where((p) => _isElement(p)).toList();
 
   List<Product> get _fabricSectionProducts {
@@ -195,6 +206,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         // retailer names stay empty; _getRetailerName() falls back per-id
       }
 
+      if (!mounted) return;
+
       // Check if we got any data
       if (products.isEmpty && tailors.isEmpty && retailers.isEmpty) {
         setState(() {
@@ -220,6 +233,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
       });
 
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
         _hasError = true;
@@ -259,7 +273,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   }
 
   void _showProductOverlay(Product product) {
-    final bool isFabric = !_isElement(product);
+    final bool isFabric = _isFabric(product);
     List<String>? materialBlends;
     
     if (isFabric && product.materialType.isNotEmpty) {
@@ -366,6 +380,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
 
   void _scrollToSection(GlobalKey key) {
     Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
       final ctx = key.currentContext;
       if (ctx != null) {
         Scrollable.ensureVisible(
@@ -1416,7 +1431,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                           ),
                   ),
                 ),
-                if (!_isElement(product) && product.materialType.isNotEmpty)
+                if (_isFabric(product) && product.materialType.isNotEmpty)
                   Positioned(
                     top: 8,
                     right: 8,
@@ -1587,6 +1602,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         return Colors.white;
       case 'black':
         return Colors.black;
+      case 'red':
+        return Colors.red;
       case 'pink':
         return Colors.pink[200]!;
       case 'blue':
@@ -1599,6 +1616,10 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         return Colors.brown[300]!;
       case 'gold':
         return const Color(0xFFD4AF37);
+      case 'silver':
+        return Colors.grey[400]!;
+      case 'purple':
+        return Colors.purple[300]!;
       default:
         return Colors.grey[300]!;
     }

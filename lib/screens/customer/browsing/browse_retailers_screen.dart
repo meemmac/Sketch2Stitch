@@ -690,6 +690,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         final isFav = await _favoriteService
             .isFavoriteRetailer(_currentUserId!, widget.retailer.id)
             .first;
+        if (!mounted) return;
         setState(() {
           _isFavorite = isFav;
         });
@@ -830,6 +831,8 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
                 .toList();
           }
         } catch (e) {
+          // Shop-name lookup is only a fallback; fall through to the
+          // retailer's embedded product list below.
         }
       }
       
@@ -837,11 +840,13 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         retailerProducts = widget.retailer.products!;
       }
       
+      if (!mounted) return;
       setState(() {
         _products = retailerProducts;
         _isLoadingProducts = false;
       });
     } catch (e) {
+      if (!mounted) return;
       if (widget.retailer.products != null) {
         setState(() {
           _products = widget.retailer.products!;
@@ -1588,6 +1593,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     switch (name.toLowerCase()) {
       case 'white': return Colors.white;
       case 'black': return Colors.black;
+      case 'red': return Colors.red;
       case 'pink': return Colors.pink[200]!;
       case 'blue': return Colors.blue[300]!;
       case 'green': return Colors.green[300]!;
@@ -2014,6 +2020,9 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   }
 
   void _showProductDetailOverlay(BuildContext context, Product product) {
+    if (_currentUserId != null) {
+      _customerService.addToLastViewed(_currentUserId!, product.id);
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -2022,6 +2031,7 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         product: product,
         isFabric: _isFabric(product),
         retailerName: widget.retailer.shopName,
+        retailerLocation: widget.retailer.location,
         userRole: widget.userRole,
         customerId: _currentUserId,
         favoriteService: _favoriteService,

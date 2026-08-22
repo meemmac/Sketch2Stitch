@@ -345,21 +345,21 @@ class _TailorsPageBodyState extends State<TailorsPageBody>
                                      widget.userRole == UserRole.retailer;
 
     return GestureDetector(
+      // Always open the profile first, in picker mode too: that screen is
+      // where "Book This Tailor" lives, so selecting straight from the card
+      // would leave the customer no way to see the portfolio and reviews
+      // before committing.
       onTap: () {
-        if (widget.onTailorSelected != null) {
-          widget.onTailorSelected!(tailor.id);
-        } else {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => TailorDetailScreen(
-                tailor: tailor,
-                userRole: widget.userRole,
-                onTailorSelected: widget.onTailorSelected,
-              ),
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TailorDetailScreen(
+              tailor: tailor,
+              userRole: widget.userRole,
+              onTailorSelected: widget.onTailorSelected,
             ),
-          );
-        }
+          ),
+        );
       },
       child: Opacity(
         opacity: isFull ? 0.65 : 1.0,
@@ -712,6 +712,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         final isFav = await _favoriteService
             .isFavoriteTailor(_currentUserId!, widget.tailor.id)
             .first;
+        if (!mounted) return;
         setState(() {
           _isFavorite = isFav;
         });
@@ -1326,6 +1327,9 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         child: ElevatedButton(
           onPressed: () {
             if (widget.onTailorSelected != null) {
+              // Close this profile first so the callback's own pop lands on
+              // the browse shell and returns the id to the setup screen.
+              Navigator.pop(context);
               widget.onTailorSelected!(widget.tailor.id);
             } else {
               AppFeedback.show(

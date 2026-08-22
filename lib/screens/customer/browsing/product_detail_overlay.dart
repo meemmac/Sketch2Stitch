@@ -88,11 +88,13 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
         final isFav = await widget.favoriteService!
             .isFavoriteProduct(widget.customerId!, widget.product.id)
             .first;
+        if (!mounted) return;
         setState(() {
           _isFavorite = isFav;
           _isLoadingFavorite = false;
         });
       } catch (e) {
+        if (!mounted) return;
         setState(() {
           _isLoadingFavorite = false;
         });
@@ -735,7 +737,11 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
     final imageWidth = screenWidth * 0.75;
     final imageHeight = 250.0;
 
-    if (_selectedOption != null && _selectedOption!.image.isNotEmpty && _selectedOption!.video.isNotEmpty) {
+    // Any option carrying more than one piece of media gets the swipeable
+    // gallery; a single image (or a single video) falls through to the
+    // fixed-size branches below.
+    final mediaCount = (_selectedOption?.image.length ?? 0) + (_selectedOption?.video.length ?? 0);
+    if (mediaCount > 1) {
       return SizedBox(
         height: imageHeight,
         child: ListView(

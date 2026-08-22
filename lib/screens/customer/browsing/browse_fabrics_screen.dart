@@ -200,6 +200,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         locations[doc.id] = data['location'] is GeoPoint ? data['location'] as GeoPoint : null;
       }
 
+      if (!mounted) return;
       setState(() {
         _retailerNames = names;
         _retailerLocations = locations;
@@ -734,6 +735,8 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         return Colors.white;
       case 'black':
         return Colors.black;
+      case 'red':
+        return Colors.red;
       case 'pink':
         return Colors.pink[200]!;
       case 'blue':
