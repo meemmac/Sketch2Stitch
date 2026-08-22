@@ -295,7 +295,7 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
                   setState(() => _selectedFilter = filter);
                 }
               },
-              selectedColor: primaryGreen,
+              selectedColor: const Color(0xFF6B8F71),
               labelStyle: TextStyle(
                 color: isSelected ? Colors.white : Colors.black87,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,

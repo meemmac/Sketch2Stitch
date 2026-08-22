@@ -233,6 +233,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   
   final InventoryService _inventoryService = InventoryService();
   String? _retailerId;
+  StreamSubscription<List<Product>>? _inventorySubscription;
 
   static const List<String> _commonMaterials = <String>[
     "Cotton",
@@ -376,7 +377,9 @@ InventoryItem _mapProductToItem(Product p) {
   Future<void> _loadInventory() async {
     if (_retailerId == null) return;
 
-    _inventoryService.streamRetailerProducts(_retailerId!).listen((products) {
+    _inventorySubscription?.cancel();
+    _inventorySubscription =
+        _inventoryService.streamRetailerProducts(_retailerId!).listen((products) {
       if (!mounted) return;
       setState(() {
         items.clear();
@@ -407,6 +410,7 @@ InventoryItem _mapProductToItem(Product p) {
   @override
   void dispose() {
     _feedbackTimer?.cancel();
+    _inventorySubscription?.cancel();
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();

@@ -806,7 +806,7 @@ class _BrowseShellState extends State<BrowseShell> {
                     });
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
@@ -832,7 +832,7 @@ class _BrowseShellState extends State<BrowseShell> {
                         Text(
                           color,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             color: isSelected ? Colors.white : Colors.grey.shade700,
                             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                           ),
@@ -877,7 +877,7 @@ class _BrowseShellState extends State<BrowseShell> {
                     });
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
@@ -1065,7 +1065,7 @@ class _BrowseShellState extends State<BrowseShell> {
                     });
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
@@ -1091,7 +1091,7 @@ class _BrowseShellState extends State<BrowseShell> {
                         Text(
                           color,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             color: isSelected ? Colors.white : Colors.grey.shade700,
                             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                           ),
@@ -1437,7 +1437,7 @@ class _BrowseShellState extends State<BrowseShell> {
                     });
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
@@ -1449,7 +1449,7 @@ class _BrowseShellState extends State<BrowseShell> {
                     child: Text(
                       location,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         color: isSelected ? Colors.white : Colors.grey.shade700,
                         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                       ),
@@ -1613,7 +1613,7 @@ class _BrowseShellState extends State<BrowseShell> {
                     });
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: isSelected ? const Color(0xFF6B8F71) : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
@@ -1625,7 +1625,7 @@ class _BrowseShellState extends State<BrowseShell> {
                     child: Text(
                       location,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         color: isSelected ? Colors.white : Colors.grey.shade700,
                         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                       ),

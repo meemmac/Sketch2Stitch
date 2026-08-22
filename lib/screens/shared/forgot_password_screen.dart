@@ -209,7 +209,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                 // Subtitle
                                 Text(
                                   _emailSent
-                                      ? 'We\'ve sent a password reset link to\n${_emailController.text.trim()}.\nOpen it to set a new password, then\ncome back and sign in.'
+                                      ? 'We\'ve sent a password reset link to\n${_emailController.text.trim()}.\nOpen the email in your mail app on this\ndevice, set a new password, then come\nback here and sign in.'
                                       : 'Enter your email and we\'ll send you a\nlink to reset your password',
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(

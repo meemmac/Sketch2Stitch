@@ -1803,7 +1803,7 @@ Widget _buildFilterChips(StateSetter setState) {
                 });
               }
             },
-            selectedColor: const Color(0xFF4F7942),
+            selectedColor: const Color(0xFF6B8F71),
             labelStyle: TextStyle(
               color: isSelected ? Colors.white : Colors.black87,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,

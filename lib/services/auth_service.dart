@@ -16,9 +16,9 @@ final String _emailjsPublicKey = dotenv.get('EMAILJS_PUBLIC_KEY', fallback: '');
 final String _emailjsAccessToken = dotenv.get('EMAILJS_ACCESS_TOKEN', fallback: '');
 final String _emailjsWelcomeTemplateId = dotenv.get('EMAILJS_WELCOME_TEMPLATE_ID', fallback: '');
 
-/// TODO: Replace with your real hosted/deep-link continue URL (see
-/// ActionCodeSettings below). This is what the "return to app" link on
-/// Firebase's reset-password page will point to.
+/// Where Firebase's reset-password page sends the user once the new
+/// password is saved. The page itself (public/reset-done.html) offers a
+/// `sketch2stitch://reset-done` deep link back into the app.
 const String _passwordResetContinueUrl =
     'https://sketch2stitch-276c8.web.app/reset-done.html';
 

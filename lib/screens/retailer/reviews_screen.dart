@@ -313,7 +313,7 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
                   setState(() => _selectedFilter = filter);
                 }
               },
-              selectedColor: const Color(0xFF1E232C),
+              selectedColor: const Color(0xFF6B8F71),
               labelStyle: TextStyle(
                 color: isSelected ? Colors.white : Colors.black87,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
