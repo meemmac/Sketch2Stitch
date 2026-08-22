@@ -205,8 +205,12 @@ class _OrderListScreenState extends State<OrderListScreen> {
                       color: Colors.grey,
                     ),
                     const SizedBox(width: 6),
+                    // `Order.itemCount` counts sub-orders plus tailor jobs —
+                    // i.e. how many separate parties are shipping something,
+                    // not how many garments were bought. Labelling it "items"
+                    // made a 6-fabric order from one shop read as "1 items".
                     Text(
-                      '${order.itemCount} items',
+                      '${order.itemCount} ${order.itemCount == 1 ? 'delivery' : 'deliveries'}',
                       style: TextStyle(
                         fontSize: 13,
                         color: Colors.grey.shade600,

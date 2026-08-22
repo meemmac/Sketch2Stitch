@@ -6,6 +6,7 @@ import '../models/payment.dart';
 import '../models/product.dart';
 import '../models/sub_order.dart';
 import 'notification_service.dart';
+import 'tailoring_service.dart';
 
 /// Thrown by [CheckoutService] with a user-friendly message so callers
 /// can surface `e.message` directly without knowing Firestore error codes.
@@ -117,6 +118,11 @@ class CheckoutService {
   static const _orders     = 'Orders';
   static const _subOrders  = 'Sub-orders';
   static const _orderItems = 'Order-Items';
+
+  /// At or below this many units left, the retailer gets a low-stock alert
+  /// when an order draws the option down. Checked at the only place stock
+  /// ever decreases — inside [placeOrder]'s transaction.
+  static const int lowStockThreshold = 5;
   static const _payments   = 'Payments';
 
   // ── getProductDetails ──────────────────────────────────────────────────────
@@ -291,7 +297,19 @@ class CheckoutService {
           id: _db.collection(_products).doc(id)
       };
 
+      // Options this order draws down to (or past) [lowStockThreshold].
+      // Filled inside the transaction and sent after it commits — a
+      // transaction body can be retried, so it is cleared on every attempt.
+      final lowStock = <({
+        String retailerId,
+        String productId,
+        String productName,
+        String color,
+        int stock,
+      })>[];
+
       await _db.runTransaction((tx) async {
+        lowStock.clear();
         // ── Reads first: Firestore forbids reading after a write. ──────────
         final productSnaps = <String, DocumentSnapshot<Map<String, dynamic>>>{};
         for (final entry in productRefs.entries) {
@@ -334,6 +352,17 @@ class CheckoutService {
             );
           }
 
+          final remaining = option.stock - quantity;
+          if (remaining <= lowStockThreshold) {
+            lowStock.add((
+              retailerId: product.retailerId,
+              productId: key.productId,
+              productName: product.productName,
+              color: option.color,
+              stock: remaining,
+            ));
+          }
+
           // Rebuild the whole array with this option's stock decremented;
           // colourOptions is an array field, so it can only be written whole.
           // Start from any decrement already applied to this same product.
@@ -357,8 +386,16 @@ class CheckoutService {
         tx.set(orderRef, {
           'customerId': customerId,
           'orderDate': orderDate,
-          // tailorSelectionDeadline is deliberately not set here — the
-          // customer hasn't chosen whether they want a tailor yet.
+          // The 72h clock starts the moment the order is paid for, NOT when
+          // the customer first opens the tailoring screen. Leaving it unset
+          // until then meant an order the customer never came back to had no
+          // deadline at all, so nothing could ever settle it: it stayed in
+          // awaiting_confirmation forever with its Sub-orders stuck on a
+          // 'pending' destination, which also blocks the retailers from
+          // marking anything delivered.
+          'tailorSelectionDeadline': Timestamp.fromDate(
+            orderDate.toDate().add(TailoringService.tailorSelectionWindow),
+          ),
           'status': OrderStatus.awaitingConfirmation.toValue,
         });
 
@@ -415,12 +452,32 @@ class CheckoutService {
         productNames: productNames,
       );
 
+      // Same best-effort footing: this order is what pushed the option low,
+      // so this is the moment the retailer needs to hear about it. The
+      // inventory screen shows stock but nobody watches it in real time.
+      for (final alert in lowStock) {
+        try {
+          await NotificationService().notifyRetailerStockAlert(
+            alert.retailerId,
+            alert.productId,
+            alert.productName,
+            alert.color,
+            alert.stock,
+          );
+        } catch (e) {
+          debugPrint('[CheckoutService] low-stock alert failed: $e');
+        }
+      }
+
       return PlacedOrder(
         order: Order(
           id: orderRef.id,
           customerId: customerId,
           orderDate: orderDate.toDate(),
           status: OrderStatus.awaitingConfirmation,
+          tailorSelectionDeadline: orderDate
+              .toDate()
+              .add(TailoringService.tailorSelectionWindow),
         ),
         subOrders: [
           for (final sub in subOrders)

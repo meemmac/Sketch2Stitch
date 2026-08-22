@@ -25,6 +25,7 @@ import 'track_order.dart';
 
 import 'package:sketch2stitch/services/auth_service.dart';
 import 'package:sketch2stitch/services/notification_service.dart';
+import 'package:sketch2stitch/services/tailoring_service.dart';
 
 class UnifiedHomeScreen extends StatefulWidget {
   final UserRole initialRole;
@@ -131,6 +132,12 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     super.initState();
     _currentRole = widget.initialRole;
     _getCurrentUser();
+    // No Cloud Functions on the free tier, so a tailor-selection window that
+    // closed while the app was shut is only settled when a device notices.
+    // Not awaited — the service swallows its own failures.
+    if (_currentRole == UserRole.customer && _currentUserId != null) {
+      TailoringService().sweepDueTailorSearches(_currentUserId!);
+    }
     _loadData();
   }
 

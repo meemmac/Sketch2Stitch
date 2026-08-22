@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../services/tailor_service.dart';
 import '../../../services/user_session.dart';
 import '../../../services/order_service.dart';
+import '../../../services/notification_service.dart';
 import '../../../services/cart_service.dart';
 import '../../../models/tailor_job.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -29,6 +30,10 @@ class TailorOrderItem {
   final bool canWash;
   final bool canBleach;
   final bool canDryClean;
+  // The care set the retailer's inventory form writes has FIVE entries;
+  // tumble dry was the one this screen had no field for, so the tailor saw
+  // four tags where the retailer and the customer both saw five.
+  final bool canTumbleDry;
   final String ironLevel;
 
   TailorOrderItem({
@@ -44,6 +49,7 @@ class TailorOrderItem {
     this.canWash = true,
     this.canBleach = false,
     this.canDryClean = true,
+    this.canTumbleDry = true,
     this.ironLevel = "Medium",
   });
 }
@@ -67,6 +73,11 @@ class TailorOrder {
   // Job-level price and date (set when tailor quotes — not per-item) #9
   double jobServicePrice;
   DateTime? jobEstimatedDeliveryDate;
+  /// Every sub-order on this order has been delivered to this tailor, so
+  /// there is fabric on the bench to actually sew.
+  final bool materialsReceived;
+  /// When the 12h window to answer this request with a quote closes.
+  final DateTime? quoteResponseDeadline;
 
   TailorOrder({
     required this.id,
@@ -86,7 +97,17 @@ class TailorOrder {
     this.deliveryDistanceKm,
     this.jobServicePrice = 0,
     this.jobEstimatedDeliveryDate,
+    this.materialsReceived = false,
+    this.quoteResponseDeadline,
   });
+
+  /// The request has gone unanswered past its 12h window. The customer's
+  /// device expires these, but until it does the job is still 'pending'
+  /// here — so the screen has to stop offering Accept on its own.
+  bool get quoteWindowClosed =>
+      status == TailorOrderStatus.pending &&
+      quoteResponseDeadline != null &&
+      DateTime.now().isAfter(quoteResponseDeadline!);
 
   int get totalQuantity => items.fold(0, (sumValue, item) => sumValue + item.quantity);
   // For display purposes use the job-level price when set, otherwise fall back to per-item sum
@@ -130,7 +151,9 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
       _tailor = widget.tailor!;
     } else {
       _tailor = Tailor(
-        id: "T-123",
+        // Placeholder only, until _fetchTailorProfile() lands. Blank rather
+        // than a fake id so nothing can accidentally write against it.
+        id: "",
         name: "Loading...",
         email: "",
         phone: "",
@@ -179,21 +202,27 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
             orderDate: _parseDateTime(job['createdAt'] ?? order['orderDate']) ?? DateTime.now(),
             status: mappedStatus,
             isCompleted: job['status'] == 'completed',
-            completionDate: job['status'] == 'completed' ? _parseDateTime(job['confirmedAt']) : null,
-            deliveryAddress: customer['address'] ?? 'N/A',
+            completionDate: job['status'] == 'completed' ? _parseDateTime(job['completedAt'] ?? job['confirmedAt']) : null,
+            // `?? 'N/A'` only caught a MISSING address; a Customer document
+            // with an empty `address` string sailed through and rendered as a
+            // blank line under a "Customer Location" heading, which read as
+            // the address simply not loading.
+            deliveryAddress: _addressOrFallback(customer['address']),
+            // The customer's rating for this job, so the "Customer Feedback"
+            // block on completed orders actually has something to render.
+            customerRating: (map['reviewRating'] as num?)?.toDouble(),
+            customerReview: map['reviewComment'] as String?,
             measurement: measurementMap != null ? Measurement.fromJson({...measurementMap, 'id': job['measurementId']}) : null,
             // #14: carry distance so we can compute the charge at Accept time
             deliveryDistanceKm: (job['deliveryDistanceKm'] as num?)?.toDouble(),
             // #9: job-level quote price and date
             jobServicePrice: jobQuoteAmount,
             jobEstimatedDeliveryDate: jobDeliveryDate,
+            materialsReceived: map['materialsReceived'] == true,
+            quoteResponseDeadline: _parseDateTime(job['quoteResponseDeadline']),
             items: items.map((i) {
-              // Products store care labels the way the retailer inventory
-              // form writes them ("Washable", "Dry Clean Only",
-              // "Iron: High"), so match on those rather than camelCase keys.
               final careSymbols = List<String>.from(i['careSymbol'] ?? []);
-              final careLower =
-                  careSymbols.map((s) => s.toLowerCase()).toList();
+              final careKeys = careSymbols.map(_careKey).toList();
               return TailorOrderItem(
                 name: i['name'],
                 quantity: i['quantity'],
@@ -204,24 +233,67 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 tailorInstructions: job['specialInstructions'] ?? i['instructions'],
                 estimatedDeliveryDate: null, // #9: date lives at job level now
                 measurementRefImages: List<String>.from(map['designUrls'] ?? []),
-                canWash: careLower.any((s) => s.contains('wash')),
-                canBleach: careLower.any((s) => s.contains('bleach')),
-                canDryClean: careLower.any((s) => s.contains('dry clean')),
-                ironLevel: careSymbols
-                    .firstWhere((s) => s.toLowerCase().startsWith('iron'),
-                        orElse: () => "Iron: Medium")
-                    .replaceFirst(
-                        RegExp(r'^iron:\s*', caseSensitive: false), ''),
+                canWash: careKeys.any((s) => s.contains('wash')),
+                canBleach: careKeys.any((s) => s.contains('bleach')),
+                canDryClean: careKeys.any((s) => s.contains('dryclean')),
+                canTumbleDry: careKeys.any((s) => s.contains('tumbledry')),
+                ironLevel: _ironLevelLabel(careSymbols),
               );
             }).toList(),
           ));
         }
         _isLoading = false;
       });
+
+      // Not awaited: a reminder must never hold up the list rendering.
+      _notifyDueDeliveryDeadlines();
     }, onError: (e) {
       debugPrint("TailorOrdersScreen: Error in stream: $e");
       if (mounted) setState(() => _isLoading = false);
     });
+  }
+
+  /// A job the tailor accepted is due (or nearly). With no Cloud Functions
+  /// there is no server to raise this, so the check runs here — where the
+  /// jobs and their dates are already loaded — and drops a notification
+  /// into the tailor's own centre so it survives them closing the screen.
+  ///
+  /// `NotificationService.notifyTailorDeliveryDeadline` dedupes per job, so
+  /// re-running this on every snapshot and every app launch is harmless.
+  Future<void> _notifyDueDeliveryDeadlines() async {
+    final tailorId = UserSession.instance.uid;
+    if (tailorId == null) return;
+
+    final now = DateTime.now();
+    for (final order in _orders) {
+      final due = order.jobEstimatedDeliveryDate;
+      if (due == null) continue;
+      if (order.status != TailorOrderStatus.confirmed &&
+          order.status != TailorOrderStatus.inProgress) {
+        continue;
+      }
+      // Within a day of the promised date, or already past it.
+      if (due.difference(now) > const Duration(days: 1)) continue;
+
+      try {
+        await NotificationService().notifyTailorDeliveryDeadline(
+          tailorId,
+          order.orderId,
+          order.customerName,
+          due,
+        );
+      } catch (e) {
+        debugPrint('TailorOrdersScreen: deadline reminder failed: $e');
+      }
+    }
+  }
+
+  /// A usable address, or a line that says why there isn't one.
+  String _addressOrFallback(dynamic raw) {
+    final address = (raw as String?)?.trim() ?? '';
+    return address.isEmpty
+        ? 'No delivery address on the customer\'s profile'
+        : address;
   }
 
   DateTime? _parseDateTime(dynamic v) {
@@ -689,14 +761,17 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                     ),
                   ],
                 ),
-                if (_selectedTabIndex == 0) ...[
+                if (_selectedTabIndex == 0 || _selectedTabIndex == 1) ...[
                   const SizedBox(height: 24),
                   const Text("Status", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: ["All", "New Request", "Pending Customer"].map((status) {
+                    children: (_selectedTabIndex == 0
+                            ? ["All", "New Request", "Pending Customer"]
+                            : ["All", "Ready to Start", "In Progress"])
+                        .map((status) {
                       return _filterChip(status, _selectedStatus == status, () {
                         setSheetState(() => _selectedStatus = status);
                         setState(() => _selectedStatus = status);
@@ -870,13 +945,28 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                     ],
                   ),
                 ),
-                Column(
+                const SizedBox(width: 8),
+                // Capped, not free-sizing: this column is a bare sibling of
+                // an Expanded, so it took whatever width its widest child
+                // wanted and ate the space the customer's name needed. The
+                // cap is sized to the longest label ("Pending Customer") at
+                // this font so every status still reads on a single line.
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 124),
+                  child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                       decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(999)),
-                      child: Text(_getStatusText(order.status), style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w900)),
+                      child: Text(
+                        _getStatusText(order.status),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w900),
+                      ),
                     ),
                     // #3: show Update Status from confirmed onward so the
                     // tailor can press "Start Stitching" once the customer pays.
@@ -901,6 +991,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                         ),
                       ),
                   ],
+                  ),
                 ),
               ],
             ),
@@ -964,6 +1055,16 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                   Icons.play_arrow_outlined,
                   Colors.purple,
                   () async {
+                    // "Mark as Finished" completes the whole ORDER, so a
+                    // tailor who stepped through both before a single
+                    // retailer shipped marked the customer's order delivered
+                    // with nothing sewn. Refuse until the fabric has arrived.
+                    if (!order.materialsReceived) {
+                      _showBanner(
+                        "The fabric hasn't reached you yet. You can start once the retailer delivers it.",
+                      );
+                      return;
+                    }
                     try {
                       await _orderService.updateWorkProgress(order.id, TailorJobStatus.inProgress);
                       Navigator.pop(context);
@@ -1067,12 +1168,20 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 ),
                 const SizedBox(height: 25),
                 if (order.status == TailorOrderStatus.pending) _buildActionButtons(order, setModalState, modalContext),
+                if (order.status == TailorOrderStatus.pending && order.quoteResponseDeadline != null) ...[
+                  const SizedBox(height: 12),
+                  _quoteDeadlineBanner(order),
+                ],
                 const SizedBox(height: 20),
                 const Text("Customer Requirements", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 ...order.items.map((item) => _itemPreviewCard(order, item, setModalState)),
                 // #9: Single price and date for the whole job, shown once below all items.
-                if (order.status == TailorOrderStatus.pending) ...[
+                // #13: still editable after the quote is sent — the PRICE
+                // until the customer confirms and pays, the DATE until the
+                // work is marked finished. OrderService re-checks both rules
+                // server-side, so a stale sheet can't re-price a paid job.
+                if (_canEditPrice(order) || _canEditDate(order)) ...[
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -1084,83 +1193,125 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("Set Quote Price & Date", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
+                        Text(
+                          order.status == TailorOrderStatus.pending
+                              ? "Set Quote Price & Date"
+                              : "Revise Quote",
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+                        ),
                         const SizedBox(height: 4),
-                        const Text("One price covers all items in this job.", style: TextStyle(fontSize: 11, color: Colors.black54)),
+                        Text(
+                          order.status == TailorOrderStatus.pending
+                              ? "One price covers all items in this job."
+                              : _canEditPrice(order)
+                                  ? "You can change the price until the customer confirms and pays."
+                                  : "The customer has already paid — only the delivery date can still change.",
+                          style: const TextStyle(fontSize: 11, color: Colors.black54),
+                        ),
                         const SizedBox(height: 12),
                         Row(
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text("Stitching Price (Tk)", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
-                                  const SizedBox(height: 6),
-                                  TextField(
-                                    keyboardType: TextInputType.number,
-                                    style: const TextStyle(fontSize: 13),
-                                    decoration: InputDecoration(
-                                      hintText: "e.g. 2000",
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.green.shade300)),
-                                      isDense: true,
-                                    ),
-                                    onChanged: (val) {
-                                      setModalState(() {
-                                        order.jobServicePrice = double.tryParse(val) ?? 0;
-                                      });
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text("Est. Delivery Date", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
-                                  const SizedBox(height: 6),
-                                  InkWell(
-                                    onTap: () async {
-                                      final date = await showDatePicker(
-                                        context: context,
-                                        initialDate: DateTime.now().add(const Duration(days: 7)),
-                                        firstDate: DateTime.now(),
-                                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                                      );
-                                      if (date != null) {
+                            if (_canEditPrice(order)) ...[
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text("Stitching Price (Tk)", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
+                                    const SizedBox(height: 6),
+                                    TextFormField(
+                                      // initialValue, so revising an existing
+                                      // quote starts from what was sent
+                                      // rather than from an empty box.
+                                      initialValue: order.jobServicePrice > 0
+                                          ? order.jobServicePrice.toInt().toString()
+                                          : '',
+                                      keyboardType: TextInputType.number,
+                                      style: const TextStyle(fontSize: 13),
+                                      decoration: InputDecoration(
+                                        hintText: "e.g. 2000",
+                                        filled: true,
+                                        fillColor: Colors.white,
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.green.shade300)),
+                                        isDense: true,
+                                      ),
+                                      onChanged: (val) {
                                         setModalState(() {
-                                          order.jobEstimatedDeliveryDate = date;
+                                          order.jobServicePrice = double.tryParse(val) ?? 0;
                                         });
-                                      }
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        border: Border.all(color: Colors.green.shade300),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.calendar_today, size: 14, color: primaryGreen),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            order.jobEstimatedDeliveryDate != null ? _formatDate(order.jobEstimatedDeliveryDate!) : "Select Date",
-                                            style: const TextStyle(fontSize: 12),
-                                          ),
-                                        ],
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                            ],
+                            if (_canEditDate(order))
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text("Est. Delivery Date", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
+                                    const SizedBox(height: 6),
+                                    InkWell(
+                                      onTap: () async {
+                                        final date = await showDatePicker(
+                                          context: context,
+                                          initialDate: order.jobEstimatedDeliveryDate != null &&
+                                                  order.jobEstimatedDeliveryDate!.isAfter(DateTime.now())
+                                              ? order.jobEstimatedDeliveryDate!
+                                              : DateTime.now().add(const Duration(days: 7)),
+                                          firstDate: DateTime.now(),
+                                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                                        );
+                                        if (date != null) {
+                                          setModalState(() {
+                                            order.jobEstimatedDeliveryDate = date;
+                                          });
+                                        }
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          border: Border.all(color: Colors.green.shade300),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.calendar_today, size: 14, color: primaryGreen),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              order.jobEstimatedDeliveryDate != null ? _formatDate(order.jobEstimatedDeliveryDate!) : "Select Date",
+                                              style: const TextStyle(fontSize: 12),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
                           ],
                         ),
+                        // 'pending' saves through Accept, which also sends
+                        // the quote; every later state is a revision of a
+                        // quote that already exists.
+                        if (order.status != TailorOrderStatus.pending) ...[
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () => _saveRevisedTerms(order, modalContext),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: primaryGreen,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              child: const Text("Save Changes", style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1172,9 +1323,14 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 _detailRow("Customer", order.customerName),
                 if (order.status != TailorOrderStatus.pending) ...[
                   _detailRow("Stitching Earnings", "Tk ${order.totalServicePrice.toInt()}"),
+                  // #9 moved price and date to the job; this row was still
+                  // reading the per-item date, which is hardcoded null, so
+                  // it always said "TBD" no matter what the tailor quoted.
                   _detailRow(
                     "Expected Delivery",
-                    order.items.first.estimatedDeliveryDate != null ? _formatDate(order.items.first.estimatedDeliveryDate!) : "TBD",
+                    order.jobEstimatedDeliveryDate != null
+                        ? _formatDate(order.jobEstimatedDeliveryDate!)
+                        : "TBD",
                   ),
                 ],
                 _detailRow("Items to Stitch", "${order.totalQuantity} units"),
@@ -1243,9 +1399,92 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     );
   }
 
+  /// The price is only negotiable while the customer has not yet accepted
+  /// and paid — after that the amount is already through bKash.
+  bool _canEditPrice(TailorOrder order) =>
+      order.status == TailorOrderStatus.pending ||
+      order.status == TailorOrderStatus.quoted;
+
+  /// The date can be corrected right up until the work is marked finished.
+  bool _canEditDate(TailorOrder order) =>
+      order.status == TailorOrderStatus.pending ||
+      order.status == TailorOrderStatus.quoted ||
+      order.status == TailorOrderStatus.confirmed ||
+      order.status == TailorOrderStatus.inProgress;
+
+  Future<void> _saveRevisedTerms(TailorOrder order, BuildContext modalContext) async {
+    final price = _canEditPrice(order) ? order.jobServicePrice : null;
+    final date = _canEditDate(order) ? order.jobEstimatedDeliveryDate : null;
+
+    if (price != null && price <= 0) {
+      _showBanner("Enter a stitching price before saving.");
+      return;
+    }
+    if (price == null && date == null) {
+      _showBanner("There's nothing left to change on this job.");
+      return;
+    }
+
+    try {
+      await _orderService.editStitchingTerms(
+        order.id,
+        newPrice: price,
+        newDate: date,
+      );
+      if (modalContext.mounted) Navigator.pop(modalContext);
+      _showBanner("Quote updated.", isError: false);
+    } catch (e) {
+      _showBanner("Couldn't update the quote. Please try again.");
+    }
+  }
+
+  /// How long the tailor has left to answer this request.
+  Widget _quoteDeadlineBanner(TailorOrder order) {
+    final deadline = order.quoteResponseDeadline!;
+    final lapsed = order.quoteWindowClosed;
+    final remaining = deadline.difference(DateTime.now());
+    final hours = remaining.inHours;
+    final minutes = remaining.inMinutes % 60;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: lapsed ? Colors.red.shade50 : Colors.amber.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: lapsed ? Colors.red.shade200 : Colors.amber.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            lapsed ? Icons.timer_off_outlined : Icons.timer_outlined,
+            size: 16,
+            color: lapsed ? Colors.red.shade700 : Colors.amber.shade800,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              lapsed
+                  ? "The 12-hour window to respond closed on ${_formatDate(deadline)}. This request is no longer yours to accept."
+                  : "Respond within ${hours > 0 ? '${hours}h ' : ''}${minutes}m — after that the customer can pick another tailor.",
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: lapsed ? Colors.red.shade800 : Colors.amber.shade900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildActionButtons(TailorOrder order, StateSetter setModalState, BuildContext modalContext) {
     // #9: Accept is enabled when the tailor has set a job-level price and date.
-    final bool canAccept = order.jobServicePrice > 0 && order.jobEstimatedDeliveryDate != null;
+    // ...and only while the 12h response window is still open — OrderService
+    // enforces the same rule, this just stops the pointless round-trip.
+    final bool canAccept = order.jobServicePrice > 0 &&
+        order.jobEstimatedDeliveryDate != null &&
+        !order.quoteWindowClosed;
 
     return Row(
       children: [
@@ -1329,6 +1568,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
               _careTag(Icons.wash, "Wash", item.canWash),
               _careTag(Icons.biotech, "Bleach", item.canBleach),
               _careTag(Icons.dry_cleaning, "Dry Clean", item.canDryClean),
+              _careTag(Icons.dry, "Tumble Dry", item.canTumbleDry),
               _careTag(Icons.iron, "Iron: ${item.ironLevel}", true),
             ]),
           ),
@@ -1657,7 +1897,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     switch (status) {
       case TailorOrderStatus.pending: return "New Request";
       case TailorOrderStatus.quoted: return "Pending Customer"; // #3: tailor quoted, waiting for customer payment
-      case TailorOrderStatus.confirmed: return "Paid – Ready to Start"; // #3: customer paid
+      case TailorOrderStatus.confirmed: return "Ready to Start"; // #3: customer paid
       case TailorOrderStatus.inProgress: return "In Progress";
       case TailorOrderStatus.ready: return "Ready";
       case TailorOrderStatus.completed: return "Finished";
@@ -1958,4 +2198,23 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
       ),
     );
   }
+}
+
+/// Care labels reach us in two shapes: the inventory form writes them spaced
+/// and capitalised ("Dry Clean Only", "Iron: High"), while older seeded
+/// products use camelCase keys ("dryCleanOnly", "ironMedium"). Flattening to
+/// bare letters lets one check match both.
+String _careKey(String symbol) =>
+    symbol.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+
+/// The ironing level as something worth showing a person: "ironMedium" and
+/// "Iron: Medium" both come back as "Medium".
+String _ironLevelLabel(List<String> careSymbols) {
+  final raw = careSymbols
+      .firstWhere((s) => s.toLowerCase().trimLeft().startsWith('iron'),
+          orElse: () => 'Iron: Medium')
+      .replaceFirst(RegExp(r'^\s*iron[:\s]*', caseSensitive: false), '')
+      .trim();
+  if (raw.isEmpty) return 'Medium';
+  return raw[0].toUpperCase() + raw.substring(1);
 }

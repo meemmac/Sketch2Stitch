@@ -8,7 +8,6 @@ import 'package:sketch2stitch/models/order_item.dart' as db;
 import 'package:sketch2stitch/services/order_service.dart';
 import 'package:sketch2stitch/services/review_service.dart';
 import '../../../models/measurement.dart';
-import '../browsing/browse_shell.dart';
 import 'reviews_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../widgets/top_feedback_banner.dart';
@@ -105,6 +104,32 @@ class CustomerOrder {
   final Map<String, double> deliveryCharges;
   final String? tailorCancellationReason;
 
+  /// The measurement profile this order's tailor job was created against.
+  /// `streamDetailedCustomerOrders` has always fetched it; nothing carried
+  /// it this far, so "View My Measurements" could only ever report that
+  /// there were none.
+  final Measurement? tailorMeasurement;
+
+  /// Retailers whose own sub-order has actually reached the customer.
+  /// Reviewing is per-party, so a shop that hasn't shipped yet must not be
+  /// rateable just because some other part of the order arrived.
+  final Set<String> deliveredRetailerNames;
+
+  /// The tailor finished (and therefore delivered) the garment.
+  final bool tailorJobCompleted;
+
+  /// When the requested tailor's 12h window to answer closes.
+  final DateTime? tailorQuoteDeadline;
+
+  /// The confirmed tailor job still hasn't been paid for. A job stays
+  /// "Confirmed" through payment, so this is what separates "accepted, pay
+  /// now" from "already settled".
+  final bool tailorUnpaid;
+
+  bool get canReviewAnyone =>
+      deliveredRetailerNames.any((r) => retailerReviews?[r] == null) ||
+      (tailorJobCompleted && tailorReview == null);
+
   CustomerOrder({
     required this.id,
     required this.retailerName,
@@ -125,6 +150,11 @@ class CustomerOrder {
     this.tailorReview,
     this.tailorRating,
     this.tailorCancellationReason,
+    this.tailorMeasurement,
+    this.deliveredRetailerNames = const {},
+    this.tailorJobCompleted = false,
+    this.tailorQuoteDeadline,
+    this.tailorUnpaid = false,
   });
 
   String get _allRetailerNames {
@@ -138,25 +168,39 @@ class CustomerOrder {
     return items.map((i) => i.retailerName ?? retailerName).toSet().toList();
   }
 
-  double get totalGrandAmount {
-    double totalRetailer = amount;
-    double totalTailor = items.where((item) => item.destination == OrderDeliveryDestination.tailor && item.tailorStatus == TailorStatus.confirmed).fold(0.0, (sum, item) => sum + (item.tailorPrice ?? 0.0));
-    double delivery = deliveryCharges.values.fold(0.0, (sum, val) => sum + val);
-    return totalRetailer + totalTailor + delivery;
+  /// The tailoring quote, counted once.
+  ///
+  /// There is one Tailor-job per ORDER, and its `quoteAmount` is copied onto
+  /// every tailored item so each card can display it. Summing across items
+  /// therefore charged the same single quote once per garment — a 3-item
+  /// order billed the stitching fee three times. Deduplicate by job id.
+  double get _confirmedTailoringTotal {
+    final seen = <String>{};
+    double total = 0;
+    for (final item in items) {
+      // Deliberately NOT gated on `destination == tailor`: the sub-order's
+      // deliveryDestination is reset to 'pending' whenever a tailor is
+      // re-hired, which zeroed the confirmed stitching fee out of the grand
+      // total while the tailor's delivery charge stayed in it. The job's own
+      // status is the only thing that decides whether it is billable.
+      if (item.tailorStatus != TailorStatus.confirmed) continue;
+      final jobId = item.tailorJobId ?? '';
+      if (!seen.add(jobId)) continue;
+      total += item.tailorPrice ?? 0.0;
+    }
+    return total;
   }
 
-  double get totalOngoingAmount {
-    double totalRetailer = amount;
-    
-    // Only include tailor price if confirmed
-    double totalTailor = items
-        .where((item) => item.destination == OrderDeliveryDestination.tailor && item.tailorStatus == TailorStatus.confirmed)
-        .fold(0.0, (sum, item) => sum + (item.tailorPrice ?? 0.0));
-        
-    // Include retailer delivery charges, and tailor delivery charges ONLY if confirmed
+  /// What the customer actually owes, at any stage of the order.
+  ///
+  /// There used to be a second "grand" variant for delivered orders that
+  /// summed every delivery charge unconditionally, so the same order could
+  /// total differently before and after delivery, and the sheet could list
+  /// charges that its own total disagreed with. One rule now: retailer
+  /// delivery always counts, tailoring and the tailor's delivery count only
+  /// once the tailoring job is confirmed.
+  double get totalGrandAmount {
     double delivery = 0;
-    bool hasConfirmedTailor = items.any((item) => item.tailorStatus == TailorStatus.confirmed);
-    
     deliveryCharges.forEach((key, value) {
       if (key == tailorName) {
         if (hasConfirmedTailor) delivery += value;
@@ -164,9 +208,14 @@ class CustomerOrder {
         delivery += value;
       }
     });
-    
-    return totalRetailer + totalTailor + delivery;
+
+    return amount + _confirmedTailoringTotal + delivery;
   }
+
+  /// True once any item's tailoring job is confirmed — the point at which the
+  /// tailor's price and delivery charge become payable.
+  bool get hasConfirmedTailor =>
+      items.any((item) => item.tailorStatus == TailorStatus.confirmed);
 
   int get totalQuantity => items.fold(0, (sum, item) => sum + item.quantity);
 }
@@ -210,7 +259,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   /// Structural Data Adapter: Translates raw backend structures into UI models.
   List<CustomerOrder> _mapFromBackend(List<Map<String, dynamic>> dbData) {
     final List<CustomerOrder> results = [];
-    final String deliveryAddress = UserSession.instance.currentProfile.value?.address ?? "No address set";
+    // `?? "No address set"` only covered a missing PROFILE. An account whose
+    // address field is an empty string got past it and rendered as a blank
+    // line under the "Shipping Address" heading — which is what "the address
+    // doesn't show" looked like. Trim first, then decide.
+    final String profileAddress =
+        UserSession.instance.currentProfile.value?.address.trim() ?? "";
+    final String deliveryAddress = profileAddress.isEmpty
+        ? "No address set — add one in your profile"
+        : profileAddress;
 
     for (var data in dbData) {
       final db.Order order = data['order'];
@@ -233,8 +290,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       final List<db.Review> reviews = (data['reviews'] as List?)?.cast<db.Review>() ?? [];
       
       final Map<String, String> currentRetailerIds = {};
+      final Set<String> deliveredRetailerNames = {};
       String? tailorIdStr;
+      Measurement? tailorMeasurement;
       bool isTailorRejected = false;
+      bool tailorJobCompleted = false;
+      DateTime? tailorQuoteDeadline;
+      bool tailorUnpaid = false;
 
       for (var soData in subOrdersData) {
         final db.SubOrder so = soData['subOrder'];
@@ -245,7 +307,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         final String currentRetailerName = retailer['shopName'] ?? "Supplier"; 
         retailerNames.add(currentRetailerName);
         currentRetailerIds[currentRetailerName] = so.retailerId;
-        charges[currentRetailerName] = so.deliveryCharge;
+        charges[currentRetailerName] =
+            (charges[currentRetailerName] ?? 0) + so.deliveryCharge;
+        // Only a sub-order that went to the CUSTOMER counts as delivered
+        // for review purposes — one handed to the tailor is an internal hop.
+        if (so.status == db.SubOrderStatus.delivered &&
+            so.deliveryDestination == db.SubOrderDeliveryDestination.customer) {
+          deliveredRetailerNames.add(currentRetailerName);
+        }
         
         for (var iData in itemsData) {
           final db.OrderItem i = iData['item'];
@@ -260,6 +329,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           }
 
           final care = p['careSymbol'] as List? ?? [];
+          final careKeys = care
+              .map((c) => c.toString().toLowerCase().replaceAll(RegExp(r'[^a-z]'), ''))
+              .toList();
 
           items.add(OrderItem(
             name: p['productName'] ?? "Product", 
@@ -268,10 +340,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             imagePath: imagePath,
             color: option?['color'] ?? "Option ${i.optionId}",
             description: p['description'] ?? "Detailed specification.",
-            canWash: care.contains('wash'),
-            canBleach: care.contains('bleach'),
-            canDryClean: care.contains('dry_clean'),
-            canTumbleDry: care.contains('tumble_dry'),
+            // `care` holds full labels ("Washable", "Dry Clean Only",
+            // "dryCleanOnly"), so this has to match within each label rather
+            // than compare the list against a bare key — List.contains('wash')
+            // looked for an element exactly equal to 'wash' and never matched,
+            // leaving every care flag false.
+            canWash: careKeys.any((s) => s.contains('wash')),
+            canBleach: careKeys.any((s) => s.contains('bleach')),
+            canDryClean: careKeys.any((s) => s.contains('dryclean')),
+            canTumbleDry: careKeys.any((s) => s.contains('tumbledry')),
             retailerName: currentRetailerName,
             destination: so.deliveryDestination == db.SubOrderDeliveryDestination.tailor 
                 ? OrderDeliveryDestination.tailor 
@@ -280,35 +357,69 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         }
       }
 
-      for (var tjData in tailorJobsData) {
+      // Only the NEWEST tailor job describes where this order actually
+      // stands. OrderService sorts them newest-first; an order picks up a
+      // second job whenever a tailor declines or a quote is turned down and
+      // the customer hires someone else, and looping over all of them let a
+      // dead job overwrite the live one's price and status — and added its
+      // delivery charge to the bill on top.
+      if (tailorJobsData.isNotEmpty) {
+        final tjData = tailorJobsData.first;
         final db.TailorJob tj = tjData['job'];
         final Map<String, dynamic> tailor = tjData['tailor'] ?? {};
-        
+        final List<String> designUrls =
+            List<String>.from(tjData['designUrls'] ?? const <String>[]);
+
+        tailorMeasurement = tjData['measurement'] as Measurement?;
         final String artisanName = tailor['name'] ?? "Artisan";
         tailorIdStr = tj.tailorId;
-        charges[artisanName] = tj.deliveryCharge ?? 0;
-        
+        tailorJobCompleted = tj.status == db.TailorJobStatus.jobCompleted;
+        tailorUnpaid = tj.tailorPaymentStatus == db.TailorPaymentStatus.unpaid;
+        tailorQuoteDeadline = tj.quoteResponseDeadline ??
+            tj.requestedAt?.add(const Duration(hours: 12));
+        final TailorStatus tailorStatus = _mapTailorStatus(tj.status);
+
+        // A job nobody is working (declined, rejected, expired) delivers
+        // nothing, so it must not carry a delivery charge into the total.
+        final bool jobIsLive = tailorStatus == TailorStatus.pending ||
+            tailorStatus == TailorStatus.quoted ||
+            tailorStatus == TailorStatus.confirmed;
+        if (jobIsLive) {
+          charges[artisanName] = tj.deliveryCharge ?? 0;
+        }
+
+        // Attached to EVERY item, not just tailor-bound ones. The moment a
+        // tailor declines, `Sub-orders.deliveryDestination` is reset to
+        // 'pending' (OrderService.declineTailorJob), so gating on
+        // `destination == tailor` wiped the tailor off this order entirely
+        // the instant the customer most needed to see it — no status, no
+        // reason, and no "browse tailor" link to recover with. One job
+        // covers the whole order anyway.
         for (int i = 0; i < items.length; i++) {
-          if (items[i].destination == OrderDeliveryDestination.tailor) {
-            items[i] = OrderItem(
-              name: items[i].name,
-              quantity: items[i].quantity,
-              price: items[i].price,
-              imagePath: items[i].imagePath,
-              color: items[i].color,
-              description: items[i].description,
-              canWash: items[i].canWash,
-              canBleach: items[i].canBleach,
-              canDryClean: items[i].canDryClean,
-              canTumbleDry: items[i].canTumbleDry,
-              retailerName: items[i].retailerName,
-              destination: items[i].destination,
-              tailorPrice: tj.quoteAmount,
-              tailorStatus: _mapTailorStatus(tj.status),
-              tailorDeliveryDate: tj.estimatedDeliveryDate,
-              tailorJobId: tj.id,
-            );
-          }
+          items[i] = OrderItem(
+            name: items[i].name,
+            quantity: items[i].quantity,
+            price: items[i].price,
+            imagePath: items[i].imagePath,
+            color: items[i].color,
+            description: items[i].description,
+            canWash: items[i].canWash,
+            canBleach: items[i].canBleach,
+            canDryClean: items[i].canDryClean,
+            canTumbleDry: items[i].canTumbleDry,
+            retailerName: items[i].retailerName,
+            destination: items[i].destination,
+            tailorPrice: tj.quoteAmount,
+            tailorStatus: tailorStatus,
+            tailorDeliveryDate: tj.estimatedDeliveryDate,
+            tailorJobId: tj.id,
+            // Both were on the job all along and only the tailor's own
+            // screen ever showed them, so the customer saw "No specific
+            // instructions provided" under designs they had uploaded
+            // themselves.
+            tailorInstructions: tj.specialInstructions,
+            measurementRefImages: designUrls,
+          );
         }
 
         if (tj.status == db.TailorJobStatus.cancelled || tj.status == db.TailorJobStatus.tailorDeclined || tj.status == db.TailorJobStatus.rejected) {
@@ -340,7 +451,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       }
 
       String mappedStatus = _mapStatusToFrontend(orderWithDetails.statusText);
-      if (isTailorRejected && mappedStatus == 'Order Preparing') {
+      // A dead job hands the order back to the customer, which now reads as
+      // 'Select a Tailor' rather than the old catch-all 'Order Preparing' —
+      // true, but it buries the fact that someone said no. Say that instead.
+      if (isTailorRejected &&
+          (mappedStatus == 'Select a Tailor' ||
+              mappedStatus == 'Choose Tailor or Skip' ||
+              mappedStatus == 'Order Preparing')) {
         mappedStatus = 'Tailor Rejected';
       }
 
@@ -359,6 +476,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         deliveryAddress: deliveryAddress,
         deliveryCharges: charges,
         tailorCancellationReason: tailorCancellationReason,
+        tailorMeasurement: tailorMeasurement,
+        deliveredRetailerNames: deliveredRetailerNames,
+        tailorJobCompleted: tailorJobCompleted,
+        tailorQuoteDeadline: tailorQuoteDeadline,
+        tailorUnpaid: tailorUnpaid,
         retailerReviews: retailerReviewsMap.isNotEmpty ? retailerReviewsMap : null,
         retailerRatings: retailerRatingsMap.isNotEmpty ? retailerRatingsMap : null,
         tailorReview: tailorReviewStr,
@@ -382,28 +504,55 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
+  /// Every status this screen can show, in funnel order. Also drives the
+  /// filter chips, so the two can't drift apart.
+  static const List<String> ongoingStatuses = [
+    'Choose Tailor or Skip',
+    'Select a Tailor',
+    'Waiting for Tailor Response',
+    'Need Confirmation',
+    'Tailor Rejected',
+    'Tailor Confirmed',
+    'Order Preparing',
+    'Order Packed',
+    'Items Delivered',
+    'Out for Delivery',
+  ];
+
+  /// Maps `Order.statusText` onto this screen's vocabulary.
+  ///
+  /// The whole front half of the funnel used to land on 'Order Preparing':
+  /// 'Awaiting Confirmation' was folded in with it, and 'Awaiting Tailor
+  /// Selection' was mislabelled as waiting on a tailor who had never been
+  /// asked. Both are decisions the CUSTOMER owes, and each now says so.
   String _mapStatusToFrontend(String backendStatus) {
     switch (backendStatus) {
       case 'Delivered':
-      case 'Items Delivered':
         return 'Delivered';
+      // Not the same thing as a finished order: every retailer has shipped,
+      // but the order hasn't closed. Calling it 'Delivered' put a Delivered
+      // badge on a card that still had no review section.
+      case 'Items Delivered':
+        return 'Items Delivered';
       case 'Order Packed':
         return 'Order Packed';
-      case 'Preparing Order':
       case 'Awaiting Confirmation':
-      case 'Processing':
-        return 'Order Preparing';
-      case 'Tailor Confirmed — Stitching Started':
-        return 'Shipping to Tailor';
+        return 'Choose Tailor or Skip';
+      case 'Awaiting Tailor Selection':
+        return 'Select a Tailor';
+      case 'Requested Tailor':
+      case 'Tailor Pending':
+        return 'Waiting for Tailor Response';
       case 'Quote Received from Tailor':
         return 'Need Confirmation';
-      case 'Requested Tailor':
-      case 'Awaiting Tailor Selection':
-        return 'Waiting for Tailor Confirmation';
+      case 'Tailor Confirmed — Stitching Started':
+        return 'Tailor Confirmed';
       case 'Stitching Completed':
         return 'Out for Delivery';
       case 'Cancelled':
-        return 'Tailor Rejected';
+        return 'Cancelled';
+      case 'Preparing Order':
+      case 'Processing':
       default:
         return 'Order Preparing';
     }
@@ -702,15 +851,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: [
+                    children: <String>[
                       "All",
-                      "Need Confirmation",
-                      "Tailor Rejected",
-                      "Order Preparing",
-                      "Order Packed",
-                      "Shipping to Tailor",
-                      "Out for Delivery",
-                      "Waiting for Tailor Confirmation",
+                      ...ongoingStatuses,
                     ].map((status) {
                       return _filterChip(status, _selectedStatus == status, () {
                         setSheetState(() => _selectedStatus = status);
@@ -905,7 +1048,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ],
                     ),
                   ),
-                  Text("Tk ${item.price.toInt()}", style: TextStyle(color: Colors.green.shade900, fontSize: 13, fontWeight: FontWeight.w800)),
+                  Text("Tk ${(item.price * item.quantity).toInt()}", style: TextStyle(color: Colors.green.shade900, fontSize: 13, fontWeight: FontWeight.w800)),
                 ],
               ),
             )),
@@ -915,17 +1058,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 _orderInfo(Icons.calendar_today_outlined, _formatDate(order.orderDate)),
                 const Spacer(),
                 Text(
-                  "Total: Tk ${order.isDelivered ? order.totalGrandAmount.toInt() : order.totalOngoingAmount.toInt()}",
+                  "Total: Tk ${order.totalGrandAmount.toInt()}",
                   style: TextStyle(color: Colors.green.shade900, fontSize: 15, fontWeight: FontWeight.w900),
                 ),
               ],
             ),
-            if (order.isDelivered) ...[
+            if ((order.retailerReviews?.isNotEmpty ?? false) || order.tailorReview != null) ...[
               const SizedBox(height: 12),
-              if ((order.retailerReviews?.isNotEmpty ?? false) || order.tailorReview != null)
-                _buildCardReviewSummary(order)
-              else
-                _buildCardLeaveReviewPrompt(),
+              _buildCardReviewSummary(order),
+            ] else if (order.canReviewAnyone) ...[
+              const SizedBox(height: 12),
+              _buildCardLeaveReviewPrompt(),
             ],
           ],
         ),
@@ -1066,11 +1209,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ),
                     ),
                   ],
-                  if (currentOrder.items.any((i) => i.destination == OrderDeliveryDestination.tailor)) ...[
+                  // Keyed off "this order has a tailor job", NOT off where the
+                  // fabric is currently routed — a declined job resets
+                  // deliveryDestination to 'pending', which used to make this
+                  // whole section (and its recovery link) vanish.
+                  if (currentOrder.items.any((i) => i.tailorStatus != null)) ...[
                     const SizedBox(height: 30),
                     const Text("Tailor Customization Details", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
-                    ...currentOrder.items.where((i) => i.destination == OrderDeliveryDestination.tailor).map((item) => _tailorCustomizationCard(item, currentOrder)),
+                    // One tailor job covers the whole order — status, quote,
+                    // delivery date, reference images and instructions are
+                    // all copied onto every item identically. Mapping over
+                    // every tailored item rendered the exact same card once
+                    // per product; it only needs to be shown once.
+                    _tailorCustomizationCard(
+                      currentOrder.items.firstWhere((i) => i.tailorStatus != null),
+                      currentOrder,
+                    ),
                   ],
                   const SizedBox(height: 30),
                   const Text("Order Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -1084,7 +1239,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   const Divider(),
                   const SizedBox(height: 12),
                   ...currentOrder.deliveryCharges.entries.where((entry) {
-                    if (entry.key == currentOrder.tailorName && !currentOrder.isDelivered) return false;
+                    // Same rule as `totalGrandAmount`: the tailor's delivery
+                    // charge is listed exactly when it is being charged.
+                    if (entry.key == currentOrder.tailorName &&
+                        !currentOrder.hasConfirmedTailor) {
+                      return false;
+                    }
                     return true;
                   }).map((entry) => _detailRow("Delivery (${entry.key})", "Tk ${entry.value.toInt()}")),
                   const SizedBox(height: 20),
@@ -1132,12 +1292,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     children: [
                       const Text("Grand Total", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
                       Text(
-                        "Tk ${currentOrder.isDelivered ? currentOrder.totalGrandAmount.toInt() : currentOrder.totalOngoingAmount.toInt()}",
+                        "Tk ${currentOrder.totalGrandAmount.toInt()}",
                         style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.green.shade800),
                       ),
                     ],
                   ),
-                  if (currentOrder.isDelivered) ...[
+                  // Reviewing is per PARTY, not per order: a shop that has
+                  // delivered can be rated while another is still preparing,
+                  // and the tailor only once the garment is finished.
+                  if (currentOrder.isDelivered ||
+                      currentOrder.canReviewAnyone ||
+                      (currentOrder.retailerReviews?.isNotEmpty ?? false) ||
+                      currentOrder.tailorReview != null) ...[
                     const SizedBox(height: 35),
                     if ((currentOrder.retailerReviews?.isNotEmpty ?? false) || currentOrder.tailorReview != null) ...[
                       const Text("Your Reviews", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -1148,16 +1314,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           child: _reviewCard("${entry.key} Review", entry.value, currentOrder.retailerRatings?[entry.key] ?? 0.0, Colors.blue),
                         )),
                       if (currentOrder.tailorReview != null) ...[
-                        _reviewCard("Tailor Review", currentOrder.tailorReview!, currentOrder.tailorRating ?? 0.0, Colors.orange),
+                        // Named, like the retailer cards beside it — "Tailor
+                        // Review" left the reader to work out which of the
+                        // order's parties the rating was actually about.
+                        _reviewCard("${currentOrder.tailorName ?? 'Tailor'} Review", currentOrder.tailorReview!, currentOrder.tailorRating ?? 0.0, Colors.orange),
                       ],
                       const SizedBox(height: 24),
                     ],
 
-                    if (uniqueRetailers.any((r) => currentOrder.retailerReviews?[r] == null) ||
-                        (currentOrder.items.any((i) => i.destination == OrderDeliveryDestination.tailor) && currentOrder.tailorReview == null)) ...[
+                    if (currentOrder.canReviewAnyone) ...[
                       const Text("Leave a Review", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 12),
-                      ...uniqueRetailers.where((r) => currentOrder.retailerReviews?[r] == null).map((retailer) => Padding(
+                      ...uniqueRetailers
+                          .where((r) =>
+                              currentOrder.deliveredRetailerNames.contains(r) &&
+                              currentOrder.retailerReviews?[r] == null)
+                          .map((retailer) => Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: _buildLeaveReviewCard(
                           title: "Rate $retailer",
@@ -1171,12 +1343,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               AppFeedback.show(context, "Please select a rating for $retailer", isError: true);
                               return;
                             }
-                            
+                            // No placeholder id: "supplier_id" would have
+                            // written a review against an account that
+                            // doesn't exist, invisible to everyone.
+                            final retailerId = currentOrder.retailerIds[retailer];
+                            if (uid == null || retailerId == null || retailerId.isEmpty) {
+                              AppFeedback.show(context, "Couldn't identify this shop. Please reopen the order.", isError: true);
+                              return;
+                            }
+
                             try {
                               await ReviewService().submitReview(
                                 orderId: currentOrder.id,
-                                customerId: uid!,
-                                recipientId: currentOrder.retailerIds[retailer] ?? "supplier_id", 
+                                customerId: uid,
+                                recipientId: retailerId,
                                 rating: tempRetailerRatings[retailer]!,
                                 comment: retailerControllers[retailer]!.text,
                                 type: db.ReviewTargetRole.retailer,
@@ -1190,9 +1370,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         ),
                       )),
                       const SizedBox(height: 12),
-                      if (currentOrder.items.any((i) => i.destination == OrderDeliveryDestination.tailor) && currentOrder.tailorReview == null)
+                      // Gated on the JOB being finished, not on the fabric
+                      // merely having been routed to a tailor — that was true
+                      // from the moment the job was created.
+                      if (currentOrder.tailorJobCompleted && currentOrder.tailorReview == null)
                         _buildLeaveReviewCard(
-                          title: "Rate Tailor",
+                          title: "Rate ${currentOrder.tailorName ?? 'Tailor'}",
                           themeColor: Colors.orange,
                           currentRating: tempTailorRating,
                           controller: tailorController,
@@ -1203,12 +1386,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               AppFeedback.show(context, "Please select a rating", isError: true);
                               return;
                             }
+                            final tailorId = currentOrder.tailorId;
+                            if (uid == null || tailorId == null || tailorId.isEmpty) {
+                              AppFeedback.show(context, "Couldn't identify this tailor. Please reopen the order.", isError: true);
+                              return;
+                            }
 
                             try {
                               await ReviewService().submitReview(
                                 orderId: currentOrder.id,
-                                customerId: uid!,
-                                recipientId: currentOrder.tailorId ?? "artisan_id", 
+                                customerId: uid,
+                                recipientId: tailorId,
                                 rating: tempTailorRating,
                                 comment: tailorController.text,
                                 type: db.ReviewTargetRole.tailor,
@@ -1249,6 +1437,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   width: 90,
                   height: 90,
                   fit: BoxFit.cover,
+                  // The order card above already falls back; without the same
+                  // guard here a product whose image 404s rendered Flutter's
+                  // broken-image box in the middle of the detail sheet.
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    width: 90,
+                    height: 90,
+                    color: Colors.green.shade50,
+                    child: Icon(Icons.shopping_bag, color: primaryGreen, size: 28),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -1263,7 +1460,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ),
                 ]),
               ),
-              Text("Tk ${item.price.toInt()}", style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.w900)),
+              Text("Tk ${(item.price * item.quantity).toInt()}", style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.w900)),
             ],
           ),
           if (item.showCareInstructions) ...[
@@ -1305,7 +1502,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                    // One tailor job, potentially covering several products —
+                    // list them all rather than naming just the one item
+                    // this card happens to have been built from.
+                    Text(
+                      currentOrder.items.where((i) => i.tailorStatus != null).map((i) => i.name).join(', '),
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    ),
                     if (isDelivered && item.tailorPrice != null)
                       Text("Stitching Price: Tk ${item.tailorPrice!.toInt()}", style: TextStyle(color: Colors.orange.shade900, fontSize: 12, fontWeight: FontWeight.w800)),
                   ],
@@ -1339,7 +1542,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        "Tailor will accept or reject your request within 24 hours.",
+                        currentOrder.tailorQuoteDeadline != null
+                            ? "Tailor will accept or reject your request by "
+                                "${_formatDate(currentOrder.tailorQuoteDeadline!)}. "
+                                "If they don't, you can pick another tailor."
+                            : "Tailor will accept or reject your request within 12 hours.",
                         style: TextStyle(color: Colors.blue.shade900, fontSize: 13, height: 1.4, fontWeight: FontWeight.w600),
                       ),
                     ),
@@ -1403,6 +1610,41 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         ),
                       ),
                     ],
+                    // A job stays "Confirmed" from the moment the quote is
+                    // accepted until the stitching fee is actually settled,
+                    // and the customer had no way back into the payment step
+                    // from here. Same route as the quote link — the setup
+                    // screen resumes the job at whatever step it's on.
+                    if (item.tailorStatus == TailorStatus.confirmed && currentOrder.tailorUnpaid) ...[
+                      const Divider(height: 20),
+                      InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => TailoringSetupScreen(
+                                orderId: currentOrder.id,
+                                orderDate: currentOrder.orderDate,
+                                savedMeasurements: const [],
+                                subOrders: currentOrder.rawSubOrders,
+                                callbacks: buildTailoringCallbacks(currentOrder.id),
+                              ),
+                            ),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                const TextSpan(text: "To review payment and pay ", style: TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w600)),
+                                TextSpan(text: "go to Checkout", style: TextStyle(color: Colors.green.shade800, fontSize: 13, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               )
@@ -1428,10 +1670,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             WidgetSpan(
                               child: GestureDetector(
                                 onTap: () {
-                                  Navigator.pop(context); 
+                                  // Browsing has to happen inside the
+                                  // checkout flow: that's the only path
+                                  // that creates the tailor job and writes
+                                  // it back to the order.
                                   Navigator.push(
                                     context,
-                                    MaterialPageRoute(builder: (_) => const BrowseShell(initialIndex: 2)),
+                                    MaterialPageRoute(
+                                      builder: (_) => TailoringSetupScreen(
+                                        orderId: currentOrder.id,
+                                        orderDate: currentOrder.orderDate,
+                                        savedMeasurements: const [],
+                                        subOrders: currentOrder.rawSubOrders,
+                                        callbacks: buildTailoringCallbacks(currentOrder.id),
+                                      ),
+                                    ),
                                   );
                                 },
                                 child: Text(
@@ -1505,7 +1758,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
               const SizedBox(height: 8),
               TextButton.icon(
-                onPressed: () => _showMeasurements(null), 
+                onPressed: () => _showMeasurements(currentOrder.tailorMeasurement),
                 icon: const Icon(Icons.straighten, size: 14),
                 label: const Text("View My Measurements", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                 style: TextButton.styleFrom(
@@ -1596,11 +1849,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       // case "Awaiting artisan": return Colors.orange.shade800;
       // case "Processing": return Colors.blue.shade800;
       case "Tailor Rejected": return Colors.red.shade800;
-      case "Waiting for Tailor Confirmation": return Colors.orange.shade800;
+      case "Cancelled": return Colors.grey.shade700;
+      case "Choose Tailor or Skip": return Colors.amber.shade800;
+      case "Select a Tailor": return Colors.purple.shade700;
+      case "Waiting for Tailor Response": return Colors.orange.shade800;
+      case "Need Confirmation": return Colors.deepOrange.shade700;
       case "Order Preparing": return Colors.blue.shade800;
       case "Order Packed": return Colors.teal.shade700;
-      case "Shipping to Tailor": return Colors.indigo.shade700;
-      case "Tailor Confirmed": return Colors.green.shade700;
+      case "Items Delivered": return Colors.teal.shade800;
+      case "Tailor Confirmed": return Colors.indigo.shade700;
       case "Out for Delivery": return Colors.deepPurple.shade700;
       default: return Colors.blueAccent;
     }
@@ -1757,8 +2014,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  void _showMeasurements(db.TailorJob? job) {
-    final Measurement? meas = job?.measurements?.firstOrNull;
+  /// [meas] comes from `CustomerOrder.tailorMeasurement` — the profile the
+  /// tailor job was actually created against, which the order stream
+  /// already loads. This used to be handed a TailorJob whose `measurements`
+  /// list is never populated by any read path, so it always bailed out.
+  void _showMeasurements(Measurement? meas) {
     if (meas == null) {
       AppFeedback.show(context, "Specifications not yet available for this assignment.", isError: true);
       return;

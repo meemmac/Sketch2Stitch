@@ -269,6 +269,11 @@ class OrderService {
                   'job': tj,
                   'tailor': tailorData,
                   'measurement': meas,
+                  // `designIds` holds Design document ids, not image URLs.
+                  // The tailor's stream already resolved these; the customer's
+                  // did not, so the customer could never see the reference
+                  // images they themselves had uploaded.
+                  'designUrls': await _resolveDesignUrls(tj.designIds),
                 };
               } catch (e) {
                 debugPrint('OrderService: Error processing tailorjob ${tDoc.id}: $e');
@@ -286,6 +291,19 @@ class OrderService {
             }).whereType<Review>().toList();
 
             final validTailorJobs = tailorJobsWithDetails.whereType<Map<String, dynamic>>().toList();
+
+            // Newest first. An order gets a SECOND Tailor-job whenever a
+            // tailor declines or a quote is turned down and the customer
+            // hires someone else, and Firestore returns them in no
+            // particular order — so `.first` here (and `Order.tailorJobs
+            // .first` in statusText) could just as easily be the dead job,
+            // showing the rejected tailor's name and status on a live order.
+            validTailorJobs.sort((a, b) {
+              final aDate = (a['job'] as TailorJob).requestedAt;
+              final bDate = (b['job'] as TailorJob).requestedAt;
+              if (aDate == null || bDate == null) return 0;
+              return bDate.compareTo(aDate);
+            });
 
             // Convenience link for Artisan name.
             if (validTailorJobs.isNotEmpty) {
@@ -378,8 +396,9 @@ class OrderService {
 
     return _db
         .collection(_ordersCollection)
-        .where('customerId', whereIn: [cleanId, '$cleanId '])
-        // 🧠 Removed orderBy to bypass index requirement for manual testing
+        .where('customerId', isEqualTo: cleanId)
+        // No orderBy: combining it with the equality filter would need a
+        // composite index, and the list is sorted in memory below anyway.
         .snapshots()
         .asyncMap((snapshot) async {
       final List<Order> orders = [];
@@ -408,6 +427,16 @@ class OrderService {
           List<TailorJob> tailorJobs = tailorJobSnap.docs
               .map((d) => TailorJob.fromJson({...d.data(), 'id': d.id}))
               .toList();
+
+          // Newest first — `Order.statusText` and the tailor-name lookup
+          // below both read `.first`, and a re-hired order has more than
+          // one job with no guaranteed Firestore ordering.
+          tailorJobs.sort((a, b) {
+            final aDate = a.requestedAt;
+            final bDate = b.requestedAt;
+            if (aDate == null || bDate == null) return 0;
+            return bDate.compareTo(aDate);
+          });
 
 
           String? tailorName;
@@ -503,16 +532,25 @@ class OrderService {
       }
 
 
-      // Fetch tailor job
+      // Fetch tailor job — NEWEST first. `.limit(1)` with no ordering let
+      // Firestore hand back whichever job it liked, so a re-hired order
+      // could render the declined tailor's name and status on its timeline.
       final tailorJobSnap = await _db
           .collection(_tailorJobsCollection)
           .where('orderId', isEqualTo: orderId)
-          .limit(1)
           .get();
-      
-      final tailorJob = tailorJobSnap.docs.isNotEmpty 
-          ? TailorJob.fromJson({...tailorJobSnap.docs.first.data(), 'id': tailorJobSnap.docs.first.id}) 
-          : null;
+
+      final tailorJobs = tailorJobSnap.docs
+          .map((d) => TailorJob.fromJson({...d.data(), 'id': d.id}))
+          .toList()
+        ..sort((a, b) {
+          final ad = a.requestedAt;
+          final bd = b.requestedAt;
+          if (ad == null || bd == null) return 0;
+          return bd.compareTo(ad);
+        });
+
+      final tailorJob = tailorJobs.isNotEmpty ? tailorJobs.first : null;
 
 
       if (tailorJob != null) {
@@ -917,20 +955,73 @@ class OrderService {
         'status': statusLower,
       };
       if (statusLower == 'delivered') {
-        subOrderUpdates['deliveryDate'] = DateTime.now().toIso8601String();
+        // Timestamp, not an ISO string — `orderDate` and the rest of the
+        // Sub-order dates are Timestamps, and mixing the two shapes in one
+        // field means every reader has to guess.
+        subOrderUpdates['deliveryDate'] = Timestamp.now();
       }
       batch.update(_db.collection(_subOrdersCollection).doc(subOrderId), subOrderUpdates);
       
-      // 2. Parent Order status logic:
-      // "order status will only change when ONLY customer is involved and retailer press delivered"
-      // Otherwise, it stays 'processing'.
-      if (destination == 'customer' && statusLower == 'delivered') {
-        batch.update(_db.collection(_ordersCollection).doc(orderId), {
-          'status': 'completed',
-        });
-      } else {
-        batch.update(_db.collection(_ordersCollection).doc(orderId), {
-          'status': 'processing',
+      // 2. Parent Order status.
+      //
+      // An order fans out into one sub-order per retailer, so it is only
+      // finished once EVERY one of them has reached the customer. Deciding
+      // this from the single sub-order being written marked a half-shipped
+      // two-retailer order 'completed' as soon as the first retailer
+      // delivered — and the second retailer's next status write then
+      // dragged it back to 'processing'.
+      //
+      // Sub-orders routed to a tailor never complete the order here at all:
+      // that order finishes when the tailor marks the work done, in
+      // updateWorkProgress().
+      final orderRef = _db.collection(_ordersCollection).doc(orderId);
+      final orderSnap = await orderRef.get();
+      final currentOrderStatus = orderSnap.data()?['status'] as String?;
+
+      // 'completed' and 'cancelled' are terminal — never walk them back.
+      //
+      // The three tailoring statuses are owned by the customer's tailoring
+      // flow (TailoringService), NOT by the retailer. Overwriting them here
+      // with 'processing' dropped the order out of activeOrderStatuses and
+      // therefore off Running Orders, so a retailer marking 'Preparing' or
+      // 'Packed' before the customer had chosen tailor-or-skip left that
+      // order unreachable: the customer could no longer make the choice, and
+      // because deliveryDestination stayed 'pending' the retailer could
+      // never mark it Delivered either.
+      const tailoringOwnedStatuses = {
+        'awaiting_confirmation',
+        'awaiting_tailor_search',
+        'tailor_pending',
+      };
+
+      if (currentOrderStatus != OrderStatus.completed.toValue &&
+          currentOrderStatus != OrderStatus.cancelled.toValue &&
+          !tailoringOwnedStatuses.contains(currentOrderStatus)) {
+        final siblings = await _db
+            .collection(_subOrdersCollection)
+            .where('orderId', isEqualTo: orderId)
+            .get();
+
+        final allDeliveredToCustomer = siblings.docs.isNotEmpty &&
+            siblings.docs.every((doc) {
+              final data = doc.data();
+              // This sub-order's own write is still sitting in the batch, so
+              // read the pending value for it rather than the stale stored one.
+              final siblingStatus = doc.id == subOrderId
+                  ? statusLower
+                  : (data['status'] ?? '').toString().toLowerCase();
+              final siblingDestination =
+                  (data['deliveryDestination'] ?? 'customer')
+                      .toString()
+                      .toLowerCase();
+              return siblingStatus == 'delivered' &&
+                  siblingDestination == 'customer';
+            });
+
+        batch.update(orderRef, {
+          'status': allDeliveredToCustomer
+              ? OrderStatus.completed.toValue
+              : OrderStatus.processing.toValue,
         });
       }
 
@@ -1095,7 +1186,23 @@ class OrderService {
     try {
       final jobDoc = await _db.collection(_tailorJobsCollection).doc(tailorJobId).get();
       if (!jobDoc.exists) throw Exception('Tailor job not found');
-      final orderId = jobDoc.data()?['orderId'];
+      final jobData = jobDoc.data()!;
+      final orderId = jobData['orderId'];
+
+      // The customer's device is the only scheduler this project has, so a
+      // lapsed 12h window may not have been swept yet. Enforce it here too,
+      // otherwise a tailor who opens the app two days late can still quote
+      // an order the customer has already moved on from.
+      final quoteDeadline = _parseDate(jobData['quoteResponseDeadline']);
+      final currentStatus =
+          TailorJobStatus.fromValue(jobData['status'] as String? ?? '');
+      if (currentStatus == TailorJobStatus.pending &&
+          quoteDeadline != null &&
+          DateTime.now().isAfter(quoteDeadline)) {
+        throw Exception(
+          'The 12-hour window to respond to this request has closed.',
+        );
+      }
 
       final batch = _db.batch();
       
@@ -1127,7 +1234,7 @@ class OrderService {
       if (orderId != null) {
         await _notifyCustomerAboutTailor(
           orderId: orderId,
-          tailorId: jobDoc.data()?['tailorId'] as String?,
+          tailorId: jobData['tailorId'] as String?,
           accepted: true,
         );
       }
@@ -1254,6 +1361,11 @@ class OrderService {
       // isn't recognized there and silently falls back to 'pending'.
       batch.update(_db.collection(_tailorJobsCollection).doc(tailorJobId), {
         'status': status.toValue,
+        // Nothing recorded when the work actually finished, so the tailor's
+        // completed list fell back to `confirmedAt` — the date the customer
+        // paid, not the date the job was done.
+        if (status == TailorJobStatus.jobCompleted)
+          'completedAt': DateTime.now().toIso8601String(),
       });
 
       // 2. Update parent Order
@@ -1272,17 +1384,59 @@ class OrderService {
     }
   }
 
-  /// Updates pricing or delivery terms for a job.
-  Future<void> editStitchingTerms(String tailorJobId, double newPrice, DateTime newDate) async {
+  /// Revises a job's price and/or estimated delivery date after the initial
+  /// quote was sent.
+  ///
+  /// Both are optional because the two have different lifetimes: the PRICE
+  /// is only negotiable while the customer has not yet accepted and paid
+  /// (job still 'quoted'), whereas the DATE can be corrected right up until
+  /// the work is marked finished. Passing null leaves that field alone.
+  ///
+  /// Guarded server-side rather than trusting the screen: a stale sheet must
+  /// not be able to re-price a job the customer has already paid for.
+  Future<void> editStitchingTerms(
+    String tailorJobId, {
+    double? newPrice,
+    DateTime? newDate,
+  }) async {
+    if (newPrice == null && newDate == null) return;
     try {
-      await _db.collection(_tailorJobsCollection).doc(tailorJobId).update({
-        'quoteAmount': newPrice,
-        'estimatedDeliveryDate': newDate.toIso8601String(),
+      final ref = _db.collection(_tailorJobsCollection).doc(tailorJobId);
+      final snap = await ref.get();
+      if (!snap.exists) throw Exception('Tailor job not found');
+
+      final status =
+          TailorJobStatus.fromValue(snap.data()?['status'] as String? ?? '');
+
+      if (newPrice != null && status != TailorJobStatus.quoted) {
+        throw Exception(
+          'The price can only be changed until the customer confirms and pays.',
+        );
+      }
+      if (newDate != null &&
+          (status == TailorJobStatus.jobCompleted ||
+              Order.deadJobStatuses.contains(status))) {
+        throw Exception('This job is finished — its date can no longer change.');
+      }
+
+      await ref.update({
+        if (newPrice != null) 'quoteAmount': newPrice,
+        if (newDate != null) 'estimatedDeliveryDate': newDate.toIso8601String(),
       });
     } catch (e) {
       debugPrint('Error editing stitching terms: $e');
       rethrow;
     }
+  }
+
+  /// `Tailor-jobs` carries dates as ISO strings from `TailorJob.toJson` and
+  /// as Timestamps from the quote writes, so reads have to survive both.
+  static DateTime? _parseDate(Object? v) {
+    if (v == null) return null;
+    if (v is Timestamp) return v.toDate();
+    if (v is DateTime) return v;
+    if (v is String) return DateTime.tryParse(v);
+    return null;
   }
 
   /// Gets analytical stats for a tailor.
@@ -1540,6 +1694,10 @@ class OrderService {
       final Map<String, Map<String, dynamic>> customerCache = {};
       final Map<String, Map<String, dynamic>> productCache = {};
       final Map<String, Map<String, dynamic>> measurementCache = {};
+      // Reviews the customer left for THIS tailor, keyed by orderId — same
+      // pattern as streamDetailedRetailerOrders, which the retailer screen
+      // already uses to show star ratings on delivered cards.
+      final Map<String, Map<String, dynamic>?> reviewCache = {};
 
       final List<Map<String, dynamic>?> results = await Future.wait(
         jobsSnap.docs.map((jobDoc) async {
@@ -1649,6 +1807,42 @@ class OrderService {
               List<String>.from(jobData['designIds'] ?? []),
             );
 
+            // Once the work is done the customer can rate the tailor. The
+            // tailor's screen has a "Customer Feedback" block for exactly
+            // this, but nothing ever fetched the review, so it never showed.
+            Map<String, dynamic>? reviewData;
+            if ((jobData['status'] ?? '') == 'completed') {
+              if (!reviewCache.containsKey(orderId)) {
+                final reviewSnap = await _db
+                    .collection(_reviewsCollection)
+                    .where('targetId', isEqualTo: tailorId)
+                    .where('targetRole', isEqualTo: 'tailor')
+                    .where('orderId', isEqualTo: orderId)
+                    .limit(1)
+                    .get();
+                reviewCache[orderId] = reviewSnap.docs.isNotEmpty
+                    ? reviewSnap.docs.first.data()
+                    : null;
+              }
+              reviewData = reviewCache[orderId];
+            }
+
+            // Has the fabric physically reached the tailor? Every sub-order
+            // on this order is routed to them, so the work can only start
+            // once all of them read 'delivered'. Without this the tailor
+            // could mark a job in progress — and then finished, which
+            // completes the whole order — before a single retailer had
+            // shipped anything.
+            final materialsReceived = subOrdersSnap.docs.isNotEmpty &&
+                subOrdersSnap.docs.every((d) {
+                  final data = d.data();
+                  final status =
+                      (data['status'] ?? '').toString().toLowerCase();
+                  final destination =
+                      (data['deliveryDestination'] ?? '').toString().toLowerCase();
+                  return status == 'delivered' && destination == 'tailor';
+                });
+
             return {
               'job': {...jobData, 'id': jobDoc.id},
               'order': {...orderData, 'id': orderId},
@@ -1656,6 +1850,9 @@ class OrderService {
               'measurement': measurementData,
               'items': allItemsList,
               'designUrls': designUrls,
+              'materialsReceived': materialsReceived,
+              'reviewRating': reviewData?['rating'],
+              'reviewComment': reviewData?['comment'],
             };
           } catch (e) {
             debugPrint("OrderService: Error processing tailor job: $e");

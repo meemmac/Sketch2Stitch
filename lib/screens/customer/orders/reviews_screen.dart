@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:sketch2stitch/services/review_service.dart';
 import 'package:sketch2stitch/models/review.dart' as db;
+import 'package:sketch2stitch/services/user_session.dart';
 
 class ReviewProduct {
   final String name;
@@ -59,8 +60,12 @@ class CustomerReview {
 }
 
 class CustomerReviewsScreen extends StatefulWidget {
-  final String customerName;
-  const CustomerReviewsScreen({super.key, this.customerName = "Maria Doe"});
+  /// Null (the normal case) means "use the signed-in customer's own name" —
+  /// this screen is only ever opened for the current user. It used to
+  /// default to a hardcoded "Maria Doe", which every customer then saw
+  /// stamped under the title as if it were their account.
+  final String? customerName;
+  const CustomerReviewsScreen({super.key, this.customerName});
 
   @override
   State<CustomerReviewsScreen> createState() => _CustomerReviewsScreenState();
@@ -78,6 +83,15 @@ class _CustomerReviewsScreenState extends State<CustomerReviewsScreen> {
     if (uid != null) {
       _reviewStream = ReviewService().streamDetailedCustomerReviews(uid);
     }
+  }
+
+  /// The signed-in customer's display name, from the session profile the
+  /// drawer already loads.
+  String get _displayName {
+    final override = widget.customerName?.trim();
+    if (override != null && override.isNotEmpty) return override;
+    final name = UserSession.instance.currentProfile.value?.name.trim();
+    return (name == null || name.isEmpty) ? 'your account' : name;
   }
 
   /// Data Translation: Map backend structures to visual components.
@@ -163,7 +177,7 @@ class _CustomerReviewsScreenState extends State<CustomerReviewsScreen> {
                   style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  "Logged in as ${widget.customerName}",
+                  "Logged in as $_displayName",
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ],
@@ -404,6 +418,42 @@ class _CustomerReviewsScreenState extends State<CustomerReviewsScreen> {
     );
   }
 
+  /// ReviewService hands back fully-resolved Cloudinary URLs (see
+  /// `_resolveImageUrls`), which `Image.asset` can never load — every
+  /// product thumbnail on this screen silently fell through to the error
+  /// placeholder. Mirrors the retailer reviews screen, which already picks
+  /// the loader by scheme.
+  Widget _buildProductImage(String path) {
+    const double size = 50;
+
+    Widget placeholder() => Container(
+          width: size,
+          height: size,
+          color: Colors.grey[200],
+          child: const Icon(Icons.shopping_bag, size: 20),
+        );
+
+    if (path.isEmpty) return placeholder();
+
+    if (path.startsWith('http')) {
+      return Image.network(
+        path,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => placeholder(),
+      );
+    }
+
+    return Image.asset(
+      path,
+      width: size,
+      height: size,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => placeholder(),
+    );
+  }
+
   Widget _buildProductMiniCard(ReviewProduct product) {
     return Container(
       width: 220,
@@ -417,18 +467,7 @@ class _CustomerReviewsScreenState extends State<CustomerReviewsScreen> {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Image.asset(
-              product.image,
-              width: 50,
-              height: 50,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                width: 50,
-                height: 50,
-                color: Colors.grey[200],
-                child: const Icon(Icons.shopping_bag, size: 20),
-              ),
-            ),
+            child: _buildProductImage(product.image),
           ),
           const SizedBox(width: 12),
           Expanded(

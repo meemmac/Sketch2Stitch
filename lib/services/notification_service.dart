@@ -507,6 +507,27 @@ class NotificationService {
 
 
 
+  /// The customer accepted this tailor's quote and paid for it — the job is
+  /// theirs to start. Nothing used to tell the tailor this had happened, so
+  /// they only found out by leaving their orders screen open.
+  Future<void> notifyTailorJobConfirmed(
+      String tailorId,
+      String orderId,
+      String customerName,
+      ) async {
+    await _sendNotification(
+      userId: tailorId,
+      userRole: UserRole.tailor,
+      type: NotificationDbType.jobConfirmed,
+      message:
+          '$customerName accepted your quote and paid. You can start stitching.',
+      orderId: orderId,
+    );
+  }
+
+
+
+
   Future<void> notifyTailorConfirmOrder(
       String tailorId,
       String orderId,
@@ -525,12 +546,27 @@ class NotificationService {
 
 
 
+  /// Reminds the tailor that a job they have taken is due.
+  ///
+  /// Sent at most once per job: with no Cloud Functions the reminder is
+  /// raised by a device noticing the date has come round, and that check
+  /// runs again on every app launch — without this guard the tailor would
+  /// collect a fresh copy of the same reminder each time they opened the
+  /// app until they delivered.
   Future<void> notifyTailorDeliveryDeadline(
       String tailorId,
       String orderId,
       String customerName,
       DateTime deadlineDate,
       ) async {
+    if (await _alreadySent(
+      userId: tailorId,
+      type: NotificationDbType.jobDeliveryDeadline,
+      orderId: orderId,
+    )) {
+      return;
+    }
+
     await _sendNotification(
       userId: tailorId,
       userRole: UserRole.tailor,
@@ -538,6 +574,29 @@ class NotificationService {
       message: 'Delivery deadline approaching for $customerName\'s order #$orderId.',
       orderId: orderId,
     );
+  }
+
+  /// True if [userId] already holds a notification of [type] for [orderId].
+  /// Fails open — a lookup error means we'd rather send a duplicate than
+  /// swallow the reminder entirely.
+  Future<bool> _alreadySent({
+    required String userId,
+    required NotificationDbType type,
+    required String orderId,
+  }) async {
+    try {
+      final snap = await _db
+          .collection(_collection)
+          .where('userId', isEqualTo: userId)
+          .where('type', isEqualTo: type.name)
+          .where('orderId', isEqualTo: orderId)
+          .limit(1)
+          .get();
+      return snap.docs.isNotEmpty;
+    } catch (e) {
+      debugPrint('[NotificationService] dedupe lookup failed: $e');
+      return false;
+    }
   }
 
 

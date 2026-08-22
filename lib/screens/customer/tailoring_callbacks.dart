@@ -75,22 +75,31 @@ TailoringSetupCallbacks buildTailoringCallbacks(
 
     onTailorSearchExpired: () => backend.expireTailorSearch(orderId),
 
-    onFetchResumeState: () async {
-      final state = await backend.fetchResumeState(orderId);
-      if (state == null) return null;
+    onQuoteRequestExpired: () => backend.expireQuoteRequest(orderId),
 
-      return OrderResumeState(
-        tailorSelectionDeadline: state['tailorSelectionDeadline'],
-        tailorJobId: state['tailorJobId'],
-        tailorId: state['tailorId'],
-        status: state['status'],
-        requestedAt: state['requestedAt'],
-        quoteAmount: state['quoteAmount'],
-        deliverCharge: state['deliverCharge'],
-        estimatedDeliveryDate: state['estimatedDeliveryDate'],
-        rejectionReason: state['rejectionReason'],
-        tailorPaymentStatus: state['tailorPaymentStatus'],
-      );
-    },
+    onFetchResumeState: () async =>
+        _toResumeState(await backend.fetchResumeState(orderId)),
+
+    onWatchResumeState: () =>
+        backend.streamResumeState(orderId).map(_toResumeState),
+  );
+}
+
+OrderResumeState? _toResumeState(Map<String, dynamic>? state) {
+  if (state == null) return null;
+
+  return OrderResumeState(
+    tailorSelectionDeadline: state['tailorSelectionDeadline'],
+    tailorJobId: state['tailorJobId'],
+    tailorId: state['tailorId'],
+    status: state['status'],
+    requestedAt: state['requestedAt'],
+    quoteAmount: state['quoteAmount'],
+    deliverCharge: state['deliverCharge'],
+    estimatedDeliveryDate: state['estimatedDeliveryDate'],
+    rejectionReason: state['rejectionReason'],
+    tailorPaymentStatus: state['tailorPaymentStatus'],
+    orderStatus: state['orderStatus'],
+    quoteResponseDeadline: state['quoteResponseDeadline'],
   );
 }
