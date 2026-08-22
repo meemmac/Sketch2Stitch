@@ -472,7 +472,9 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         final bool showMaterialBadge = widget.showFabrics && !isElement && materialDisplay != "N/A";
 
         return GestureDetector(
-          onTap: () => _showFabricDetailOverlay(context, fabricData),
+          onTap: () => isElement
+              ? _showElementDetailOverlay(context, product)
+              : _showFabricDetailOverlay(context, fabricData),
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white,
