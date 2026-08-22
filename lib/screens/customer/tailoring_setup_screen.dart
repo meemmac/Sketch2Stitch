@@ -591,6 +591,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
           otherUserId: tailorId,
           otherUserName: tailorName,
           otherUserRole: UserRole.tailor,
+          currentUserRole: UserRole.customer,
           orderId: widget.orderId,
         ),
       ),

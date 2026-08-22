@@ -4,6 +4,8 @@ import 'package:sketch2stitch/models/review.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
 import 'package:sketch2stitch/models/user_role.dart';
+import 'package:sketch2stitch/services/messaging_service.dart';
+import 'package:sketch2stitch/services/user_session.dart';
 
 class TailorDetailScreen extends StatefulWidget {
   final Tailor tailor;
@@ -225,17 +227,36 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     );
   }
 
-  void _startConversation() {
+  void _startConversation() async {
+    final myId = UserSession.instance.uid;
+    if (myId == null) return;
+    
+    final myRole = UserSession.instance.role ?? UserRole.customer;
+
+    // Check for existing conversation
+    final messagingService = MessagingService();
+    final existing = await messagingService.getConversationBetween(myId, widget.tailor.id);
+    
+    final conversation = existing ?? await messagingService.createConversation(
+      customerId: myId,
+      otherId: widget.tailor.id,
+      otherRole: UserRole.tailor,
+      orderId: 'GEN-${DateTime.now().millisecondsSinceEpoch}',
+    );
+
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ChatScreen(
-          conversationId: 'current_customer_id_${widget.tailor.id}',
-          customerId: 'current_customer_id',
+          conversationId: conversation.id,
+          customerId: myId,
           otherUserId: widget.tailor.id,
           otherUserName: widget.tailor.name,
           otherUserRole: UserRole.tailor,
+          currentUserRole: myRole,
           otherUserAvatar: widget.tailor.profilePicture,
+          orderId: conversation.orderId,
         ),
       ),
     );

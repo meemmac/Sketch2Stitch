@@ -7,6 +7,8 @@ import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.d
 import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
 import 'package:sketch2stitch/models/user_role.dart';
+import 'package:sketch2stitch/services/messaging_service.dart';
+import 'package:sketch2stitch/services/user_session.dart';
 
 class RetailerDetailScreen extends StatefulWidget {
   final Retailer retailer;
@@ -162,17 +164,36 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
   List<Product> get _elements =>
       widget.retailer.products?.where((p) => _isElement(p)).toList() ?? [];
 
-  void _startConversation() {
+  void _startConversation() async {
+    final myId = UserSession.instance.uid;
+    if (myId == null) return;
+    
+    final myRole = UserSession.instance.role ?? UserRole.customer;
+
+    // Check for existing conversation
+    final messagingService = MessagingService();
+    final existing = await messagingService.getConversationBetween(myId, widget.retailer.id);
+    
+    final conversation = existing ?? await messagingService.createConversation(
+      customerId: myId,
+      otherId: widget.retailer.id,
+      otherRole: UserRole.retailer,
+      orderId: 'GEN-${DateTime.now().millisecondsSinceEpoch}',
+    );
+
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ChatScreen(
-          conversationId: 'current_customer_id_${widget.retailer.id}',
-          customerId: 'current_customer_id',
+          conversationId: conversation.id,
+          customerId: myId,
           otherUserId: widget.retailer.id,
           otherUserName: widget.retailer.shopName,
           otherUserRole: UserRole.retailer,
+          currentUserRole: myRole,
           otherUserAvatar: widget.retailer.profilePicture,
+          orderId: conversation.orderId,
         ),
       ),
     );

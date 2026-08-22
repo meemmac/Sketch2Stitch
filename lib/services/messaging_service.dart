@@ -101,15 +101,22 @@ class MessagingService {
   }
 
   /// Fetches an existing conversation between two users for a specific order.
-  Future<Conversation?> getConversationBetween(String customerId, String otherId, {String? orderId}) async {
+  /// 🧠 Includes otherRole to prevent collisions between different roles with same ID
+  Future<Conversation?> getConversationBetween(String customerId, String otherId, {UserRole? otherRole, String? orderId}) async {
     try {
       Query query = _db.collection(_conversations)
           .where('customerId', isEqualTo: customerId)
           .where('otherId', isEqualTo: otherId);
       
+      if (otherRole != null) {
+        query = query.where('otherRole', isEqualTo: otherRole.name);
+      }
+
+
       if (orderId != null) {
         query = query.where('orderId', isEqualTo: orderId);
       }
+
 
       final snap = await query.limit(1).get();
       if (snap.docs.isEmpty) return null;
@@ -402,63 +409,45 @@ class MessagingService {
     try {
       final List<Map<String, dynamic>> results = [];
       final collections = [_customers, _tailors, _retailers];
-      
+      final lowercaseQuery = query.toLowerCase();
+
       for (var col in collections) {
-        // 1. Search by 'name' field
-        final nameSnap = await _db.collection(col)
-            .where('name', isGreaterThanOrEqualTo: query)
-            .where('name', isLessThanOrEqualTo: '$query\uf8ff')
-            .limit(5)
-            .get();
-        
-        results.addAll(nameSnap.docs.map((doc) => {
-          ...doc.data(),
-          'id': doc.id,
-          'role': col == _customers ? 'customer' : (col == _tailors ? 'tailor' : 'retailer'),
-          'name': doc.data()['name'] ?? doc.data()['shopName'] ?? 'Unknown',
-        }));
-
-
-        // 2. Search by 'shopName' field (Specifically for Retailers)
-        if (col == _retailers) {
-          final shopSnap = await _db.collection(col)
-              .where('shopName', isGreaterThanOrEqualTo: query)
-              .where('shopName', isLessThanOrEqualTo: '$query\uf8ff')
-              .limit(5)
-              .get();
+        try {
+          // 🧠 Fetching docs and filtering in memory to ensure maximum flexibility
+          // This handles Case-Insensitivity, Partial Matches, and Number vs String for phone.
+          final snap = await _db.collection(col).get();
           
-          for (var doc in shopSnap.docs) {
-            // Avoid adding duplicates if already found by 'name'
-            if (!results.any((r) => r['id'] == doc.id)) {
-              results.add({
-                ...doc.data(),
-                'id': doc.id,
-                'role': 'retailer',
-                'name': doc.data()['shopName'] ?? 'Unknown',
-              });
+          for (var doc in snap.docs) {
+            final data = doc.data();
+            final role = col == _customers ? 'customer' : (col == _tailors ? 'tailor' : 'retailer');
+            
+            // 🛡️ Safe conversion to String for all searchable fields
+            final String rawName = (data['name'] ?? '').toString();
+            final String rawShopName = (data['shopName'] ?? '').toString();
+            final String rawPhone = (data['phone'] ?? '').toString();
+            
+            final name = rawName.toLowerCase();
+            final shopName = rawShopName.toLowerCase();
+            
+            // Check for match in Name, Shop Name, or Phone
+            if (name.contains(lowercaseQuery) || 
+                shopName.contains(lowercaseQuery) || 
+                rawPhone.contains(query)) {
+              
+              // Unique results by ID + Role
+              if (!results.any((r) => r['id'] == doc.id && r['role'] == role)) {
+                results.add({
+                  'id': doc.id,
+                  'name': rawShopName.isNotEmpty ? rawShopName : (rawName.isNotEmpty ? rawName : 'Unknown'),
+                  'profilePicture': data['profilePicture']?.toString(),
+                  'phone': rawPhone,
+                  'role': role,
+                });
+              }
             }
           }
-        }
-
-
-        // 3. Search by 'phone' field
-        if (results.length < 10) {
-          final phoneSnap = await _db.collection(col)
-              .where('phone', isGreaterThanOrEqualTo: query)
-              .where('phone', isLessThanOrEqualTo: '$query\uf8ff')
-              .limit(5)
-              .get();
-          
-          for (var doc in phoneSnap.docs) {
-            if (!results.any((r) => r['id'] == doc.id)) {
-              results.add({
-                ...doc.data(),
-                'id': doc.id,
-                'role': col == _customers ? 'customer' : (col == _tailors ? 'tailor' : 'retailer'),
-                'name': doc.data()['name'] ?? doc.data()['shopName'] ?? 'Unknown',
-              });
-            }
-          }
+        } catch (innerError) {
+          debugPrint('[MessagingService] Skip bad record in $col: $innerError');
         }
       }
       

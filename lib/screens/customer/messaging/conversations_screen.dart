@@ -5,7 +5,6 @@ import 'package:sketch2stitch/models/message.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
 import 'package:sketch2stitch/services/messaging_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class ConversationsScreen extends StatefulWidget {
   final String customerId;
@@ -68,30 +67,65 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   // ─── User Data Management ──────────────────────────────────────────
 
   /// Fetches user info from Firestore and updates cache
-  Future<void> _fetchUserInfo(String userId, UserRole role) async {
-    if (_userCache.containsKey(userId) || _fetchingIds.contains(userId)) return;
+  Future<void> _fetchUserInfo(Conversation conversation) async {
+    // 🧠 Smart Opposite Party Detection
+    final String myId = widget.customerId;
+    final String targetId = (conversation.customerId == myId) 
+        ? conversation.otherId 
+        : conversation.customerId;
+    
+    final UserRole targetRole = (conversation.customerId == myId)
+        ? conversation.otherRole
+        : UserRole.customer;
 
-    _fetchingIds.add(userId);
-    final info = await _messagingService.getUserBasicInfo(userId, role);
+    final String cacheKey = "${targetId}_${targetRole.name}";
+
+    if (_userCache.containsKey(cacheKey) || _fetchingIds.contains(cacheKey)) return;
+
+
+    _fetchingIds.add(cacheKey);
+    final info = await _messagingService.getUserBasicInfo(targetId, targetRole);
     if (info != null) {
       if (mounted) {
         setState(() {
-          _userCache[userId] = info;
-          _fetchingIds.remove(userId);
+          _userCache[cacheKey] = info;
+          _fetchingIds.remove(cacheKey);
         });
       }
     } else {
-      _fetchingIds.remove(userId);
+      _fetchingIds.remove(cacheKey);
     }
   }
 
+
   String _getOtherUserName(Conversation conversation) {
-    final userData = _userCache[conversation.otherId];
+    final String myId = widget.customerId;
+    final String targetId = (conversation.customerId == myId) 
+        ? conversation.otherId 
+        : conversation.customerId;
+    
+    final UserRole targetRole = (conversation.customerId == myId)
+        ? conversation.otherRole
+        : UserRole.customer;
+
+    final String cacheKey = "${targetId}_${targetRole.name}";
+    final userData = _userCache[cacheKey];
     return userData?['name'] ?? 'Loading...';
   }
 
+
   String? _getOtherUserAvatar(Conversation conversation) {
-    final userData = _userCache[conversation.otherId];
+    final String myId = widget.customerId;
+    final String targetId = (conversation.customerId == myId) 
+        ? conversation.otherId 
+        : conversation.customerId;
+
+    final UserRole targetRole = (conversation.customerId == myId)
+        ? conversation.otherRole
+        : UserRole.customer;
+
+    final String cacheKey = "${targetId}_${targetRole.name}";
+    final userData = _userCache[cacheKey];
     return userData?['profilePicture'];
   }
 
@@ -276,13 +310,27 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                 : null,
                           ),
                           title: Text(user['name'] ?? 'Unknown'),
-                          subtitle: Text(user['phone'] ?? ''),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(user['phone'] ?? ''),
+                              Text(
+                                role.name.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: role == UserRole.tailor ? Colors.blue : Colors.orange,
+                                ),
+                              ),
+                            ],
+                          ),
                           trailing: const Icon(Icons.chevron_right),
                           onTap: () async {
                             Navigator.pop(context);
                             final existing = await _messagingService.getConversationBetween(
                               widget.customerId, 
                               user['id'],
+                              otherRole: role,
                             );
                             final conversation = existing ?? await _messagingService.createConversation(
                               customerId: widget.customerId,
@@ -320,6 +368,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           otherUserId: conversation.otherId,
           otherUserName: _getOtherUserName(conversation),
           otherUserRole: conversation.otherRole,
+          currentUserRole: widget.currentUserRole,
           otherUserAvatar: _getOtherUserAvatar(conversation),
           orderId: conversation.orderId,
           onConversationRead: _onConversationRead,
@@ -434,8 +483,8 @@ class _ConversationsScreenState extends State<ConversationsScreen>
             padding: const EdgeInsets.symmetric(vertical: 8),
             itemBuilder: (context, index) {
               final conversation = filtered[index];
-              // Background fetch for user details
-              _fetchUserInfo(conversation.otherId, conversation.otherRole);
+              // Background fetch for user details using smart lookup
+              _fetchUserInfo(conversation);
               return _buildConversationCard(conversation);
             },
           );
@@ -460,7 +509,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -667,7 +716,12 @@ class _ConversationSearchDelegate extends SearchDelegate {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         
         final results = snapshot.data!.where((conv) {
-          final name = userCache[conv.otherId]?['name']?.toString().toLowerCase() ?? '';
+          // 🧠 Perspective-Aware Cache Key
+          final targetId = (conv.customerId == customerId) ? conv.otherId : conv.customerId;
+          final targetRole = (conv.customerId == customerId) ? conv.otherRole : UserRole.customer;
+          final cacheKey = "${targetId}_${targetRole.name}";
+          
+          final name = userCache[cacheKey]?['name']?.toString().toLowerCase() ?? '';
           return name.contains(query.toLowerCase());
         }).toList();
 
@@ -677,9 +731,15 @@ class _ConversationSearchDelegate extends SearchDelegate {
           itemCount: results.length,
           itemBuilder: (context, index) {
             final conv = results[index];
-            final name = userCache[conv.otherId]?['name'] ?? 'User';
+            
+            final targetId = (conv.customerId == customerId) ? conv.otherId : conv.customerId;
+            final targetRole = (conv.customerId == customerId) ? conv.otherRole : UserRole.customer;
+            final cacheKey = "${targetId}_${targetRole.name}";
+            
+            final name = userCache[cacheKey]?['name'] ?? 'User';
             return ListTile(
               title: Text(name),
+              subtitle: Text(targetRole.name.toUpperCase()),
               onTap: () {
                 close(context, null);
                 onConversationTap(conv);

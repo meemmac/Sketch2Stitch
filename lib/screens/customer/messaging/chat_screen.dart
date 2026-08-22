@@ -11,14 +11,16 @@ import 'package:sketch2stitch/services/messaging_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
-  final String customerId;
+  final String customerId; // Represents the logged in user's ID
   final String otherUserId;
   final String otherUserName;
   final UserRole otherUserRole;
+  final UserRole currentUserRole; // 🆕 Added to identify sender
   final String? otherUserAvatar;
   final String? orderId;
   final Function(String)? onConversationRead;
   final bool? isBlocked;
+
 
   const ChatScreen({
     super.key,
@@ -27,6 +29,7 @@ class ChatScreen extends StatefulWidget {
     required this.otherUserId,
     required this.otherUserName,
     required this.otherUserRole,
+    required this.currentUserRole, // 🆕 Required now
     this.otherUserAvatar,
     this.orderId,
     this.onConversationRead,
@@ -205,7 +208,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
 
     final data = {
-      'senderRole': UserRole.customer.name,
+      'senderRole': widget.currentUserRole.name, // 🧠 Uses dynamic role
       'msgText': text,
       'replyToMessageId': _replyingToMessageId,
       'replyToText': _replyingToMessageText,
