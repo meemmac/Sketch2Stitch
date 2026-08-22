@@ -397,10 +397,6 @@ class ReviewService {
     DocumentSnapshot? startAfter,
   }) async {
     try {
-      print('🔍 getReviewsByTargetId called');
-      print('   - targetId: $targetId');
-      print('   - targetRole: ${targetRole.name}');
-      print('   - Collection: $_reviewsCollection');
       
       // DIRECT QUERY by targetId (this is the primary method)
       Query query = _db
@@ -419,34 +415,23 @@ class ReviewService {
       }
 
       final snapshot = await query.get();
-      
-      print('📊 Direct query found ${snapshot.docs.length} documents');
-      
-      // Debug: Print each review found
-      for (var doc in snapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        print('   - Review: targetId=${data['targetId']}, rating=${data['rating']}, customer=${data['customerId']}');
-      }
-      
+
       List<Review> reviews = snapshot.docs
           .map((doc) => Review.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
           .toList();
       
       // If reviews found, return them
       if (reviews.isNotEmpty) {
-        print('✅ Found ${reviews.length} reviews by exact targetId match');
         return reviews;
       }
       
       // FALLBACK: Try case-insensitive match
-      print('🔍 No reviews found by direct query. Trying case-insensitive match...');
       
       final allReviewsSnapshot = await _db
           .collection(_reviewsCollection)
           .where('targetRole', isEqualTo: targetRole.name)
           .get();
       
-      print('📊 Total reviews with targetRole ${targetRole.name}: ${allReviewsSnapshot.docs.length}');
       
       List<Review> matchedReviews = [];
       for (var doc in allReviewsSnapshot.docs) {
@@ -455,12 +440,10 @@ class ReviewService {
         
         if (docTargetId != null && docTargetId.toLowerCase() == targetId.toLowerCase()) {
           matchedReviews.add(Review.fromJson({...data, 'id': doc.id}));
-          print('   ✅ MATCH FOUND: $docTargetId == $targetId');
         }
       }
       
       if (matchedReviews.isNotEmpty) {
-        print('✅ Found ${matchedReviews.length} reviews by case-insensitive matching');
         matchedReviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         if (matchedReviews.length > limit) {
           return matchedReviews.sublist(0, limit);
@@ -468,7 +451,6 @@ class ReviewService {
         return matchedReviews;
       }
       
-      print('⚠️ No reviews found for targetId: $targetId');
       return [];
       
     } catch (e) {
@@ -486,7 +468,6 @@ class ReviewService {
     int limit = 50,
   }) async {
     try {
-      print('🔍 getReviewsByName called with name: $name, targetRole: ${targetRole.name}');
       
       final snapshot = await _db
           .collection(_reviewsCollection)
@@ -501,7 +482,6 @@ class ReviewService {
         
         if (targetId != null && targetId.toLowerCase() == name.toLowerCase()) {
           matchingReviews.add(Review.fromJson({...data, 'id': doc.id}));
-          print('   ✅ Found review with targetId: $targetId');
         }
       }
       
@@ -511,7 +491,6 @@ class ReviewService {
         return matchingReviews.sublist(0, limit);
       }
       
-      print('✅ Found ${matchingReviews.length} reviews by name: $name');
       return matchingReviews;
       
     } catch (e) {

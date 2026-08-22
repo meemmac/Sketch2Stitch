@@ -129,6 +129,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
   
   String? _currentUserId;
   Map<String, String> _retailerNames = {};
+  Map<String, GeoPoint?> _retailerLocations = {};
 
   // Categories that are considered "Elements" (non-fabric items)
   final List<String> _elementCategories = [
@@ -167,21 +168,28 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
           .get();
       
       final Map<String, String> names = {};
+      final Map<String, GeoPoint?> locations = {};
       for (final doc in retailersSnapshot.docs) {
         final data = doc.data();
         names[doc.id] = data['shopName'] as String? ?? 'Unknown Retailer';
+        locations[doc.id] = data['location'] is GeoPoint ? data['location'] as GeoPoint : null;
       }
-      
+
       setState(() {
         _retailerNames = names;
+        _retailerLocations = locations;
       });
     } catch (e) {
-      print('Error loading retailer names: $e');
+      // retailer names/locations stay empty; getters fall back per-id
     }
   }
 
   String _getRetailerName(String retailerId) {
     return _retailerNames[retailerId] ?? 'Unknown Retailer';
+  }
+
+  GeoPoint? _getRetailerLocation(String retailerId) {
+    return _retailerLocations[retailerId];
   }
 
   @override
@@ -259,10 +267,8 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
             List<Product> filteredProducts;
             if (widget.showFabrics) {
               filteredProducts = products.where((p) => _isFabric(p)).toList();
-              print('📊 Fabrics filtered: ${filteredProducts.length} from ${products.length} total');
             } else {
               filteredProducts = products.where((p) => _isElement(p)).toList();
-              print('📊 Elements filtered: ${filteredProducts.length} from ${products.length} total');
             }
             
             final fabricDataList = filteredProducts
@@ -728,6 +734,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         product: fabricData.product,
         isFabric: true,
         retailerName: _getRetailerName(fabricData.product.retailerId),
+        retailerLocation: _getRetailerLocation(fabricData.product.retailerId),
         materialBlends: fabricData.materialBlendList,
         userRole: widget.userRole,
         customerId: _currentUserId,
@@ -748,6 +755,7 @@ class _FabricsPageBodyState extends State<FabricsPageBody>
         product: product,
         isFabric: false,
         retailerName: _getRetailerName(product.retailerId),
+        retailerLocation: _getRetailerLocation(product.retailerId),
         userRole: widget.userRole,
         customerId: _currentUserId,
         favoriteService: _favoriteService,

@@ -664,13 +664,11 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     
     try {
       String retailerId = widget.retailer.id;
-      print('🔍 Loading detailed reviews for retailer: $retailerId');
       
       _reviewSubscription?.cancel();
       
       _reviewSubscription = _reviewService.streamDetailedShopReviews(retailerId).listen(
         (detailedReviews) {
-          print('✅ Received ${detailedReviews.length} detailed reviews for retailer');
           
           if (!mounted) return;
           
@@ -712,7 +710,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
           });
         },
         onError: (error) {
-          print('❌ Error loading detailed reviews: $error');
           if (mounted) {
             setState(() {
               _isLoading = false;
@@ -725,7 +722,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
       );
       
     } catch (e) {
-      print('❌ Error loading reviews: $e');
       setState(() {
         _isLoading = false;
         _isLoadingReviews = false;
@@ -739,10 +735,8 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
     setState(() => _isLoadingProducts = true);
     try {
       String retailerId = widget.retailer.id;
-      print('🔍 Loading products for retailer: $retailerId');
       
       final allProducts = await _browseService.getProductsByFilter().first;
-      print('📦 Total products in Firestore: ${allProducts.length}');
       
       List<Product> retailerProducts = [];
       
@@ -750,11 +744,9 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         retailerProducts = allProducts
             .where((p) => p.retailerId == retailerId)
             .toList();
-        print('✅ Found ${retailerProducts.length} products by retailer ID');
       }
       
       if (retailerProducts.isEmpty) {
-        print('🔍 Trying to find retailer by shop name: ${widget.retailer.shopName}');
         try {
           final retailerSnapshot = await FirebaseFirestore.instance
               .collection('Retailer')
@@ -765,26 +757,21 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
           if (retailerSnapshot.docs.isNotEmpty) {
             final doc = retailerSnapshot.docs.first;
             final foundRetailerId = doc.id;
-            print('✅ Found retailer with ID: $foundRetailerId');
             
             retailerProducts = allProducts
                 .where((p) => p.retailerId == foundRetailerId)
                 .toList();
-            print('✅ Found ${retailerProducts.length} products by shop name');
           }
         } catch (e) {
-          print('❌ Error finding retailer by shop name: $e');
         }
       }
       
       if (retailerProducts.isEmpty && widget.retailer.products != null) {
-        print('📦 Using products from retailer object: ${widget.retailer.products!.length}');
         retailerProducts = widget.retailer.products!;
       }
       
       if (retailerProducts.isNotEmpty) {
         for (final product in retailerProducts) {
-          print('   - ${product.productName} (Category: ${product.category})');
         }
       }
       
@@ -793,7 +780,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
         _isLoadingProducts = false;
       });
     } catch (e) {
-      print('❌ Error loading products: $e');
       if (widget.retailer.products != null) {
         setState(() {
           _products = widget.retailer.products!;

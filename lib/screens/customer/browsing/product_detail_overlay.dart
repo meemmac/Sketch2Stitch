@@ -1,9 +1,12 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/services/cart_service.dart';
+import 'package:sketch2stitch/services/customer_service.dart';
 import 'package:sketch2stitch/services/user_session.dart';
 import 'package:sketch2stitch/services/favorite_service.dart';
+import 'package:sketch2stitch/utils/geo_utils.dart';
 import '../../../widgets/video_preview_player.dart';
 import '../../../widgets/care_info_tooltip.dart';
 import '../../../widgets/top_feedback_banner.dart';
@@ -12,6 +15,7 @@ class ProductDetailOverlay extends StatefulWidget {
   final Product product;
   final bool isFabric;
   final String retailerName;
+  final GeoPoint? retailerLocation;
   final List<String>? materialBlends;
   final UserRole userRole;
   final String? customerId;
@@ -22,6 +26,7 @@ class ProductDetailOverlay extends StatefulWidget {
     required this.product,
     this.isFabric = true,
     this.retailerName = 'Unknown Retailer',
+    this.retailerLocation,
     this.materialBlends,
     this.userRole = UserRole.customer,
     this.customerId,
@@ -34,12 +39,14 @@ class ProductDetailOverlay extends StatefulWidget {
 
 class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
   final CartService _cartService = CartService();
+  final CustomerService _customerService = CustomerService();
 
   int _quantity = 1;
   late ColorOption? _selectedOption;
   bool _isFavorite = false;
   bool _isLoadingFavorite = true;
   bool _isAddingToCart = false;
+  double? _deliveryCharge;
 
   @override
   void initState() {
@@ -48,8 +55,32 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
     _selectedOption = options.isEmpty
         ? null
         : options.firstWhere((o) => o.stock > 0, orElse: () => options.first);
-    
+
     _checkFavoriteStatus();
+    _loadDeliveryEstimate();
+  }
+
+  /// Estimates delivery based on the great-circle distance between the
+  /// customer's saved location and the retailer's, same formula checkout
+  /// uses (CartService.deliveryChargeFor). Falls back to the flat base
+  /// charge if either location is unavailable.
+  Future<void> _loadDeliveryEstimate() async {
+    if (widget.retailerLocation == null || widget.customerId == null) {
+      if (mounted) setState(() => _deliveryCharge = CartService.baseDeliveryCharge);
+      return;
+    }
+    try {
+      final customer = await _customerService.streamCustomerProfile(widget.customerId!).first;
+      final customerLocation = customer?.location;
+      final distanceKm = customerLocation != null
+          ? GeoUtils.distanceKm(customerLocation, widget.retailerLocation!)
+          : null;
+      if (mounted) {
+        setState(() => _deliveryCharge = CartService.deliveryChargeFor(distanceKm));
+      }
+    } catch (e) {
+      if (mounted) setState(() => _deliveryCharge = CartService.baseDeliveryCharge);
+    }
   }
 
   Future<void> _checkFavoriteStatus() async {
@@ -317,7 +348,9 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                             Icon(Icons.directions_bike, size: 18, color: Colors.grey[600]),
                             const SizedBox(width: 4),
                             Text(
-                              'Tk 50 delivery',
+                              _deliveryCharge != null
+                                  ? 'Tk ${_deliveryCharge!.toStringAsFixed(0)} delivery'
+                                  : 'Calculating delivery...',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[600],

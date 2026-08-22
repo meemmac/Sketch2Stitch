@@ -60,7 +60,6 @@ class PortfolioService {
     int pageSize = defaultPageSize,
   }) async {
     try {
-      print('🔍 PortfolioService: Fetching portfolio for tailorId: $tailorId');
       
       // Query by tailorId - supports both manual and auto-generated IDs
       var query = _db
@@ -74,14 +73,11 @@ class PortfolioService {
 
       final snap = await query.get();
       
-      print('📦 PortfolioService: Query returned ${snap.docs.length} documents');
 
       if (snap.docs.isEmpty) {
         // Try to find portfolio by tailor name if ID didn't work
-        print('⚠️ No portfolio found for tailorId: $tailorId, trying to find by tailor name...');
         final portfolioItems = await _findPortfolioByTailorName(tailorId);
         if (portfolioItems.isNotEmpty) {
-          print('✅ Found ${portfolioItems.length} portfolio items by tailor name');
           return PaginatedResult(items: portfolioItems, nextPageCursor: null);
         }
         return PaginatedResult(items: [], nextPageCursor: null);
@@ -90,7 +86,6 @@ class PortfolioService {
       final items = snap.docs
           .map((d) {
             final data = d.data();
-            print('   - Portfolio doc: ${d.id}, tailorId: ${data['tailorId']}, image: ${data['image']}');
             return Portfolio.fromJson({...data, 'id': d.id});
           })
           .toList();
@@ -99,12 +94,10 @@ class PortfolioService {
 
       return PaginatedResult(items: items, nextPageCursor: cursor);
     } on FirebaseException catch (e) {
-      print('❌ PortfolioService FirebaseException: ${e.message}');
       throw PortfolioServiceException(
         'Failed to fetch portfolio: ${e.message ?? e.code}',
       );
     } catch (e) {
-      print('❌ PortfolioService Error: $e');
       throw PortfolioServiceException(
         'Failed to fetch portfolio: $e',
       );
@@ -117,7 +110,6 @@ class PortfolioService {
       // First, get the tailor document to find the name
       final tailorDoc = await _db.collection('Tailor').doc(tailorId).get();
       if (!tailorDoc.exists) {
-        print('❌ Tailor document not found for ID: $tailorId');
         return [];
       }
 
@@ -125,11 +117,9 @@ class PortfolioService {
       final tailorName = tailorData?['name'] as String?;
       
       if (tailorName == null || tailorName.isEmpty) {
-        print('❌ Tailor name not found for ID: $tailorId');
         return [];
       }
 
-      print('🔍 Found tailor name: $tailorName, searching for portfolio...');
 
       // Get all portfolio items
       final allPortfolio = await _db.collection(_portfolio).get();
@@ -156,7 +146,6 @@ class PortfolioService {
       
       return matchingItems;
     } catch (e) {
-      print('❌ Error finding portfolio by tailor name: $e');
       return [];
     }
   }

@@ -95,6 +95,13 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     return _retailerNames[retailerId] ?? 'Unknown Retailer';
   }
 
+  GeoPoint? _getRetailerLocation(String retailerId) {
+    for (final retailer in _allRetailers) {
+      if (retailer.id == retailerId) return retailer.location;
+    }
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -110,7 +117,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         _currentUserId = user.uid;
       }
     } catch (e) {
-      print('Error getting current user: $e');
+      // no-op: _currentUserId stays null if lookup fails
     }
   }
 
@@ -122,61 +129,49 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     });
     
     try {
-      print('🔄 Loading data from Firestore...');
-      
       // Load products
-      print('📦 Loading products...');
       List<Product> products = [];
       try {
         products = await _browseService.getProductsByFilter().first;
-        print('✅ Loaded ${products.length} products');
       } catch (e) {
-        print('❌ Error loading products: $e');
         products = [];
       }
-      
-      // Load tailors
-      print('👤 Loading tailors...');
+
+      // Load tailors. Fully-booked tailors (maxOrder == 0) are excluded on
+      // the home screen entirely, not just sorted last.
       List<Tailor> tailors = [];
       try {
-        tailors = await _browseService.getTailorsByFilter().first;
-        print('✅ Loaded ${tailors.length} tailors');
+        final loadedTailors = await _browseService.getTailorsByFilter().first;
+        tailors = loadedTailors.where((t) => t.maxOrder != 0).toList();
       } catch (e) {
-        print('❌ Error loading tailors: $e');
         tailors = [];
       }
-      
+
       // Load retailers
-      print('🏪 Loading retailers...');
       List<Retailer> retailers = [];
       try {
         retailers = await _browseService.getRetailersByFilter().first;
-        print('✅ Loaded ${retailers.length} retailers');
       } catch (e) {
-        print('❌ Error loading retailers: $e');
         retailers = [];
       }
-      
+
       // Load retailer names
-      print('📋 Loading retailer names...');
       Map<String, String> names = {};
       try {
         final retailerSnapshot = await FirebaseFirestore.instance
             .collection('Retailer')
             .get();
-        
+
         for (final doc in retailerSnapshot.docs) {
           final data = doc.data();
           names[doc.id] = data['shopName'] as String? ?? 'Unknown Retailer';
         }
-        print('✅ Loaded ${names.length} retailer names');
       } catch (e) {
-        print('❌ Error loading retailer names: $e');
+        // retailer names stay empty; _getRetailerName() falls back per-id
       }
 
       // Check if we got any data
       if (products.isEmpty && tailors.isEmpty && retailers.isEmpty) {
-        print('⚠️ ALL DATA IS EMPTY!');
         setState(() {
           _allProducts = [];
           _allTailors = [];
@@ -189,7 +184,6 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         return;
       }
 
-      print('✅ Setting state with ${products.length} products, ${tailors.length} tailors, ${retailers.length} retailers');
       setState(() {
         _allProducts = products;
         _allTailors = tailors;
@@ -198,10 +192,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         _isLoading = false;
         _hasError = false;
       });
-      
+
     } catch (e) {
-      print('❌ Error loading data: $e');
-      print('❌ Stack trace: ${StackTrace.current}');
       setState(() {
         _isLoading = false;
         _hasError = true;
@@ -265,6 +257,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         product: product,
         isFabric: isFabric,
         retailerName: _getRetailerName(product.retailerId),
+        retailerLocation: _getRetailerLocation(product.retailerId),
         materialBlends: materialBlends,
         userRole: _currentRole,
         customerId: _currentUserId,

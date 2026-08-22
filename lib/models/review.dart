@@ -85,7 +85,6 @@ class Review {
       try {
         createdAt = DateTime.parse(createdAtValue);
       } catch (e) {
-        print('Error parsing createdAt string: $e');
         createdAt = DateTime.now();
       }
     } else {

@@ -686,13 +686,11 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     
     try {
       String tailorId = widget.tailor.id;
-      print('🔍 Loading detailed reviews for tailor: $tailorId');
       
       _reviewSubscription?.cancel();
       
       _reviewSubscription = _reviewService.streamDetailedTailorReviews(tailorId).listen(
         (detailedReviews) {
-          print('✅ Received ${detailedReviews.length} detailed reviews for tailor');
           
           if (!mounted) return;
           
@@ -723,7 +721,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
           });
         },
         onError: (error) {
-          print('❌ Error loading detailed reviews: $error');
           if (mounted) {
             setState(() {
               _isLoading = false;
@@ -736,7 +733,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       );
       
     } catch (e) {
-      print('❌ Error loading reviews: $e');
       setState(() {
         _isLoading = false;
         _isLoadingReviews = false;
@@ -750,7 +746,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     setState(() => _isLoadingPortfolio = true);
     try {
       if (widget.tailor.portfolio != null && widget.tailor.portfolio!.isNotEmpty) {
-        print('📦 Using portfolio from tailor object: ${widget.tailor.portfolio!.length} items');
         setState(() {
           _portfolioItems = widget.tailor.portfolio!;
           _isLoadingPortfolio = false;
@@ -758,13 +753,11 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         return;
       }
       
-      print('🔍 Loading portfolio for tailor: ${widget.tailor.id}');
       final result = await _portfolioService.getTailorPortfolio(
         widget.tailor.id,
         pageSize: 20,
       );
       
-      print('✅ Loaded ${result.items.length} portfolio items');
       
       setState(() {
         _portfolioItems = result.items;
@@ -772,11 +765,9 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       });
       
       if (_portfolioItems.isEmpty) {
-        print('⚠️ No portfolio items found, trying fallback...');
         await _loadPortfolioFallback();
       }
     } catch (e) {
-      print('❌ Error loading portfolio: $e');
       await _loadPortfolioFallback();
     }
   }
@@ -810,7 +801,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
       }
       
       if (foundItems.isNotEmpty) {
-        print('✅ Fallback: Found ${foundItems.length} portfolio items');
         setState(() {
           _portfolioItems = foundItems;
           _isLoadingPortfolio = false;
@@ -819,7 +809,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
         setState(() => _isLoadingPortfolio = false);
       }
     } catch (e) {
-      print('❌ Fallback error: $e');
       setState(() => _isLoadingPortfolio = false);
     }
   }
