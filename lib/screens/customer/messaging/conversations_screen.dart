@@ -1,5 +1,4 @@
 // lib/screens/customer/messaging/conversations_screen.dart
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/conversation.dart';
 import 'package:sketch2stitch/models/user_role.dart';
@@ -33,7 +32,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   bool _isSearching = false;
   final TextEditingController _inboxSearchController = TextEditingController();
   String _searchQuery = '';
-  Timer? _presenceTimer;
 
   @override
   void initState() {
@@ -42,14 +40,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     _tabController = TabController(length: tabCount, vsync: this);
     _tabController.addListener(() {
       if (mounted) setState(() {});
-    });
-
-    // Start online presence heartbeat
-    _messagingService.updateUserPresence(widget.customerId, widget.currentUserRole);
-    _presenceTimer = Timer.periodic(const Duration(seconds: 20), (timer) {
-      if (mounted) {
-        _messagingService.updateUserPresence(widget.customerId, widget.currentUserRole);
-      }
     });
   }
 
@@ -65,7 +55,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   void dispose() {
     _tabController.dispose();
     _inboxSearchController.dispose();
-    _presenceTimer?.cancel();
     _removeNotificationOverlay();
     super.dispose();
   }

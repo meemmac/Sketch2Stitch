@@ -266,13 +266,22 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     if (_isPickingImage) return;
     _isPickingImage = true;
     try {
-      final XFile? image = await _imagePicker.pickImage(source: ImageSource.gallery);
-      if (image != null && mounted) {
-        _openPhotoPreview(File(image.path), ImageSource.gallery);
+      final List<XFile> images = await _imagePicker.pickMultiImage();
+      if (images.isNotEmpty && mounted) {
+        if (images.length == 1) {
+          // Single image → open preview screen as before
+          _openPhotoPreview(File(images.first.path), ImageSource.gallery);
+        } else {
+          // Multiple images → send all sequentially without preview
+          _showTopNotification('Sending ${images.length} photos...');
+          for (final img in images) {
+            await _uploadAndSend(File(img.path), 'image');
+          }
+        }
       }
     } catch (e) {
-      debugPrint('Error picking image from gallery: $e');
-      if (mounted) _showTopNotification('Failed to pick image: $e', isError: true);
+      debugPrint('Error picking images from gallery: $e');
+      if (mounted) _showTopNotification('Failed to pick images', isError: true);
     } finally {
       _isPickingImage = false;
     }

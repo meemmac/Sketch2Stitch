@@ -292,6 +292,9 @@ class MessagingService {
       if (convData['unreadCounts'] is Map) {
         existingUnread = Map<String, dynamic>.from(convData['unreadCounts'] as Map);
       }
+      final int currentCount = (existingUnread[receiverId] as num?)?.toInt() ?? 0;
+      existingUnread[receiverId] = currentCount + 1;
+      existingUnread[cleanSenderId] = 0; // Sender has 0 unread for their own messages
       String lastMsgPreview = '';
       if (data['attachment'] != null) {
         final caption = (data['msgText'] ?? '').toString().trim();
