@@ -1,9 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
+import 'package:flutter/foundation.dart';
 import '../models/order.dart';
 import '../models/order_item.dart';
 import '../models/payment.dart';
 import '../models/product.dart';
 import '../models/sub_order.dart';
+import 'notification_service.dart';
+import 'tailoring_service.dart';
 
 /// Thrown by [CheckoutService] with a user-friendly message so callers
 /// can surface `e.message` directly without knowing Firestore error codes.
@@ -115,6 +118,11 @@ class CheckoutService {
   static const _orders     = 'Orders';
   static const _subOrders  = 'Sub-orders';
   static const _orderItems = 'Order-Items';
+
+  /// At or below this many units left, the retailer gets a low-stock alert
+  /// when an order draws the option down. Checked at the only place stock
+  /// ever decreases — inside [placeOrder]'s transaction.
+  static const int lowStockThreshold = 5;
   static const _payments   = 'Payments';
 
   // ── getProductDetails ──────────────────────────────────────────────────────
@@ -278,13 +286,30 @@ class CheckoutService {
         for (final s in subOrders) s.retailerId: _db.collection(_subOrders).doc()
       };
 
+      // Product names, filled in during the transaction below so the
+      // "new order" notifications can name what was bought without a second
+      // round of reads after the commit.
+      final productNames = <String, String>{};
+
       final wanted = _totalsByProductOption(allItems);
       final productRefs = {
         for (final id in wanted.keys.map((k) => k.productId).toSet())
           id: _db.collection(_products).doc(id)
       };
 
+      // Options this order draws down to (or past) [lowStockThreshold].
+      // Filled inside the transaction and sent after it commits — a
+      // transaction body can be retried, so it is cleared on every attempt.
+      final lowStock = <({
+        String retailerId,
+        String productId,
+        String productName,
+        String color,
+        int stock,
+      })>[];
+
       await _db.runTransaction((tx) async {
+        lowStock.clear();
         // ── Reads first: Firestore forbids reading after a write. ──────────
         final productSnaps = <String, DocumentSnapshot<Map<String, dynamic>>>{};
         for (final entry in productRefs.entries) {
@@ -307,6 +332,7 @@ class CheckoutService {
           }
 
           final product = Product.fromJson({...snap.data()!, 'id': snap.id});
+          productNames[key.productId] = product.productName;
           final option = _optionOf(product, key.optionId);
 
           if (option == null) {
@@ -324,6 +350,17 @@ class CheckoutService {
                   : 'Only ${option.stock} left of "${product.productName}" '
                       '(${option.color}) — please reduce the quantity.',
             );
+          }
+
+          final remaining = option.stock - quantity;
+          if (remaining <= lowStockThreshold) {
+            lowStock.add((
+              retailerId: product.retailerId,
+              productId: key.productId,
+              productName: product.productName,
+              color: option.color,
+              stock: remaining,
+            ));
           }
 
           // Rebuild the whole array with this option's stock decremented;
@@ -349,8 +386,16 @@ class CheckoutService {
         tx.set(orderRef, {
           'customerId': customerId,
           'orderDate': orderDate,
-          // tailorSelectionDeadline is deliberately not set here — the
-          // customer hasn't chosen whether they want a tailor yet.
+          // The 72h clock starts the moment the order is paid for, NOT when
+          // the customer first opens the tailoring screen. Leaving it unset
+          // until then meant an order the customer never came back to had no
+          // deadline at all, so nothing could ever settle it: it stayed in
+          // awaiting_confirmation forever with its Sub-orders stuck on a
+          // 'pending' destination, which also blocks the retailers from
+          // marking anything delivered.
+          'tailorSelectionDeadline': Timestamp.fromDate(
+            orderDate.toDate().add(TailoringService.tailorSelectionWindow),
+          ),
           'status': OrderStatus.awaitingConfirmation.toValue,
         });
 
@@ -397,12 +442,42 @@ class CheckoutService {
         }
       });
 
+      // Best-effort, after the order is safely committed: tell each retailer
+      // a paid order is waiting for them. These were the notifications the
+      // retailer dashboard was built to show but nothing ever created.
+      await _notifyRetailersOfNewOrder(
+        customerId: customerId,
+        orderId: orderRef.id,
+        subOrders: subOrders,
+        productNames: productNames,
+      );
+
+      // Same best-effort footing: this order is what pushed the option low,
+      // so this is the moment the retailer needs to hear about it. The
+      // inventory screen shows stock but nobody watches it in real time.
+      for (final alert in lowStock) {
+        try {
+          await NotificationService().notifyRetailerStockAlert(
+            alert.retailerId,
+            alert.productId,
+            alert.productName,
+            alert.color,
+            alert.stock,
+          );
+        } catch (e) {
+          debugPrint('[CheckoutService] low-stock alert failed: $e');
+        }
+      }
+
       return PlacedOrder(
         order: Order(
           id: orderRef.id,
           customerId: customerId,
           orderDate: orderDate.toDate(),
           status: OrderStatus.awaitingConfirmation,
+          tailorSelectionDeadline: orderDate
+              .toDate()
+              .add(TailoringService.tailorSelectionWindow),
         ),
         subOrders: [
           for (final sub in subOrders)
@@ -699,6 +774,52 @@ class CheckoutService {
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
+
+  /// Fires one `notifyRetailerNewOrder` per retailer in a freshly placed
+  /// order.
+  ///
+  /// Deliberately best-effort: the order is already committed and paid by
+  /// the time this runs, so a notification failure must never surface as a
+  /// checkout failure.
+  Future<void> _notifyRetailersOfNewOrder({
+    required String customerId,
+    required String orderId,
+    required List<SubOrderInput> subOrders,
+    required Map<String, String> productNames,
+  }) async {
+    try {
+      final notifications = NotificationService();
+
+      final customerSnap =
+          await _db.collection('Customer').doc(customerId).get();
+      final customerName =
+          (customerSnap.data()?['name'] as String?)?.trim().isNotEmpty == true
+              ? customerSnap.data()!['name'] as String
+              : 'A customer';
+
+      for (final sub in subOrders) {
+        final names = sub.items
+            .map((i) => productNames[i.productId])
+            .whereType<String>()
+            .toSet()
+            .toList();
+        final itemName = names.isEmpty
+            ? '${sub.items.length} item(s)'
+            : names.length == 1
+                ? names.first
+                : '${names.first} +${names.length - 1} more';
+
+        await notifications.notifyRetailerNewOrder(
+          sub.retailerId,
+          orderId,
+          customerName,
+          itemName,
+        );
+      }
+    } catch (e) {
+      debugPrint('[CheckoutService] new-order notifications failed: $e');
+    }
+  }
 
   ColorOption? _optionOf(Product product, int optionId) =>
       product.colorOptions.cast<ColorOption?>().firstWhere(

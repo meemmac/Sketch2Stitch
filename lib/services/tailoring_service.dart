@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -9,6 +10,9 @@ import '../models/payment.dart';
 import '../models/sub_order.dart';
 import '../models/tailor_job.dart';
 import 'Cloudinary_service.dart';
+import '../utils/geo_utils.dart';
+import 'browse_service.dart';
+import 'notification_service.dart';
 
 class TailoringServiceException implements Exception {
   final String message;
@@ -42,6 +46,19 @@ class TailoringService {
   static const _tailorJobs = 'Tailor-jobs';
   static const _payments = 'Payments';
   static const _designs = 'Design';
+
+  /// How long the customer gets, from the moment the order is placed, to
+  /// end up with a confirmed-and-paid tailor. When it runs out the order
+  /// falls back to direct retailer → customer delivery, whatever stage the
+  /// tailoring decision had reached. Written onto
+  /// `Orders.tailorSelectionDeadline` by `CheckoutService.placeOrder`.
+  static const Duration tailorSelectionWindow = Duration(hours: 72);
+
+  /// How long a tailor gets to answer a request with a quote. Written onto
+  /// `Tailor-jobs.quoteResponseDeadline` when the job is created. Running
+  /// out frees the customer to hire someone else — it does NOT end their
+  /// [tailorSelectionWindow], which keeps running underneath.
+  static const Duration tailorQuoteWindow = Duration(hours: 12);
 
   // ─── Reads ──────────────────────────────────────────────────────────
 
@@ -81,6 +98,12 @@ class TailoringService {
       final job = jobSnap?.data();
 
       return {
+        // The screen needs the ORDER status too: a job can read 'expired'
+        // for two different reasons — the tailor let the 12h quote window
+        // lapse (order back to awaiting_tailor_search, customer picks
+        // someone else) or the 72h selection window closed (order moved to
+        // processing, direct delivery). Only the order tells them apart.
+        'orderStatus': orderSnap.data()?['status'] as String?,
         'tailorSelectionDeadline':
             _toDate(orderSnap.data()?['tailorSelectionDeadline']),
         'tailorJobId': jobSnap?.id,
@@ -92,11 +115,69 @@ class TailoringService {
         'estimatedDeliveryDate': _toDate(job?['estimatedDeliveryDate']),
         'rejectionReason': job?['rejectionReason'] as String?,
         'tailorPaymentStatus': job?['tailorPaymentStatus'] as String?,
+        'quoteResponseDeadline': _toDate(job?['quoteResponseDeadline']),
       };
     } catch (e) {
       debugPrint('[TailoringService] fetchResumeState failed: $e');
       rethrow;
     }
+  }
+
+  /// Live version of [fetchResumeState].
+  ///
+  /// `TailoringSetupScreen` used to re-run the fetch on a 20-second timer,
+  /// which meant a quote could sit unseen for most of a minute while the
+  /// screen burned two reads per tick doing nothing. Both documents it
+  /// depends on are ordinary Firestore documents, so a snapshot listener
+  /// costs no more and delivers the moment the tailor writes.
+  ///
+  /// Two sources have to be merged: the quote lands on `Tailor-jobs`, the
+  /// deadline and order status on `Orders`. Either changing re-reads the
+  /// pair — a couple of reads per actual change, versus per tick.
+  Stream<Map<String, dynamic>?> streamResumeState(String orderId) {
+    final controller = StreamController<Map<String, dynamic>?>();
+    StreamSubscription? orderSub;
+    StreamSubscription? jobSub;
+    var inFlight = false;
+    var again = false;
+
+    Future<void> emit() async {
+      // Collapse overlapping refreshes: the two listeners usually fire back
+      // to back for the same write (a batch touches both documents).
+      if (inFlight) {
+        again = true;
+        return;
+      }
+      inFlight = true;
+      try {
+        do {
+          again = false;
+          final state = await fetchResumeState(orderId);
+          if (controller.isClosed) return;
+          controller.add(state);
+        } while (again);
+      } catch (e) {
+        debugPrint('[TailoringService] streamResumeState refresh failed: $e');
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    controller.onListen = () {
+      orderSub =
+          _db.collection(_orders).doc(orderId).snapshots().listen((_) => emit());
+      jobSub = _db
+          .collection(_tailorJobs)
+          .where('orderId', isEqualTo: orderId)
+          .snapshots()
+          .listen((_) => emit());
+    };
+    controller.onCancel = () async {
+      await orderSub?.cancel();
+      await jobSub?.cancel();
+    };
+
+    return controller.stream;
   }
 
   // ─── Step 1: tailoring yes/no ───────────────────────────────────────
@@ -146,6 +227,138 @@ class TailoringService {
       SubOrderDeliveryDestination.customer,
     );
     await _commit(batch, 'expireTailorSearch');
+  }
+
+  /// The tailor let their 12h response window lapse without quoting.
+  ///
+  /// Unlike [expireTailorSearch] this does NOT end the customer's tailoring
+  /// attempt: the job dies, the fabric stops being routed to that tailor,
+  /// and the order goes back to `awaiting_tailor_search` so another tailor
+  /// can be hired inside whatever is left of the 72h selection window.
+  /// Same shape as a tailor declining outright — because that is what a
+  /// silent tailor amounts to.
+  Future<void> expireQuoteRequest(String orderId) async {
+    final job = await _latestJobSnap(orderId);
+    if (job == null) return;
+
+    final batch = _db.batch();
+    batch.update(job.reference, {
+      'status': TailorJobStatus.expired.toValue,
+      'quoteStatus': QuoteStatus.expired.toValue,
+      'rejectionReason': 'The tailor did not respond in time.',
+    });
+    batch.update(_db.collection(_orders).doc(orderId), {
+      'status': OrderStatus.awaitingTailorSearch.toValue,
+    });
+    await _applyDeliveryDestination(
+      batch,
+      orderId,
+      SubOrderDeliveryDestination.pending,
+    );
+    await _commit(batch, 'expireQuoteRequest');
+  }
+
+  /// True if [job] is a `pending` request whose 12h quote window has closed.
+  static bool _quoteWindowLapsed(Map<String, dynamic>? job) {
+    if (job == null) return false;
+    if (TailorJobStatus.fromValue(job['status'] as String? ?? '') !=
+        TailorJobStatus.pending) {
+      return false;
+    }
+    // Jobs created before quoteResponseDeadline existed fall back to the
+    // request time, so they age out on the same rule rather than never.
+    final deadline = _toDate(job['quoteResponseDeadline']) ??
+        _toDate(job['requestedAt'])?.add(tailorQuoteWindow);
+    return deadline != null && DateTime.now().isAfter(deadline);
+  }
+
+  /// Settles every selection window of [customerId]'s that closed while the
+  /// app was not running. Returns how many orders it expired.
+  ///
+  /// The countdown in `TailoringSetupScreen` only calls [expireTailorSearch]
+  /// while that screen is open, and on the free tier there are no Cloud
+  /// Functions to run a scheduled sweep behind it. So a window that ran out
+  /// overnight left its order stuck in `awaiting_tailor_search` forever — and
+  /// since `Sub-orders.deliveryDestination` stays 'pending' until the
+  /// tailoring decision is made, that order's retailers never learned where
+  /// to ship either. Running this on app start makes the customer's own
+  /// device the scheduler.
+  ///
+  /// Deliberately scoped to one customer's orders: that is all a customer is
+  /// allowed to read, and it keeps the sweep to a single query.
+  Future<int> sweepDueTailorSearches(String customerId) async {
+    if (customerId.isEmpty) return 0;
+
+    try {
+      // Only `customerId` is filtered server-side. Adding the status filter
+      // to the query would need a composite index deployed alongside it, and
+      // a customer has few enough orders that filtering here is cheaper than
+      // the index would be.
+      final snap = await _db
+          .collection(_orders)
+          .where('customerId', isEqualTo: customerId)
+          .get();
+
+      // 'awaiting_confirmation' belongs here too: an order sits in it from
+      // the moment it is placed until the customer opens the tailoring
+      // screen, and until they do nothing else can move — Sub-orders keep a
+      // 'pending' destination, so the retailers cannot even ship. The 72h
+      // window has to be able to settle that case, not just the ones where
+      // the customer already started looking for a tailor.
+      const openStatuses = {
+        'awaiting_confirmation',
+        'awaiting_tailor_search',
+        'tailor_pending',
+      };
+
+      final now = DateTime.now();
+      var expired = 0;
+
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        if (!openStatuses.contains(data['status'])) continue;
+
+        final jobSnap = await _latestJobSnap(doc.id);
+        final job = jobSnap?.data();
+
+        // A job the customer already paid for is settled — neither window
+        // applies to it any more.
+        final jobStatus =
+            TailorJobStatus.fromValue(job?['status'] as String? ?? '');
+        if (job != null &&
+            (jobStatus == TailorJobStatus.confirmed ||
+                jobStatus == TailorJobStatus.inProgress ||
+                jobStatus == TailorJobStatus.jobCompleted)) {
+          continue;
+        }
+
+        // 72h selection window first — it is the terminal one. A quote the
+        // customer never answered is NOT exempt: the banner promises that an
+        // order with no confirmed tailor ships direct, and exempting
+        // 'quoted' left exactly those orders frozen in tailor_pending with
+        // no way out.
+        final deadline = _toDate(data['tailorSelectionDeadline']);
+        if (deadline != null && now.isAfter(deadline)) {
+          await expireTailorSearch(doc.id);
+          expired++;
+          continue;
+        }
+
+        // Still inside the 72h window, but this tailor has gone quiet past
+        // their 12h — release the customer to hire someone else.
+        if (_quoteWindowLapsed(job)) {
+          await expireQuoteRequest(doc.id);
+          expired++;
+        }
+      }
+
+      return expired;
+    } catch (e) {
+      // Never worth blocking a screen load over — the next launch, or opening
+      // the order itself, tries again.
+      debugPrint('[TailoringService] sweepDueTailorSearches failed: $e');
+      return 0;
+    }
   }
 
   // ─── Step 4: the tailor job ─────────────────────────────────────────
@@ -202,7 +415,20 @@ class TailoringService {
     String instructions = '',
   }) async {
     try {
+      // Capacity guard. The browse screens already hide tailors who are at
+      // their maxOrder, but the customer may be acting on a stale list — or
+      // two customers may go for the same last slot at once — so re-check
+      // against live data before writing the job.
+      await _assertTailorHasCapacity(tailorId);
+
+      // Distance tailor → customer, captured now. The tailor's Accept button
+      // prices delivery with CartService.deliveryChargeFor(deliveryDistanceKm),
+      // but nothing had ever written that field, so every tailored order fell
+      // back to the flat base fee no matter how far apart the two parties were.
+      final delivery = await _tailorDeliveryFor(orderId, tailorId);
+
       final ref = _db.collection(_tailorJobs).doc();
+      final requestedAt = DateTime.now();
       final job = TailorJob(
         id: ref.id,
         orderId: orderId,
@@ -211,8 +437,15 @@ class TailoringService {
         designIds: designIds,
         specialInstructions: instructions,
         status: TailorJobStatus.pending,
-        requestedAt: DateTime.now(),
-        createdAt: DateTime.now(),
+        requestedAt: requestedAt,
+        createdAt: requestedAt,
+        // The tailor has [tailorQuoteWindow] to answer with a quote. The
+        // field existed on the model from the start but nothing ever set
+        // it, so a tailor who simply never opened the app held the
+        // customer's order hostage for the whole 72h selection window.
+        quoteResponseDeadline: requestedAt.add(tailorQuoteWindow),
+        deliveryDistanceKm: delivery.$1,
+        deliveryPoint: delivery.$2,
         quoteStatus: QuoteStatus.notSent,
         tailorPaymentStatus: TailorPaymentStatus.unpaid,
       );
@@ -231,6 +464,11 @@ class TailoringService {
         SubOrderDeliveryDestination.tailor,
       );
       await _commit(batch, 'createTailorJob');
+
+      // Best-effort: the tailor has no other way to learn a job is waiting,
+      // and the retailers need to know the fabric is now going to a tailor
+      // rather than to the customer.
+      await _notifyJobRequested(orderId: orderId, tailorId: tailorId);
 
       return ref.id;
     } on TailoringServiceException {
@@ -291,8 +529,14 @@ class TailoringService {
           'confirmedAt': Timestamp.now(),
         });
 
+        // The tailor has been paid, but nothing has been stitched yet, so
+        // the ORDER is not finished — it moves into 'processing' and only
+        // reaches 'completed' when the tailor marks the work done
+        // (OrderService.updateWorkProgress). Writing 'completed' here made a
+        // brand-new job read as finished, and then go backwards to
+        // 'processing' the moment the tailor actually started.
         tx.update(_db.collection(_orders).doc(orderId), {
-          'status': OrderStatus.completed.toValue,
+          'status': OrderStatus.processing.toValue,
         });
 
         // Payments.targetType admits 'retailer' or 'tailor'; the retailer
@@ -310,6 +554,15 @@ class TailoringService {
           'status': PaymentStatus.completed.toValue,
         });
       });
+
+      // The tailor's screen flips the job from "Pending Customer" to
+      // "Ready to Start" on its own stream, but nothing ever told them it
+      // had happened — they had to keep the app open to notice they'd been
+      // paid and could begin work.
+      await _notifyTailorJobConfirmed(
+        orderId: orderId,
+        tailorId: jobSnap.data()?['tailorId'] as String?,
+      );
     } on TailoringServiceException {
       rethrow;
     } catch (e) {
@@ -321,16 +574,40 @@ class TailoringService {
   }
 
   /// Customer declines the quote. No reason is collected — this is a plain
-  /// "no thanks", not a justified decision. The order stays active in
-  /// `tailor_pending` so they can browse another tailor before the
+  /// "no thanks", not a justified decision. The order goes back to
+  /// `awaiting_tailor_search` so they can browse another tailor before the
   /// selection deadline runs out.
   Future<void> rejectTailorJob(String orderId) async {
     final jobSnap = await _latestJobSnap(orderId);
     if (jobSnap == null) return;
     try {
-      await jobSnap.reference.update({
+      final batch = _db.batch();
+      batch.update(jobSnap.reference, {
         'status': TailorJobStatus.rejected.toValue,
+        'quoteStatus': QuoteStatus.expired.toValue,
       });
+
+      // Symmetry with declineTailorJob(): whoever says no, the fabric stops
+      // being bound for that tailor. Leaving it at 'tailor' kept telling
+      // every retailer on the order to ship to a tailor whose quote had
+      // just been turned down, and leaving the order at 'tailor_pending'
+      // implied a decision was still owed to a job that is now dead.
+      batch.update(_db.collection(_orders).doc(orderId), {
+        'status': OrderStatus.awaitingTailorSearch.toValue,
+      });
+      await _applyDeliveryDestination(
+        batch,
+        orderId,
+        SubOrderDeliveryDestination.pending,
+      );
+      await _commit(batch, 'rejectTailorJob');
+
+      // The tailor quoted and is waiting on an answer — tell them it was a
+      // no, otherwise the job just goes quiet on their screen forever.
+      final tailorId = jobSnap.data()?['tailorId'] as String?;
+      if (tailorId != null) {
+        await _notifyQuoteRejected(orderId: orderId, tailorId: tailorId);
+      }
     } catch (e) {
       debugPrint('[TailoringService] rejectTailorJob failed: $e');
       throw const TailoringServiceException(
@@ -339,7 +616,164 @@ class TailoringService {
     }
   }
 
+  // ─── Notifications ──────────────────────────────────────────────────
+
+  /// Customer's display name, or a neutral fallback. Notification copy only,
+  /// so a missing document must not throw.
+  Future<String> _customerNameForOrder(String orderId) async {
+    try {
+      final orderSnap = await _db.collection(_orders).doc(orderId).get();
+      final customerId = orderSnap.data()?['customerId'] as String?;
+      if (customerId == null) return 'A customer';
+      final snap = await _db.collection('Customer').doc(customerId).get();
+      final name = (snap.data()?['name'] as String?)?.trim();
+      return (name == null || name.isEmpty) ? 'A customer' : name;
+    } catch (_) {
+      return 'A customer';
+    }
+  }
+
+  /// Tells the chosen tailor a request is waiting, and tells every retailer
+  /// on the order that its fabric is now bound for that tailor.
+  ///
+  /// Best-effort throughout: the job is already written by the time this
+  /// runs, so a notification failure must not fail the request.
+  Future<void> _notifyJobRequested({
+    required String orderId,
+    required String tailorId,
+  }) async {
+    try {
+      final notifications = NotificationService();
+      final customerName = await _customerNameForOrder(orderId);
+
+      await notifications.notifyTailorNewOrder(
+        tailorId,
+        orderId,
+        customerName,
+        'a custom stitching job',
+      );
+
+      final tailorSnap = await _db.collection('Tailor').doc(tailorId).get();
+      final tailorName =
+          (tailorSnap.data()?['name'] as String?)?.trim().isNotEmpty == true
+              ? tailorSnap.data()!['name'] as String
+              : 'a tailor';
+
+      final subs = await _db
+          .collection(_subOrders)
+          .where('orderId', isEqualTo: orderId)
+          .get();
+      for (final doc in subs.docs) {
+        final retailerId = doc.data()['retailerId'] as String?;
+        if (retailerId == null) continue;
+        await notifications.notifyRetailerTailorAssigned(
+          retailerId,
+          orderId,
+          customerName,
+          tailorName,
+          DateTime.now(),
+        );
+      }
+    } catch (e) {
+      debugPrint('[TailoringService] job-requested notifications failed: $e');
+    }
+  }
+
+  /// Tells the tailor their quote was accepted and paid.
+  Future<void> _notifyTailorJobConfirmed({
+    required String orderId,
+    required String? tailorId,
+  }) async {
+    if (tailorId == null) return;
+    try {
+      final customerName = await _customerNameForOrder(orderId);
+      await NotificationService()
+          .notifyTailorJobConfirmed(tailorId, orderId, customerName);
+    } catch (e) {
+      debugPrint('[TailoringService] job-confirmed notification failed: $e');
+    }
+  }
+
+  /// Tells the tailor the customer turned their quote down.
+  Future<void> _notifyQuoteRejected({
+    required String orderId,
+    required String tailorId,
+  }) async {
+    try {
+      final customerName = await _customerNameForOrder(orderId);
+      await NotificationService().notifyTailorOrderCancelled(
+        tailorId,
+        orderId,
+        customerName,
+        'a custom stitching job',
+        'The customer declined your quote.',
+      );
+    } catch (e) {
+      debugPrint('[TailoringService] quote-rejected notification failed: $e');
+    }
+  }
+
   // ─── Helpers ────────────────────────────────────────────────────────
+
+  /// Throws if [tailorId] has already filled every slot their `maxOrder`
+  /// allows. A null `maxOrder` is "Not Set" — unlimited.
+  Future<void> _assertTailorHasCapacity(String tailorId) async {
+    final snap = await _db.collection('Tailor').doc(tailorId).get();
+    final capacity = (snap.data()?['maxOrder'] as num?)?.toInt();
+    if (capacity == null) return;
+
+    if (capacity <= 0) {
+      throw const TailoringServiceException(
+        'This tailor is not accepting new orders right now.',
+      );
+    }
+
+    final running = await _db
+        .collection(_tailorJobs)
+        .where('tailorId', isEqualTo: tailorId)
+        .where('status', whereIn: BrowseService.runningJobStatuses)
+        .get();
+
+    if (running.docs.length >= capacity) {
+      throw const TailoringServiceException(
+        'This tailor is fully booked right now. Please choose another one.',
+      );
+    }
+  }
+
+  /// Distance from [tailorId] to the customer on [orderId], plus the
+  /// customer's coordinates — the finished garment travels tailor →
+  /// customer, so that is the leg the delivery charge is priced on.
+  ///
+  /// Returns `(null, null)` when either party has no pinned location;
+  /// `CartService.deliveryChargeFor` already treats a null distance as
+  /// "charge the base fee", which is the old behaviour.
+  Future<(double?, GeoPoint?)> _tailorDeliveryFor(
+    String orderId,
+    String tailorId,
+  ) async {
+    try {
+      final orderSnap = await _db.collection(_orders).doc(orderId).get();
+      final customerId = orderSnap.data()?['customerId'] as String?;
+      if (customerId == null) return (null, null);
+
+      final results = await Future.wait([
+        _db.collection('Customer').doc(customerId).get(),
+        _db.collection('Tailor').doc(tailorId).get(),
+      ]);
+
+      final customerPoint = results[0].data()?['location'];
+      final tailorPoint = results[1].data()?['location'];
+      if (customerPoint is! GeoPoint) return (null, null);
+      if (tailorPoint is! GeoPoint) return (null, customerPoint);
+
+      return (GeoUtils.distanceKm(tailorPoint, customerPoint), customerPoint);
+    } catch (e) {
+      // Pricing falls back to the base fee — not worth failing the request.
+      debugPrint('[TailoringService] delivery distance lookup failed: $e');
+      return (null, null);
+    }
+  }
 
   /// Points every sub-order in this order at its final destination. Left
   /// as 'pending' by `CheckoutService.placeOrder`, because at payment time

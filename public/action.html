@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Sketch2Stitch</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background: linear-gradient(180deg, #CDECCB, #EFF9EE);
+      text-align: center;
+      padding: 20px;
+    }
+    h1 { color: #222; font-size: 22px; }
+    p { color: #555; font-size: 15px; max-width: 320px; line-height: 1.45; }
+    a.btn {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 12px 28px;
+      background: #000;
+      color: #fff;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 15px;
+    }
+  </style>
+</head>
+<body>
+  <h1 id="title">Opening Sketch2Stitch…</h1>
+  <p id="body">Taking you back to the app to set your new password.</p>
+  <a class="btn" id="cta" href="#">Open the app</a>
+
+  <script>
+    // Firebase appends its own query params to this page's URL when it is set
+    // as the "custom action URL" for the project's email templates. We only
+    // handle password resets in-app; anything else is forwarded to Firebase's
+    // own default handler so nothing silently breaks.
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var mode = params.get('mode');
+      var oobCode = params.get('oobCode');
+      var apiKey = params.get('apiKey');
+      var lang = params.get('lang') || 'en';
+
+      var title = document.getElementById('title');
+      var body = document.getElementById('body');
+      var cta = document.getElementById('cta');
+
+      if (mode !== 'resetPassword' || !oobCode) {
+        if (mode && oobCode && apiKey) {
+          window.location.replace(
+            'https://sketch2stitch-276c8.firebaseapp.com/__/auth/action' +
+            '?mode=' + encodeURIComponent(mode) +
+            '&oobCode=' + encodeURIComponent(oobCode) +
+            '&apiKey=' + encodeURIComponent(apiKey) +
+            '&lang=' + encodeURIComponent(lang)
+          );
+          return;
+        }
+        title.textContent = 'Link not recognised';
+        body.textContent =
+          'This link is missing information. Please request a new password ' +
+          'reset from the Sketch2Stitch app.';
+        cta.style.display = 'none';
+        return;
+      }
+
+      var deepLink = 'sketch2stitch://reset?oobCode=' +
+        encodeURIComponent(oobCode);
+      cta.setAttribute('href', deepLink);
+
+      // Most mail clients open this in an in-app browser where an immediate
+      // navigation is allowed; where it is blocked the button above is the
+      // manual fallback.
+      window.location.replace(deepLink);
+
+      setTimeout(function () {
+        title.textContent = 'Open Sketch2Stitch';
+        body.textContent =
+          "If the app didn't open automatically, tap the button below to " +
+          'finish setting your new password.';
+      }, 1500);
+    })();
+  </script>
+</body>
+</html>

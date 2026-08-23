@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';  // ✅ ADD THIS IMPORT
+
 enum ReviewTargetRole {
   tailor,
   retailer,
@@ -59,17 +61,45 @@ class Review {
   };
 
   factory Review.fromJson(Map<String, dynamic> json) {
+    // Handle case-insensitive targetRole
+    String targetRoleStr = (json['targetRole'] ?? 'tailor').toString().toLowerCase();
+    
+    ReviewTargetRole targetRole;
+    try {
+      targetRole = ReviewTargetRole.values.byName(targetRoleStr);
+    } catch (e) {
+      targetRole = ReviewTargetRole.tailor;
+    }
+    
+    // Handle createdAt - could be String or Timestamp
+    DateTime createdAt;
+    final createdAtValue = json['createdAt'];
+    
+    if (createdAtValue == null) {
+      createdAt = DateTime.now();
+    } else if (createdAtValue is Timestamp) {
+      // Firestore Timestamp -> DateTime
+      createdAt = createdAtValue.toDate();
+    } else if (createdAtValue is String) {
+      // ISO String -> DateTime
+      try {
+        createdAt = DateTime.parse(createdAtValue);
+      } catch (e) {
+        createdAt = DateTime.now();
+      }
+    } else {
+      createdAt = DateTime.now();
+    }
+    
     return Review(
       id: json['id'] ?? '',
       customerId: json['customerId'] ?? '',
       targetId: json['targetId'] ?? '',
-      targetRole: ReviewTargetRole.values.byName(json['targetRole'] ?? 'tailor'),
-      orderId: json['orderId'],
+      targetRole: targetRole,
+      orderId: json['orderId'] as String?,
       rating: (json['rating'] ?? 0).toDouble(),
       comment: json['comment'] ?? '',
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
-          : DateTime.now(),
+      createdAt: createdAt,
     );
   }
 

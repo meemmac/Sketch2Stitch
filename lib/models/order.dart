@@ -77,83 +77,127 @@ class Order {
     this.tailorName,
   });
 
+  /// Job statuses that describe a job nobody is working any more. A dead
+  /// job must not price the order, count towards its deliveries, or name
+  /// the tailor — an order picks up a fresh job every time one is declined
+  /// or a quote is turned down and the customer hires someone else.
+  static const Set<TailorJobStatus> deadJobStatuses = {
+    TailorJobStatus.rejected,
+    TailorJobStatus.tailorDeclined,
+    TailorJobStatus.expired,
+    TailorJobStatus.cancelled,
+  };
+
+  /// The newest job on this order, dead or alive. Callers get it sorted
+  /// newest-first by whichever OrderService stream loaded them.
+  TailorJob? get latestTailorJob =>
+      (tailorJobs == null || tailorJobs!.isEmpty) ? null : tailorJobs!.first;
+
+  /// The newest job that is still live, or null if the order currently has
+  /// no tailor working it.
+  TailorJob? get activeTailorJob {
+    final job = latestTailorJob;
+    if (job == null || deadJobStatuses.contains(job.status)) return null;
+    return job;
+  }
+
   String get statusText {
     // 1. Check for Terminal Statuses First
     if (status == OrderStatus.completed) return 'Delivered';
     if (status == OrderStatus.cancelled) return 'Cancelled';
 
+    // 2. A live tailor job is the most specific thing we can say.
+    final tj = activeTailorJob;
+    if (tj != null) {
+      switch (tj.status) {
+        case TailorJobStatus.jobCompleted:
+          return "Stitching Completed";
+        case TailorJobStatus.inProgress:
+        case TailorJobStatus.confirmed:
+          return "Tailor Confirmed — Stitching Started";
+        case TailorJobStatus.quoted:
+          return "Quote Received from Tailor";
+        case TailorJobStatus.pending:
+          return "Requested Tailor";
+        default:
+          break;
+      }
+    }
 
-    // 2. Derived Status Logic based on progress
+    // 3. Decisions the customer still owes. These have to be answered
+    // BEFORE the sub-order derivation below: every order always has
+    // sub-orders, so deriving first collapsed the entire front half of the
+    // funnel — "choose tailor or skip" and "pick a tailor" alike — into a
+    // single misleading "Preparing Order".
+    if (status == OrderStatus.awaitingConfirmation) {
+      return 'Awaiting Confirmation';
+    }
+    if (status == OrderStatus.awaitingTailorSearch) {
+      return 'Awaiting Tailor Selection';
+    }
+    if (status == OrderStatus.tailorPending) {
+      return 'Tailor Pending';
+    }
+
+    // 4. Derived progress for an order whose tailoring question is settled.
     if (subOrders != null && subOrders!.isNotEmpty) {
       bool allDelivered = subOrders!.every((so) => so.status == SubOrderStatus.delivered);
       bool allPacked = subOrders!.every((so) => so.status == SubOrderStatus.packed || so.status == SubOrderStatus.delivered);
-      
-      bool hasTailor = tailorJobs != null && tailorJobs!.isNotEmpty;
-      if (hasTailor) {
-        final tj = tailorJobs!.first;
-
-        if (tj.status == TailorJobStatus.jobCompleted) {
-          return "Stitching Completed";
-        }
-        if (tj.status == TailorJobStatus.inProgress) {
-          return "Tailor Confirmed — Stitching Started";
-        }
-        if (tj.status == TailorJobStatus.confirmed) {
-          return "Tailor Confirmed — Stitching Started";
-        }
-        if (tj.status == TailorJobStatus.quoted) return "Quote Received from Tailor";
-        if (tj.status == TailorJobStatus.pending) return "Requested Tailor";
-      }
-
 
       if (allDelivered) return "Items Delivered";
       if (allPacked) return "Order Packed";
       return "Preparing Order";
     }
 
-
-    // 3. Fallback to main status field text
-    switch (status) {
-      case OrderStatus.awaitingConfirmation:
-        return 'Awaiting Confirmation';
-      case OrderStatus.processing:
-        return 'Processing';
-      case OrderStatus.awaitingTailorSearch:
-        return 'Awaiting Tailor Selection';
-      case OrderStatus.tailorPending:
-        return 'Tailor Pending';
-      default:
-        return 'Processing';
-    }
+    return 'Processing';
   }
 
-  int get itemCount => (subOrders?.length ?? 0) + (tailorJobs?.length ?? 0);
+  /// How many separate parties are delivering something. Only a LIVE tailor
+  /// job counts — a declined one is not a delivery.
+  int get itemCount =>
+      (subOrders?.length ?? 0) + (activeTailorJob != null ? 1 : 0);
 
   double get totalAmount {
     double total = 0;
     subOrders?.forEach((so) {
       total += so.itemsSubtotal + so.deliveryCharge;
     });
-    tailorJobs?.forEach((tj) {
+    // Only the live job is billable. Summing every job charged a re-hired
+    // order once per tailor it had ever asked.
+    final tj = activeTailorJob;
+    if (tj != null) {
       total += (tj.quoteAmount ?? 0) + (tj.deliveryCharge ?? 0);
-    });
+    }
     return total;
   }
 
+  /// Keyed off [statusText], not the raw status field — the two are derived
+  /// differently, so switching on `status` here painted "Stitching
+  /// Completed" with the blue `processing` dot.
   Color get statusColor {
-    switch (status) {
-      case OrderStatus.awaitingConfirmation:
-        return Colors.orange;
-      case OrderStatus.processing:
-        return Colors.blue;
-      case OrderStatus.awaitingTailorSearch:
-        return Colors.purple;
-      case OrderStatus.tailorPending:
-        return Colors.amber;
-      case OrderStatus.completed:
+    switch (statusText) {
+      case 'Delivered':
+      case 'Items Delivered':
         return Colors.green;
-      case OrderStatus.cancelled:
+      case 'Cancelled':
         return Colors.red;
+      case 'Awaiting Confirmation':
+        return Colors.orange;
+      case 'Awaiting Tailor Selection':
+        return Colors.purple;
+      case 'Requested Tailor':
+      case 'Tailor Pending':
+        return Colors.amber;
+      case 'Quote Received from Tailor':
+        return Colors.deepOrange;
+      case 'Tailor Confirmed — Stitching Started':
+        return Colors.indigo;
+      case 'Stitching Completed':
+        return Colors.teal;
+      case 'Order Packed':
+        return Colors.teal.shade700;
+      default:
+        return Colors.blue;
     }
   }
 

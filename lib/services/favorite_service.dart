@@ -11,6 +11,25 @@ class FavoriteService {
 
   final FirebaseFirestore _db;
 
+  /// Firestore caps `whereIn` at 30 values, so id lookups are issued in
+  /// batches and the results concatenated. Without this a customer with more
+  /// than 30 favorites would make the whole wishlist query throw.
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _fetchByIds(
+    String collection,
+    List<String> ids,
+  ) async {
+    final docs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+    for (var i = 0; i < ids.length; i += 30) {
+      final batch = ids.sublist(i, i + 30 > ids.length ? ids.length : i + 30);
+      final snapshot = await _db
+          .collection(collection)
+          .where(FieldPath.documentId, whereIn: batch)
+          .get();
+      docs.addAll(snapshot.docs);
+    }
+    return docs;
+  }
+
   // ─── Core Logic ────────────────────────────────────────────────────────────
 
   /// Adds a target to the customer's favorites.
@@ -98,12 +117,11 @@ class FavoriteService {
       final ids = snapshot.docs.map((doc) => doc['targetId'] as String).toList();
       if (ids.isEmpty) return [];
 
-      final tailorsQuery = await _db
-          .collection('Tailor')
-          .where(FieldPath.documentId, whereIn: ids)
-          .get();
+      final docs = await _fetchByIds('Tailor', ids);
 
-      return tailorsQuery.docs.map((doc) => Tailor.fromJson(doc.data())).toList();
+      return docs
+          .map((doc) => Tailor.fromJson(doc.data(), id: doc.id))
+          .toList();
     });
   }
 
@@ -136,13 +154,11 @@ class FavoriteService {
       if (ids.isEmpty) return [];
 
 
-      final retailersQuery = await _db
-          .collection('Retailer')
-          .where(FieldPath.documentId, whereIn: ids)
-          .get();
+      final docs = await _fetchByIds('Retailer', ids);
 
-
-      return retailersQuery.docs.map((doc) => Retailer.fromJson(doc.data())).toList();
+      return docs
+          .map((doc) => Retailer.fromJson(doc.data(), id: doc.id))
+          .toList();
     });
   }
 
@@ -175,13 +191,11 @@ class FavoriteService {
       if (ids.isEmpty) return [];
 
 
-      final productsQuery = await _db
-          .collection('Products')
-          .where(FieldPath.documentId, whereIn: ids)
-          .get();
+      final docs = await _fetchByIds('Products', ids);
 
-
-      return productsQuery.docs.map((doc) => Product.fromJson(doc.data())).toList();
+      return docs
+          .map((doc) => Product.fromJson(doc.data(), id: doc.id))
+          .toList();
     });
   }
 

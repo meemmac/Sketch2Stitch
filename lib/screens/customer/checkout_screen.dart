@@ -20,7 +20,11 @@ class CheckoutScreen extends StatefulWidget {
   final List<CartLine> cartLines;
   final Map<String, RetailerInfo> retailers;
   final double grandTotal;
-  final Measurement measurement;
+  /// Nullable on purpose: fabric can be bought without any tailoring, so
+  /// the cart no longer forces a complete measurement profile before
+  /// checkout. TailoringSetupScreen prompts for measurements itself if the
+  /// customer goes on to pick a tailor.
+  final Measurement? measurement;
   final List<SubOrder> subOrders;
   final VoidCallback onOrderPlaced;
 
@@ -29,7 +33,7 @@ class CheckoutScreen extends StatefulWidget {
     required this.cartLines,
     required this.retailers,
     required this.grandTotal,
-    required this.measurement,
+    this.measurement,
     required this.subOrders,
     required this.onOrderPlaced,
   });
@@ -217,7 +221,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           builder: (_) => TailoringSetupScreen(
             orderId: placed.order.id,
             orderDate: placed.order.orderDate,
-            savedMeasurements: [widget.measurement],
+            savedMeasurements:
+                widget.measurement == null ? const [] : [widget.measurement!],
             subOrders: placed.subOrders,
             callbacks: buildTailoringCallbacks(placed.order.id),
           ),

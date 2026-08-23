@@ -64,6 +64,7 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
   void _loadData() async {
     final tailorId = _authService.currentUser?.uid;
     if (tailorId == null) {
+       setState(() => _isLoading = false);
       return;
     }
 
@@ -103,6 +104,9 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
         }).toList();
         _isLoading = false;
       });
+        }, onError: (e) {
+      debugPrint('Error loading reviews: $e');
+      if (mounted) setState(() => _isLoading = false);
     });
   }
 
@@ -113,6 +117,10 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
         return list.where((r) => r.rating >= 5.0).toList();
       case "4 Star & above":
         return list.where((r) => r.rating >= 4.0).toList();
+      // Strictly < 4.0, so this bucket and "4 Star & above" stay disjoint —
+      // same rule as the customer-facing tailor/retailer review pages.
+      case "Below 4 Star":
+        return list.where((r) => r.rating < 4.0).toList();
       default:
         return list;
     }
@@ -187,14 +195,22 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
             ),
             _buildFilterChips(),
             const SizedBox(height: 16),
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: filtered.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 16),
-              itemBuilder: (context, index) => _buildReviewItem(filtered[index]),
-            ),
+            if (filtered.isEmpty)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32.0),
+                  child: Text("No reviews found yet."),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: filtered.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 16),
+                itemBuilder: (context, index) => _buildReviewItem(filtered[index]),
+              ),
             const SizedBox(height: 32),
           ],
         ),
@@ -300,7 +316,7 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
   }
 
   Widget _buildFilterChips() {
-    final filters = ["All reviews", "5 Star", "4 Star & above"];
+    final filters = ["All reviews", "5 Star", "4 Star & above", "Below 4 Star"];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -317,7 +333,7 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
                   setState(() => _selectedFilter = filter);
                 }
               },
-              selectedColor: primaryGreen,
+              selectedColor: const Color(0xFF6B8F71),
               labelStyle: TextStyle(
                 color: isSelected ? Colors.white : Colors.black87,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -360,14 +376,23 @@ class _TailorReviewsScreenState extends State<TailorReviewsScreen> {
           ),
           const SizedBox(height: 8),
           Row(
-            children: List.generate(
-              5,
-                  (index) => Icon(
-                index < review.rating.floor() ? Icons.star : Icons.star_border,
-                color: Colors.orange,
-                size: 14,
+            children: [
+              Row(
+                children: List.generate(
+                  5,
+                      (index) => Icon(
+                    index < review.rating.floor() ? Icons.star : Icons.star_border,
+                    color: Colors.orange,
+                    size: 14,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              Text(
+                review.rating.toStringAsFixed(1),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Text(

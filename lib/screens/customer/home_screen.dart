@@ -3,26 +3,29 @@ import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/tailor.dart';
 import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/models/user_role.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_fabrics_screen.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_tailors_screen.dart'
-    show kHardcodedTailors;
-import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.dart'
-    show kHardcodedRetailers;
+import 'package:sketch2stitch/screens/customer/browsing/browse_tailors_screen.dart';
+import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/product_detail_overlay.dart';
-import 'package:sketch2stitch/screens/customer/browsing/tailor_detail_screen.dart';
-import 'package:sketch2stitch/screens/customer/browsing/retailer_detail_screen.dart';
 import 'package:sketch2stitch/widgets/cart_icon_button.dart';
+import 'package:sketch2stitch/services/browse_service.dart';
+import 'package:sketch2stitch/services/favorite_service.dart';
+import 'package:sketch2stitch/services/customer_service.dart';
+import 'package:sketch2stitch/services/cart_service.dart';
+import 'package:sketch2stitch/utils/geo_utils.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../widgets/dashboard_drawer.dart';
 import 'virtual_trial_screen.dart';
 import 'notification_screen.dart';
 import 'package:sketch2stitch/screens/retailer/inventory_screen.dart';
 import 'package:sketch2stitch/screens/tailor/orders_screen.dart';
 import 'order_list_screen.dart';
+import 'track_order.dart';
 
 import 'package:sketch2stitch/services/auth_service.dart';
 import 'package:sketch2stitch/services/notification_service.dart';
+import 'package:sketch2stitch/services/tailoring_service.dart';
 
 class UnifiedHomeScreen extends StatefulWidget {
   final UserRole initialRole;
@@ -50,90 +53,228 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
 
   String _favoritesFilter = 'Fabric and elements';
 
-  // ─── Get all fabric products from kHardcodedFabricData ──────────────
+  // ─── Services ──────────────────────────────────────────────────────────
+  final BrowseService _browseService = BrowseService();
+  final FavoriteService _favoriteService = FavoriteService();
+  final CustomerService _customerService = CustomerService();
+  String? _currentUserId;
 
-  List<Product> get _allFabricProducts {
-    return kHardcodedFabricData
-        .map((fabricData) => fabricData.product)
-        .toList();
-  }
+  // ─── Data State ──────────────────────────────────────────────────────
+  List<Product> _allProducts = [];
+  List<Tailor> _allTailors = [];
+  List<Retailer> _allRetailers = [];
+  Map<String, String> _retailerNames = {};
+  GeoPoint? _customerLocation;
+  bool _isLoading = true;
+  bool _hasError = false;
+  String _errorMessage = '';
 
-  List<Product> get _allElementProducts => kHardcodedElements;
-
-  // ─── Last Viewed ──────────────────────────────────────────────────────
-
-  List<Product> get _lastViewedProducts {
-    final fabrics = _allFabricProducts;
-    return fabrics.isNotEmpty ? fabrics.take(3).toList() : [];
-  }
-
-  // ─── Favorites ────────────────────────────────────────────────────────
-
-  List<Product> get _favoriteFabricProducts {
-    final fabrics = _allFabricProducts;
-    return fabrics.length > 2 ? fabrics.skip(2).take(3).toList() : fabrics;
-  }
-
-  List<Tailor> get _favoriteTailors => kHardcodedTailors.take(3).toList();
-  List<Retailer> get _favoriteRetailers => kHardcodedRetailers.take(3).toList();
-
-  // ─── Section Products ────────────────────────────────────────────────
-
-  List<Product> get _fabricSectionProducts {
-    final fabrics = _allFabricProducts;
-    return fabrics
-        .where((p) => ['Cotton', 'Silk', 'Wool', 'Linen'].contains(p.category))
-        .take(6)
-        .toList();
-  }
-
-  List<Product> get _elementSectionProducts {
-    final elements = _allElementProducts;
-    return elements
-        .where(
-          (p) => [
-            'Lace',
-            'Embroidery',
-            'Fasteners',
-            'Buttons',
-            'Threads',
-            'Trims',
-            'Ribbons',
-          ].contains(p.category),
-        )
-        .take(6)
-        .toList();
-  }
-
-  // ─── Get Retailer Name ───────────────────────────────────────────────
-
-  String _getRetailerName(String retailerId) {
-    return retailerNameMap[retailerId] ?? 'Unknown Retailer';
-  }
-
+  // Must match the category values written by the retailer inventory form,
+  // which stores exactly "Fabric" or "Element".
   final List<String> _elementCategories = [
-    'Fasteners',
-    'Buttons',
-    'Threads',
-    'Embellishments',
-    'Trims',
-    'Ribbons',
+    'Element',
+  ];
+
+  // Categories that are considered "Fabrics"
+  final List<String> _fabricCategories = [
+    'Fabric',
   ];
 
   bool _isElement(Product product) =>
       _elementCategories.contains(product.category);
 
+  bool _isFabric(Product product) =>
+      _fabricCategories.contains(product.category);
+
+  // ─── Getters ──────────────────────────────────────────────────────────
+  // Matched to the Browse Fabrics tab: only an explicit "Fabric" category
+  // counts, so a product with a missing/unknown category is not silently
+  // listed here while being absent from browsing.
+  List<Product> get _allFabricProducts => _allProducts.where((p) => _isFabric(p)).toList();
+  List<Product> get _allElementProducts => _allProducts.where((p) => _isElement(p)).toList();
+
+  List<Product> get _fabricSectionProducts {
+    final fabrics = _allFabricProducts;
+    return fabrics.take(6).toList();
+  }
+
+  List<Product> get _elementSectionProducts {
+    final elements = _allElementProducts;
+    return elements.take(6).toList();
+  }
+
+  String _getRetailerName(String retailerId) {
+    return _retailerNames[retailerId] ?? 'Unknown Retailer';
+  }
+
+  GeoPoint? _getRetailerLocation(String retailerId) {
+    for (final retailer in _allRetailers) {
+      if (retailer.id == retailerId) return retailer.location;
+    }
+    return null;
+  }
+
+  /// Great-circle distance from the customer's saved location to [target],
+  /// or null if either location is unavailable.
+  double? _distanceKmTo(GeoPoint? target) {
+    if (_customerLocation == null || target == null) return null;
+    return GeoUtils.distanceKm(_customerLocation!, target);
+  }
+
+  /// Same base + per-km delivery estimate used at checkout
+  /// (CartService.deliveryChargeFor), formatted for card display.
+  String _deliveryChargeLabel(GeoPoint? target) {
+    return 'Tk ${CartService.deliveryChargeFor(_distanceKmTo(target)).toStringAsFixed(0)}';
+  }
+
   @override
   void initState() {
     super.initState();
     _currentRole = widget.initialRole;
+    _getCurrentUser();
+    // No Cloud Functions on the free tier, so a tailor-selection window that
+    // closed while the app was shut is only settled when a device notices.
+    // Not awaited — the service swallows its own failures.
+    if (_currentRole == UserRole.customer && _currentUserId != null) {
+      TailoringService().sweepDueTailorSearches(_currentUserId!);
+    }
+    _loadData();
+  }
+
+  void _getCurrentUser() {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        _currentUserId = user.uid;
+      }
+    } catch (e) {
+      // no-op: _currentUserId stays null if lookup fails
+    }
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+      _errorMessage = '';
+    });
+    
+    try {
+      // Load products
+      List<Product> products = [];
+      try {
+        products = await _browseService.getProductsByFilter().first;
+      } catch (e) {
+        products = [];
+      }
+
+      // Load tailors. Fully-booked tailors (at their maxOrder capacity) are
+      // excluded on the home screen entirely, not just sorted last.
+      List<Tailor> tailors = [];
+      try {
+        final loadedTailors = await _browseService.getTailorsByFilter().first;
+        final runningJobCounts = await _browseService.fetchRunningJobCounts();
+        tailors = loadedTailors
+            .where((t) => !BrowseService.isTailorFull(t, runningJobCounts))
+            .toList();
+      } catch (e) {
+        tailors = [];
+      }
+
+      // Load retailers
+      List<Retailer> retailers = [];
+      try {
+        retailers = await _browseService.getRetailersByFilter().first;
+      } catch (e) {
+        retailers = [];
+      }
+
+      // Load the customer's saved location, used to estimate delivery
+      // charge/distance on tailor, retailer and product cards.
+      GeoPoint? customerLocation;
+      if (_currentUserId != null) {
+        try {
+          final customer =
+              await _customerService.streamCustomerProfile(_currentUserId!).first;
+          customerLocation = customer?.location;
+        } catch (e) {
+          customerLocation = null;
+        }
+      }
+
+      // Load retailer names
+      Map<String, String> names = {};
+      try {
+        final retailerSnapshot = await FirebaseFirestore.instance
+            .collection('Retailer')
+            .get();
+
+        for (final doc in retailerSnapshot.docs) {
+          final data = doc.data();
+          names[doc.id] = data['shopName'] as String? ?? 'Unknown Retailer';
+        }
+      } catch (e) {
+        // retailer names stay empty; _getRetailerName() falls back per-id
+      }
+
+      if (!mounted) return;
+
+      // Check if we got any data
+      if (products.isEmpty && tailors.isEmpty && retailers.isEmpty) {
+        setState(() {
+          _allProducts = [];
+          _allTailors = [];
+          _allRetailers = [];
+          _retailerNames = names;
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage = 'No data found. Please add products, tailors, and retailers.';
+        });
+        return;
+      }
+
+      setState(() {
+        _allProducts = products;
+        _allTailors = tailors;
+        _allRetailers = retailers;
+        _retailerNames = names;
+        _customerLocation = customerLocation;
+        _isLoading = false;
+        _hasError = false;
+      });
+
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+        _errorMessage = 'Failed to load data: ${e.toString()}';
+      });
+    }
   }
 
   void _openNotifications() async {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => UnifiedNotificationScreen(role: _currentRole),
+        builder: (_) => UnifiedNotificationScreen(
+          role: _currentRole,
+          // Without this the notification cards marked themselves read and
+          // did nothing else — every notification is about an order, so a
+          // tap should open that order's tracking timeline.
+          onNotificationTap: (orderId, subOrderId) {
+            if (orderId.isEmpty) return;
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => OrderTrackScreen(
+                  orderId: orderId,
+                  userRole: _currentRole,
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -147,27 +288,33 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     );
   }
 
-  // ✅ FIXED: Pass userRole to BrowseShell
   void _openBrowseTab(int index) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            BrowseShell(initialIndex: index, userRole: _currentRole),
+        builder: (_) => BrowseShell(
+          initialIndex: index,
+          userRole: _currentRole,
+        ),
       ),
     );
   }
 
   void _showProductOverlay(Product product) {
-    final bool isFabric = !_isElement(product);
+    final bool isFabric = _isFabric(product);
     List<String>? materialBlends;
-    if (isFabric) {
-      for (final fabricData in kHardcodedFabricData) {
-        if (fabricData.product.id == product.id) {
-          materialBlends = fabricData.materialBlendList;
-          break;
+    
+    if (isFabric && product.materialType.isNotEmpty) {
+      materialBlends = product.materialType.map((m) {
+        if (m.blend > 0) {
+          return '${m.blend.toInt()}% ${m.type}';
         }
-      }
+        return m.type;
+      }).toList();
+    }
+
+    if (_currentUserId != null) {
+      _customerService.addToLastViewed(_currentUserId!, product.id);
     }
 
     showModalBottomSheet(
@@ -178,35 +325,39 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         product: product,
         isFabric: isFabric,
         retailerName: _getRetailerName(product.retailerId),
+        retailerLocation: _getRetailerLocation(product.retailerId),
         materialBlends: materialBlends,
         userRole: _currentRole,
+        customerId: _currentUserId,
+        favoriteService: _favoriteService,
       ),
     );
   }
 
-  // ✅ FIXED: Pass userRole to TailorDetailScreen
   void _openTailorDetail(Tailor tailor) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            TailorDetailScreen(tailor: tailor, userRole: _currentRole),
+        builder: (context) => TailorDetailScreen(
+          tailor: tailor,
+          userRole: _currentRole,
+        ),
       ),
     );
   }
 
-  // ✅ FIXED: Pass userRole to RetailerDetailScreen
   void _openRetailerDetail(Retailer retailer) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            RetailerDetailScreen(retailer: retailer, userRole: _currentRole),
+        builder: (context) => RetailerDetailScreen(
+          retailer: retailer,
+          userRole: _currentRole,
+        ),
       ),
     );
   }
 
-  // ✅ FIXED: Pass userRole to SeeAllGridScreen
   void _openSeeAllProducts(String title, List<Product> products) {
     Navigator.push(
       context,
@@ -221,7 +372,6 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     );
   }
 
-  // ✅ FIXED: Pass userRole to SeeAllGridScreen
   void _openSeeAllTailors(String title, List<Tailor> tailors) {
     Navigator.push(
       context,
@@ -236,7 +386,6 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     );
   }
 
-  // ✅ FIXED: Pass userRole to SeeAllGridScreen
   void _openSeeAllRetailers(String title, List<Retailer> retailers) {
     Navigator.push(
       context,
@@ -259,6 +408,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
 
   void _scrollToSection(GlobalKey key) {
     Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
       final ctx = key.currentContext;
       if (ctx != null) {
         Scrollable.ensureVisible(
@@ -282,22 +432,99 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
             _buildTopBar(),
             _buildSectionNavBar(),
             Expanded(
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 16),
-                    Container(key: _heroKey, child: _buildHeroSection()),
-                    const SizedBox(height: 20),
-                    _buildRoleSpecificSections(),
-                  ],
-                ),
+              child: _buildBody(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              color: kSage,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Loading...',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
               ),
             ),
           ],
         ),
+      );
+    }
+
+    if (_hasError) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Colors.red[300],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Unable to load data',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[700],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _errorMessage,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[500],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _loadData,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kSage,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Retry',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      controller: _scrollController,
+      physics: const BouncingScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 16),
+          Container(key: _heroKey, child: _buildHeroSection()),
+          const SizedBox(height: 20),
+          _buildRoleSpecificSections(),
+        ],
       ),
     );
   }
@@ -786,17 +1013,27 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   }
 
   Widget _buildLastViewedSection() {
-    final items = _lastViewedProducts;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionHeader('Your last viewed'),
-        const SizedBox(height: 12),
-        _buildFabricRow(items),
-        _buildSeeAllButton(
-          () => _openSeeAllProducts('Your Last Viewed', items),
-        ),
-      ],
+    final customerId = _currentUserId;
+    if (customerId == null) return const SizedBox.shrink();
+
+    return StreamBuilder<List<Product>>(
+      stream: _customerService.streamLastViewed(customerId),
+      builder: (context, snapshot) {
+        final items = snapshot.data ?? [];
+        if (items.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSectionHeader('Your last viewed'),
+            const SizedBox(height: 12),
+            _buildFabricRow(items),
+            _buildSeeAllButton(
+              () => _openSeeAllProducts('Your Last Viewed', items),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -813,37 +1050,88 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
     );
   }
 
+  Widget _buildFavoritesEmpty(String message) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+      child: Row(
+        children: [
+          Icon(Icons.favorite_border, size: 18, color: Colors.grey[400]),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFavoritesContent() {
+    final customerId = _currentUserId;
+    if (customerId == null) return const SizedBox.shrink();
+
     switch (_favoritesFilter) {
       case 'Retailers':
-        final items = _favoriteRetailers;
-        return Column(
-          children: [
-            _buildRetailerRow(items),
-            _buildSeeAllButton(
-              () => _openSeeAllRetailers('Wish-listed Retailers', items),
-            ),
-          ],
+        return StreamBuilder<List<Retailer>>(
+          stream: _favoriteService.getFavoriteRetailers(customerId),
+          builder: (context, snapshot) {
+            final items = snapshot.data ?? [];
+            if (items.isEmpty) {
+              return _buildFavoritesEmpty(
+                'No wish-listed retailers yet. Tap the heart on a retailer to save it here.',
+              );
+            }
+            return Column(
+              children: [
+                _buildRetailerRow(items),
+                _buildSeeAllButton(
+                  () => _openSeeAllRetailers('Wish-listed Retailers', items),
+                ),
+              ],
+            );
+          },
         );
       case 'Tailors':
-        final items = _favoriteTailors;
-        return Column(
-          children: [
-            _buildTailorRow(items),
-            _buildSeeAllButton(
-              () => _openSeeAllTailors('Wish-listed Tailors', items),
-            ),
-          ],
+        return StreamBuilder<List<Tailor>>(
+          stream: _favoriteService.getFavoriteTailors(customerId),
+          builder: (context, snapshot) {
+            final items = snapshot.data ?? [];
+            if (items.isEmpty) {
+              return _buildFavoritesEmpty(
+                'No wish-listed tailors yet. Tap the heart on a tailor to save it here.',
+              );
+            }
+            return Column(
+              children: [
+                _buildTailorRow(items),
+                _buildSeeAllButton(
+                  () => _openSeeAllTailors('Wish-listed Tailors', items),
+                ),
+              ],
+            );
+          },
         );
       default:
-        final items = _favoriteFabricProducts;
-        return Column(
-          children: [
-            _buildFabricRow(items),
-            _buildSeeAllButton(
-              () => _openSeeAllProducts('Wish-listed Fabrics & Elements', items),
-            ),
-          ],
+        return StreamBuilder<List<Product>>(
+          stream: _favoriteService.getFavoriteProducts(customerId),
+          builder: (context, snapshot) {
+            final items = snapshot.data ?? [];
+            if (items.isEmpty) {
+              return _buildFavoritesEmpty(
+                'No wish-listed fabrics or elements yet. Tap the heart on a product to save it here.',
+              );
+            }
+            return Column(
+              children: [
+                _buildFabricRow(items),
+                _buildSeeAllButton(
+                  () => _openSeeAllProducts('Wish-listed Fabrics & Elements', items),
+                ),
+              ],
+            );
+          },
         );
     }
   }
@@ -867,9 +1155,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                     decoration: BoxDecoration(
                       border: Border(
                         bottom: BorderSide(
-                          color: active
-                              ? Colors.green.shade600
-                              : Colors.transparent,
+                          color: active ? kSage : Colors.transparent,
                           width: 2,
                         ),
                       ),
@@ -879,7 +1165,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                        color: active ? Colors.green.shade800 : Colors.black45,
+                        color: active ? kSage : Colors.black45,
                       ),
                     ),
                   ),
@@ -976,7 +1262,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  ' Inventory Management',
+                  'Inventory Management',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -1082,6 +1368,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
 
   // ---------------- Fabric product row & card ----------------
   Widget _buildFabricRow(List<Product> products) {
+    if (products.isEmpty) return const SizedBox.shrink();
+    
     return SizedBox(
       height: 220,
       child: ListView.builder(
@@ -1099,15 +1387,26 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         ? product.colorOptions.first.image.first
         : null;
     final bool outOfStock = product.colorOptions.every((c) => c.stock <= 0);
+    
+    // Check if user is Tailor or Retailer
+    final bool isTailorOrRetailer = _currentRole == UserRole.tailor || 
+                                     _currentRole == UserRole.retailer;
 
     return GestureDetector(
       onTap: () => _showProductOverlay(product),
       child: Container(
         margin: const EdgeInsets.only(right: 14),
         decoration: BoxDecoration(
-          color: kCardBg,
+          color: const Color(0xFFFFFFFF),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: kBorder, width: 0.5),
+          border: Border.all(color: const Color(0xFFE8ECF0), width: 0.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1122,31 +1421,45 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                   child: SizedBox(
                     height: 120,
                     width: double.infinity,
-                    child: coverImage != null
-                        ? Image.asset(
-                            coverImage,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Container(
-                                  color: kSage.withOpacity(0.12),
-                                  child: Icon(
-                                    Icons.texture,
-                                    size: 34,
-                                    color: kSageDark,
-                                  ),
-                                ),
-                          )
+                    child: coverImage != null && coverImage.isNotEmpty
+                        ? (coverImage.startsWith('http')
+                            ? Image.network(
+                                coverImage,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Container(
+                                      color: kSage.withOpacity(0.12),
+                                      child: Icon(
+                                        Icons.texture,
+                                        size: 34,
+                                        color: const Color(0xFF4A7C59),
+                                      ),
+                                    ),
+                              )
+                            : Image.asset(
+                                coverImage,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Container(
+                                      color: kSage.withOpacity(0.12),
+                                      child: Icon(
+                                        Icons.texture,
+                                        size: 34,
+                                        color: const Color(0xFF4A7C59),
+                                      ),
+                                    ),
+                              ))
                         : Container(
                             color: kSage.withOpacity(0.12),
                             child: Icon(
                               Icons.texture,
                               size: 34,
-                              color: kSageDark,
+                              color: const Color(0xFF4A7C59),
                             ),
                           ),
                   ),
                 ),
-                if (!_isElement(product))
+                if (_isFabric(product) && product.materialType.isNotEmpty)
                   Positioned(
                     top: 8,
                     right: 8,
@@ -1215,7 +1528,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: kSageDark,
+                      color: const Color(0xFF4A7C59),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1236,7 +1549,36 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                               )
                               .toList(),
                         ),
-                        Row(
+                        // Only show delivery info for customers
+                        if (!isTailorOrRetailer)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.directions_bike,
+                                size: 12,
+                                color: Colors.grey[600],
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                _deliveryChargeLabel(_getRetailerLocation(product.retailerId)),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 6),
+                    // Only show delivery info for customers
+                    if (!isTailorOrRetailer)
+                      Align(
+                        alignment: Alignment.bottomRight,
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
@@ -1246,7 +1588,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                             ),
                             const SizedBox(width: 2),
                             Text(
-                              'Tk 50',
+                              _deliveryChargeLabel(_getRetailerLocation(product.retailerId)),
                               style: TextStyle(
                                 fontSize: 10,
                                 color: Colors.grey[600],
@@ -1255,32 +1597,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ] else ...[
-                    const SizedBox(height: 6),
-                    Align(
-                      alignment: Alignment.bottomRight,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.directions_bike,
-                            size: 12,
-                            color: Colors.grey[600],
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            'Tk 50',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
                       ),
-                    ),
                   ],
                 ],
               ),
@@ -1301,7 +1618,7 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         decoration: BoxDecoration(
           color: _resolveColor(option.color),
           shape: BoxShape.circle,
-          border: Border.all(color: kBorder, width: 0.5),
+          border: Border.all(color: const Color(0xFFE8ECF0), width: 0.5),
         ),
       ),
     );
@@ -1313,6 +1630,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         return Colors.white;
       case 'black':
         return Colors.black;
+      case 'red':
+        return Colors.red;
       case 'pink':
         return Colors.pink[200]!;
       case 'blue':
@@ -1325,18 +1644,30 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
         return Colors.brown[300]!;
       case 'gold':
         return const Color(0xFFD4AF37);
+      case 'silver':
+        return Colors.grey[400]!;
+      case 'purple':
+        return Colors.purple[300]!;
       default:
         return Colors.grey[300]!;
     }
   }
 
   String _materialBadgeText(Product product) {
-    for (final fabricData in kHardcodedFabricData) {
-      if (fabricData.product.id == product.id) {
-        return fabricData.materialDisplay;
-      }
+    // Build from MaterialBlend list
+    if (product.materialType.isEmpty) {
+      return "N/A";
     }
-    final material = product.materialType.isNotEmpty ? product.materialType.first.type : "";
+    
+    final parts = product.materialType.map((m) {
+      if (m.blend > 0) {
+        return '${m.blend.toInt()}% ${m.type}';
+      }
+      return m.type;
+    }).toList();
+    
+    final material = parts.join(', ');
+    
     if (material.isEmpty || material == "N/A") {
       return "N/A";
     }
@@ -1344,8 +1675,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
       return material;
     }
     if (material.contains(',')) {
-      final parts = material.split(',').map((s) => s.trim()).toList();
-      final hasPercentages = parts.any((p) => p.contains('%'));
+      final splitParts = material.split(',').map((s) => s.trim()).toList();
+      final hasPercentages = splitParts.any((p) => p.contains('%'));
       if (hasPercentages) return material;
       return "100% $material";
     }
@@ -1354,6 +1685,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
 
   // ---------------- Tailor row & card ----------------
   Widget _buildTailorRow(List<Tailor> tailors) {
+    if (tailors.isEmpty) return const SizedBox.shrink();
+    
     return SizedBox(
       height: 200,
       child: ListView.builder(
@@ -1369,15 +1702,26 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   Widget _buildTailorCard(Tailor tailor) {
     final bool isTopRated = tailor.rating >= 4.8;
     final String imageUrl = tailor.profilePicture ?? 'assets/images/fab.jpg';
+    
+    // Check if user is Tailor or Retailer
+    final bool isTailorOrRetailer = _currentRole == UserRole.tailor || 
+                                     _currentRole == UserRole.retailer;
 
     return GestureDetector(
       onTap: () => _openTailorDetail(tailor),
       child: Container(
         margin: const EdgeInsets.only(right: 14),
         decoration: BoxDecoration(
-          color: kCardBg,
+          color: const Color(0xFFFFFFFF),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: kBorder, width: 0.5),
+          border: Border.all(color: const Color(0xFFE8ECF0), width: 0.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1392,14 +1736,25 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                   child: SizedBox(
                     height: 110,
                     width: double.infinity,
-                    child: Image.asset(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: kSage.withOpacity(0.12),
-                        child: Icon(Icons.person, size: 34, color: kSageDark),
-                      ),
-                    ),
+                    child: imageUrl.startsWith('http')
+                        ? Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  color: kSage.withOpacity(0.12),
+                                  child: Icon(Icons.person, size: 34, color: const Color(0xFF4A7C59)),
+                                ),
+                          )
+                        : Image.asset(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  color: kSage.withOpacity(0.12),
+                                  child: Icon(Icons.person, size: 34, color: const Color(0xFF4A7C59)),
+                                ),
+                          ),
                   ),
                 ),
                 if (isTopRated)
@@ -1491,50 +1846,55 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '1.8 km',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: Colors.green.shade800,
-                            fontWeight: FontWeight.bold,
+                      // Only show distance for customers
+                      if (!isTailorOrRetailer && _distanceKmTo(tailor.location) != null) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 1,
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.bottomRight,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.directions_bike,
-                          size: 12,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          'Tk 50',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w600,
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '${_distanceKmTo(tailor.location)!.toStringAsFixed(1)} km',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.green.shade800,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
+                  const SizedBox(height: 8),
+                  // Only show delivery info for customers
+                  if (!isTailorOrRetailer)
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.directions_bike,
+                            size: 12,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            _deliveryChargeLabel(tailor.location),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -1546,6 +1906,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
 
   // ---------------- Retailer row & card ----------------
   Widget _buildRetailerRow(List<Retailer> retailers) {
+    if (retailers.isEmpty) return const SizedBox.shrink();
+    
     return SizedBox(
       height: 200,
       child: ListView.builder(
@@ -1561,15 +1923,26 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   Widget _buildRetailerCard(Retailer retailer) {
     final bool isTopRated = retailer.rating >= 4.8;
     final String imageUrl = retailer.profilePicture ?? 'assets/images/fab.jpg';
+    
+    // Check if user is Tailor or Retailer
+    final bool isTailorOrRetailer = _currentRole == UserRole.tailor || 
+                                     _currentRole == UserRole.retailer;
 
     return GestureDetector(
       onTap: () => _openRetailerDetail(retailer),
       child: Container(
         margin: const EdgeInsets.only(right: 14),
         decoration: BoxDecoration(
-          color: kCardBg,
+          color: const Color(0xFFFFFFFF),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: kBorder, width: 0.5),
+          border: Border.all(color: const Color(0xFFE8ECF0), width: 0.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1584,14 +1957,25 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                   child: SizedBox(
                     height: 110,
                     width: double.infinity,
-                    child: Image.asset(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: kSage.withOpacity(0.12),
-                        child: Icon(Icons.store, size: 34, color: kSageDark),
-                      ),
-                    ),
+                    child: imageUrl.startsWith('http')
+                        ? Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  color: kSage.withOpacity(0.12),
+                                  child: Icon(Icons.store, size: 34, color: const Color(0xFF4A7C59)),
+                                ),
+                          )
+                        : Image.asset(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  color: kSage.withOpacity(0.12),
+                                  child: Icon(Icons.store, size: 34, color: const Color(0xFF4A7C59)),
+                                ),
+                          ),
                   ),
                 ),
                 if (isTopRated)
@@ -1683,50 +2067,55 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '2.5 km',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: Colors.green.shade800,
-                            fontWeight: FontWeight.bold,
+                      // Only show distance for customers
+                      if (!isTailorOrRetailer && _distanceKmTo(retailer.location) != null) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 1,
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.bottomRight,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.directions_bike,
-                          size: 12,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          'Tk 50',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w600,
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '${_distanceKmTo(retailer.location)!.toStringAsFixed(1)} km',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.green.shade800,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
+                  const SizedBox(height: 8),
+                  // Only show delivery info for customers
+                  if (!isTailorOrRetailer)
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.directions_bike,
+                            size: 12,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            _deliveryChargeLabel(retailer.location),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -1739,6 +2128,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   // ---------------- Explore Sections ----------------
   Widget _buildExploreFabricsSection() {
     final items = _fabricSectionProducts;
+    if (items.isEmpty) return const SizedBox.shrink();
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1763,6 +2154,8 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
 
   Widget _buildExploreElementsSection() {
     final items = _elementSectionProducts;
+    if (items.isEmpty) return const SizedBox.shrink();
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1775,26 +2168,30 @@ class _UnifiedHomeScreenState extends State<UnifiedHomeScreen> {
   }
 
   Widget _buildExploreRetailersSection() {
-    final items = kHardcodedRetailers;
+    final items = _allRetailers;
+    if (items.isEmpty) return const SizedBox.shrink();
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildCenteredHeading('Explore Retailers'),
         const SizedBox(height: 14),
-        _buildRetailerRow(items),
+        _buildRetailerRow(items.take(6).toList()),
         _buildSeeAllButton(() => _openBrowseTab(3)),
       ],
     );
   }
 
   Widget _buildExploreTailorsSection() {
-    final items = kHardcodedTailors;
+    final items = _allTailors;
+    if (items.isEmpty) return const SizedBox.shrink();
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildCenteredHeading('Explore Tailors'),
         const SizedBox(height: 14),
-        _buildTailorRow(items),
+        _buildTailorRow(items.take(6).toList()),
         _buildSeeAllButton(() => _openBrowseTab(2)),
       ],
     );
@@ -1806,13 +2203,13 @@ class _SeeAllGridScreen<T> extends StatelessWidget {
   final String title;
   final List<T> items;
   final Widget Function(BuildContext, T) cardBuilder;
-  final UserRole userRole; // ✅ Added
+  final UserRole userRole;
 
   const _SeeAllGridScreen({
     required this.title,
     required this.items,
     required this.cardBuilder,
-    required this.userRole, // ✅ Required
+    required this.userRole,
   });
 
   @override

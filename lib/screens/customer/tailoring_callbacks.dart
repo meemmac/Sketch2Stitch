@@ -60,7 +60,8 @@ TailoringSetupCallbacks buildTailoringCallbacks(
     // own screen. The customer is only locking in what's already on the
     // job, and confirmTailorJob re-reads it inside a transaction so a
     // withdrawn or never-quoted job can't be accepted from stale state.
-    onConfirmTailorJob: () => backend.confirmTailorJob(orderId),
+    onConfirmTailorJob: ({String? transactionId}) =>
+        backend.confirmTailorJob(orderId, transactionId: transactionId),
 
     // No reason required — the customer can simply decline the tailor's
     // quote without justifying it.
@@ -74,22 +75,31 @@ TailoringSetupCallbacks buildTailoringCallbacks(
 
     onTailorSearchExpired: () => backend.expireTailorSearch(orderId),
 
-    onFetchResumeState: () async {
-      final state = await backend.fetchResumeState(orderId);
-      if (state == null) return null;
+    onQuoteRequestExpired: () => backend.expireQuoteRequest(orderId),
 
-      return OrderResumeState(
-        tailorSelectionDeadline: state['tailorSelectionDeadline'],
-        tailorJobId: state['tailorJobId'],
-        tailorId: state['tailorId'],
-        status: state['status'],
-        requestedAt: state['requestedAt'],
-        quoteAmount: state['quoteAmount'],
-        deliverCharge: state['deliverCharge'],
-        estimatedDeliveryDate: state['estimatedDeliveryDate'],
-        rejectionReason: state['rejectionReason'],
-        tailorPaymentStatus: state['tailorPaymentStatus'],
-      );
-    },
+    onFetchResumeState: () async =>
+        _toResumeState(await backend.fetchResumeState(orderId)),
+
+    onWatchResumeState: () =>
+        backend.streamResumeState(orderId).map(_toResumeState),
+  );
+}
+
+OrderResumeState? _toResumeState(Map<String, dynamic>? state) {
+  if (state == null) return null;
+
+  return OrderResumeState(
+    tailorSelectionDeadline: state['tailorSelectionDeadline'],
+    tailorJobId: state['tailorJobId'],
+    tailorId: state['tailorId'],
+    status: state['status'],
+    requestedAt: state['requestedAt'],
+    quoteAmount: state['quoteAmount'],
+    deliverCharge: state['deliverCharge'],
+    estimatedDeliveryDate: state['estimatedDeliveryDate'],
+    rejectionReason: state['rejectionReason'],
+    tailorPaymentStatus: state['tailorPaymentStatus'],
+    orderStatus: state['orderStatus'],
+    quoteResponseDeadline: state['quoteResponseDeadline'],
   );
 }

@@ -1,26 +1,35 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/product.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/services/cart_service.dart';
+import 'package:sketch2stitch/services/customer_service.dart';
 import 'package:sketch2stitch/services/user_session.dart';
+import 'package:sketch2stitch/services/favorite_service.dart';
+import 'package:sketch2stitch/utils/geo_utils.dart';
 import '../../../widgets/video_preview_player.dart';
-import '../../../widgets/care_info_tooltip.dart';
 import '../../../widgets/top_feedback_banner.dart';
 
 class ProductDetailOverlay extends StatefulWidget {
   final Product product;
   final bool isFabric;
   final String retailerName;
+  final GeoPoint? retailerLocation;
   final List<String>? materialBlends;
   final UserRole userRole;
+  final String? customerId;
+  final FavoriteService? favoriteService;
 
   const ProductDetailOverlay({
     super.key,
     required this.product,
     this.isFabric = true,
     this.retailerName = 'Unknown Retailer',
+    this.retailerLocation,
     this.materialBlends,
     this.userRole = UserRole.customer,
+    this.customerId,
+    this.favoriteService,
   });
 
   @override
@@ -29,11 +38,14 @@ class ProductDetailOverlay extends StatefulWidget {
 
 class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
   final CartService _cartService = CartService();
+  final CustomerService _customerService = CustomerService();
 
   int _quantity = 1;
   late ColorOption? _selectedOption;
   bool _isFavorite = false;
+  bool _isLoadingFavorite = true;
   bool _isAddingToCart = false;
+  double? _deliveryCharge;
 
   @override
   void initState() {
@@ -42,6 +54,81 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
     _selectedOption = options.isEmpty
         ? null
         : options.firstWhere((o) => o.stock > 0, orElse: () => options.first);
+
+    _checkFavoriteStatus();
+    _loadDeliveryEstimate();
+  }
+
+  /// Estimates delivery based on the great-circle distance between the
+  /// customer's saved location and the retailer's, same formula checkout
+  /// uses (CartService.deliveryChargeFor). Falls back to the flat base
+  /// charge if either location is unavailable.
+  Future<void> _loadDeliveryEstimate() async {
+    if (widget.retailerLocation == null || widget.customerId == null) {
+      if (mounted) setState(() => _deliveryCharge = CartService.baseDeliveryCharge);
+      return;
+    }
+    try {
+      final customer = await _customerService.streamCustomerProfile(widget.customerId!).first;
+      final customerLocation = customer?.location;
+      final distanceKm = customerLocation != null
+          ? GeoUtils.distanceKm(customerLocation, widget.retailerLocation!)
+          : null;
+      if (mounted) {
+        setState(() => _deliveryCharge = CartService.deliveryChargeFor(distanceKm));
+      }
+    } catch (e) {
+      if (mounted) setState(() => _deliveryCharge = CartService.baseDeliveryCharge);
+    }
+  }
+
+  Future<void> _checkFavoriteStatus() async {
+    if (widget.customerId != null && widget.favoriteService != null) {
+      try {
+        final isFav = await widget.favoriteService!
+            .isFavoriteProduct(widget.customerId!, widget.product.id)
+            .first;
+        if (!mounted) return;
+        setState(() {
+          _isFavorite = isFav;
+          _isLoadingFavorite = false;
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _isLoadingFavorite = false;
+        });
+      }
+    } else {
+      setState(() {
+        _isLoadingFavorite = false;
+      });
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (widget.customerId == null || widget.favoriteService == null) {
+      AppFeedback.show(context, 'Please sign in to add favorites.',
+          isError: true);
+      return;
+    }
+
+    try {
+      await widget.favoriteService!
+          .toggleFavoriteProduct(widget.customerId!, widget.product.id);
+      if (!mounted) return;
+      setState(() {
+        _isFavorite = !_isFavorite;
+      });
+      AppFeedback.show(
+        context,
+        _isFavorite ? 'Added to favorites.' : 'Removed from favorites.',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      AppFeedback.show(context, "Couldn't update favorites. Please try again.",
+          isError: true);
+    }
   }
 
   bool get _inStock => (_selectedOption?.stock ?? 0) > 0;
@@ -52,25 +139,18 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
       return widget.materialBlends!.join(", ");
     }
 
-    final material = widget.product.materialType.isNotEmpty ? widget.product.materialType.first.type : "";
-    if (material.isEmpty || material == "N/A") {
-      return "N/A";
+    // Use materialType list from Product model
+    if (widget.product.materialType.isNotEmpty) {
+      final parts = widget.product.materialType.map((m) {
+        if (m.blend > 0) {
+          return '${m.blend.toInt()}% ${m.type}';
+        }
+        return m.type;
+      }).toList();
+      return parts.join(", ");
     }
     
-    if (material.contains('%')) {
-      return material;
-    }
-    
-    if (material.contains(',')) {
-      final parts = material.split(',').map((s) => s.trim()).toList();
-      final hasPercentages = parts.any((p) => p.contains('%'));
-      if (hasPercentages) {
-        return material;
-      }
-      return "100% $material";
-    }
-    
-    return "100% $material";
+    return "N/A";
   }
 
   void _selectOption(ColorOption option) {
@@ -135,6 +215,13 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 380;
     final materialBlendDisplay = _materialBlendDisplay;
+    
+    // Check if careSymbol exists and is not empty
+    final bool hasCareInstructions = widget.product.careSymbol.isNotEmpty;
+    
+    // Check if user is Tailor or Retailer
+    final bool isTailorOrRetailer = widget.userRole == UserRole.tailor || 
+                                     widget.userRole == UserRole.retailer;
     
     return Container(
       constraints: BoxConstraints(
@@ -208,15 +295,15 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                           padding: const EdgeInsets.only(left: 8),
                           child: IconButton(
                             icon: Icon(
-                              _isFavorite ? Icons.favorite : Icons.favorite_border,
-                              color: _isFavorite ? Colors.red : Colors.grey,
+                              _isLoadingFavorite 
+                                  ? Icons.favorite_border 
+                                  : (_isFavorite ? Icons.favorite : Icons.favorite_border),
+                              color: _isLoadingFavorite 
+                                  ? Colors.grey 
+                                  : (_isFavorite ? Colors.red : Colors.grey),
                               size: 28,
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _isFavorite = !_isFavorite;
-                              });
-                            },
+                            onPressed: _isLoadingFavorite ? null : _toggleFavorite,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
                               minWidth: 44,
@@ -244,21 +331,25 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                           color: Color(0xFF2C5C44),
                         ),
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.directions_bike, size: 18, color: Colors.grey[600]),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Tk 50 delivery',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w600,
+                      // Only show delivery info for customers
+                      if (!isTailorOrRetailer)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.directions_bike, size: 18, color: Colors.grey[600]),
+                            const SizedBox(width: 4),
+                            Text(
+                              _deliveryCharge != null
+                                  ? 'Tk ${_deliveryCharge!.toStringAsFixed(0)} delivery'
+                                  : 'Calculating delivery...',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
                       if (!_inStock)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -346,6 +437,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 10),
 
+                  // Only show material blend for fabrics
                   if (widget.isFabric && materialBlendDisplay != "N/A") ...[
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -479,7 +571,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: isSelected
-                                        ? Colors.white.withValues(alpha: 0.85)
+                                        ? Colors.white.withOpacity(0.85)
                                         : const Color.fromARGB(255, 59, 59, 59),
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -493,7 +585,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                                         Icons.inventory_2,
                                         size: 12,
                                         color: isSelected
-                                            ? Colors.white.withValues(alpha: 0.7)
+                                            ? Colors.white.withOpacity(0.7)
                                             : Colors.grey[500],
                                       ),
                                       const SizedBox(width: 3),
@@ -502,7 +594,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: isSelected
-                                              ? Colors.white.withValues(alpha: 0.7)
+                                              ? Colors.white.withOpacity(0.7)
                                               : const Color.fromARGB(255, 63, 63, 63),
                                           fontWeight: FontWeight.w400,
                                         ),
@@ -519,7 +611,8 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 24),
 
-                  if (widget.isFabric) ...[
+                  // Only show Care Instructions for Fabrics that have them
+                  if (widget.isFabric && hasCareInstructions) ...[
                     const SizedBox(height: 25),
                     const Text(
                       "Care Instructions",
@@ -539,26 +632,31 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                       child: Column(
                         children: [
                           CareInstructionRow(
+                            icon: Icons.wash,
                             label: "Machine Washable",
                             isOk: _canMachineWash(),
                             info: "Indicates whether the garment can be safely washed in a washing machine and the recommended washing conditions. Following these instructions helps maintain the fabric's quality, color, and shape.",
                           ),
                           CareInstructionRow(
+                            icon: Icons.biotech,
                             label: "Bleach Allowed",
                             isOk: _canBleach(),
                             info: "Indicates whether bleach can be safely used on the fabric. Some materials may fade, weaken, or become damaged when exposed to bleach.",
                           ),
                           CareInstructionRow(
+                            icon: Icons.dry_cleaning,
                             label: "Dry Clean Only",
                             isOk: _canDryClean(),
                             info: "Indicates whether the garment should be professionally cleaned using special solvents instead of water. This method is recommended for delicate fabrics or garments with special finishes.",
                           ),
                           CareInstructionRow(
+                            icon: Icons.settings_input_component,
                             label: "Tumble Dry",
                             isOk: _canTumbleDry(),
                             info: "Tumble drying is the process of drying clothes in a clothes dryer (dryer machine) instead of hanging them to air dry. It indicates whether the garment is suitable for tumble drying and the recommended heat setting. Using the wrong drying method may cause shrinking or fabric damage.",
                           ),
                           CareInstructionRow(
+                            icon: Icons.iron,
                             label: "Iron Level",
                             isOk: true,
                             value: _getIronLevel(),
@@ -588,8 +686,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Add to Cart Button - only for customers
-                  // Add to Cart Button - only for customers
                   if (_isCustomer)
                     SizedBox(
                       width: double.infinity,
@@ -597,13 +693,13 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                         onPressed:
                             !_inStock || _isAddingToCart ? null : _addToCart,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2C5C44), // ✅ Dark green background
-                          foregroundColor: Colors.white, // ✅ White text
+                          backgroundColor: const Color(0xFF2C5C44),
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          elevation: 2, // ✅ Slight elevation for better visibility
+                          elevation: 2,
                         ),
                         child: _isAddingToCart
                             ? const SizedBox(
@@ -624,9 +720,6 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                               ),
                       ),
                     ),
-
-                  // ❌ REMOVED: "View product details" button and text for Tailors/Retailers
-
                   const SizedBox(height: 30),
                 ],
               ),
@@ -644,7 +737,11 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
     final imageWidth = screenWidth * 0.75;
     final imageHeight = 250.0;
 
-    if (_selectedOption != null && _selectedOption!.image.isNotEmpty && _selectedOption!.video.isNotEmpty) {
+    // Any option carrying more than one piece of media gets the swipeable
+    // gallery; a single image (or a single video) falls through to the
+    // fixed-size branches below.
+    final mediaCount = (_selectedOption?.image.length ?? 0) + (_selectedOption?.video.length ?? 0);
+    if (mediaCount > 1) {
       return SizedBox(
         height: imageHeight,
         child: ListView(
@@ -764,7 +861,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
 
   bool _canMachineWash() {
     final careSymbols = widget.product.careSymbol.map((s) => s.toLowerCase()).toList();
-    return careSymbols.any((s) => s.contains('wash'));
+    return careSymbols.any((s) => s.contains('wash') && !s.contains('do not') && !s.contains('no'));
   }
 
   bool _canBleach() {
@@ -784,12 +881,87 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
 
   String _getIronLevel() {
     final careSymbols = widget.product.careSymbol.map((s) => s.toLowerCase()).toList();
-    if (careSymbols.any((s) => s.contains('iron'))) {
-      if (careSymbols.any((s) => s.contains('low'))) return "Low";
-      if (careSymbols.any((s) => s.contains('medium'))) return "Medium";
-      if (careSymbols.any((s) => s.contains('high'))) return "High";
-      return "Medium";
+    for (final symbol in careSymbols) {
+      if (symbol.contains('iron')) {
+        if (symbol.contains('low')) return "Low";
+        if (symbol.contains('medium')) return "Medium";
+        if (symbol.contains('high')) return "High";
+      }
     }
     return "Medium";
+  }
+}
+
+// ─── CareInstructionRow Widget ─────────────────────────────────────────────
+
+class CareInstructionRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isOk;
+  final String? value;
+  final String info;
+
+  const CareInstructionRow({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.isOk,
+    this.value,
+    required this.info,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: isOk ? Colors.green : Colors.grey),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => _showInfoDialog(context, label, info),
+            child: Icon(Icons.info_outline, size: 16, color: Colors.blue.shade300),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: isOk ? Colors.black87 : Colors.grey),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value ?? (isOk ? "Yes" : "No"),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isOk ? Colors.green.shade800 : Colors.grey,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showInfoDialog(BuildContext context, String title, String content) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: Text(content),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Got it"),
+          ),
+        ],
+      ),
+    );
   }
 }

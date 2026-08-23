@@ -1,12 +1,238 @@
+// lib/screens/customer/browsing/browse_shell.dart
 import 'dart:ui' show lerpDouble;
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_fabrics_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_tailors_screen.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_retailers_screen.dart';
-import 'package:sketch2stitch/screens/customer/browsing/browse_palette.dart';
-import 'package:sketch2stitch/screens/customer/browsing/filter_data.dart';
-import 'package:sketch2stitch/widgets/cart_icon_button.dart';
 import 'package:sketch2stitch/models/user_role.dart';
+import 'package:sketch2stitch/widgets/cart_icon_button.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared green used across all "Browse" screens — Fabrics, Elements, Tailors,
+// Retailers — so they read as one consistent design language.
+// ─────────────────────────────────────────────────────────────────────────────
+const kSage = Color(0xFF6B8F71);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Filter Data Classes
+// ─────────────────────────────────────────────────────────────────────────────
+
+abstract class ProductFilterData {
+  final double minPrice;
+  final double maxPrice;
+  final List<String> colors;
+  final List<String> materialTypes;
+  final String sortBy;
+
+  ProductFilterData({
+    required this.minPrice,
+    required this.maxPrice,
+    required this.colors,
+    required this.materialTypes,
+    this.sortBy = 'default',
+  });
+
+  bool get hasFilters {
+    return minPrice > 0 ||
+        maxPrice < 5000 ||
+        (colors.isNotEmpty && !colors.contains('All')) ||
+        (materialTypes.isNotEmpty && !materialTypes.contains('All')) ||
+        sortBy != 'default';
+  }
+
+  bool matchesColor(List<String>? productColors) {
+    if (colors.isEmpty || colors.contains('All')) {
+      return true;
+    }
+
+    if (productColors == null || productColors.isEmpty) {
+      return false;
+    }
+
+    for (final productColor in productColors) {
+      for (final selectedColor in colors) {
+        if (productColor.toLowerCase().contains(selectedColor.toLowerCase())) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  bool matchesMaterial(String? productMaterialType, List<String>? productMaterialBlends) {
+    if (materialTypes.isEmpty || materialTypes.contains('All')) {
+      return true;
+    }
+
+    if (productMaterialBlends != null && productMaterialBlends.isNotEmpty) {
+      for (final blend in productMaterialBlends) {
+        for (final selectedType in materialTypes) {
+          if (blend.toLowerCase().contains(selectedType.toLowerCase())) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    if (productMaterialType == null || productMaterialType.isEmpty) {
+      return false;
+    }
+
+    for (final selectedType in materialTypes) {
+      if (productMaterialType.toLowerCase().contains(selectedType.toLowerCase())) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
+class FabricsFilterData extends ProductFilterData {
+  FabricsFilterData({
+    required super.minPrice,
+    required super.maxPrice,
+    required super.colors,
+    required super.materialTypes,
+    super.sortBy = 'default',
+  });
+}
+
+class ElementsFilterData extends ProductFilterData {
+  ElementsFilterData({
+    required super.minPrice,
+    required super.maxPrice,
+    required super.colors,
+    required super.materialTypes,
+    super.sortBy = 'default',
+  });
+}
+
+class TailorsFilterData {
+  final double minRating;
+  final String location;
+  final String sortBy;
+
+  TailorsFilterData({
+    required this.minRating,
+    required this.location,
+    this.sortBy = 'default',
+  });
+
+  bool get hasFilters {
+    return minRating > 0 || location != 'All' || sortBy != 'default';
+  }
+}
+
+class RetailersFilterData {
+  final double minRating;
+  final String location;
+  final String sortBy;
+
+  RetailersFilterData({
+    required this.minRating,
+    required this.location,
+    this.sortBy = 'default',
+  });
+
+  bool get hasFilters {
+    return minRating > 0 || location != 'All' || sortBy != 'default';
+  }
+}
+
+class MaterialFilterOptions {
+  static const List<String> allMaterials = [
+    'All',
+    'Cotton',
+    'Silk',
+    'Wool',
+    'Linen',
+    'Polyester',
+    'Viscose',
+    'Nylon',
+    'Cashmere',
+    'Spandex',
+    'Khadi',
+    'Muslin',
+    'Jamdani',
+    'Embroidery',
+  ];
+
+  static List<String> extractFromBlends(List<String> blends) {
+    final Set<String> materials = {};
+    for (final blend in blends) {
+      final parts = blend.split(',').map((s) => s.trim()).toList();
+      for (final part in parts) {
+        String cleanPart = part.replaceAll(RegExp(r'^\d+%'), '').trim();
+        for (final material in allMaterials) {
+          if (material != 'All' && cleanPart.toLowerCase().contains(material.toLowerCase())) {
+            materials.add(material);
+            break;
+          }
+        }
+      }
+    }
+    return materials.toList();
+  }
+
+  static List<String> getMaterialOptions() {
+    return allMaterials;
+  }
+}
+
+class ColorFilterOptions {
+  static const List<String> allColors = [
+    'All',
+    'White',
+    'Black',
+    'Red',
+    'Blue',
+    'Green',
+    'Gold',
+    'Silver',
+    'Pink',
+    'Beige',
+    'Brown',
+    'Purple',
+  ];
+
+  static List<String> extractFromProductColors(List<String> productColors) {
+    final Set<String> colors = {};
+    for (final color in productColors) {
+      final cleanColor = color.trim();
+      for (final availableColor in allColors) {
+        if (availableColor != 'All' && 
+            cleanColor.toLowerCase().contains(availableColor.toLowerCase())) {
+          colors.add(availableColor);
+          break;
+        }
+      }
+    }
+    return colors.toList();
+  }
+
+  static List<String> getColorOptions() {
+    return allColors;
+  }
+
+  static bool matchesSelectedColors(String colorName, List<String> selectedColors) {
+    if (selectedColors.isEmpty || selectedColors.contains('All')) {
+      return true;
+    }
+    
+    final cleanColorName = colorName.toLowerCase();
+    for (final selected in selectedColors) {
+      if (cleanColorName.contains(selected.toLowerCase())) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BrowseShell Widget
+// ─────────────────────────────────────────────────────────────────────────────
 
 /// Shared shell for the four "Browse" tabs (Fabrics, Elements, Tailors, Retailers)
 class BrowseShell extends StatefulWidget {
@@ -138,12 +364,14 @@ class _BrowseShellState extends State<BrowseShell> {
     });
   }
 
-
+  // Filter values are read straight from the fields below on every build, so
+  // closing the overlay via setState is all that's needed to re-run the
+  // queries. (Re-assigning _searchNotifier to its current value would notify
+  // nobody — ValueNotifier only fires when the value actually changes.)
   void _applyFilters() {
     setState(() {
       _showFilterOverlay = false;
     });
-    _searchNotifier.value = _searchNotifier.value;
   }
 
   void _resetFilters() {
@@ -169,7 +397,6 @@ class _BrowseShellState extends State<BrowseShell> {
 
       _showFilterOverlay = false;
     });
-    _searchNotifier.value = _searchNotifier.value;
   }
 
   bool get _hasActiveFilters {
@@ -374,63 +601,37 @@ class _BrowseShellState extends State<BrowseShell> {
             },
           ),
           const Spacer(),
-          if (!isCustomer)
-            Stack(
-              children: [
-                IconButton(
-                  onPressed: _toggleFilterOverlay,
-                  icon: Icon(
-                    Icons.filter_list,
-                    color: _showFilterOverlay || _hasActiveFilters ? kSage : Colors.black87,
-                    size: 24,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
+          Stack(
+            children: [
+              IconButton(
+                onPressed: _toggleFilterOverlay,
+                icon: Icon(
+                  Icons.filter_list,
+                  color: _showFilterOverlay || _hasActiveFilters ? kSage : Colors.black87,
+                  size: 24,
                 ),
-                if (_hasActiveFilters)
-                  Positioned(
-                    top: 2,
-                    right: 2,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+              if (_hasActiveFilters)
+                Positioned(
+                  top: 2,
+                  right: 2,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
                     ),
                   ),
-              ],
-            ),
+                ),
+            ],
+          ),
           if (isCustomer) ...[
-            Stack(
-              children: [
-                IconButton(
-                  onPressed: _toggleFilterOverlay,
-                  icon: Icon(
-                    Icons.filter_list,
-                    color: _showFilterOverlay || _hasActiveFilters ? kSage : Colors.black87,
-                    size: 24,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-                if (_hasActiveFilters)
-                  Positioned(
-                    top: 2,
-                    right: 2,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
             const SizedBox(width: 8),
+            // Same badged control as the home screen's app bar, so the live
+            // item count is visible from browsing too.
             const CartIconButton(
               iconSize: 24,
               padding: EdgeInsets.zero,
@@ -593,7 +794,7 @@ class _BrowseShellState extends State<BrowseShell> {
                     });
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: isSelected ? kSage : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
@@ -619,7 +820,7 @@ class _BrowseShellState extends State<BrowseShell> {
                         Text(
                           color,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             color: isSelected ? Colors.white : Colors.grey.shade700,
                             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                           ),
@@ -664,7 +865,7 @@ class _BrowseShellState extends State<BrowseShell> {
                     });
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: isSelected ? kSage : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
@@ -852,7 +1053,7 @@ class _BrowseShellState extends State<BrowseShell> {
                     });
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: isSelected ? kSage : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
@@ -878,7 +1079,7 @@ class _BrowseShellState extends State<BrowseShell> {
                         Text(
                           color,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             color: isSelected ? Colors.white : Colors.grey.shade700,
                             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                           ),
@@ -1224,7 +1425,7 @@ class _BrowseShellState extends State<BrowseShell> {
                     });
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: isSelected ? kSage : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
@@ -1236,7 +1437,7 @@ class _BrowseShellState extends State<BrowseShell> {
                     child: Text(
                       location,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         color: isSelected ? Colors.white : Colors.grey.shade700,
                         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                       ),
@@ -1400,7 +1601,7 @@ class _BrowseShellState extends State<BrowseShell> {
                     });
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: isSelected ? kSage : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
@@ -1412,7 +1613,7 @@ class _BrowseShellState extends State<BrowseShell> {
                     child: Text(
                       location,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         color: isSelected ? Colors.white : Colors.grey.shade700,
                         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                       ),

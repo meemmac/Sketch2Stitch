@@ -74,5 +74,14 @@
 	<string>We need camera access to allow you to take photos for chat attachments.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>We need access to your gallery to allow you to pick photos for chat attachments.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+	  <dict>
+	    <key>CFBundleURLSchemes</key>
+	    <array>
+	      <string>sketch2stitch</string>
+	    </array>
+	  </dict>
+	</array>
 </dict>
 </plist>

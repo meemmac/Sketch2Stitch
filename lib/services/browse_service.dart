@@ -28,78 +28,132 @@ class BrowseService {
       query = query.where('category', isEqualTo: category);
     }
 
-    // Apply sorting logic
-    if (sortBy == 'lowToHigh') {
-      query = query.orderBy('minPrice', descending: false);
-    } else if (sortBy == 'highToLow') {
-      query = query.orderBy('maxPrice', descending: true);
-    }
+    // Price sorting is deliberately NOT an orderBy here: minPrice/maxPrice are
+    // computed from colorOptions on the model and are never written to
+    // Firestore, so ordering on them would match zero documents. The callers
+    // sort the resulting list client-side instead.
 
     return query.snapshots().map((snapshot) {
-      var products = snapshot.docs
-          .map((doc) => Product.fromJson(doc.data() as Map<String, dynamic>))
-          .toList();
+      if (snapshot.docs.isEmpty) {
+        return <Product>[];
+      }
 
-      // Client-side filtering for more complex logic not easily handled by Firestore queries
+      var products = snapshot.docs.map((doc) {
+        try {
+          final data = doc.data() as Map<String, dynamic>;
+          return Product.fromJson(data, id: doc.id);
+        } catch (e) {
+          return Product(
+            id: doc.id,
+            retailerId: '',
+            productName: 'Error: ${doc.id}',
+            productCode: '',
+            category: '',
+            materialType: [],
+            colorOptions: [],
+            description: '',
+            careSymbol: [],
+          );
+        }
+      }).toList();
+
+      // Client-side filtering for more complex logic
+
+      // Filter by material type - updated for MaterialBlend
+      if (materialType != null && materialType != 'All') {
+        products = products.where((p) {
+          // Check if any material type contains the filter string
+          return p.materialType.any(
+            (m) => m.type.toLowerCase().contains(materialType.toLowerCase())
+          );
+        }).toList();
+      }
+
+      // Filter by price
       if (minPrice != null || maxPrice != null) {
         products = products.where((p) {
           final price = p.minPrice;
           return (minPrice == null || price >= minPrice) &&
-              (maxPrice == null || price <= maxPrice);
+                 (maxPrice == null || price <= maxPrice);
         }).toList();
       }
 
-      if (materialType != null && materialType != 'All') {
-        products = products
-            .where(
-              (p) => p.materialType.any(
-                (m) =>
-                    m.type.toLowerCase().contains(materialType.toLowerCase()),
-              ),
-            )
-            .toList();
-      }
-
+      // Filter by colors
       if (colors != null && colors.isNotEmpty && !colors.contains('All')) {
         products = products.where((p) {
           final productColors = p.colorOptions
               .map((c) => c.color.toLowerCase())
               .toList();
-          return colors.any((c) => productColors.contains(c.toLowerCase()));
+          // Substring match, matching ColorFilterOptions.matchesSelectedColors,
+          // so "Navy Blue" is still found by the "Blue" chip.
+          return colors.any(
+            (c) => productColors.any((pc) => pc.contains(c.toLowerCase())),
+          );
         }).toList();
       }
 
+      // Filter by search
       if (search != null && search.isNotEmpty) {
-        products = products
-            .where(
-              (p) => p.productName.toLowerCase().contains(search.toLowerCase()),
-            )
-            .toList();
+        final lowerSearch = search.toLowerCase();
+        products = products.where((p) {
+          return p.productName.toLowerCase().contains(lowerSearch) ||
+                 p.description.toLowerCase().contains(lowerSearch);
+        }).toList();
       }
 
       return products;
     });
   }
 
-  /// Performs a prefix search on product names.
-  Future<List<Product>> searchProductsByQuery(String query) async {
-    if (query.isEmpty) return [];
+  // ─── Tailors ──────────────────────────────────────────────────────────────
 
-    final normalizedQuery = query.toLowerCase();
-    final snapshot = await _db
-        .collection('Products')
-        .where('productNameLower', isGreaterThanOrEqualTo: normalizedQuery)
-        .where(
-          'productNameLower',
-          isLessThanOrEqualTo: '$normalizedQuery\uf8ff',
-        )
-        .limit(20)
-        .get();
+  /// `Tailor-jobs.status` values that still occupy one of a tailor's
+  /// `maxOrder` slots — anything awaiting their response, awaiting the
+  /// customer's, or actively being worked on. Finished/abandoned jobs
+  /// (completed, rejected, expired, cancelled, tailor_declined) free the
+  /// slot again.
+  static const List<String> runningJobStatuses = [
+    'pending',
+    'quoted',
+    'confirmed',
+    'in_progress',
+  ];
 
-    return snapshot.docs.map((doc) => Product.fromJson(doc.data())).toList();
+  /// How many jobs each tailor currently has in flight, keyed by tailorId.
+  /// Tailors with no running jobs are simply absent from the map.
+  Future<Map<String, int>> fetchRunningJobCounts() async {
+    try {
+      final snap = await _db
+          .collection('Tailor-jobs')
+          .where('status', whereIn: runningJobStatuses)
+          .get();
+
+      final counts = <String, int>{};
+      for (final doc in snap.docs) {
+        final id = doc.data()['tailorId'];
+        if (id is String && id.isNotEmpty) {
+          counts[id] = (counts[id] ?? 0) + 1;
+        }
+      }
+      return counts;
+    } catch (e) {
+      // On failure nobody is treated as full — better to show a tailor who
+      // turns out to be busy than to hide every tailor in the app.
+      return const {};
+    }
   }
 
-  // ─── Tailors ──────────────────────────────────────────────────────────────
+  /// Whether [tailor] has hit the capacity they set on their own dashboard.
+  ///
+  /// `maxOrder == null` means "Not Set" — unlimited. `maxOrder == 0` is an
+  /// explicit "not taking work". Anything higher is compared against the
+  /// tailor's running job count from [fetchRunningJobCounts].
+  static bool isTailorFull(Tailor tailor, Map<String, int> runningJobCounts) {
+    final capacity = tailor.maxOrder;
+    if (capacity == null) return false;
+    if (capacity <= 0) return true;
+    return (runningJobCounts[tailor.id] ?? 0) >= capacity;
+  }
 
   /// Filters tailors based on rating, location, and search terms.
   Stream<List<Tailor>> getTailorsByFilter({
@@ -116,12 +170,26 @@ class BrowseService {
 
     if (sortBy == 'ratingHighToLow') {
       query = query.orderBy('rating', descending: true);
+    } else if (sortBy == 'ratingLowToHigh') {
+      query = query.orderBy('rating', descending: false);
     }
 
-    return query.snapshots().map((snapshot) {
-      var tailors = snapshot.docs
-          .map((doc) => Tailor.fromJson(doc.data() as Map<String, dynamic>))
-          .toList();
+    return query.snapshots().asyncMap((snapshot) async {
+      var tailors = snapshot.docs.map((doc) {
+        try {
+          final data = doc.data() as Map<String, dynamic>;
+          return Tailor.fromJson(data, id: doc.id);
+        } catch (e) {
+          return Tailor(
+            id: doc.id,
+            name: 'Error',
+            email: '',
+            phone: '',
+            address: '',
+            rating: 0.0,
+          );
+        }
+      }).toList();
 
       if (location != null && location != 'All') {
         tailors = tailors
@@ -132,26 +200,24 @@ class BrowseService {
       }
 
       if (search != null && search.isNotEmpty) {
-        tailors = tailors
-            .where((t) => t.name.toLowerCase().contains(search.toLowerCase()))
-            .toList();
+        final lowerSearch = search.toLowerCase();
+        tailors = tailors.where((t) =>
+          t.name.toLowerCase().contains(lowerSearch) ||
+          t.address.toLowerCase().contains(lowerSearch)
+        ).toList();
       }
 
-      return tailors;
+      // Fully-booked tailors (at their maxOrder capacity) always sort below
+      // available ones; a stable partition keeps the existing order (e.g.
+      // rating sort) within each group.
+      final counts = await fetchRunningJobCounts();
+      return [
+        ...tailors.where((t) => !isTailorFull(t, counts)),
+        ...tailors.where((t) => isTailorFull(t, counts)),
+      ];
     });
   }
 
-  /// Searches for tailors by name.
-  Future<List<Tailor>> searchTailorsByQuery(String query) async {
-    final normalizedQuery = query.toLowerCase();
-    final snapshot = await _db
-        .collection('Tailor')
-        .where('nameLower', isGreaterThanOrEqualTo: normalizedQuery)
-        .where('nameLower', isLessThanOrEqualTo: '$normalizedQuery\uf8ff')
-        .get();
-
-    return snapshot.docs.map((doc) => Tailor.fromJson(doc.data())).toList();
-  }
   // ─── Retailers ────────────────────────────────────────────────────────────
 
   /// Filters retailers based on rating, location, and search terms.
@@ -169,12 +235,26 @@ class BrowseService {
 
     if (sortBy == 'ratingHighToLow') {
       query = query.orderBy('rating', descending: true);
+    } else if (sortBy == 'ratingLowToHigh') {
+      query = query.orderBy('rating', descending: false);
     }
 
     return query.snapshots().map((snapshot) {
-      var retailers = snapshot.docs
-          .map((doc) => Retailer.fromJson(doc.data() as Map<String, dynamic>))
-          .toList();
+      var retailers = snapshot.docs.map((doc) {
+        try {
+          final data = doc.data() as Map<String, dynamic>;
+          return Retailer.fromJson(data, id: doc.id);
+        } catch (e) {
+          return Retailer(
+            id: doc.id,
+            shopName: 'Error',
+            email: '',
+            phone: '',
+            address: '',
+            rating: 0.0,
+          );
+        }
+      }).toList();
 
       if (location != null && location != 'All') {
         retailers = retailers
@@ -185,27 +265,15 @@ class BrowseService {
       }
 
       if (search != null && search.isNotEmpty) {
-        retailers = retailers
-            .where(
-              (r) => r.shopName.toLowerCase().contains(search.toLowerCase()),
-            )
-            .toList();
+        final lowerSearch = search.toLowerCase();
+        retailers = retailers.where((r) =>
+          r.shopName.toLowerCase().contains(lowerSearch) ||
+          r.address.toLowerCase().contains(lowerSearch)
+        ).toList();
       }
 
       return retailers;
     });
-  }
-
-  /// Searches for retailers by shop name.
-  Future<List<Retailer>> searchRetailersByQuery(String query) async {
-    final normalizedQuery = query.toLowerCase();
-    final snapshot = await _db
-        .collection('Retailer')
-        .where('shopNameLower', isGreaterThanOrEqualTo: normalizedQuery)
-        .where('shopNameLower', isLessThanOrEqualTo: '$normalizedQuery\uf8ff')
-        .get();
-
-    return snapshot.docs.map((doc) => Retailer.fromJson(doc.data())).toList();
   }
 
   // ─── Orders ───────────────────────────────────────────────────────────────
