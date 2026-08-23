@@ -14,6 +14,8 @@ import 'package:sketch2stitch/utils/geo_utils.dart';
 import 'package:sketch2stitch/widgets/rating_stars.dart';
 import 'package:sketch2stitch/widgets/top_feedback_banner.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
+import 'package:sketch2stitch/services/messaging_service.dart';
+import 'package:sketch2stitch/services/user_session.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:sketch2stitch/screens/customer/browsing/browse_shell.dart';
@@ -661,6 +663,7 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
   final PortfolioService _portfolioService = PortfolioService();
   final CustomerService _customerService = CustomerService();
   final BrowseService _browseService = BrowseService();
+  final MessagingService _messagingService = MessagingService();
   String? _currentUserId;
   GeoPoint? _customerLocation;
 
@@ -977,17 +980,37 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
     );
   }
 
-  void _startConversation() {
+  Future<void> _startConversation() async {
+    final myId = UserSession.instance.uid;
+    if (myId == null) return;
+
+    final myRole = UserSession.instance.role ?? UserRole.customer;
+
+    // Reuse the existing thread if there is one, so reopening the chat lands
+    // on the same conversation instead of spawning a duplicate.
+    //
+    // Nothing is created here any more: opening the chat used to write a
+    // Conversation immediately, which put an empty "No messages yet" thread in
+    // both inboxes just for tapping Message. ChatScreen creates it on the first
+    // actual send instead.
+    final existing =
+        await _messagingService.getConversationBetween(myId, widget.tailor.id);
+
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ChatScreen(
-          conversationId: '${_currentUserId ?? 'customer'}_${widget.tailor.id}',
-          customerId: _currentUserId ?? 'current_customer_id',
+          conversationId: existing?.id ?? 'TEMP-${widget.tailor.id}',
+          customerId: myId,
           otherUserId: widget.tailor.id,
           otherUserName: widget.tailor.name,
           otherUserRole: UserRole.tailor,
+          currentUserRole: myRole,
           otherUserAvatar: widget.tailor.profilePicture,
+          orderId: existing?.orderId,
+          isBlocked: existing?.isBlocked ?? false,
+          blockedBy: existing?.blockedBy,
         ),
       ),
     );

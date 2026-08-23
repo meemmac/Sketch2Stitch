@@ -1,15 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../models/conversation.dart';
 import '../models/customer.dart';
-import '../models/message.dart';
 import '../models/notification.dart';
 import '../models/order.dart';
 import '../models/product.dart';
 import '../models/sub_order.dart';
 import '../models/tailor_job.dart';
-import '../models/user_role.dart';
 import 'Cloudinary_service.dart';
 
 /// Thrown by [SharedService] with a user-friendly message so callers can
@@ -64,8 +61,6 @@ class SharedService {
 
   static const _customers      = 'Customer';
   static const _products       = 'Products';
-  static const _messages       = 'Messages';
-  static const _conversations  = 'Conversations';
   static const _orders         = 'Orders';
   static const _subOrders      = 'Sub-orders';
   static const _tailorJobs     = 'Tailor-jobs';
@@ -138,123 +133,11 @@ class SharedService {
   Future<Product> getProductByProductId(String productId) =>
       getProductDetails(productId);
 
-  // ── sendMessage ────────────────────────────────────────────────────────────
-
-  /// Adds a message to [conversationId] and updates the conversation's
-  /// `updatedAt` and `unreadCount` in a single batch.
-  ///
-  /// [data] must include `msgText` and `senderRole`; all other fields
-  /// (`conversationId`, `senderId`, `sentAt`, `isRead`) are written by this
-  /// method.
-  ///
-  /// Returns the saved [Message].
-  Future<Message> sendMessage(
-    String conversationId,
-    String senderId,
-    Map<String, dynamic> data,
-  ) async {
-    try {
-      final now = Timestamp.now();
-      final msgPayload = Map<String, dynamic>.from(data)
-        ..['conversationId'] = conversationId
-        ..['senderId']       = senderId
-        ..['sentAt']         = now
-        ..['isRead']         = false;
-
-      final batch   = _db.batch();
-      final msgRef  = _db.collection(_messages).doc();
-      final convRef = _db.collection(_conversations).doc(conversationId);
-
-      batch.set(msgRef, msgPayload);
-      batch.update(convRef, {
-        'updatedAt':   now,
-        'unreadCount': FieldValue.increment(1),
-      });
-
-      await batch.commit();
-
-      final snap = await msgRef.get();
-      return Message.fromJson({...snap.data()!, 'id': snap.id});
-    } on FirebaseException catch (e) {
-      throw SharedServiceException(
-          'Failed to send message: ${e.message ?? e.code}');
-    }
-  }
-
-  // ── markMessagesRead ───────────────────────────────────────────────────────
-
-  /// Marks all unread messages in [conversationId] that were NOT sent by
-  /// [userId] as read, and resets the conversation's `unreadCount` to 0.
-  ///
-  /// Uses a batch write for atomicity across Messages + Conversations.
-  Future<void> markMessagesRead(
-    String conversationId,
-    String userId,
-  ) async {
-    try {
-      final unreadSnap = await _db
-          .collection(_messages)
-          .where('conversationId', isEqualTo: conversationId)
-          .where('isRead', isEqualTo: false)
-          .get();
-
-      if (unreadSnap.docs.isEmpty) return;
-
-      final now   = Timestamp.now();
-      final batch = _db.batch();
-
-      for (final doc in unreadSnap.docs) {
-        // Only mark messages sent by the other party.
-        if (doc.data()['senderId'] != userId) {
-          batch.update(doc.reference, {'isRead': true, 'readAt': now});
-        }
-      }
-
-      batch.update(
-        _db.collection(_conversations).doc(conversationId),
-        {'unreadCount': 0, 'lastReadAt': now},
-      );
-
-      await batch.commit();
-    } on FirebaseException catch (e) {
-      throw SharedServiceException(
-          'Failed to mark messages read: ${e.message ?? e.code}');
-    }
-  }
-
-  // ── createConversation ─────────────────────────────────────────────────────
-
-  /// Creates a new `Conversations` document linking [customerId] with
-  /// [otherId] (a tailor or retailer identified by [otherRole]) for [orderId].
-  ///
-  /// Returns the saved [Conversation].
-  Future<Conversation> createConversation(
-    String customerId,
-    String otherId,
-    UserRole otherRole,
-    String orderId,
-  ) async {
-    try {
-      final now     = Timestamp.now();
-      final payload = {
-        'customerId':  customerId,
-        'otherId':     otherId,
-        'otherRole':   otherRole.name,
-        'orderId':     orderId,
-        'unreadCount': 0,
-        'isBlocked':   false,
-        'isDeleted':   false,
-        'updatedAt':   now,
-      };
-
-      final ref  = await _db.collection(_conversations).add(payload);
-      final snap = await ref.get();
-      return Conversation.fromJson({...snap.data()!, 'id': snap.id});
-    } on FirebaseException catch (e) {
-      throw SharedServiceException(
-          'Failed to create conversation: ${e.message ?? e.code}');
-    }
-  }
+  // NOTE: messaging lives in MessagingService. A duplicate sendMessage /
+  // markMessagesRead / createConversation used to sit here writing the legacy
+  // singular `unreadCount` field, which conflicts with the per-user
+  // `unreadCounts` map the app actually uses. Nothing referenced it, so it was
+  // removed rather than left as a trap.
 
   // ── getDashboardSummary ────────────────────────────────────────────────────
 

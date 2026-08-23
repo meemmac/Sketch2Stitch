@@ -6,10 +6,14 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
 
 class CloudinaryService {
-  // !!! REPLACE WITH YOUR ACTUAL CLOUDINARY VALUES !!!
-  static const String cloudName = 'eh11vsnw'; // Get this from your dashboard
-  static const String uploadPreset = 'sketch2stitch'; // Your preset name from the image
-  
+  // Unsigned upload against Cloudinary's free tier. These two values are not
+  // secrets (an unsigned preset is designed to ship in the client), but the
+  // preset should be configured in the Cloudinary dashboard with an allowed
+  // formats list and a max file size so the endpoint cannot be abused.
+  // Callers additionally validate size and extension before uploading.
+  static const String cloudName = 'eh11vsnw';
+  static const String uploadPreset = 'sketch2stitch';
+
   static String get uploadUrl => 
       'https://api.cloudinary.com/v1_1/$cloudName/auto/upload';
   

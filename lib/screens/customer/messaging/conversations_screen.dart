@@ -1,14 +1,11 @@
 // lib/screens/customer/messaging/conversations_screen.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/conversation.dart';
-import 'package:sketch2stitch/models/message.dart';
 import 'package:sketch2stitch/models/user_role.dart';
-import 'package:sketch2stitch/models/tailor.dart';
-import 'package:sketch2stitch/models/retailer.dart';
 import 'package:sketch2stitch/screens/customer/messaging/chat_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-import '../../../models/customer.dart';
+import 'package:sketch2stitch/services/messaging_service.dart';
 
 class ConversationsScreen extends StatefulWidget {
   final String customerId;
@@ -26,120 +23,185 @@ class ConversationsScreen extends StatefulWidget {
 
 class _ConversationsScreenState extends State<ConversationsScreen>
     with SingleTickerProviderStateMixin {
-  List<Conversation> _conversations = [];
-  List<Conversation> _filteredConversations = [];
-  bool _isLoading = true;
-  String _searchQuery = "";
-  late TabController _tabController;
-  String _selectedTab = "All";
-
-  // User data cache with Tailor and Retailer models
+  final MessagingService _messagingService = MessagingService();
+  
   final Map<String, Map<String, dynamic>> _userCache = {};
+  final Set<String> _fetchingIds = {};
+  // Lookups that came back empty, so a missing profile is not re-queried on
+  // every single list rebuild.
+  final Set<String> _failedIds = {};
 
-  // Overlay notification
+  // Preview text for threads whose Conversation doc has no denormalized
+  // `lastMessage` (they were created before that field existed), keyed by
+  // conversation id. Same caching rules as the profile lookups above.
+  final Map<String, Map<String, String>> _previewCache = {};
+  final Set<String> _fetchingPreviews = {};
+  final Set<String> _failedPreviews = {};
+
+  late final Stream<List<Conversation>> _conversationsStream;
+
+  late TabController _tabController;
   OverlayEntry? _notificationOverlay;
+
+  bool _isSearching = false;
+  final TextEditingController _inboxSearchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    final tabCount = widget.currentUserRole == UserRole.customer ? 4 : 2;
-    _tabController = TabController(length: tabCount, vsync: this);
+    _conversationsStream = _messagingService.getConversations(widget.customerId);
+    _tabController = TabController(length: 2 + _partnerRoles.length, vsync: this);
     _tabController.addListener(() {
-      setState(() {
-        if (widget.currentUserRole == UserRole.customer) {
-          switch (_tabController.index) {
-            case 0:
-              _selectedTab = "All";
-              break;
-            case 1:
-              _selectedTab = "Unread";
-              break;
-            case 2:
-              _selectedTab = "Tailors";
-              break;
-            case 3:
-              _selectedTab = "Retailers";
-              break;
-          }
-        } else {
-          switch (_tabController.index) {
-            case 0:
-              _selectedTab = "All";
-              break;
-            case 1:
-              _selectedTab = "Unread";
-              break;
-          }
-        }
-        _applyFilter();
-      });
+      if (mounted) setState(() {});
     });
-    _loadConversations();
+  }
+
+  /// Roles the signed-in user is allowed to talk to: everyone except their
+  /// own role (customer↔tailor, customer↔retailer, tailor↔retailer).
+  List<UserRole> get _partnerRoles =>
+      UserRole.values.where((r) => r != widget.currentUserRole).toList();
+
+  static String _roleTabLabel(UserRole role) {
+    switch (role) {
+      case UserRole.customer:
+        return 'Customers';
+      case UserRole.tailor:
+        return 'Tailors';
+      case UserRole.retailer:
+        return 'Retailers';
+    }
+  }
+
+  void _stopSearch() {
+    setState(() {
+      _isSearching = false;
+      _searchQuery = '';
+      _inboxSearchController.clear();
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _inboxSearchController.dispose();
     _removeNotificationOverlay();
     super.dispose();
   }
 
-  // ─── Top Notification System ──────────────────────────────────────────
+  // ─── User Data Management ──────────────────────────────────────────
+
+  /// The other participant. `customerId` is simply whoever opened the thread
+  /// first, so it is not necessarily the customer.
+  String _partnerId(Conversation conversation) =>
+      conversation.customerId == widget.customerId
+          ? conversation.otherId
+          : conversation.customerId;
+
+  /// The partner's role: `otherRole` when I started the thread, otherwise the
+  /// initiator's own `customerRole`. Assuming `customer` here left the name
+  /// stuck on "Loading..." for every tailor- or retailer-initiated chat.
+  UserRole _partnerRole(Conversation conversation) =>
+      conversation.customerId == widget.customerId
+          ? conversation.otherRole
+          : conversation.customerRole;
+
+  Future<void> _fetchUserInfo(Conversation conversation) async {
+    final String targetId = _partnerId(conversation);
+    final UserRole targetRole = _partnerRole(conversation);
+
+    final String cacheKey = "${targetId}_${targetRole.name}";
+    if (_userCache.containsKey(cacheKey) ||
+        _fetchingIds.contains(cacheKey) ||
+        _failedIds.contains(cacheKey)) {
+      return;
+    }
+
+    _fetchingIds.add(cacheKey);
+    final info = await _messagingService.getUserBasicInfo(targetId, targetRole);
+    if (!mounted) {
+      _fetchingIds.remove(cacheKey);
+      return;
+    }
+    setState(() {
+      _fetchingIds.remove(cacheKey);
+      if (info != null) {
+        _userCache[cacheKey] = info;
+      } else {
+        // Cache the miss, otherwise itemBuilder re-queries it every frame.
+        _failedIds.add(cacheKey);
+      }
+    });
+  }
+
+  /// Reads the newest message straight from Messages when the conversation
+  /// itself carries no preview, so an older thread stops claiming
+  /// "No messages yet" while its chat is full of messages.
+  Future<void> _fetchLastMessagePreview(Conversation conversation) async {
+    final String convId = conversation.id;
+    if ((conversation.lastMessage ?? '').trim().isNotEmpty) return;
+    if (_previewCache.containsKey(convId) ||
+        _fetchingPreviews.contains(convId) ||
+        _failedPreviews.contains(convId)) {
+      return;
+    }
+
+    _fetchingPreviews.add(convId);
+    final preview = await _messagingService.getLastMessagePreview(convId);
+    if (!mounted) {
+      _fetchingPreviews.remove(convId);
+      return;
+    }
+    setState(() {
+      _fetchingPreviews.remove(convId);
+      if (preview != null) {
+        _previewCache[convId] = preview;
+      } else {
+        _failedPreviews.add(convId);
+      }
+    });
+  }
+
+  String _getOtherUserName(Conversation conversation) {
+    final String targetId = _partnerId(conversation);
+    final UserRole targetRole = _partnerRole(conversation);
+    final String cacheKey = "${targetId}_${targetRole.name}";
+    final cached = _userCache[cacheKey]?['name'];
+    if (cached != null) return cached;
+    return _failedIds.contains(cacheKey) ? 'Unknown user' : 'Loading...';
+  }
+
+  String? _getOtherUserAvatar(Conversation conversation) {
+    final String targetId = _partnerId(conversation);
+    final UserRole targetRole = _partnerRole(conversation);
+    final String cacheKey = "${targetId}_${targetRole.name}";
+    final String picture = (_userCache[cacheKey]?['profilePicture'] ?? '').toString().trim();
+    // An empty or non-http value would blow up NetworkImage and leave a blank
+    // circle instead of the user's initial.
+    return picture.startsWith('http') ? picture : null;
+  }
+
+  // ─── Notification System ────────────────────────────────────────────
 
   void _showTopNotification(String message, {bool isError = false}) {
     _removeNotificationOverlay();
-
     final overlay = Overlay.of(context);
     final entry = OverlayEntry(
       builder: (context) => Positioned(
-        top: 0,
-        left: 0,
-        right: 0,
+        top: 0, left: 0, right: 0,
         child: SafeArea(
           child: Material(
             color: Colors.transparent,
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: isError
-                    ? Colors.red[700]
-                    : const Color.fromARGB(255, 45, 141, 61),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.25),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
+              decoration: BoxDecoration(color: isError ? Colors.red[700] : const Color(0xFF2D8D3D), borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10, offset: const Offset(0, 3))]),
               child: Row(
                 children: [
-                  Icon(
-                    isError ? Icons.error_outline : Icons.notifications_active,
-                    color: Colors.white,
-                    size: 20,
-                  ),
+                  Icon(isError ? Icons.error_outline : Icons.notifications_active, color: Colors.white, size: 20),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      message,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: _removeNotificationOverlay,
-                    child: const Icon(
-                      Icons.close,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
+                  Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500))),
+                  GestureDetector(onTap: _removeNotificationOverlay, child: const Icon(Icons.close, color: Colors.white, size: 18)),
                 ],
               ),
             ),
@@ -147,14 +209,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         ),
       ),
     );
-
     overlay.insert(entry);
     _notificationOverlay = entry;
-
-    // Auto dismiss after 2 seconds
-    Future.delayed(const Duration(seconds: 2), () {
-      _removeNotificationOverlay();
-    });
+    Future.delayed(const Duration(seconds: 2), _removeNotificationOverlay);
   }
 
   void _removeNotificationOverlay() {
@@ -162,1200 +219,185 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     _notificationOverlay = null;
   }
 
-  Future<void> _loadConversations() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
+  // ─── Helper Methods ────────────────────────────────────────────────
 
-    _initUserCache();
-
-    // ✅ All conversations (both Tailor/Retailer and Customer)
-    final allConversations = [
-      // Tailor conversations
-      Conversation(
-        id: 'conv_1',
-        customerId: widget.customerId,
-        otherId: 't1',
-        otherRole: UserRole.tailor,
-        orderId: 'ORD-001',
-        unreadCount: 1,
-        isBlocked: false,
-        updatedAt: DateTime.now().subtract(const Duration(minutes: 5)),
-        messages: [
-          Message(
-            id: 'm1',
-            conversationId: 'conv_1',
-            senderId: 't1',
-            senderRole: UserRole.tailor,
-            msgText: 'Your suit is ready for fitting! 🎉',
-            sentAt: DateTime.now().subtract(const Duration(minutes: 5)),
-            isRead: false,
-          ),
-          Message(
-            id: 'm2',
-            conversationId: 'conv_1',
-            senderId: widget.customerId,
-            senderRole: UserRole.customer,
-            msgText: 'Great! I\'ll come tomorrow.',
-            sentAt: DateTime.now().subtract(const Duration(hours: 2)),
-            isRead: true,
-            readAt: DateTime.now().subtract(
-              const Duration(hours: 1, minutes: 55),
-            ),
-          ),
-        ],
-      ),
-      // Retailer conversation
-      Conversation(
-        id: 'conv_2',
-        customerId: widget.customerId,
-        otherId: 'r1',
-        otherRole: UserRole.retailer,
-        orderId: 'ORD-002',
-        unreadCount: 0,
-        isBlocked: false,
-        updatedAt: DateTime.now().subtract(const Duration(days: 1)),
-        messages: [
-          Message(
-            id: 'm3',
-            conversationId: 'conv_2',
-            senderId: 'r1',
-            senderRole: UserRole.retailer,
-            msgText: 'Your fabric order has been shipped! 📦',
-            sentAt: DateTime.now().subtract(const Duration(days: 1)),
-            isRead: true,
-            readAt: DateTime.now().subtract(const Duration(days: 1)),
-          ),
-        ],
-      ),
-      // Another Tailor conversation
-      Conversation(
-        id: 'conv_3',
-        customerId: widget.customerId,
-        otherId: 't2',
-        otherRole: UserRole.tailor,
-        orderId: 'ORD-003',
-        unreadCount: 2,
-        isBlocked: false,
-        updatedAt: DateTime.now().subtract(const Duration(days: 1, hours: 23)),
-        messages: [
-          Message(
-            id: 'm4',
-            conversationId: 'conv_3',
-            senderId: widget.customerId,
-            senderRole: UserRole.customer,
-            msgText: 'I need a custom blazer for my presentation.',
-            sentAt: DateTime.now().subtract(const Duration(days: 2)),
-            isRead: true,
-            readAt: DateTime.now().subtract(const Duration(days: 1, hours: 23)),
-          ),
-          Message(
-            id: 'm5',
-            conversationId: 'conv_3',
-            senderId: 't2',
-            senderRole: UserRole.tailor,
-            msgText: 'Sure! Let me know your measurements.',
-            sentAt: DateTime.now().subtract(const Duration(days: 1, hours: 23)),
-            isRead: false,
-          ),
-          Message(
-            id: 'm6',
-            conversationId: 'conv_3',
-            senderId: 't2',
-            senderRole: UserRole.tailor,
-            msgText: 'I can start working on it next week.',
-            sentAt: DateTime.now().subtract(const Duration(days: 1, hours: 22)),
-            isRead: false,
-          ),
-        ],
-      ),
-      // Another Retailer conversation
-      Conversation(
-        id: 'conv_4',
-        customerId: widget.customerId,
-        otherId: 'r2',
-        otherRole: UserRole.retailer,
-        orderId: 'ORD-004',
-        unreadCount: 0,
-        isBlocked: true,
-        updatedAt: DateTime.now().subtract(const Duration(days: 2, hours: 12)),
-        messages: [
-          Message(
-            id: 'm7',
-            conversationId: 'conv_4',
-            senderId: 'r2',
-            senderRole: UserRole.retailer,
-            msgText: 'New silk collection just arrived! 🌟',
-            sentAt: DateTime.now().subtract(const Duration(days: 3)),
-            isRead: true,
-            readAt: DateTime.now().subtract(const Duration(days: 2, hours: 12)),
-          ),
-          Message(
-            id: 'm8',
-            conversationId: 'conv_4',
-            senderId: widget.customerId,
-            senderRole: UserRole.customer,
-            msgText: 'I\'ll visit your store tomorrow.',
-            sentAt: DateTime.now().subtract(const Duration(days: 2, hours: 12)),
-            isRead: true,
-            readAt: DateTime.now().subtract(const Duration(days: 2, hours: 11)),
-          ),
-        ],
-      ),
-      // ✅ Customer to Customer conversation (for Tailor/Retailer view)
-      // ✅ Multiple Customer conversations
-      Conversation(
-        id: 'conv_5',
-        customerId: widget.customerId,
-        otherId: 'c2',
-        otherRole: UserRole.customer,
-        orderId: 'ORD-005',
-        unreadCount: 1,
-        isBlocked: false,
-        updatedAt: DateTime.now().subtract(const Duration(hours: 1)),
-        messages: [
-          Message(
-            id: 'm9',
-            conversationId: 'conv_5',
-            senderId: 'c2',
-            senderRole: UserRole.customer,
-            msgText: 'Hi! I need help with my order.',
-            sentAt: DateTime.now().subtract(const Duration(hours: 1)),
-            isRead: false,
-          ),
-        ],
-      ),
-      Conversation(
-        id: 'conv_6',
-        customerId: widget.customerId,
-        otherId: 'c3',
-        otherRole: UserRole.customer,
-        orderId: 'ORD-006',
-        unreadCount: 0,
-        isBlocked: false,
-        updatedAt: DateTime.now().subtract(const Duration(days: 1)),
-        messages: [
-          Message(
-            id: 'm10',
-            conversationId: 'conv_6',
-            senderId: 'c3',
-            senderRole: UserRole.customer,
-            msgText: 'Thank you for the amazing service!',
-            sentAt: DateTime.now().subtract(const Duration(days: 1)),
-            isRead: true,
-          ),
-        ],
-      ),
-      Conversation(
-        id: 'conv_7',
-        customerId: widget.customerId,
-        otherId: 'c4',
-        otherRole: UserRole.customer,
-        orderId: 'ORD-007',
-        unreadCount: 2,
-        isBlocked: false,
-        updatedAt: DateTime.now().subtract(const Duration(hours: 3)),
-        messages: [
-          Message(
-            id: 'm11',
-            conversationId: 'conv_7',
-            senderId: 'c4',
-            senderRole: UserRole.customer,
-            msgText: 'When will my order be delivered?',
-            sentAt: DateTime.now().subtract(const Duration(hours: 3)),
-            isRead: false,
-          ),
-          Message(
-            id: 'm12',
-            conversationId: 'conv_7',
-            senderId: 'c4',
-            senderRole: UserRole.customer,
-            msgText: 'Please let me know.',
-            sentAt: DateTime.now().subtract(const Duration(hours: 2)),
-            isRead: false,
-          ),
-        ],
-      ),
-    ];
-
-    // Filter based on role
-    List<Conversation> filteredConversations;
-    if (widget.currentUserRole == UserRole.customer) {
-      filteredConversations = allConversations
-          .where(
-            (conv) =>
-                conv.otherRole == UserRole.tailor ||
-                conv.otherRole == UserRole.retailer,
-          )
-          .toList();
-    } else {
-      // Tailor/Retailer: ONLY Customer
-      filteredConversations = allConversations
-          .where((conv) => conv.otherRole == UserRole.customer)
-          .toList();
-    }
-
-    setState(() {
-      _conversations = filteredConversations;
-      _filteredConversations = filteredConversations;
-      _isLoading = false;
-    });
-  }
-
-  void _initUserCache() {
-    // Tailors
-    final tailor1 = Tailor(
-      id: 't1',
-      name: 'Abdul Karim',
-      email: 'abdul@tailor.com',
-      phone: '01711111111',
-      address: 'Dhaka',
-      rating: 4.8,
-      profilePicture: 'assets/images/fab.jpg',
-    );
-
-    final tailor2 = Tailor(
-      id: 't2',
-      name: 'Rehana Begum',
-      email: 'rehana@tailor.com',
-      phone: '01722222222',
-      address: 'Dhaka',
-      rating: 4.5,
-      profilePicture: 'assets/images/silk.jpg',
-    );
-
-    // Retailers
-    final retailer1 = Retailer(
-      id: 'r1',
-      shopName: 'Dhaka Fabric House',
-      email: 'info@dhakafabric.com',
-      phone: '01911111111',
-      address: 'Dhaka',
-      rating: 4.7,
-      profilePicture: 'assets/images/fab.jpg',
-    );
-
-    final retailer2 = Retailer(
-      id: 'r2',
-      shopName: 'Chowdhury Textiles',
-      email: 'info@chowdhurytextiles.com',
-      phone: '01922222222',
-      address: 'Dhaka',
-      rating: 4.6,
-      profilePicture: 'assets/images/textile.jpg',
-    );
-
-    // ✅ Multiple Customers (no profile picture)
-    final customer2 = Customer(
-      id: 'c2',
-      name: 'Fatima Khan',
-      email: 'fatima@example.com',
-      phone: '01522222222',
-      address: 'Dhaka',
-    );
-    final customer3 = Customer(
-      id: 'c3',
-      name: 'Aisha Rahman',
-      email: 'aisha@example.com',
-      phone: '01533333333',
-      address: 'Dhaka',
-    );
-    final customer4 = Customer(
-      id: 'c4',
-      name: 'Nadia Hasan',
-      email: 'nadia@example.com',
-      phone: '01544444444',
-      address: 'Dhaka',
-    );
-    final customer5 = Customer(
-      id: 'c5',
-      name: 'Zara Malik',
-      email: 'zara@example.com',
-      phone: '01555555555',
-      address: 'Dhaka',
-    );
-    final customer6 = Customer(
-      id: 'c6',
-      name: 'Mariam Ali',
-      email: 'mariam@example.com',
-      phone: '01566666666',
-      address: 'Dhaka',
-    );
-    final customer7 = Customer(
-      id: 'c7',
-      name: 'Hassan Raza',
-      email: 'hassan@example.com',
-      phone: '01577777777',
-      address: 'Dhaka',
-    );
-    final customer8 = Customer(
-      id: 'c8',
-      name: 'Sana Khan',
-      email: 'sana@example.com',
-      phone: '01588888888',
-      address: 'Dhaka',
-    );
-
-    _userCache.addAll({
-      // ... Tailors and Retailers (same as before)
-      't1': {
-        'name': tailor1.name,
-        'phone': tailor1.phone,
-        'avatar': tailor1.profilePicture ?? 'assets/images/fab.jpg',
-        'role': UserRole.tailor,
-        'model': tailor1,
-        'isAnonymous': false,
-      },
-      't2': {
-        'name': tailor2.name,
-        'phone': tailor2.phone,
-        'avatar': tailor2.profilePicture ?? 'assets/images/silk.jpg',
-        'role': UserRole.tailor,
-        'model': tailor2,
-        'isAnonymous': false,
-      },
-      'r1': {
-        'name': retailer1.shopName,
-        'phone': retailer1.phone,
-        'avatar': retailer1.profilePicture ?? 'assets/images/fab.jpg',
-        'role': UserRole.retailer,
-        'model': retailer1,
-        'isAnonymous': false,
-      },
-      'r2': {
-        'name': retailer2.shopName,
-        'phone': retailer2.phone,
-        'avatar': retailer2.profilePicture ?? 'assets/images/textile.jpg',
-        'role': UserRole.retailer,
-        'model': retailer2,
-        'isAnonymous': false,
-      },
-      // ✅ All Customers
-      'c2': {
-        'name': customer2.name,
-        'phone': customer2.phone,
-        'avatar': null,
-        'role': UserRole.customer,
-        'model': customer2,
-        'isAnonymous': false,
-      },
-      'c3': {
-        'name': customer3.name,
-        'phone': customer3.phone,
-        'avatar': null,
-        'role': UserRole.customer,
-        'model': customer3,
-        'isAnonymous': false,
-      },
-      'c4': {
-        'name': customer4.name,
-        'phone': customer4.phone,
-        'avatar': null,
-        'role': UserRole.customer,
-        'model': customer4,
-        'isAnonymous': false,
-      },
-      'c5': {
-        'name': customer5.name,
-        'phone': customer5.phone,
-        'avatar': null,
-        'role': UserRole.customer,
-        'model': customer5,
-        'isAnonymous': false,
-      },
-      'c6': {
-        'name': customer6.name,
-        'phone': customer6.phone,
-        'avatar': null,
-        'role': UserRole.customer,
-        'model': customer6,
-        'isAnonymous': false,
-      },
-      'c7': {
-        'name': customer7.name,
-        'phone': customer7.phone,
-        'avatar': null,
-        'role': UserRole.customer,
-        'model': customer7,
-        'isAnonymous': false,
-      },
-      'c8': {
-        'name': customer8.name,
-        'phone': customer8.phone,
-        'avatar': null,
-        'role': UserRole.customer,
-        'model': customer8,
-        'isAnonymous': false,
-      },
-    });
-  }
-
-  void _applyFilter() {
-    setState(() {
-      List<Conversation> filtered = List.from(_conversations);
-
-      // Exclude deleted conversations
-      filtered = filtered.where((conv) => !conv.isDeleted).toList();
-      // Role-based visibility — customers only talk to tailors/retailers,
-      // tailors/retailers only talk to customers.
-      filtered = filtered.where((conv) {
-        if (widget.currentUserRole == UserRole.customer) {
-          return conv.otherRole == UserRole.tailor ||
-              conv.otherRole == UserRole.retailer;
-        } else {
-          return conv.otherRole == UserRole.customer;
-        }
-      }).toList();
-
-      // Search filter
-      if (_searchQuery.isNotEmpty) {
-        filtered = filtered.where((conv) {
-          final userData = _userCache[conv.otherId];
-          final userName = userData?['name']?.toString().toLowerCase() ?? '';
-          final userPhone = userData?['phone']?.toString().toLowerCase() ?? '';
-          final lastMessage = _getLastMessage(conv).toLowerCase();
-          final query = _searchQuery.toLowerCase();
-
-          return userName.contains(query) ||
-              userPhone.contains(query) ||
-              lastMessage.contains(query);
-        }).toList();
-      }
-
-      switch (_selectedTab) {
-        case "Unread":
-          filtered = filtered.where((conv) => conv.unreadCount > 0).toList();
-          break;
-        case "Tailors":
-          filtered = filtered
-              .where((conv) => conv.otherRole == UserRole.tailor)
-              .toList();
-          break;
-        case "Retailers":
-          filtered = filtered
-              .where((conv) => conv.otherRole == UserRole.retailer)
-              .toList();
-          break;
-        default:
-          break;
-      }
-
-      _filteredConversations = filtered;
-    });
-  }
-
-  String _getOtherUserName(Conversation conversation) {
-    final userData = _userCache[conversation.otherId];
-    if (userData != null) {
-      // For anonymous users, return the phone number
-      if (userData['isAnonymous'] == true) {
-        return userData['phone'] ?? conversation.otherId;
-      }
-      return userData['name'] ?? conversation.otherId;
-    }
-    return conversation.otherId;
-  }
-
-  String _getOtherUserAvatar(Conversation conversation) {
-    final userData = _userCache[conversation.otherId];
-    if (userData != null) {
-      return userData['avatar'] ?? 'assets/images/fab.jpg';
-    }
-    return 'assets/images/fab.jpg';
-  }
-
-  bool _isAnonymous(Conversation conversation) {
-    final userData = _userCache[conversation.otherId];
-    return userData?['isAnonymous'] == true;
-  }
-
-  String _getLastMessage(Conversation conversation) {
-    if (conversation.messages == null || conversation.messages!.isEmpty) {
-      return 'No messages yet';
-    }
-    return conversation.messages!.last.msgText;
-  }
-
-  DateTime _getLastMessageTime(Conversation conversation) {
-    if (conversation.messages == null || conversation.messages!.isEmpty) {
-      return conversation.updatedAt ?? DateTime.now();
-    }
-    return conversation.messages!.last.sentAt;
-  }
-
-  String _getTimeAgo(DateTime time) {
+  String _getTimeAgo(DateTime? time) {
+    if (time == null) return '';
     final now = DateTime.now();
     final difference = now.difference(time);
-
-    if (difference.inDays > 7) {
-      return '${difference.inDays ~/ 7}w';
-    } else if (difference.inDays > 1) {
-      return '${difference.inDays}d';
-    } else if (difference.inDays == 1) {
-      return '1d';
-    } else if (difference.inHours > 1) {
-      return '${difference.inHours}h';
-    } else if (difference.inHours == 1) {
-      return '1h';
-    } else if (difference.inMinutes > 1) {
-      return '${difference.inMinutes}m';
-    } else {
-      return 'Now';
-    }
+    if (difference.inDays > 7) return '${difference.inDays ~/ 7}w';
+    if (difference.inDays > 0) return '${difference.inDays}d';
+    if (difference.inHours > 0) return '${difference.inHours}h';
+    if (difference.inMinutes > 0) return '${difference.inMinutes}m';
+    return 'Now';
   }
 
-  void _markConversationAsRead(String conversationId) {
-    setState(() {
-      final index = _conversations.indexWhere((c) => c.id == conversationId);
-      if (index != -1) {
-        final conversation = _conversations[index];
+  // ─── Backend Actions ────────────────────────────────────────────────
 
-        final updatedMessages = conversation.messages?.map((m) {
-          if (m.senderId != widget.customerId && !m.isRead) {
-            return m.copyWith(isRead: true, readAt: DateTime.now());
-          }
-          return m;
-        }).toList();
-
-        _conversations[index] = conversation.copyWith(
-          messages: updatedMessages,
-          unreadCount: 0,
-          lastReadAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
-      }
-      _applyFilter();
-    });
-
-    _updateConversationReadStatus(conversationId);
-  }
-
-  Future<void> _updateConversationReadStatus(String conversationId) async {
+  Future<void> _unblockUser(Conversation conversation) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-        'last_read_$conversationId',
-        DateTime.now().toIso8601String(),
-      );
-      await prefs.setInt('unread_count_$conversationId', 0);
-    } catch (_) {
-      // Non-fatal: the unread badge just stays until the next open.
-    }
-  }
-
-  void _onConversationRead(String conversationId) {
-    _markConversationAsRead(conversationId);
-    _refreshConversationStatus(conversationId);
-  }
-
-  Future<void> _refreshConversationStatus(String conversationId) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final isBlocked = prefs.getBool('blocked_$conversationId') ?? false;
-      final unreadCount = prefs.getInt('unread_count_$conversationId') ?? 0;
-
-      setState(() {
-        final index = _conversations.indexWhere((c) => c.id == conversationId);
-        if (index != -1) {
-          _conversations[index] = _conversations[index].copyWith(
-            isBlocked: isBlocked,
-            unreadCount: unreadCount,
-          );
-        }
-        _applyFilter();
-      });
-    } catch (_) {
-      // Non-fatal: the list still renders with the last known status.
+      await _messagingService.unblockConversationByConversationId(conversation.id);
+      _showTopNotification('${_getOtherUserName(conversation)} unblocked');
+    } catch (e) {
+      _showTopNotification('Failed to unblock', isError: true);
     }
   }
 
   Future<void> _blockUser(Conversation conversation) async {
-    setState(() {
-      final index = _conversations.indexWhere((c) => c.id == conversation.id);
-      if (index != -1) {
-        _conversations[index] = _conversations[index].copyWith(
-          isBlocked: true,
-          updatedAt: DateTime.now(),
-        );
-      }
-      _applyFilter();
-    });
-
     try {
-      _showTopNotification(
-        '${_getOtherUserName(conversation)} has been blocked',
-      );
+      await _messagingService.blockConversationByConversationId(conversation.id, widget.customerId);
+      _showTopNotification('${_getOtherUserName(conversation)} blocked');
     } catch (e) {
-      setState(() {
-        final index = _conversations.indexWhere((c) => c.id == conversation.id);
-        if (index != -1) {
-          _conversations[index] = _conversations[index].copyWith(
-            isBlocked: false,
-          );
-        }
-        _applyFilter();
-      });
+      _showTopNotification('Failed to block', isError: true);
     }
   }
 
-  Future<void> _unblockUser(Conversation conversation) async {
-    setState(() {
-      final index = _conversations.indexWhere((c) => c.id == conversation.id);
-      if (index != -1) {
-        _conversations[index] = _conversations[index].copyWith(
-          isBlocked: false,
-          updatedAt: DateTime.now(),
-        );
-      }
-      _applyFilter();
-    });
+  void _confirmDeleteConversation(Conversation conversation) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Conversation'),
+        content: Text(
+          'Remove your copy of the chat with ${_getOtherUserName(conversation)}? '
+          'It stays in their inbox, and a new message will bring it back.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _deleteConversation(conversation);
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
 
-    try {
-      _showTopNotification(
-        '${_getOtherUserName(conversation)} has been unblocked',
-      );
-    } catch (e) {
-      setState(() {
-        final index = _conversations.indexWhere((c) => c.id == conversation.id);
-        if (index != -1) {
-          _conversations[index] = _conversations[index].copyWith(
-            isBlocked: true,
-          );
-        }
-        _applyFilter();
-      });
-    }
+  void _confirmBlockUser(Conversation conversation) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Block User'),
+        content: Text('Block ${_getOtherUserName(conversation)}? You will no longer exchange messages.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _blockUser(conversation);
+            },
+            child: const Text('Block', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _deleteConversation(Conversation conversation) async {
-    setState(() {
-      final index = _conversations.indexWhere((c) => c.id == conversation.id);
-      if (index != -1) {
-        _conversations[index] = _conversations[index].copyWith(
-          isDeleted: true,
-          deletedAt: DateTime.now(),
-          deletedBy: widget.customerId,
-          updatedAt: DateTime.now(),
-        );
-      }
-      _applyFilter();
-    });
-
     try {
+      await _messagingService.deleteConversationByConversationId(conversation.id, widget.customerId);
       _showTopNotification('Conversation deleted');
     } catch (e) {
-      setState(() {
-        final index = _conversations.indexWhere((c) => c.id == conversation.id);
-        if (index != -1) {
-          _conversations[index] = _conversations[index].copyWith(
-            isDeleted: false,
-            deletedAt: null,
-            deletedBy: null,
-          );
-        }
-        _applyFilter();
-      });
+      _showTopNotification('Failed to delete', isError: true);
     }
   }
 
-  void _showNewConversationDialog() {
-    final List<Map<String, dynamic>> tailorRetailerContacts = [
-      {
-        'id': 't3',
-        'name': 'Fatima Noor',
-        'phone': '01733333333',
-        'role': UserRole.tailor,
-        'avatar': 'assets/images/lace.jpg',
-        'roleDisplay': 'Tailor',
-        'model': Tailor(
-          id: 't3',
-          name: 'Fatima Noor',
-          email: 'fatima@tailor.com',
-          phone: '01733333333',
-          address: 'Dhaka',
-          rating: 4.9,
-          profilePicture: 'assets/images/lace.jpg',
-        ),
-      },
-      {
-        'id': 't4',
-        'name': 'Kamal Hossain',
-        'phone': '01744444444',
-        'role': UserRole.tailor,
-        'avatar': 'assets/images/fab2.jpg',
-        'roleDisplay': 'Tailor',
-        'model': Tailor(
-          id: 't4',
-          name: 'Kamal Hossain',
-          email: 'kamal@tailor.com',
-          phone: '01744444444',
-          address: 'Dhaka',
-          rating: 4.3,
-          profilePicture: 'assets/images/fab2.jpg',
-        ),
-      },
-      {
-        'id': 'r3',
-        'name': 'Silk & Lace Emporium',
-        'phone': '01933333333',
-        'role': UserRole.retailer,
-        'avatar': 'assets/images/silk.jpg',
-        'roleDisplay': 'Retailer',
-        'model': Retailer(
-          id: 'r3',
-          shopName: 'Silk & Lace Emporium',
-          email: 'info@silkandlace.com',
-          phone: '01933333333',
-          address: 'Dhaka',
-          rating: 4.8,
-          profilePicture: 'assets/images/silk.jpg',
-        ),
-      },
-      {
-        'id': 'r4',
-        'name': 'Bengal Cotton Co.',
-        'phone': '01944444444',
-        'role': UserRole.retailer,
-        'avatar': 'assets/images/fab2.jpg',
-        'roleDisplay': 'Retailer',
-        'model': Retailer(
-          id: 'r4',
-          shopName: 'Bengal Cotton Co.',
-          email: 'info@bengalcotton.com',
-          phone: '01944444444',
-          address: 'Dhaka',
-          rating: 4.4,
-          profilePicture: 'assets/images/fab2.jpg',
-        ),
-      },
-      // ✅ No anonymous contacts
-    ];
+  // ─── Navigation ──────────────────────────────────────────────────
 
-    final List<Map<String, dynamic>> customerContacts = [
-      {
-        'id': 'c2',
-        'name': 'Fatima Khan',
-        'phone': '01522222222',
-        'role': UserRole.customer,
-        'avatar': null,
-        'roleDisplay': 'Customer',
-      },
-      {
-        'id': 'c3',
-        'name': 'Aisha Rahman',
-        'phone': '01533333333',
-        'role': UserRole.customer,
-        'avatar': null,
-        'roleDisplay': 'Customer',
-      },
-      {
-        'id': 'c4',
-        'name': 'Nadia Hasan',
-        'phone': '01544444444',
-        'role': UserRole.customer,
-        'avatar': null,
-        'roleDisplay': 'Customer',
-      },
-      {
-        'id': 'c5',
-        'name': 'Zara Malik',
-        'phone': '01555555555',
-        'role': UserRole.customer,
-        'avatar': null,
-        'roleDisplay': 'Customer',
-      },
-      {
-        'id': 'c6',
-        'name': 'Mariam Ali',
-        'phone': '01566666666',
-        'role': UserRole.customer,
-        'avatar': null,
-        'roleDisplay': 'Customer',
-      },
-      {
-        'id': 'c7',
-        'name': 'Hassan Raza',
-        'phone': '01577777777',
-        'role': UserRole.customer,
-        'avatar': null,
-        'roleDisplay': 'Customer',
-      },
-      {
-        'id': 'c8',
-        'name': 'Sana Khan',
-        'phone': '01588888888',
-        'role': UserRole.customer,
-        'avatar': null,
-        'roleDisplay': 'Customer',
-      },
-    ];
+  void _openChat(Conversation conversation) {
+    // Mark as read immediately when user taps — unread bold state clears instantly
+    _messagingService.markConversationReadByConversationId(conversation.id, widget.customerId);
 
-    final List<Map<String, dynamic>> contacts =
-        widget.currentUserRole == UserRole.customer
-        ? tailorRetailerContacts
-        : customerContacts;
-    String searchQuery = '';
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          conversationId: conversation.id,
+          customerId: widget.customerId,
+          otherUserId: _partnerId(conversation),
+          otherUserName: _getOtherUserName(conversation),
+          otherUserRole: _partnerRole(conversation),
+          currentUserRole: widget.currentUserRole,
+          otherUserAvatar: _getOtherUserAvatar(conversation),
+          orderId: conversation.orderId,
+          isBlocked: conversation.isBlocked,
+          blockedBy: conversation.blockedBy,
+        ),
+      ),
+    );
+  }
 
+  void _openNewConversationSheet() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            List filteredContacts = contacts.where((contact) {
-              final name = contact['name'].toLowerCase();
-              final phone = contact['phone'].toLowerCase();
-              final query = searchQuery.toLowerCase();
-              return name.contains(query) || phone.contains(query);
-            }).toList();
-
-            return Container(
-              padding: const EdgeInsets.all(16),
-              height: MediaQuery.of(context).size.height * 0.7,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const Text(
-                    'New Conversation',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Search by name or phone number',
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Search name or phone...',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[50],
-                      suffixIcon: searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear, size: 18),
-                              onPressed: () {
-                                setState(() {
-                                  searchQuery = '';
-                                });
-                              },
-                            )
-                          : null,
-                    ),
-                    onChanged: (value) {
-                      setState(() {
-                        searchQuery = value;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: filteredContacts.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.person_search,
-                                  size: 64,
-                                  color: Colors.grey[400],
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  searchQuery.isEmpty
-                                      ? 'No contacts available'
-                                      : 'No contacts found',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                                if (searchQuery.isNotEmpty) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Try a different name or phone number',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey[500],
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: filteredContacts.length,
-                            itemBuilder: (context, index) {
-                              final contact = filteredContacts[index];
-                              final contactRole = contact['role'] as UserRole;
-                              final isAnonymous =
-                                  contact['isAnonymous'] == true;
-
-                              // For anonymous users, show the phone number as name
-                              String displayName = contact['name'];
-                              bool hasAvatar =
-                                  contact['avatar'] != null &&
-                                  contact['avatar'].toString().isNotEmpty;
-
-                              return ListTile(
-                                leading: CircleAvatar(
-                                  radius: 24,
-                                  backgroundColor: contact['avatar'] != null
-                                      ? Colors.grey[200]
-                                      : Colors.grey[300],
-                                  backgroundImage: contact['avatar'] != null
-                                      ? AssetImage(contact['avatar'])
-                                      : null,
-                                  child: contact['avatar'] == null
-                                      ? Text(
-                                          contact['name'].isNotEmpty
-                                              ? contact['name'][0].toUpperCase()
-                                              : '?',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.grey[700],
-                                          ),
-                                        )
-                                      : null,
-                                ),
-
-                                title: Text(
-                                  displayName,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: isAnonymous
-                                        ? Colors.grey[700]
-                                        : Colors.black,
-                                  ),
-                                ),
-                                subtitle: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.phone,
-                                      size: 12,
-                                      color: Colors.grey[500],
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      contact['phone'],
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey[600],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    // Role badge (Tailor/Retailer) - removed "Unknown" label
-                                    // Role badge (Tailor/Retailer/Customer)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 1,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: contactRole == UserRole.tailor
-                                            ? Colors.green.shade50
-                                            : contactRole == UserRole.retailer
-                                            ? Colors.blue.shade50
-                                            : Colors.orange.shade50,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        contact['roleDisplay'] ??
-                                            contactRole.name,
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: contactRole == UserRole.tailor
-                                              ? Colors.green.shade700
-                                              : contactRole == UserRole.retailer
-                                              ? Colors.blue.shade700
-                                              : Colors.orange.shade700,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                trailing: const Icon(
-                                  Icons.chevron_right,
-                                  color: Colors.grey,
-                                ),
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  final contactId = contact['id'];
-
-                                  final existingConv = _conversations.firstWhere(
-                                    (conv) => conv.otherId == contactId,
-                                    orElse: () => Conversation(
-                                      id: 'conv_new_${DateTime.now().millisecondsSinceEpoch}',
-                                      customerId: widget.customerId,
-                                      otherId: contactId,
-                                      otherRole: contact['role'],
-                                      orderId:
-                                          'ORD-${DateTime.now().millisecondsSinceEpoch}',
-                                      messages: [],
-                                      unreadCount: 0,
-                                      isBlocked: false,
-                                      updatedAt: DateTime.now(),
-                                    ),
-                                  );
-
-                                  // For anonymous users, store phone number as name
-                                  final userName = isAnonymous
-                                      ? contact['phone']
-                                      : displayName;
-
-                                  _userCache[contactId] = {
-                                    'name': userName,
-                                    'phone': contact['phone'],
-                                    'avatar': contact['avatar'],
-                                    'role': contact['role'],
-                                    'model': contact['model'],
-                                    'isAnonymous': isAnonymous,
-                                  };
-
-                                  if (!_conversations.any(
-                                    (c) => c.id == existingConv.id,
-                                  )) {
-                                    setState(() {
-                                      _conversations.add(existingConv);
-                                      _applyFilter();
-                                    });
-                                  }
-
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ChatScreen(
-                                        conversationId: existingConv.id,
-                                        customerId: widget.customerId,
-                                        otherUserId: existingConv.otherId,
-                                        otherUserName: userName,
-                                        otherUserRole: existingConv.otherRole,
-                                        otherUserAvatar: contact['avatar'],
-                                        orderId: existingConv.orderId,
-                                        onConversationRead: _onConversationRead,
-                                        isBlocked: existingConv.isBlocked,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showSearch() {
-    showSearch(
-      context: context,
-      delegate: _ConversationSearchDelegate(
-        conversations: _conversations,
-        userCache: _userCache,
-        getOtherUserName: _getOtherUserName,
-        getOtherUserAvatar: _getOtherUserAvatar,
-        getLastMessage: _getLastMessage,
-        getLastMessageTime: _getLastMessageTime,
+      builder: (context) => NewConversationBottomSheet(
         customerId: widget.customerId,
-        onConversationTap: (conversation) {
-          if (conversation.isBlocked) {
-            _showBlockedDialog(conversation);
-            return;
-          }
-          _markConversationAsRead(conversation.id);
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ChatScreen(
-                conversationId: conversation.id,
-                customerId: widget.customerId,
-                otherUserId: conversation.otherId,
-                otherUserName: _getOtherUserName(conversation),
-                otherUserRole: conversation.otherRole,
-                otherUserAvatar: _getOtherUserAvatar(conversation),
-                orderId: conversation.orderId,
-                onConversationRead: _onConversationRead,
-                isBlocked: conversation.isBlocked,
-              ),
-            ),
-          );
-        },
+        currentUserRole: widget.currentUserRole,
+        messagingService: _messagingService,
       ),
     );
   }
 
-  void _showBlockedDialog(Conversation conversation) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text('User Blocked'),
-          content: Text(
-            '${_getOtherUserName(conversation)} is blocked.\n\n'
-            'You need to unblock this user to send messages.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _unblockUser(conversation);
-              },
-              child: const Text(
-                'Unblock',
-                style: TextStyle(color: Colors.green),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
+  // ─── Main Build ────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text(
-          'Messages',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
+        leading: _isSearching
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: _stopSearch,
+              )
+            : IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.maybePop(context),
+              ),
+        title: _isSearching
+            ? TextField(
+                controller: _inboxSearchController,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+                cursorColor: Colors.white,
+                decoration: const InputDecoration(
+                  hintText: 'Search in messages...',
+                  hintStyle: TextStyle(color: Colors.white70, fontSize: 16),
+                  border: InputBorder.none,
+                ),
+                onChanged: (val) {
+                  setState(() => _searchQuery = val.trim());
+                },
+              )
+            : const Text('Messages', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFF2C5C44),
-        elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search, color: Colors.white),
-            onPressed: _showSearch,
-          ),
+          if (_isSearching)
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white),
+              onPressed: () {
+                if (_inboxSearchController.text.isNotEmpty) {
+                  _inboxSearchController.clear();
+                  setState(() => _searchQuery = '');
+                } else {
+                  _stopSearch();
+                }
+              },
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.search, color: Colors.white),
+              onPressed: () => setState(() => _isSearching = true),
+            ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
@@ -1364,311 +406,208 @@ class _ConversationsScreenState extends State<ConversationsScreen>
             child: TabBar(
               controller: _tabController,
               indicatorColor: Colors.white,
-              indicatorWeight: 3,
               labelColor: Colors.white,
               unselectedLabelColor: Colors.white70,
-              tabs: widget.currentUserRole == UserRole.customer
-                  ? const [
-                      Tab(text: 'All'),
-                      Tab(text: 'Unread'),
-                      Tab(text: 'Tailors'),
-                      Tab(text: 'Retailers'),
-                    ]
-                  : const [Tab(text: 'All'), Tab(text: 'Unread')],
+              onTap: (index) {
+                if (mounted) setState(() {});
+              },
+              tabs: [
+                const Tab(text: 'All'),
+                const Tab(text: 'Unread'),
+                for (final role in _partnerRoles) Tab(text: _roleTabLabel(role)),
+              ],
             ),
           ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _showNewConversationDialog,
         backgroundColor: const Color(0xFF2C5C44),
-        child: const Icon(Icons.add, color: Colors.white),
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        onPressed: _openNewConversationSheet,
+        child: const Icon(Icons.add, color: Colors.white, size: 28),
       ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF2C5C44)),
-            )
-          : _conversations.where((c) => !c.isDeleted).isEmpty
-          ? _buildEmptyState()
-          : _filteredConversations.isEmpty
-          ? _buildEmptyFilterState()
-          : ListView.builder(
-              itemCount: _filteredConversations.length,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemBuilder: (context, index) {
-                final conversation = _filteredConversations[index];
-                return _buildConversationCard(conversation);
-              },
-            ),
+      body: StreamBuilder<List<Conversation>>(
+        stream: _conversationsStream,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator(color: Color(0xFF2C5C44)));
+          if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
+          
+          final conversations = snapshot.data ?? [];
+          if (conversations.isEmpty) return _buildEmptyState();
+
+          // Resolve names for the whole list, not just the rows ListView.builder
+          // happens to have built — otherwise searching by name silently misses
+          // conversations the user has not scrolled to. Results are cached, so
+          // this settles after one pass.
+          for (final conv in conversations) {
+            _fetchUserInfo(conv);
+            _fetchLastMessagePreview(conv);
+          }
+
+          final int tabIndex = _tabController.index;
+
+          final filtered = conversations.where((conv) {
+            if (conv.isDeleted) return false;
+            final bool isUnread = _isConversationUnread(conv);
+
+            if (tabIndex == 1) return isUnread; // Unread tab
+            if (tabIndex >= 2 &&
+                _partnerRole(conv) != _partnerRoles[tabIndex - 2]) {
+              return false;
+            }
+
+            // Search query filter (matches contact name or last message text)
+            if (_searchQuery.isNotEmpty) {
+              final String otherName = _getOtherUserName(conv).toLowerCase();
+              final String lastMsg = (conv.lastMessage ?? '').toLowerCase();
+              final String q = _searchQuery.toLowerCase();
+              if (!otherName.contains(q) && !lastMsg.contains(q)) {
+                return false;
+              }
+            }
+
+            return true;
+          }).toList();
+
+          if (filtered.isEmpty) return _buildEmptyFilterState();
+
+          return ListView.builder(
+            itemCount: filtered.length, padding: const EdgeInsets.symmetric(vertical: 8),
+            itemBuilder: (context, index) {
+              final conversation = filtered[index];
+              return _buildConversationCard(conversation);
+            },
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.chat_bubble_outline, size: 80, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
-            'No messages yet',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Start a conversation with a tailor or retailer',
-            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: _showNewConversationDialog,
-            icon: const Icon(Icons.add),
-            label: const Text('New Conversation'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2C5C44),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+  bool _isConversationUnread(Conversation conv) {
+    final String myId = widget.customerId.trim();
+    final int unread = conv.unreadCounts[myId] ?? 0;
+    final String lastSender = (conv.lastSenderId ?? '').trim();
+    final bool iAmLast = lastSender.isNotEmpty && lastSender == myId;
+
+    if (unread > 0) return true;
+    if (!iAmLast && lastSender.isNotEmpty && conv.lastMessageRead == false) return true;
+    return false;
   }
 
-  Widget _buildEmptyFilterState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.filter_alt_off, size: 80, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
-            'No conversations match',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Try a different filter or search term',
-            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-          ),
-        ],
-      ),
-    );
+  String _formatLastMessage(Conversation conversation, bool iAmLastSender, String otherName) {
+    if (conversation.isBlocked) return '🔒 Blocked';
+    String? rawMsg = conversation.lastMessage;
+    if (rawMsg == null || rawMsg.trim().isEmpty) {
+      rawMsg = _previewCache[conversation.id]?['lastMessage'];
+    }
+    if (rawMsg == null || rawMsg.trim().isEmpty) {
+      return _fetchingPreviews.contains(conversation.id) ? '...' : 'No messages yet';
+    }
+
+    final trimmed = rawMsg.trim();
+    final bool isPhoto = trimmed == '📷 Photo' ||
+        trimmed.startsWith('📷 ') ||
+        trimmed == 'Photo' ||
+        trimmed == '📷' ||
+        trimmed.contains('chat_attachments');
+
+    if (isPhoto) {
+      final caption = trimmed.startsWith('📷 ') ? trimmed.substring(2).trim() : '';
+      final isRealCaption = caption.isNotEmpty && caption.toLowerCase() != 'photo';
+      if (iAmLastSender) {
+        return isRealCaption ? 'You sent a photo: $caption' : 'You sent a photo';
+      } else {
+        return isRealCaption ? '$otherName sent a photo: $caption' : '$otherName sent a photo';
+      }
+    }
+
+    if (iAmLastSender) {
+      return 'You: $trimmed';
+    }
+    return trimmed;
   }
 
   Widget _buildConversationCard(Conversation conversation) {
     final otherName = _getOtherUserName(conversation);
     final otherAvatar = _getOtherUserAvatar(conversation);
-    final lastMessage = _getLastMessage(conversation);
-    final lastTime = _getLastMessageTime(conversation);
-    final unreadCount = conversation.unreadCount;
-    final isBlocked = conversation.isBlocked;
-    final isCustomer = conversation.otherRole == UserRole.customer;
+    final Color primaryGreen = const Color(0xFF2C5C44);
+    final Color unreadBg = const Color(0xFFF1F8F1);
+    
+    final String myId = widget.customerId.trim();
+    final String lastSenderId = (conversation.lastSenderId ??
+            _previewCache[conversation.id]?['lastSenderId'] ??
+            '')
+        .trim();
+    final String partnerId = _partnerId(conversation).trim();
+
+    final int myUnreadCount = conversation.unreadCounts[myId] ?? 0;
+    final int partnerUnreadCount = conversation.unreadCounts[partnerId] ?? 0;
+
+    final bool iAmLastSender = lastSenderId == myId;
+    final bool isUnread = _isConversationUnread(conversation);
+    // Only render a number when there is a real count behind it; the previous
+    // `: 1` fallback invented an unread message that did not exist.
+    final int displayBadgeCount = myUnreadCount;
+
+    /// 🧠 Logic-based Ticks: If I sent the latest message, it is Seen only when the recipient's unread count is 0.
+    final bool lastMessageIsRead = iAmLastSender && (partnerUnreadCount == 0 || conversation.lastMessageRead == true);
 
     return GestureDetector(
-      onTap: () {
-        if (isBlocked) {
-          _showBlockedDialog(conversation);
-          return;
-        }
-        _markConversationAsRead(conversation.id);
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ChatScreen(
-              conversationId: conversation.id,
-              customerId: widget.customerId,
-              otherUserId: conversation.otherId,
-              otherUserName: otherName,
-              otherUserRole: conversation.otherRole,
-              otherUserAvatar: otherAvatar,
-              orderId: conversation.orderId,
-              onConversationRead: _onConversationRead,
-              isBlocked: isBlocked,
-            ),
-          ),
-        );
-      },
-      onLongPress: () {
-        _showConversationOptions(conversation);
-      },
+      onTap: () => _openChat(conversation),
+      onLongPress: () => _showConversationOptions(conversation),
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: unreadCount > 0 ? const Color(0xFFE8F0FE) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          color: isUnread ? unreadBg : Colors.white, borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: isUnread ? primaryGreen.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))],
+          border: isUnread ? Border.all(color: primaryGreen.withValues(alpha: 0.2), width: 2) : Border.all(color: Colors.grey.shade100, width: 1),
         ),
         child: Row(
           children: [
             Stack(
               children: [
-                // ✅ For Customer: show first letter, no profile picture
                 CircleAvatar(
-                  radius: 28,
-                  backgroundColor: isCustomer
-                      ? Colors.grey[300]
-                      : Colors.grey[200],
-                  backgroundImage:
-                      (!isCustomer &&
-                          otherAvatar != null &&
-                          otherAvatar.isNotEmpty)
-                      ? AssetImage(otherAvatar)
-                      : null,
-                  child: isCustomer
-                      ? Text(
-                          otherName.isNotEmpty
-                              ? otherName[0].toUpperCase()
-                              : '?',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black54,
-                          ),
-                        )
-                      : null,
+                  radius: 30, backgroundColor: Colors.grey[200], backgroundImage: otherAvatar != null ? NetworkImage(otherAvatar) : null,
+                  child: otherAvatar == null ? Text(otherName.isNotEmpty ? otherName[0].toUpperCase() : '?', style: TextStyle(color: primaryGreen, fontWeight: FontWeight.bold)) : null,
                 ),
-                if (isBlocked)
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.block,
-                        size: 10,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
+                if (isUnread) Positioned(right: 0, bottom: 0, child: Container(width: 14, height: 14, decoration: BoxDecoration(color: Colors.green, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)))),
               ],
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Text(
-                              otherName,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: unreadCount > 0
-                                    ? FontWeight.bold
-                                    : FontWeight.w600,
-                                color: isCustomer
-                                    ? Colors.grey[700]
-                                    : Colors.black,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            if (unreadCount > 0) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF2C5C44),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  unreadCount.toString(),
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      Text(
-                        _getTimeAgo(lastTime),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[500],
-                          fontWeight: unreadCount > 0
-                              ? FontWeight.w600
-                              : FontWeight.normal,
-                        ),
-                      ),
+                      Expanded(child: Text(otherName, style: TextStyle(fontSize: 17, fontWeight: isUnread ? FontWeight.w900 : FontWeight.w600, color: isUnread ? primaryGreen : Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                      Text(_getTimeAgo(conversation.updatedAt), style: TextStyle(fontSize: 12, color: isUnread ? primaryGreen : Colors.grey[500], fontWeight: isUnread ? FontWeight.bold : FontWeight.normal)),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
-                      if (conversation.messages != null &&
-                          conversation.messages!.isNotEmpty &&
-                          conversation.messages!.last.senderId !=
-                              widget.customerId &&
-                          conversation.messages!.last.isRead)
-                        const Icon(
-                          Icons.done_all,
-                          size: 14,
-                          color: Colors.blue,
+                      if (iAmLastSender && !conversation.isBlocked)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Icon(lastMessageIsRead ? Icons.done_all : Icons.done, size: 14, color: lastMessageIsRead ? Colors.blue[400] : Colors.grey),
                         ),
-                      if (conversation.messages != null &&
-                          conversation.messages!.isNotEmpty &&
-                          conversation.messages!.last.senderId !=
-                              widget.customerId &&
-                          !conversation.messages!.last.isRead)
-                        const Icon(Icons.done, size: 14, color: Colors.grey),
-                      if (conversation.messages != null &&
-                          conversation.messages!.isNotEmpty &&
-                          conversation.messages!.last.senderId !=
-                              widget.customerId)
-                        const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          isBlocked
-                              ? '🔒 User is blocked - Tap to unblock'
-                              : lastMessage,
+                          _formatLastMessage(conversation, iAmLastSender, otherName),
                           style: TextStyle(
-                            fontSize: 13,
-                            color: isBlocked
-                                ? Colors.red
-                                : (unreadCount > 0
-                                      ? Colors.black87
-                                      : Colors.grey[600]),
-                            fontWeight: unreadCount > 0
-                                ? FontWeight.w500
-                                : FontWeight.normal,
+                            fontSize: 14,
+                            color: isUnread ? Colors.black87 : Colors.grey[600],
+                            fontWeight: isUnread ? FontWeight.bold : FontWeight.normal,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      if (isUnread && displayBadgeCount > 0) Container(margin: const EdgeInsets.only(left: 8), padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: primaryGreen, borderRadius: BorderRadius.circular(10)), child: Text(displayBadgeCount.toString(), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))),
                     ],
                   ),
                 ],
@@ -1681,511 +620,293 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   }
 
   void _showConversationOptions(Conversation conversation) {
-    final isBlocked = conversation.isBlocked;
+    final String myId = widget.customerId.trim();
+    final bool iBlockedThem = conversation.isBlocked && conversation.blockedBy == myId;
+    final bool theyBlockedMe = conversation.isBlocked && conversation.blockedBy != null && conversation.blockedBy != myId;
 
     showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                ListTile(
-                  leading: Icon(
-                    isBlocked ? Icons.block : Icons.block_outlined,
-                    color: isBlocked ? Colors.green : Colors.red,
-                  ),
-                  title: Text(
-                    isBlocked ? 'Unblock user' : 'Block user',
-                    style: TextStyle(
-                      color: isBlocked ? Colors.green : Colors.red,
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    if (isBlocked) {
-                      _unblockUser(conversation);
-                    } else {
-                      _showBlockConfirmation(conversation);
-                    }
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.delete, color: Colors.red),
-                  title: const Text(
-                    'Delete conversation',
-                    style: TextStyle(color: Colors.red),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showDeleteConfirmation(conversation);
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showBlockConfirmation(Conversation conversation) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text('Block User'),
-          content: Text(
-            'Are you sure you want to block ${_getOtherUserName(conversation)}?\n\n'
-            'You will no longer receive messages from this user.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _blockUser(conversation);
-              },
-              child: const Text('Block', style: TextStyle(color: Colors.red)),
-            ),
+      context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!conversation.isBlocked)
+              ListTile(leading: const Icon(Icons.block, color: Colors.red), title: const Text('Block user', style: TextStyle(color: Colors.red)), onTap: () { Navigator.pop(context); _confirmBlockUser(conversation); }),
+            if (iBlockedThem)
+              ListTile(leading: const Icon(Icons.lock_open, color: Colors.green), title: const Text('Unblock user', style: TextStyle(color: Colors.green)), onTap: () { Navigator.pop(context); _unblockUser(conversation); }),
+            if (theyBlockedMe)
+              const ListTile(leading: Icon(Icons.block, color: Colors.grey), title: Text('You are blocked', style: TextStyle(color: Colors.grey))),
+            ListTile(leading: const Icon(Icons.delete, color: Colors.red), title: const Text('Delete conversation'), onTap: () { Navigator.pop(context); _confirmDeleteConversation(conversation); }),
           ],
-        );
-      },
-    );
-  }
-
-  void _showDeleteConfirmation(Conversation conversation) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text('Delete Conversation'),
-          content: Text(
-            'Are you sure you want to delete the conversation with ${_getOtherUserName(conversation)}? This action cannot be undone.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _deleteConversation(conversation);
-              },
-              child: const Text('Delete', style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-// ─── Search Delegate ─────────────────────────────────────────────────────
-
-class _ConversationSearchDelegate extends SearchDelegate {
-  final List<Conversation> conversations;
-  final Map<String, Map<String, dynamic>> userCache;
-  final String Function(Conversation) getOtherUserName;
-  final String Function(Conversation) getOtherUserAvatar;
-  final String Function(Conversation) getLastMessage;
-  final DateTime Function(Conversation) getLastMessageTime;
-  final String customerId;
-  final Function(Conversation) onConversationTap;
-
-  _ConversationSearchDelegate({
-    required this.conversations,
-    required this.userCache,
-    required this.getOtherUserName,
-    required this.getOtherUserAvatar,
-    required this.getLastMessage,
-    required this.getLastMessageTime,
-    required this.customerId,
-    required this.onConversationTap,
-  });
-
-  @override
-  String get searchFieldLabel => 'Search conversations...';
-
-  @override
-  ThemeData appBarTheme(BuildContext context) {
-    return ThemeData(
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF2C5C44),
-        foregroundColor: Colors.white,
-      ),
-      inputDecorationTheme: const InputDecorationTheme(
-        hintStyle: TextStyle(color: Colors.white70),
+        ),
       ),
     );
   }
 
-  @override
-  List<Widget> buildActions(BuildContext context) {
-    return [
-      IconButton(
-        icon: const Icon(Icons.clear, color: Colors.white),
-        onPressed: () {
-          query = '';
-          showSuggestions(context);
-        },
-      ),
-    ];
-  }
-
-  @override
-  Widget buildLeading(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.arrow_back, color: Colors.white),
-      onPressed: () {
-        close(context, null);
-      },
-    );
-  }
-
-  // ✅ Fixed: Properly filter results based on query
-  @override
-  Widget buildResults(BuildContext context) {
-    final results = _getFilteredResults(query);
-    return _buildResultsList(results);
-  }
-
-  // ✅ Fixed: Suggestions also show filtered results
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    final results = _getFilteredResults(query);
-    return _buildResultsList(results);
-  }
-
-  // ✅ Helper: Get filtered results based on search query
-  List<Conversation> _getFilteredResults(String searchQuery) {
-    if (searchQuery.isEmpty) {
-      return conversations.where((conv) => !conv.isDeleted).toList();
-    }
-
-    return conversations.where((conv) {
-      if (conv.isDeleted) return false;
-
-      final userData = userCache[conv.otherId];
-      final userName = userData?['name']?.toString().toLowerCase() ?? '';
-      final userPhone = userData?['phone']?.toString().toLowerCase() ?? '';
-      final lastMessage = getLastMessage(conv).toLowerCase();
-      final query = searchQuery.toLowerCase();
-
-      return userName.contains(query) ||
-          userPhone.contains(query) ||
-          lastMessage.contains(query);
-    }).toList();
-  }
-
-  // ✅ Helper: Build the results list
-  Widget _buildResultsList(List<Conversation> results) {
-    if (results.isEmpty) {
+  Widget _buildEmptyState() => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.chat_bubble_outline, size: 80, color: Colors.grey[400]), const SizedBox(height: 16), const Text('No messages yet', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))]));
+  Widget _buildEmptyFilterState() {
+    if (_searchQuery.isNotEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+            Icon(Icons.search_off, size: 80, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
-              query.isEmpty
-                  ? 'Type to search conversations'
-                  : 'No conversations found',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              'No messages match "$_searchQuery"',
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Colors.black87),
             ),
-            if (query.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Try searching by name or phone number',
-                style: TextStyle(fontSize: 13, color: Colors.grey[500]),
-              ),
-            ],
           ],
         ),
       );
     }
+    return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.filter_alt_off, size: 80, color: Colors.grey[400]), const SizedBox(height: 16), const Text('No results match filter', style: TextStyle(fontSize: 18))]));
+  }
+}
 
-    return ListView.builder(
-      itemCount: results.length,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemBuilder: (context, index) {
-        final conversation = results[index];
-        final otherName = getOtherUserName(conversation);
-        final otherAvatar = getOtherUserAvatar(conversation);
-        final lastMessage = getLastMessage(conversation);
-        final lastTime = getLastMessageTime(conversation);
-        final unreadCount = conversation.unreadCount;
-        final isBlocked = conversation.isBlocked;
-        final isAnonymous =
-            userCache[conversation.otherId]?['isAnonymous'] == true;
-        final isCustomer = conversation.otherRole == UserRole.customer;
+class NewConversationBottomSheet extends StatefulWidget {
+  final String customerId;
+  final UserRole currentUserRole;
+  final MessagingService messagingService;
 
-        return GestureDetector(
-          onTap: () {
-            close(context, null);
-            if (isBlocked) {
-              showDialog(
-                context: context,
-                builder: (context) {
-                  return AlertDialog(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    title: const Text('User Blocked'),
-                    content: Text(
-                      '$otherName is blocked.\n\n'
-                      'You need to unblock this user to send messages.',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          onConversationTap(conversation);
-                        },
-                        child: const Text(
-                          'Unblock',
-                          style: TextStyle(color: Colors.green),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              );
-              return;
-            }
-            onConversationTap(conversation);
-          },
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: unreadCount > 0 ? const Color(0xFFE8F0FE) : Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Stack(
-                  children: [
-                    // ✅ For Customer: show first letter, no profile picture
-                    CircleAvatar(
-                      radius: 28,
-                      backgroundColor: isCustomer
-                          ? Colors.grey[300]
-                          : Colors.grey[200],
-                      backgroundImage:
-                          (!isCustomer &&
-                              otherAvatar != null &&
-                              otherAvatar.isNotEmpty)
-                          ? AssetImage(otherAvatar)
-                          : null,
-                      child: isCustomer
-                          ? Text(
-                              otherName.isNotEmpty
-                                  ? otherName[0].toUpperCase()
-                                  : '?',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey[700],
-                              ),
-                            )
-                          : null,
-                    ),
-                    if (isBlocked)
-                      Positioned(
-                        top: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.block,
-                            size: 10,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Row(
-                              children: [
-                                Text(
-                                  otherName,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: isAnonymous
-                                        ? FontWeight.normal
-                                        : (unreadCount > 0
-                                              ? FontWeight.bold
-                                              : FontWeight.w600),
-                                    color: isCustomer
-                                        ? Colors.grey[700]
-                                        : Colors.black,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                if (unreadCount > 0) ...[
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF2C5C44),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      unreadCount.toString(),
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          Text(
-                            _getTimeAgo(lastTime),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[500],
-                              fontWeight: unreadCount > 0
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          if (conversation.messages != null &&
-                              conversation.messages!.isNotEmpty &&
-                              conversation.messages!.last.senderId !=
-                                  customerId &&
-                              conversation.messages!.last.isRead)
-                            const Icon(
-                              Icons.done_all,
-                              size: 14,
-                              color: Colors.blue,
-                            ),
-                          if (conversation.messages != null &&
-                              conversation.messages!.isNotEmpty &&
-                              conversation.messages!.last.senderId !=
-                                  customerId &&
-                              !conversation.messages!.last.isRead)
-                            const Icon(
-                              Icons.done,
-                              size: 14,
-                              color: Colors.grey,
-                            ),
-                          if (conversation.messages != null &&
-                              conversation.messages!.isNotEmpty &&
-                              conversation.messages!.last.senderId !=
-                                  customerId)
-                            const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              isBlocked
-                                  ? '🔒 User is blocked - Tap to unblock'
-                                  : lastMessage,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: isBlocked
-                                    ? Colors.red
-                                    : (unreadCount > 0
-                                          ? Colors.black87
-                                          : Colors.grey[600]),
-                                fontWeight: unreadCount > 0
-                                    ? FontWeight.w500
-                                    : FontWeight.normal,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+  const NewConversationBottomSheet({
+    super.key,
+    required this.customerId,
+    required this.currentUserRole,
+    required this.messagingService,
+  });
+
+  @override
+  State<NewConversationBottomSheet> createState() => _NewConversationBottomSheetState();
+}
+
+class _NewConversationBottomSheetState extends State<NewConversationBottomSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  List<Map<String, dynamic>> _searchResults = [];
+  bool _isLoading = false;
+  bool _hasSearched = false;
+  Timer? _debounce;
+  // Incremented per search so a slow earlier response cannot overwrite a
+  // newer one's results.
+  int _searchToken = 0;
+  bool _isOpening = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _performSearch('');
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  /// Every keystroke used to scan three collections. Wait for a pause first.
+  void _onQueryChanged(String query) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () => _performSearch(query));
+  }
+
+  Future<void> _performSearch(String query) async {
+    final int token = ++_searchToken;
+    setState(() => _isLoading = true);
+    try {
+      final results = await widget.messagingService.searchUsersByNameOrPhone(query);
+      if (!mounted || token != _searchToken) return;
+      setState(() {
+        // Only roles the current user is allowed to start a chat with.
+        final allowed = UserRole.values
+            .where((r) => r != widget.currentUserRole)
+            .map((r) => r.name)
+            .toSet();
+        _searchResults = results
+            .where((u) =>
+                u['id'] != widget.customerId &&
+                allowed.contains((u['role'] ?? '').toString()))
+            .toList();
+        _isLoading = false;
+        _hasSearched = true;
+      });
+    } catch (e) {
+      if (!mounted || token != _searchToken) return;
+      setState(() {
+        _searchResults = [];
+        _isLoading = false;
+        _hasSearched = true;
+      });
+    }
+  }
+
+  void _onUserSelected(Map<String, dynamic> user) async {
+    if (_isOpening) return;
+    _isOpening = true;
+    final String userId = user['id'];
+    final String userName = user['name'];
+    final String? avatar = user['profilePicture'];
+    final String roleStr = user['role'] ?? 'customer';
+    final UserRole role = UserRole.values.firstWhere((e) => e.name == roleStr, orElse: () => UserRole.customer);
+
+    final existing = await widget.messagingService.getConversationBetween(widget.customerId, userId);
+
+    if (!mounted) {
+      _isOpening = false;
+      return;
+    }
+    Navigator.pop(context); // Close bottom sheet
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          conversationId: existing?.id ?? 'TEMP-$userId',
+          customerId: widget.customerId,
+          otherUserId: userId,
+          otherUserName: userName,
+          otherUserRole: role,
+          currentUserRole: widget.currentUserRole,
+          otherUserAvatar: avatar,
+          isBlocked: existing?.isBlocked ?? false,
+          blockedBy: existing?.blockedBy,
+        ),
+      ),
     );
   }
 
-  String _getTimeAgo(DateTime time) {
-    final now = DateTime.now();
-    final difference = now.difference(time);
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Column(
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 12),
+              width: 44,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2.5),
+              ),
+            ),
+          ),
+          // Title
+          const Text(
+            'New Conversation',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Search input box
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.search, color: Colors.black54, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: const InputDecoration(
+                      hintText: 'Search by name or phone number...',
+                      hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onChanged: (val) => _onQueryChanged(val.trim()),
+                  ),
+                ),
+                if (_searchController.text.isNotEmpty)
+                  GestureDetector(
+                    onTap: () {
+                      _searchController.clear();
+                      _performSearch('');
+                    },
+                    child: const Icon(Icons.close, size: 18, color: Colors.grey),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Results list
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF2C5C44)))
+                : (_searchResults.isEmpty && _hasSearched)
+                    ? Center(
+                        child: Text(
+                          _searchController.text.isEmpty ? 'No users found in database' : 'No users match "${_searchController.text}"',
+                          style: TextStyle(color: Colors.grey[600], fontSize: 15),
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: _searchResults.length,
+                        separatorBuilder: (context, index) => Divider(height: 1, indent: 72, color: Colors.grey.shade100),
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        itemBuilder: (context, index) {
+                          final user = _searchResults[index];
+                          final String userName = user['name'] ?? 'Unknown';
+                          final String? avatar = user['profilePicture'];
+                          final String phone = user['phone'] ?? '';
+                          final String role = (user['role'] ?? '').toString();
 
-    if (difference.inDays > 7) {
-      return '${difference.inDays ~/ 7}w';
-    } else if (difference.inDays > 1) {
-      return '${difference.inDays}d';
-    } else if (difference.inDays == 1) {
-      return '1d';
-    } else if (difference.inHours > 1) {
-      return '${difference.inHours}h';
-    } else if (difference.inHours == 1) {
-      return '1h';
-    } else if (difference.inMinutes > 1) {
-      return '${difference.inMinutes}m';
-    } else {
-      return 'Now';
-    }
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                            leading: CircleAvatar(
+                              radius: 24,
+                              backgroundColor: const Color(0xFFA7E8C7),
+                              backgroundImage: (avatar != null && avatar.isNotEmpty) ? NetworkImage(avatar) : null,
+                              child: (avatar == null || avatar.isEmpty)
+                                  ? Text(
+                                      userName.isNotEmpty ? userName[0].toUpperCase() : '?',
+                                      style: const TextStyle(
+                                        color: Color(0xFF1B4332),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            title: Text(
+                              userName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            subtitle: Text(
+                              phone.isNotEmpty ? phone : (role.isNotEmpty ? role.toUpperCase() : ''),
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            trailing: const Icon(
+                              Icons.chevron_right,
+                              color: Colors.black54,
+                              size: 22,
+                            ),
+                            onTap: () => _onUserSelected(user),
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
   }
 }
+

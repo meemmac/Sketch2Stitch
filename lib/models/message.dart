@@ -95,26 +95,36 @@ class Message {
   /// Handles both native Firestore Timestamp (current/new docs) and
   /// ISO8601 strings (legacy docs written before this fix).
   factory Message.fromJson(Map<String, dynamic> json) {
-    DateTime? _parseDate(dynamic value) {
+    DateTime? parseDate(dynamic value) {
       if (value == null) return null;
       if (value is Timestamp) return value.toDate();
       if (value is String) return DateTime.tryParse(value);
       return null;
     }
 
+    // byName throws on anything unexpected, which killed the whole message
+    // stream for one malformed doc — fall back instead.
+    UserRole parseRole(dynamic r) {
+      final name = (r ?? '').toString().toLowerCase().trim();
+      return UserRole.values.firstWhere(
+        (e) => e.name.toLowerCase() == name,
+        orElse: () => UserRole.customer,
+      );
+    }
+
     return Message(
       id: json['id'] ?? '',
       conversationId: json['conversationId'] ?? '',
       senderId: json['senderId'] ?? '',
-      senderRole: UserRole.values.byName(json['senderRole'] ?? 'customer'),
+      senderRole: parseRole(json['senderRole']),
       msgText: json['msgText'] ?? '',
       attachment: json['attachment'],
-      sentAt: _parseDate(json['sentAt']) ?? DateTime.now(),
+      sentAt: parseDate(json['sentAt']) ?? DateTime.now(),
       replyToMessageId: json['replyToMessageId'],
       replyToText: json['replyToText'],
       replyToSender: json['replyToSender'],
       isRead: json['isRead'] ?? false,
-      readAt: _parseDate(json['readAt']),
+      readAt: parseDate(json['readAt']),
     );
   }
 }
