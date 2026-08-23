@@ -266,6 +266,27 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
 
     final now = DateTime.now();
     for (final order in _orders) {
+      // A request still waiting on a quote: remind them before the 12h
+      // window shuts, since letting it lapse loses them the job.
+      if (order.status == TailorOrderStatus.pending) {
+        final respondBy = order.quoteResponseDeadline;
+        if (respondBy == null || order.quoteWindowClosed) continue;
+        if (respondBy.difference(now) > const Duration(hours: 6)) continue;
+        try {
+          await NotificationService().notifyTailorConfirmOrder(
+            tailorId,
+            order.orderId,
+            order.customerName,
+            order.items.isNotEmpty
+                ? order.items.first.name
+                : 'a custom stitching job',
+          );
+        } catch (e) {
+          debugPrint('TailorOrdersScreen: quote reminder failed: $e');
+        }
+        continue;
+      }
+
       final due = order.jobEstimatedDeliveryDate;
       if (due == null) continue;
       if (order.status != TailorOrderStatus.confirmed &&

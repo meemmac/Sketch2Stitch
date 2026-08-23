@@ -1035,6 +1035,13 @@ class OrderService {
           retailerId: subOrderData['retailerId'] as String?,
         );
       }
+
+      // A tailor-bound hop is internal to the customer, but it is the whole
+      // story for the tailor: they cannot start until the last sub-order
+      // lands, and nothing used to tell them it had.
+      if (statusLower == 'delivered' && destination == 'tailor') {
+        await _notifyTailorMaterialsArrived(orderId: orderId);
+      }
     } catch (e) {
       debugPrint('Error updating order status for $subOrderId: $e');
       rethrow;
@@ -1068,6 +1075,55 @@ class OrderService {
       );
     } catch (e) {
       debugPrint('Error sending delivery notification: $e');
+    }
+  }
+
+  /// Best-effort "all your materials are here" notification, raised only once
+  /// every tailor-bound sub-order on the order reads 'delivered' — the same
+  /// condition the tailor's own `materialsReceived` flag is computed from.
+  /// The service dedupes per job, so a re-run after the last arrival is safe.
+  Future<void> _notifyTailorMaterialsArrived({required String orderId}) async {
+    try {
+      final subs = await _db
+          .collection(_subOrdersCollection)
+          .where('orderId', isEqualTo: orderId)
+          .get();
+
+      final allArrived = subs.docs.isNotEmpty &&
+          subs.docs.every((d) {
+            final data = d.data();
+            return (data['status'] ?? '').toString().toLowerCase() ==
+                    'delivered' &&
+                (data['deliveryDestination'] ?? '').toString().toLowerCase() ==
+                    'tailor';
+          });
+      if (!allArrived) return;
+
+      final jobSnap = await _db
+          .collection(_tailorJobsCollection)
+          .where('orderId', isEqualTo: orderId)
+          .limit(1)
+          .get();
+      final tailorId = jobSnap.docs.isEmpty
+          ? null
+          : jobSnap.docs.first.data()['tailorId'] as String?;
+      if (tailorId == null) return;
+
+      final orderSnap =
+          await _db.collection(_ordersCollection).doc(orderId).get();
+      final customerId = orderSnap.data()?['customerId'] as String?;
+
+      String customerName = 'the customer';
+      if (customerId != null) {
+        final snap = await _db.collection('Customer').doc(customerId).get();
+        final name = (snap.data()?['name'] as String?)?.trim();
+        if (name != null && name.isNotEmpty) customerName = name;
+      }
+
+      await NotificationService()
+          .notifyTailorMaterialsArrived(tailorId, orderId, customerName);
+    } catch (e) {
+      debugPrint('Error sending materials-arrived notification: $e');
     }
   }
 
@@ -1326,11 +1382,13 @@ class OrderService {
 
       final notifications = NotificationService();
       if (accepted) {
-        await notifications.notifyCustomerOrderConfirmed(
+        // A quote is an offer, not a confirmation: the customer still has to
+        // accept and pay. Sending "your order is confirmed" here hid the very
+        // action they had to take.
+        await notifications.notifyCustomerQuoteReceived(
           customerId,
           orderId,
           tailorName,
-          'tailor',
         );
       } else {
         await notifications.notifyCustomerOrderCancelled(

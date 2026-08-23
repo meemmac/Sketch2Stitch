@@ -7,6 +7,7 @@ import '../models/conversation.dart';
 import '../models/message.dart';
 import '../models/user_role.dart';
 import 'Cloudinary_service.dart';
+import 'notification_service.dart';
 
 class MessagingService {
   MessagingService({FirebaseFirestore? firestore})
@@ -427,9 +428,58 @@ class MessagingService {
       });
 
       await batch.commit();
+
+      // Only the message that takes the thread from read to unread raises a
+      // notification — one per conversation, not one per message, so a long
+      // exchange can't bury the receiver's notification centre.
+      final int previousUnread =
+          ((convData['unreadCounts'] as Map<String, dynamic>?)?[receiverId]
+                  as num?)
+              ?.toInt() ??
+              0;
+      if (previousUnread == 0) {
+        await _notifyNewMessage(
+          receiverId: receiverId,
+          senderId: cleanSenderId,
+          convData: convData,
+        );
+      }
     } catch (e) {
       debugPrint('[MessagingService] ❌ Error sending message: $e');
       rethrow;
+    }
+  }
+
+  /// Drops a "new message" card into the receiver's notification centre.
+  /// Best-effort: the message is already committed by the time this runs, so
+  /// a notification failure must never surface as a failed send.
+  Future<void> _notifyNewMessage({
+    required String receiverId,
+    required String senderId,
+    required Map<String, dynamic> convData,
+  }) async {
+    try {
+      UserRole roleFor(String userId) {
+        if (userId == (convData['customerId'] ?? '').toString().trim()) {
+          return UserRole.customer;
+        }
+        final name =
+            (convData['otherRole'] ?? '').toString().toLowerCase().trim();
+        return UserRole.values.firstWhere(
+          (e) => e.name.toLowerCase() == name,
+          orElse: () => UserRole.tailor,
+        );
+      }
+
+      final senderInfo = await getUserBasicInfo(senderId, roleFor(senderId));
+      await NotificationService().notifyNewMessage(
+        receiverId,
+        roleFor(receiverId),
+        (senderInfo?['name'] as String?) ?? 'Someone',
+        (convData['orderId'] ?? '').toString(),
+      );
+    } catch (e) {
+      debugPrint('[MessagingService] new-message notification failed: $e');
     }
   }
 

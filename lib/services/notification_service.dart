@@ -467,6 +467,43 @@ class NotificationService {
 
 
 
+  /// A tailor answered the request with a price. This is NOT a confirmation —
+  /// the customer still has to accept and pay — so it must not reuse
+  /// [notifyCustomerOrderConfirmed], which tells them the opposite.
+  Future<void> notifyCustomerQuoteReceived(
+      String customerId,
+      String orderId,
+      String tailorName,
+      ) async {
+    await _sendNotification(
+      userId: customerId,
+      userRole: UserRole.customer,
+      type: NotificationDbType.quoteReceived,
+      message:
+          '$tailorName sent a quote for order #$orderId. Review it to confirm your stitching.',
+      orderId: orderId,
+    );
+  }
+
+
+  /// A tailoring window closed with nothing confirmed. Without this the
+  /// order silently reset and the customer went on waiting for a tailor who
+  /// was never coming.
+  Future<void> notifyCustomerQuoteExpired(
+      String customerId,
+      String orderId,
+      String message,
+      ) async {
+    await _sendNotification(
+      userId: customerId,
+      userRole: UserRole.customer,
+      type: NotificationDbType.quoteExpired,
+      message: message,
+      orderId: orderId,
+    );
+  }
+
+
   Future<void> notifyCustomerOrderCancelled(
       String customerId,
       String orderId,
@@ -528,12 +565,24 @@ class NotificationService {
 
 
 
+  /// Nudges the tailor to answer a request before their response window
+  /// closes. Raised by the tailor's own device (no Cloud Functions), so it
+  /// dedupes per job the same way the delivery reminder does — otherwise
+  /// every snapshot and every app launch would add another copy.
   Future<void> notifyTailorConfirmOrder(
       String tailorId,
       String orderId,
       String customerName,
       String itemName,
       ) async {
+    if (await _alreadySent(
+      userId: tailorId,
+      type: NotificationDbType.selectionDeadlineReminder,
+      orderId: orderId,
+    )) {
+      return;
+    }
+
     await _sendNotification(
       userId: tailorId,
       userRole: UserRole.tailor,
@@ -597,6 +646,35 @@ class NotificationService {
       debugPrint('[NotificationService] dedupe lookup failed: $e');
       return false;
     }
+  }
+
+
+
+
+  /// Every sub-order on this job has reached the tailor, so there is fabric
+  /// on the bench to sew. Deduped per job: only the arrival that completes
+  /// the set should raise it, and that check can re-run.
+  Future<void> notifyTailorMaterialsArrived(
+      String tailorId,
+      String orderId,
+      String customerName,
+      ) async {
+    if (await _alreadySent(
+      userId: tailorId,
+      type: NotificationDbType.materialsArrived,
+      orderId: orderId,
+    )) {
+      return;
+    }
+
+    await _sendNotification(
+      userId: tailorId,
+      userRole: UserRole.tailor,
+      type: NotificationDbType.materialsArrived,
+      message:
+          'All materials for $customerName\'s order #$orderId have arrived. You can start stitching.',
+      orderId: orderId,
+    );
   }
 
 
@@ -680,6 +758,32 @@ class NotificationService {
       userRole: UserRole.retailer,
       type: NotificationDbType.jobConfirmed,
       message: 'A tailor ($tailorName) has been assigned to $customerName\'s order #$orderId.',
+      orderId: orderId,
+    );
+  }
+
+
+
+
+// ─── Shared Notifications ──────────────────────────────────────────────────
+
+
+
+
+  /// A chat message arrived for [receiverId]. Callers are expected to raise
+  /// this only for the first unread message in a thread — one notification
+  /// per conversation, not one per message.
+  Future<void> notifyNewMessage(
+      String receiverId,
+      UserRole receiverRole,
+      String senderName,
+      String orderId,
+      ) async {
+    await _sendNotification(
+      userId: receiverId,
+      userRole: receiverRole,
+      type: NotificationDbType.newMessage,
+      message: 'New message from $senderName.',
       orderId: orderId,
     );
   }
