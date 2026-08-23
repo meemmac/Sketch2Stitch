@@ -27,6 +27,24 @@ class CustomerDatabaseSeeder {
       final existingOrders = await db.collection('Orders').where('customerId', isEqualTo: customerId).get();
       for (var doc in existingOrders.docs) {
         batch.delete(doc.reference);
+        
+        // Delete associated sub-orders
+        final subOrders = await db.collection('Sub-orders').where('orderId', isEqualTo: doc.id).get();
+        for (var so in subOrders.docs) {
+          batch.delete(so.reference);
+          
+          // Delete associated order items
+          final items = await db.collection('Order-Items').where('subOrderId', isEqualTo: so.id).get();
+          for (var item in items.docs) {
+            batch.delete(item.reference);
+          }
+        }
+        
+        // Delete associated tailor jobs
+        final tailorJobs = await db.collection('Tailor-jobs').where('orderId', isEqualTo: doc.id).get();
+        for (var tj in tailorJobs.docs) {
+          batch.delete(tj.reference);
+        }
       }
       debugPrint("Clearing ${existingOrders.docs.length} existing orders...");
 
@@ -213,7 +231,12 @@ class CustomerDatabaseSeeder {
           hasTailorReview = true;
         } else {
           int stateMod = i % 8;
-          switch (stateMod) {
+          if (i >= 16 && i <= 19) {
+            hasTailor = false;
+            orderStatusValue = 'processing';
+            orderStatusText = 'Order Preparing'; // Default fallback, the UI logic will override this anyway
+          } else {
+            switch (stateMod) {
             case 0: // No Tailor, Retailer only, processing -> Order Packed
               hasTailor = false;
               orderStatusText = 'Order Packed';
@@ -254,6 +277,7 @@ class CustomerDatabaseSeeder {
               hasRetailerReview = true;
               hasTailorReview = true;
               break;
+            }
           }
         }
 
@@ -282,12 +306,30 @@ class CustomerDatabaseSeeder {
         // app ever exercised a multi-item sub-order. Alternate between one
         // and three lines (with quantities above 1) so the item lists, the
         // "N units" counts and the subtotal arithmetic are all visible.
-        final int lineCount = (i % 3 == 0) ? 3 : 1;
+        int lineCount = (i % 3 == 0) ? 3 : 1;
+        if (i >= 16 && i <= 19) lineCount = 2;
+        
         final List<Map<String, dynamic>> lines = [];
         for (int line = 0; line < lineCount; line++) {
-          final productIndex = (i + line) % productImages.length;
+          int productIndex;
+          if (lineCount == 3) {
+            // Intentionally pick products from different retailers to create
+            // multi-retailer sub-orders for testing.
+            if (line == 0) productIndex = i % 3; // 0, 1, or 2 (targetId)
+            else if (line == 1) productIndex = 4 + (i % 2) * 2; // 4 or 6 (mock_ret_1)
+            else productIndex = 3 + (i % 2) * 2; // 3 or 5 or 7 (mock_ret_2)
+          } else if (i >= 16 && i <= 19) {
+            if (line == 0) productIndex = 1; // targetId
+            else productIndex = 4; // mock_ret_1
+          } else {
+            productIndex = (i + line) % productImages.length;
+          }
+
+          String lineRetailerId = productIndex < 3 ? targetId : 'mock_ret_${(productIndex % 2) + 1}';
+
           lines.add({
             'productId': productIds[productIndex],
+            'retailerId': lineRetailerId,
             'quantity': line + 1,
             'optionId': 1,
             // Mirrors the option price the product was seeded with, so the
@@ -296,35 +338,54 @@ class CustomerDatabaseSeeder {
           });
         }
 
-        // itemsSubtotal has to be price × quantity summed over every line —
-        // it was the unit price of a single item, so any order with more
-        // than one garment under-reported its own total.
-        final double itemsSubtotal = lines.fold(
-          0.0,
-          (runningTotal, l) => runningTotal + (l['price'] as double) * (l['quantity'] as int),
-        );
+        // Group lines by retailer
+        Map<String, List<Map<String, dynamic>>> retailerLines = {};
+        for (var line in lines) {
+          retailerLines.putIfAbsent(line['retailerId'], () => []).add(line);
+        }
 
-        // Create Sub-order
-        batch.set(db.collection('Sub-orders').doc(subOrderId), {
-          'orderId': orderId,
-          'retailerId': retailerId,
-          'status': subOrderStatus,
-          'deliveryDestination': hasTailor ? 'tailor' : 'customer',
-          'itemsSubtotal': itemsSubtotal,
-          'deliveryCharge': 60.0,
-          'deliveryDistanceKm': 5.0,
-          'deliveryPoint': const GeoPoint(23.7, 90.3),
-          'deliveryDate': orderStatusValue == 'completed' ? Timestamp.now() : null,
-        });
+        int subOrderIndex = 0;
+        for (var entry in retailerLines.entries) {
+          String currentRetailerId = entry.key;
+          List<Map<String, dynamic>> currentLines = entry.value;
+          String currentSubOrderId = retailerLines.length > 1 ? "$subOrderId-$subOrderIndex" : subOrderId;
 
-        // Create Order Items
-        for (int line = 0; line < lines.length; line++) {
-          batch.set(db.collection('Order-Items').doc("ITEM-$orderId-$line"), {
-            'subOrderId': subOrderId,
-            'productId': lines[line]['productId'],
-            'quantity': lines[line]['quantity'],
-            'optionId': lines[line]['optionId'],
+          String specificSubStatus = subOrderStatus;
+          if (i >= 16 && i <= 19) {
+            if (i == 16) specificSubStatus = subOrderIndex == 0 ? 'preparing' : 'packed';
+            else if (i == 17) specificSubStatus = 'preparing';
+            else if (i == 18) specificSubStatus = 'packed';
+            else if (i == 19) specificSubStatus = subOrderIndex == 0 ? 'packed' : 'delivered';
+          }
+
+          final double itemsSubtotal = currentLines.fold(
+            0.0,
+            (runningTotal, l) => runningTotal + (l['price'] as double) * (l['quantity'] as int),
+          );
+
+          // Create Sub-order
+          batch.set(db.collection('Sub-orders').doc(currentSubOrderId), {
+            'orderId': orderId,
+            'retailerId': currentRetailerId,
+            'status': specificSubStatus,
+            'deliveryDestination': hasTailor ? 'tailor' : 'customer',
+            'itemsSubtotal': itemsSubtotal,
+            'deliveryCharge': 60.0,
+            'deliveryDistanceKm': 5.0,
+            'deliveryPoint': const GeoPoint(23.7, 90.3),
+            'deliveryDate': orderStatusValue == 'completed' ? Timestamp.now() : null,
           });
+
+          // Create Order Items
+          for (int line = 0; line < currentLines.length; line++) {
+            batch.set(db.collection('Order-Items').doc("ITEM-$currentSubOrderId-$line"), {
+              'subOrderId': currentSubOrderId,
+              'productId': currentLines[line]['productId'],
+              'quantity': currentLines[line]['quantity'],
+              'optionId': currentLines[line]['optionId'],
+            });
+          }
+          subOrderIndex++;
         }
 
         // Create Tailor Job (if applicable)
@@ -373,15 +434,17 @@ class CustomerDatabaseSeeder {
 
         // Create Reviews (if applicable)
         if (hasRetailerReview) {
-          batch.set(db.collection('Reviews').doc("REV-RET-$orderId"), {
-            'orderId': orderId,
-            'customerId': customerId,
-            'targetId': retailerId,
-            'targetRole': 'retailer',
-            'rating': 4.0 + (i % 2),
-            'comment': 'Great fabric quality!',
-            'createdAt': Timestamp.now(),
-          });
+          for (String rId in retailerLines.keys) {
+            batch.set(db.collection('Reviews').doc("REV-RET-$orderId-$rId"), {
+              'orderId': orderId,
+              'customerId': customerId,
+              'targetId': rId,
+              'targetRole': 'retailer',
+              'rating': 4.0 + (i % 2),
+              'comment': 'Great fabric quality!',
+              'createdAt': Timestamp.now(),
+            });
+          }
         }
 
         if (hasTailorReview && hasTailor) {
