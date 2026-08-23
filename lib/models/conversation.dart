@@ -109,31 +109,57 @@ class Conversation {
   };
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
-    DateTime? _parseDate(dynamic value) {
+    DateTime? parseDate(dynamic value) {
       if (value == null) return null;
       if (value is Timestamp) return value.toDate();
       if (value is String) return DateTime.tryParse(value);
       return null;
     }
 
+    UserRole parseRole(dynamic r) {
+      if (r == null) return UserRole.tailor;
+      final name = r.toString().toLowerCase().trim();
+      return UserRole.values.firstWhere(
+        (e) => e.name.toLowerCase() == name,
+        orElse: () => UserRole.tailor,
+      );
+    }
+
+    final String cId = (json['customerId'] ?? '').toString().trim();
+    final String oId = (json['otherId'] ?? '').toString().trim();
+    final String lastSender = (json['lastSenderId'] ?? '').toString().trim();
+
+    Map<String, int> parsedUnread = {};
+    if (json['unreadCounts'] is Map) {
+      (json['unreadCounts'] as Map).forEach((k, v) {
+        if (v is num) parsedUnread[k.toString().trim()] = v.toInt();
+      });
+    }
+    
+    // Support legacy singular unreadCount if unreadCounts was not populated
+    if (parsedUnread.isEmpty && json['unreadCount'] is num && (json['unreadCount'] as num) > 0) {
+      final target = (lastSender == cId) ? oId : cId;
+      if (target.isNotEmpty) {
+        parsedUnread[target] = (json['unreadCount'] as num).toInt();
+      }
+    }
+
     return Conversation(
       id: json['id'] ?? '',
-      customerId: json['customerId'] ?? '',
-      otherId: json['otherId'] ?? '',
-      otherRole: UserRole.values.byName(json['otherRole'] ?? 'tailor'),
+      customerId: cId,
+      otherId: oId,
+      otherRole: parseRole(json['otherRole']),
       orderId: json['orderId'] ?? '',
       lastMessage: json['lastMessage'],
-      lastSenderId: json['lastSenderId'],
+      lastSenderId: lastSender.isNotEmpty ? lastSender : null,
       lastMessageRead: json['lastMessageRead'] as bool?,
-      unreadCounts: (json['unreadCounts'] as Map<String, dynamic>?)?.map(
-            (key, value) => MapEntry(key, (value as num).toInt()),
-          ) ?? {},
-      lastReadAt: _parseDate(json['lastReadAt']),
+      unreadCounts: parsedUnread,
+      lastReadAt: parseDate(json['lastReadAt']),
       isBlocked: json['isBlocked'] ?? false,
       blockedBy: json['blockedBy'],
-      updatedAt: _parseDate(json['updatedAt']),
+      updatedAt: parseDate(json['updatedAt']),
       isDeleted: json['isDeleted'] ?? false,
-      deletedAt: _parseDate(json['deletedAt']),
+      deletedAt: parseDate(json['deletedAt']),
       deletedBy: json['deletedBy'],
     );
   }

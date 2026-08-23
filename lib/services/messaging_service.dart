@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
@@ -33,12 +34,13 @@ class MessagingService {
     final String cleanUserId = userId.trim();
     return _db
         .collection(_conversations)
-        .where('isDeleted', isEqualTo: false)
         .snapshots()
         .map((snap) {
       final List<Conversation> results = [];
       for (var doc in snap.docs) {
         final data = doc.data();
+        if (data['isDeleted'] == true) continue;
+
         final String cId = (data['customerId'] ?? '').toString().trim();
         final String oId = (data['otherId'] ?? '').toString().trim();
         if (cId == cleanUserId || oId == cleanUserId) {
@@ -166,7 +168,8 @@ class MessagingService {
 
       final convDoc = await conversationRef.get();
       if (!convDoc.exists) return;
-      final lastSenderId = (convDoc.data()?['lastSenderId'] ?? '').toString().trim();
+      final convData = convDoc.data() ?? {};
+      final lastSenderId = (convData['lastSenderId'] ?? '').toString().trim();
 
       final unreadQuery = await _db.collection(_messages)
           .where('conversationId', isEqualTo: conversationId)
@@ -186,8 +189,14 @@ class MessagingService {
         }
       }
 
+      Map<String, dynamic> existingUnread = {};
+      if (convData['unreadCounts'] is Map) {
+        existingUnread = Map<String, dynamic>.from(convData['unreadCounts'] as Map);
+      }
+      existingUnread[cleanUserId] = 0;
+
       final Map<String, dynamic> updates = {
-        'unreadCounts.$cleanUserId': 0,
+        'unreadCounts': existingUnread,
         'lastReadAt': FieldValue.serverTimestamp(),
       };
 
@@ -195,7 +204,7 @@ class MessagingService {
         updates['lastMessageRead'] = true;
       }
 
-      batch.update(conversationRef, updates);
+      batch.set(conversationRef, updates, SetOptions(merge: true));
 
       await batch.commit();
       debugPrint('[MessagingService] ✅ Messages marked read for $cleanUserId');
@@ -279,10 +288,18 @@ class MessagingService {
       final String oId = (convData['otherId'] ?? '').toString().trim();
       final String receiverId = (cId == cleanSenderId) ? oId : cId;
 
+      Map<String, dynamic> existingUnread = {};
+      if (convData['unreadCounts'] is Map) {
+        existingUnread = Map<String, dynamic>.from(convData['unreadCounts'] as Map);
+      }
+      final int currentCount = (existingUnread[receiverId] as num?)?.toInt() ?? 0;
+      existingUnread[receiverId] = currentCount + 1;
+      existingUnread[cleanSenderId] = 0; // Sender has 0 unread for their own messages
+
       // 2. Update Conversation metadata
       await _db.collection(_conversations).doc(conversationId).set({
         'updatedAt': FieldValue.serverTimestamp(),
-        'unreadCounts.$receiverId': FieldValue.increment(1),
+        'unreadCounts': existingUnread,
         'lastMessage': data['msgText'] ?? (data['attachment'] != null ? '📷 Photo' : ''),
         'lastSenderId': cleanSenderId,
         'lastMessageRead': false, 
@@ -346,3 +363,4 @@ class MessagingService {
     } catch (e) { debugPrint('Error searching users: $e'); return []; }
   }
 }
+

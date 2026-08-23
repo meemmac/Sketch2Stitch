@@ -27,7 +27,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   final Set<String> _fetchingIds = {};
 
   late TabController _tabController;
-  String _selectedTab = "All";
   OverlayEntry? _notificationOverlay;
 
   @override
@@ -36,22 +35,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     final tabCount = widget.currentUserRole == UserRole.customer ? 4 : 2;
     _tabController = TabController(length: tabCount, vsync: this);
     _tabController.addListener(() {
-      if (_tabController.indexIsChanging) return;
-      setState(() {
-        if (widget.currentUserRole == UserRole.customer) {
-          switch (_tabController.index) {
-            case 0: _selectedTab = "All"; break;
-            case 1: _selectedTab = "Unread"; break;
-            case 2: _selectedTab = "Tailors"; break;
-            case 3: _selectedTab = "Retailers"; break;
-          }
-        } else {
-          switch (_tabController.index) {
-            case 0: _selectedTab = "All"; break;
-            case 1: _selectedTab = "Unread"; break;
-          }
-        }
-      });
+      if (mounted) setState(() {});
     });
   }
 
@@ -183,6 +167,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   // ─── Navigation ──────────────────────────────────────────────────
 
   void _openChat(Conversation conversation) {
+    // Mark as read immediately when user taps — unread bold state clears instantly
+    _messagingService.markConversationReadByConversationId(conversation.id, widget.customerId);
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -222,8 +209,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final String myId = widget.customerId.trim();
-    
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -244,7 +229,13 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           child: Container(
             color: const Color(0xFF2C5C44),
             child: TabBar(
-              controller: _tabController, indicatorColor: Colors.white, labelColor: Colors.white, unselectedLabelColor: Colors.white70,
+              controller: _tabController,
+              indicatorColor: Colors.white,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white70,
+              onTap: (index) {
+                if (mounted) setState(() {});
+              },
               tabs: widget.currentUserRole == UserRole.customer
                   ? const [Tab(text: 'All'), Tab(text: 'Unread'), Tab(text: 'Tailors'), Tab(text: 'Retailers')]
                   : const [Tab(text: 'All'), Tab(text: 'Unread')],
@@ -268,13 +259,16 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           final conversations = snapshot.data ?? [];
           if (conversations.isEmpty) return _buildEmptyState();
 
+          final int tabIndex = _tabController.index;
+
           final filtered = conversations.where((conv) {
             if (conv.isDeleted) return false;
-            final bool isUnread = (conv.unreadCounts[myId] ?? 0) > 0;
-            if (_selectedTab == "Unread") return isUnread;
+            final bool isUnread = _isConversationUnread(conv);
+
+            if (tabIndex == 1) return isUnread; // Unread tab
             if (widget.currentUserRole == UserRole.customer) {
-              if (_selectedTab == "Tailors" && conv.otherRole != UserRole.tailor) return false;
-              if (_selectedTab == "Retailers" && conv.otherRole != UserRole.retailer) return false;
+              if (tabIndex == 2 && conv.otherRole != UserRole.tailor) return false;
+              if (tabIndex == 3 && conv.otherRole != UserRole.retailer) return false;
             }
             return true;
           }).toList();
@@ -294,6 +288,17 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     );
   }
 
+  bool _isConversationUnread(Conversation conv) {
+    final String myId = widget.customerId.trim();
+    final int unread = conv.unreadCounts[myId] ?? 0;
+    final String lastSender = (conv.lastSenderId ?? '').trim();
+    final bool iAmLast = lastSender.isNotEmpty && lastSender == myId;
+
+    if (unread > 0) return true;
+    if (!iAmLast && lastSender.isNotEmpty && conv.lastMessageRead == false) return true;
+    return false;
+  }
+
   Widget _buildConversationCard(Conversation conversation) {
     final otherName = _getOtherUserName(conversation);
     final otherAvatar = _getOtherUserAvatar(conversation);
@@ -307,11 +312,12 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     final int myUnreadCount = conversation.unreadCounts[myId] ?? 0;
     final int partnerUnreadCount = conversation.unreadCounts[partnerId] ?? 0;
 
-    final bool isUnread = myUnreadCount > 0;
     final bool iAmLastSender = lastSenderId == myId;
+    final bool isUnread = _isConversationUnread(conversation);
+    final int displayBadgeCount = myUnreadCount > 0 ? myUnreadCount : 1;
 
     /// 🧠 Logic-based Ticks: If I sent the latest message, it is Seen only when the recipient's unread count is 0.
-    final bool lastMessageIsRead = iAmLastSender && partnerUnreadCount == 0;
+    final bool lastMessageIsRead = iAmLastSender && (partnerUnreadCount == 0 || conversation.lastMessageRead == true);
 
     return GestureDetector(
       onTap: () => _openChat(conversation),
@@ -356,7 +362,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                           child: Icon(lastMessageIsRead ? Icons.done_all : Icons.done, size: 14, color: lastMessageIsRead ? Colors.blue[400] : Colors.grey),
                         ),
                       Expanded(child: Text(conversation.isBlocked ? '🔒 Blocked' : (conversation.lastMessage ?? 'No messages yet'), style: TextStyle(fontSize: 14, color: isUnread ? Colors.black87 : Colors.grey[600], fontWeight: isUnread ? FontWeight.bold : FontWeight.normal), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                      if (isUnread) Container(margin: const EdgeInsets.only(left: 8), padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: primaryGreen, borderRadius: BorderRadius.circular(10)), child: Text(myUnreadCount.toString(), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))),
+                      if (isUnread) Container(margin: const EdgeInsets.only(left: 8), padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: primaryGreen, borderRadius: BorderRadius.circular(10)), child: Text(displayBadgeCount.toString(), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))),
                     ],
                   ),
                 ],

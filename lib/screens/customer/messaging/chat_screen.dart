@@ -87,6 +87,8 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     
     if (!_isNewChat) {
       _attachLiveListeners();
+      // Mark as read immediately when screen opens (eager read on first frame)
+      WidgetsBinding.instance.addPostFrameCallback((_) => _markAsRead());
     }
 
     _retrieveLostData();
@@ -146,8 +148,10 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
     _messageSubscription = _messageStream.listen((messages) {
       if (!mounted || messages.isEmpty) return;
-      final hasUnread = messages.any((m) => m.senderId != widget.customerId && !m.isRead);
-      if (hasUnread) _markAsRead();
+      final bool hasUnread = messages.any((m) => m.senderId != widget.customerId && !m.isRead);
+      if (hasUnread) {
+        _markAsRead();
+      }
     });
 
     _conversationSubscription = _messagingService.streamConversation(_activeConversationId).listen((conv) {
