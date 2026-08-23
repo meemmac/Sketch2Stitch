@@ -127,8 +127,9 @@ class CustomerOrder {
   final bool tailorUnpaid;
 
   bool get canReviewAnyone =>
-      deliveredRetailerNames.any((r) => retailerReviews?[r] == null) ||
-      (tailorJobCompleted && tailorReview == null);
+      isDelivered &&
+      (deliveredRetailerNames.any((r) => retailerReviews?[r] == null) ||
+      (tailorJobCompleted && tailorReview == null));
 
   CustomerOrder({
     required this.id,
@@ -461,6 +462,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         mappedStatus = 'Tailor Rejected';
       }
 
+      // Check if tailor is involved
+      bool hasTailor = tailorIdStr != null && tailorIdStr.isNotEmpty;
+      if (!hasTailor || isTailorRejected) {
+        // If no tailor involved, determine status from sub-orders
+        bool allPacked = subOrdersList.isNotEmpty && subOrdersList.every((so) => so.status == db.SubOrderStatus.packed);
+        bool allDelivered = subOrdersList.isNotEmpty && subOrdersList.every((so) => so.status == db.SubOrderStatus.delivered);
+
+        if (allDelivered) {
+          mappedStatus = 'Delivered';
+        } else if (allPacked) {
+          mappedStatus = 'Out for Delivery';
+        } else {
+          mappedStatus = 'Order Preparing';
+        }
+      }
+
       results.add(CustomerOrder(
         id: order.id,
         retailerName: retailerNames.join(", "),
@@ -512,7 +529,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     'Waiting for Tailor Response',
     'Need Confirmation',
     'Tailor Rejected',
-    'Tailor Confirmed',
+    'Tailor Stitching',
     'Order Preparing',
     'Order Packed',
     'Items Delivered',
@@ -546,7 +563,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       case 'Quote Received from Tailor':
         return 'Need Confirmation';
       case 'Tailor Confirmed — Stitching Started':
-        return 'Tailor Confirmed';
+        return 'Tailor Stitching';
       case 'Stitching Completed':
         return 'Out for Delivery';
       case 'Cancelled':
@@ -993,6 +1010,33 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
+  String? _getRetailerSubOrderStatus(String rName, CustomerOrder order) {
+    if (order.isDelivered || order.status == 'Delivered') return null;
+
+    final rId = order.retailerIds[rName];
+    if (rId == null) return null;
+
+    final so = order.rawSubOrders.where((s) => s.retailerId == rId).firstOrNull;
+    if (so == null) return null;
+
+    final bool hasTailor = order.tailorId != null && !['Select a Tailor', 'Choose Tailor or Skip'].contains(order.status);
+    
+    if (hasTailor) {
+      if (['Waiting for Tailor Response', 'Need Confirmation', 'Tailor Rejected'].contains(order.status)) {
+        return 'Order Pending';
+      }
+      if (order.status == 'Tailor Stitching') {
+        return 'Delivered to Tailor';
+      }
+      if (order.status == 'Out for Delivery') {
+        return null;
+      }
+    }
+    
+    // Retailer only or fallback
+    return so.statusText;
+  }
+
   Widget _orderCard(CustomerOrder order, List<CustomerOrder> allOrders) {
     final statusColor = _getOrderStatusColor(order.status, order.isDelivered);
 
@@ -1027,31 +1071,83 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ],
             ),
             const SizedBox(height: 14),
-            ...order.items.map((item) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: _buildSmartImage(
-                      item.imagePath, width: 44, height: 44, fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(width: 44, height: 44, color: Colors.green.shade50, child: Icon(Icons.shopping_bag, color: primaryGreen, size: 20)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(item.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                        Text("Qty: ${item.quantity} | ${item.color}", style: const TextStyle(color: Colors.black54, fontSize: 11, fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  ),
-                  Text("Tk ${(item.price * item.quantity).toInt()}", style: TextStyle(color: Colors.green.shade900, fontSize: 13, fontWeight: FontWeight.w800)),
-                ],
-              ),
-            )),
+            ...order._uniqueRetailerNames.map((rName) {
+              final rItems = order.items.where((i) => i.retailerName == rName).toList();
+              
+              String? rStatus = _getRetailerSubOrderStatus(rName, order);
+
+              bool isExpanded = false;
+              return StatefulBuilder(
+                  builder: (context, setState) {
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200)
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(rName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
+                              if (rStatus != null)
+                                Text(rStatus, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: primaryGreen)),
+                            ]
+                          ),
+                          const Divider(height: 16),
+                          ...List.generate(isExpanded ? rItems.length : 1, (index) {
+                            final item = rItems[index];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Row(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: _buildSmartImage(
+                                      item.imagePath, width: 36, height: 36, fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => Container(width: 36, height: 36, color: Colors.green.shade50, child: Icon(Icons.shopping_bag, color: primaryGreen, size: 16)),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(item.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                        Text("Qty: ${item.quantity} | ${item.color}", style: const TextStyle(color: Colors.black54, fontSize: 10, fontWeight: FontWeight.w600)),
+                                      ],
+                                    ),
+                                  ),
+                                  Text("Tk ${(item.price * item.quantity).toInt()}", style: TextStyle(color: Colors.green.shade900, fontSize: 12, fontWeight: FontWeight.w800)),
+                                ]
+                              )
+                            );
+                          }),
+                          if (rItems.length > 1)
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  isExpanded = !isExpanded;
+                                });
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 4, bottom: 4),
+                                child: Text(
+                                  isExpanded ? "Show less" : "+${rItems.length - 1} more",
+                                  style: TextStyle(color: primaryGreen, fontWeight: FontWeight.bold, fontSize: 12),
+                                ),
+                              ),
+                            ),
+                        ]
+                      )
+                    );
+                  }
+                );
+            }),
             const SizedBox(height: 4),
             Row(
               children: [
@@ -1185,7 +1281,28 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   const SizedBox(height: 25),
                   const Text("Products", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  ...currentOrder.items.map((item) => _itemPreviewCard(item)),
+                  ...currentOrder._uniqueRetailerNames.map((rName) {
+                    final rItems = currentOrder.items.where((i) => i.retailerName == rName).toList();
+                    String? rStatus = _getRetailerSubOrderStatus(rName, currentOrder);
+                    
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8, top: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(rName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87)),
+                              if (rStatus != null)
+                                Text(rStatus, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: primaryGreen)),
+                            ]
+                          ),
+                        ),
+                        ...rItems.map((item) => _itemPreviewCard(item)),
+                      ],
+                    );
+                  }),
                   if (currentOrder.tailorCancellationReason != null) ...[
                     const SizedBox(height: 20),
                     Container(
@@ -1297,11 +1414,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ),
                     ],
                   ),
-                  // Reviewing is per PARTY, not per order: a shop that has
-                  // delivered can be rated while another is still preparing,
-                  // and the tailor only once the garment is finished.
+                  // Reviewing is only allowed once the entire order is delivered
+                  // (i.e. it has moved to the "Past Orders" section).
                   if (currentOrder.isDelivered ||
-                      currentOrder.canReviewAnyone ||
                       (currentOrder.retailerReviews?.isNotEmpty ?? false) ||
                       currentOrder.tailorReview != null) ...[
                     const SizedBox(height: 35),
