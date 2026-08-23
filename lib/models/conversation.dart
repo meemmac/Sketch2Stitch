@@ -10,7 +10,6 @@ class Conversation {
   // customer, so the receiving side needs it to look them up.
   final UserRole customerRole;
   final UserRole otherRole;
-  final String orderId;
   
   // 🛡️ Denormalized fields for zero-latency inbox sync
   final String? lastMessage;
@@ -37,7 +36,6 @@ class Conversation {
     required this.otherId,
     this.customerRole = UserRole.customer,
     required this.otherRole,
-    required this.orderId,
     this.lastMessage,
     this.lastSenderId,
     this.lastMessageRead,
@@ -58,7 +56,6 @@ class Conversation {
     String? otherId,
     UserRole? customerRole,
     UserRole? otherRole,
-    String? orderId,
     String? lastMessage,
     String? lastSenderId,
     bool? lastMessageRead,
@@ -78,7 +75,6 @@ class Conversation {
       otherId: otherId ?? this.otherId,
       customerRole: customerRole ?? this.customerRole,
       otherRole: otherRole ?? this.otherRole,
-      orderId: orderId ?? this.orderId,
       lastMessage: lastMessage ?? this.lastMessage,
       lastSenderId: lastSenderId ?? this.lastSenderId,
       lastMessageRead: lastMessageRead ?? this.lastMessageRead,
@@ -101,7 +97,6 @@ class Conversation {
     'otherId': otherId,
     'customerRole': customerRole.name,
     'otherRole': otherRole.name,
-    'orderId': orderId,
     'lastMessage': lastMessage,
     'lastSenderId': lastSenderId,
     'lastMessageRead': lastMessageRead,
@@ -157,7 +152,6 @@ class Conversation {
       otherId: oId,
       customerRole: parseRole(json['customerRole'], fallback: UserRole.customer),
       otherRole: parseRole(json['otherRole']),
-      orderId: json['orderId'] ?? '',
       lastMessage: json['lastMessage'],
       lastSenderId: lastSender.isNotEmpty ? lastSender : null,
       lastMessageRead: json['lastMessageRead'] as bool?,

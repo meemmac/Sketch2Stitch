@@ -18,6 +18,8 @@ class Message {
   final String? replyToSender;
   final bool isRead;
   final DateTime? readAt;
+  /// IDs of users who have "deleted" this message on their side.
+  final List<String> deletedFor;
 
   Message({
     required this.id,
@@ -32,6 +34,7 @@ class Message {
     this.replyToSender,
     this.isRead = false,
     this.readAt,
+    this.deletedFor = const [],
   });
 
   String get senderRoleText {
@@ -58,6 +61,7 @@ class Message {
     String? replyToSender,
     bool? isRead,
     DateTime? readAt,
+    List<String>? deletedFor,
   }) {
     return Message(
       id: id ?? this.id,
@@ -72,6 +76,7 @@ class Message {
       replyToSender: replyToSender ?? this.replyToSender,
       isRead: isRead ?? this.isRead,
       readAt: readAt ?? this.readAt,
+      deletedFor: deletedFor ?? this.deletedFor,
     );
   }
 
@@ -90,6 +95,7 @@ class Message {
     'replyToSender': replyToSender,
     'isRead': isRead,
     'readAt': readAt != null ? Timestamp.fromDate(readAt!) : null,
+    'deletedFor': deletedFor,
   };
 
   /// Handles both native Firestore Timestamp (current/new docs) and
@@ -125,6 +131,7 @@ class Message {
       replyToSender: json['replyToSender'],
       isRead: json['isRead'] ?? false,
       readAt: parseDate(json['readAt']),
+      deletedFor: (json['deletedFor'] as List?)?.map((e) => e.toString()).toList() ?? const [],
     );
   }
 }

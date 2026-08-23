@@ -98,6 +98,15 @@ service cloud.firestore {
                          .affectedKeys().hasOnly(['isRead', 'readAt'])
                     && request.resource.data.isRead == true;
 
+      // A participant may soft-delete messages for themselves by adding their
+      // own uid to the message's `deletedFor` array.
+      allow update: if inConversation(resource.data.conversationId)
+                    && request.resource.data.diff(resource.data)
+                         .affectedKeys().hasOnly(['deletedFor'])
+                    && request.resource.data.deletedFor.hasAll(resource.data.deletedFor)
+                    && request.resource.data.deletedFor.hasOnly(
+                         resource.data.deletedFor.concat([uid()]));
+
       // Only the author can delete their own message.
       allow delete: if inConversation(resource.data.conversationId)
                     && resource.data.senderId == uid();

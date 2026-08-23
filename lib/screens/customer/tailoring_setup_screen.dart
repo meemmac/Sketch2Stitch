@@ -862,7 +862,6 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     final existing = await messagingService.getConversationBetween(
       customerId,
       tailorId,
-      orderId: widget.orderId,
     );
 
     if (!mounted) return;
@@ -877,7 +876,6 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
           otherUserName: tailorName,
           otherUserRole: UserRole.tailor,
           currentUserRole: UserRole.customer,
-          orderId: widget.orderId,
           isBlocked: existing?.isBlocked ?? false,
           blockedBy: existing?.blockedBy,
         ),

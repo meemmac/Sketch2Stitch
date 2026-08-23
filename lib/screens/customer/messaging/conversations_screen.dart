@@ -27,9 +27,10 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   
   final Map<String, Map<String, dynamic>> _userCache = {};
   final Set<String> _fetchingIds = {};
-  // Lookups that came back empty, so a missing profile is not re-queried on
-  // every single list rebuild.
-  final Set<String> _failedIds = {};
+  // Lookups that failed, keyed to when they failed so they can be retried
+  // after a cooldown instead of staying "Unknown user" for the whole session.
+  static const Duration _retryAfter = Duration(seconds: 30);
+  final Map<String, DateTime> _failedAt = {};
 
   // Preview text for threads whose Conversation doc has no denormalized
   // `lastMessage` (they were created before that field existed), keyed by
@@ -111,10 +112,14 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     final UserRole targetRole = _partnerRole(conversation);
 
     final String cacheKey = "${targetId}_${targetRole.name}";
-    if (_userCache.containsKey(cacheKey) ||
-        _fetchingIds.contains(cacheKey) ||
-        _failedIds.contains(cacheKey)) {
+    if (_userCache.containsKey(cacheKey) || _fetchingIds.contains(cacheKey)) {
       return;
+    }
+    // Retry after cooldown: clear the stale failure so it re-fetches.
+    final failedTime = _failedAt[cacheKey];
+    if (failedTime != null) {
+      if (DateTime.now().difference(failedTime) < _retryAfter) return;
+      _failedAt.remove(cacheKey);
     }
 
     _fetchingIds.add(cacheKey);
@@ -127,9 +132,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       _fetchingIds.remove(cacheKey);
       if (info != null) {
         _userCache[cacheKey] = info;
+        _failedAt.remove(cacheKey); // clear any old failure on success
       } else {
-        // Cache the miss, otherwise itemBuilder re-queries it every frame.
-        _failedIds.add(cacheKey);
+        _failedAt[cacheKey] = DateTime.now();
       }
     });
   }
@@ -168,7 +173,13 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     final String cacheKey = "${targetId}_${targetRole.name}";
     final cached = _userCache[cacheKey]?['name'];
     if (cached != null) return cached;
-    return _failedIds.contains(cacheKey) ? 'Unknown user' : 'Loading...';
+    // Show "Unknown user" only while within the retry cooldown; otherwise
+    // the next rebuild will trigger a fresh fetch.
+    final failedTime = _failedAt[cacheKey];
+    if (failedTime != null && DateTime.now().difference(failedTime) < _retryAfter) {
+      return 'Unknown user';
+    }
+    return 'Loading...';
   }
 
   String? _getOtherUserAvatar(Conversation conversation) {
@@ -323,7 +334,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           otherUserRole: _partnerRole(conversation),
           currentUserRole: widget.currentUserRole,
           otherUserAvatar: _getOtherUserAvatar(conversation),
-          orderId: conversation.orderId,
           isBlocked: conversation.isBlocked,
           blockedBy: conversation.blockedBy,
         ),

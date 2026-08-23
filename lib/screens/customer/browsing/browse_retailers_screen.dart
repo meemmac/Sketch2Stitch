@@ -895,7 +895,6 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
           otherUserRole: UserRole.retailer,
           currentUserRole: myRole,
           otherUserAvatar: widget.retailer.profilePicture,
-          orderId: existing?.orderId,
           isBlocked: existing?.isBlocked ?? false,
           blockedBy: existing?.blockedBy,
         ),

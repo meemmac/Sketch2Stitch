@@ -1008,7 +1008,6 @@ class _TailorDetailScreenState extends State<TailorDetailScreen> {
           otherUserRole: UserRole.tailor,
           currentUserRole: myRole,
           otherUserAvatar: widget.tailor.profilePicture,
-          orderId: existing?.orderId,
           isBlocked: existing?.isBlocked ?? false,
           blockedBy: existing?.blockedBy,
         ),

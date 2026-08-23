@@ -113,20 +113,14 @@ class MessagingService {
         .map((snap) => snap.exists ? Conversation.fromJson({...snap.data()!, 'id': snap.id}) : null);
   }
 
-  Future<Conversation?> getConversationBetween(String customerId, String otherId, {UserRole? otherRole, String? orderId}) async {
+  Future<Conversation?> getConversationBetween(String customerId, String otherId, {UserRole? otherRole}) async {
     try {
       final cleanCustomerId = customerId.trim();
       final cleanOtherId = otherId.trim();
 
-      // NOTE: deliberately not filtered by otherRole. The role stored on the
-      // doc is "the other party as seen by whoever started the thread", so it
-      // cannot be applied symmetrically to the reverse lookup below — filtering
-      // one direction and not the other returned different threads for the same
-      // pair depending on who opened the chat.
       Query query = _db.collection(_conversations)
           .where('customerId', isEqualTo: cleanCustomerId)
           .where('otherId', isEqualTo: cleanOtherId);
-      if (orderId != null) query = query.where('orderId', isEqualTo: orderId);
 
       final snap = await query.limit(1).get();
       if (snap.docs.isNotEmpty) {
@@ -137,7 +131,6 @@ class MessagingService {
       Query revQuery = _db.collection(_conversations)
           .where('customerId', isEqualTo: cleanOtherId)
           .where('otherId', isEqualTo: cleanCustomerId);
-      if (orderId != null) revQuery = revQuery.where('orderId', isEqualTo: orderId);
 
       final revSnap = await revQuery.limit(1).get();
       if (revSnap.docs.isNotEmpty) {
@@ -183,7 +176,6 @@ class MessagingService {
     required String customerId,
     required String otherId,
     required UserRole otherRole,
-    required String orderId,
     UserRole customerRole = UserRole.customer,
   }) async {
     try {
@@ -197,7 +189,6 @@ class MessagingService {
         'otherId': otherId,
         'customerRole': customerRole.name,
         'otherRole': otherRole.name,
-        'orderId': orderId,
         'unreadCounts': {
           customerId: 0,
           otherId: 0,
@@ -214,7 +205,6 @@ class MessagingService {
         otherId: otherId,
         customerRole: customerRole,
         otherRole: otherRole,
-        orderId: orderId,
         updatedAt: now.toDate(),
         unreadCounts: {customerId: 0, otherId: 0},
       );
@@ -321,16 +311,37 @@ class MessagingService {
     }
   }
 
-  /// Hides the conversation for [userId] only. Previously this set a shared
-  /// `isDeleted` flag, which removed the thread from the other participant's
-  /// inbox as well.
+  /// Hides the conversation for [userId] only and soft-deletes all its
+  /// messages for [userId] so the chat history is gone if the conversation
+  /// ever reappears.
   Future<void> deleteConversationByConversationId(String conversationId, String userId) async {
     try {
+      final cleanUserId = userId.trim();
+
+      // 1. Mark the conversation hidden for this user.
       await _db.collection(_conversations).doc(conversationId).update({
-        'deletedFor': FieldValue.arrayUnion([userId.trim()]),
+        'deletedFor': FieldValue.arrayUnion([cleanUserId]),
         'deletedAt': FieldValue.serverTimestamp(),
-        'deletedBy': userId.trim(),
+        'deletedBy': cleanUserId,
       });
+
+      // 2. Soft-delete every message in the conversation for this user.
+      final msgSnap = await _db
+          .collection(_messages)
+          .where('conversationId', isEqualTo: conversationId)
+          .get();
+
+      const int chunkSize = 400;
+      final docs = msgSnap.docs;
+      for (var i = 0; i < docs.length; i += chunkSize) {
+        final batch = _db.batch();
+        for (final doc in docs.skip(i).take(chunkSize)) {
+          batch.update(doc.reference, {
+            'deletedFor': FieldValue.arrayUnion([cleanUserId]),
+          });
+        }
+        await batch.commit();
+      }
     } catch (e) {
       debugPrint('Error deleting conversation: $e');
     }
@@ -338,10 +349,16 @@ class MessagingService {
 
   // ─── Message Management ──────────────────────────────────────────────────
 
-  Stream<List<Message>> getMessagesByConversationId(String conversationId) {
+  /// Streams messages for [conversationId] visible to [userId] —
+  /// messages the user has "deleted" (via conversation delete) are filtered out.
+  Stream<List<Message>> getMessagesByConversationId(String conversationId, String userId) {
+    final cleanUserId = userId.trim();
     return _db.collection(_messages).where('conversationId', isEqualTo: conversationId)
         .snapshots().map((snap) {
-          final messages = snap.docs.map((doc) => Message.fromJson({...doc.data(), 'id': doc.id})).toList();
+          final messages = snap.docs
+              .map((doc) => Message.fromJson({...doc.data(), 'id': doc.id}))
+              .where((m) => !m.deletedFor.contains(cleanUserId))
+              .toList();
           messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
           return messages;
         });

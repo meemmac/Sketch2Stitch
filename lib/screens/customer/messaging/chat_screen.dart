@@ -20,7 +20,6 @@ class ChatScreen extends StatefulWidget {
   final UserRole otherUserRole;
   final UserRole currentUserRole;
   final String? otherUserAvatar;
-  final String? orderId;
   final bool? isBlocked;
   final String? blockedBy;
 
@@ -33,7 +32,6 @@ class ChatScreen extends StatefulWidget {
     required this.otherUserRole,
     required this.currentUserRole,
     this.otherUserAvatar,
-    this.orderId,
     this.isBlocked,
     this.blockedBy,
   });
@@ -89,7 +87,7 @@ class _ChatScreenState extends State<ChatScreen>
     _activeConversationId = widget.conversationId;
     _isNewChat = _activeConversationId.startsWith('TEMP-');
 
-    _messageStream = _messagingService.getMessagesByConversationId(_activeConversationId);
+    _messageStream = _messagingService.getMessagesByConversationId(_activeConversationId, widget.customerId);
     _otherUserTypingStream = _messagingService.streamTypingStatus(_activeConversationId, widget.otherUserId);
     
     if (!_isNewChat) {
@@ -217,7 +215,6 @@ class _ChatScreenState extends State<ChatScreen>
           otherId: widget.otherUserId,
           otherRole: widget.otherUserRole,
           customerRole: widget.currentUserRole,
-          orderId: widget.orderId ?? '',
         );
         return newConv.id;
       } catch (e) {
@@ -236,7 +233,7 @@ class _ChatScreenState extends State<ChatScreen>
 
     if (!mounted) return newId;
     setState(() {
-      _messageStream = _messagingService.getMessagesByConversationId(newId);
+      _messageStream = _messagingService.getMessagesByConversationId(newId, widget.customerId);
       _otherUserTypingStream =
           _messagingService.streamTypingStatus(newId, widget.otherUserId);
     });
