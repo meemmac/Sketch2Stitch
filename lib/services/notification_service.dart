@@ -860,34 +860,14 @@ class NotificationService {
 
 
 
-  /// A chat message arrived for [receiverId]. Callers are expected to raise
-  /// this only for the first unread message in a thread — one notification
-  /// per conversation, not one per message.
-  Future<void> notifyNewMessage(
-      String receiverId,
-      UserRole receiverRole,
-      String senderName,
-      String orderId, {
-      String? conversationId,
-      }) async {
-    await _sendNotification(
-      userId: receiverId,
-      userRole: receiverRole,
-      type: NotificationDbType.newMessage,
-      message: 'New message from $senderName.',
-      orderId: orderId,
-      // Stamped so opening the thread can clear exactly this card. Matching on
-      // orderId instead would clear other threads' cards, since several
-      // conversations share one order (and some carry no order at all).
-      extraFields: (conversationId != null && conversationId.isNotEmpty)
-          ? {'conversationId': conversationId}
-          : null,
-    );
-  }
-
-  /// Clears the "New message" cards [userId] holds for [conversationId],
-  /// called when they actually open and read the thread. Without this the
-  /// bell badge kept counting a message the user had already read.
+  /// Clears any "New message" cards [userId] still holds for [conversationId],
+  /// called when they open and read the thread.
+  ///
+  /// Nothing raises these cards any more — chat now announces itself through
+  /// the unread badge on the drawer's "Messages" entry
+  /// ([MessagingService.getTotalUnreadCount]) instead. This is kept so cards
+  /// written before that change still clear out of the bell as their threads
+  /// are read, rather than sitting there unread forever.
   ///
   /// Equality-only filters, so Firestore serves this without a composite index.
   Future<void> markMessageNotificationsRead(

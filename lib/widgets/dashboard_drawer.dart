@@ -7,6 +7,7 @@ import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/services/auth_service.dart';
 import 'package:sketch2stitch/services/user_session.dart';
 import 'package:sketch2stitch/services/cloudinary_service.dart';
+import 'package:sketch2stitch/services/messaging_service.dart';
 import 'package:sketch2stitch/widgets/cloudinary_image.dart';
 import '../screens/customer/virtual_trial_screen.dart';
 import '../screens/retailer/inventory_screen.dart';
@@ -550,6 +551,12 @@ class DrawerNavigationSection extends StatelessWidget {
             icon: item['icon'] as IconData,
             label: item['title'] as String,
             themeColor: themeColor,
+            // Unread chat is announced here rather than in the notification
+            // bell, so an active conversation cannot bury the order updates
+            // the bell exists for.
+            badgeCount: item['title'] == 'Messages' && customerId != null
+                ? MessagingService().getTotalUnreadCount(customerId!)
+                : null,
             onTap: () {
               Navigator.pop(context); // close drawer first
               if (item['title'] == 'Virtual Trial') {
@@ -672,16 +679,30 @@ class NavigationDrawerDestination extends StatelessWidget {
   final Color themeColor;
   final VoidCallback onTap;
 
+  /// Live count to highlight this entry with, or null for a plain entry.
+  /// A zero or errored count draws nothing.
+  final Stream<int>? badgeCount;
+
   const NavigationDrawerDestination({
     super.key,
     required this.icon,
     required this.label,
     required this.themeColor,
     required this.onTap,
+    this.badgeCount,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (badgeCount == null) return _row(0);
+    return StreamBuilder<int>(
+      stream: badgeCount,
+      builder: (context, snapshot) => _row(snapshot.data ?? 0),
+    );
+  }
+
+  Widget _row(int count) {
+    final bool highlighted = count > 0;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 2.0),
       child: InkWell(
@@ -689,23 +710,55 @@ class NavigationDrawerDestination extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: highlighted ? themeColor.withValues(alpha: 0.10) : null,
+          ),
           child: Row(
             children: [
-              Icon(icon, color: Colors.black54, size: 22),
+              Icon(
+                icon,
+                color: highlighted ? themeColor : Colors.black54,
+                size: 22,
+              ),
               const SizedBox(width: 16),
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black87,
+                  fontWeight: highlighted ? FontWeight.w700 : FontWeight.w500,
+                  color: highlighted ? themeColor : Colors.black87,
                 ),
               ),
               const Spacer(),
-              const Icon(
+              if (highlighted) ...[
+                Container(
+                  constraints: const BoxConstraints(minWidth: 20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: themeColor,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    // Past 99 the exact number stops meaning anything and the
+                    // pill would start pushing the label around.
+                    count > 99 ? '99+' : '$count',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Icon(
                 Icons.chevron_right_rounded,
-                color: Colors.black26,
+                color: highlighted ? themeColor : Colors.black26,
                 size: 18,
               ),
             ],

@@ -276,6 +276,10 @@ class MessagingService {
       final Map<String, dynamic> updates = {
         'unreadCounts.$cleanUserId': 0,
         'lastReadAt': FieldValue.serverTimestamp(),
+        // Per-user read stamp. `lastReadAt` above is shared by both parties, so
+        // it cannot say whether *this* user is currently in the thread — which
+        // is what the sender checks before raising a "New message" card.
+        'readAts.$cleanUserId': FieldValue.serverTimestamp(),
       };
       if (lastSenderId != cleanUserId) {
         updates['lastMessageRead'] = true;
@@ -433,68 +437,33 @@ class MessagingService {
       });
 
       await batch.commit();
-
-      // Only the message that takes the thread from read to unread raises a
-      // notification — one per conversation, not one per message, so a long
-      // exchange can't bury the receiver's notification centre.
-      final int previousUnread =
-          ((convData['unreadCounts'] as Map<String, dynamic>?)?[receiverId]
-                  as num?)
-              ?.toInt() ??
-              0;
-      if (previousUnread == 0) {
-        await _notifyNewMessage(
-          conversationId: conversationId,
-          receiverId: receiverId,
-          senderId: cleanSenderId,
-          convData: convData,
-        );
-      }
     } catch (e) {
       debugPrint('[MessagingService] ❌ Error sending message: $e');
       rethrow;
     }
   }
 
-  /// Drops a "new message" card into the receiver's notification centre.
-  /// Best-effort: the message is already committed by the time this runs, so
-  /// a notification failure must never surface as a failed send.
-  Future<void> _notifyNewMessage({
-    required String conversationId,
-    required String receiverId,
-    required String senderId,
-    required Map<String, dynamic> convData,
-  }) async {
-    try {
-      UserRole roleFrom(dynamic raw, UserRole fallback) {
-        final name = (raw ?? '').toString().toLowerCase().trim();
-        return UserRole.values.firstWhere(
-          (e) => e.name.toLowerCase() == name,
-          orElse: () => fallback,
-        );
+  /// Total unread messages waiting for [userId] across every thread they are
+  /// still part of — the badge on the drawer's "Messages" entry.
+  ///
+  /// A new message deliberately raises no notification card any more: an
+  /// active thread would otherwise keep dropping cards into the bell for
+  /// something the inbox already shows. The badge is derived from the same
+  /// `unreadCounts` the inbox uses, so opening a thread clears it for free via
+  /// [markMessagesRead].
+  Stream<int> getTotalUnreadCount(String userId) {
+    final cleanUserId = userId.trim();
+    if (cleanUserId.isEmpty) return Stream.value(0);
+    return getConversations(cleanUserId).map((conversations) {
+      var total = 0;
+      for (final c in conversations) {
+        // Blocked threads stay in the inbox but must not pull attention back
+        // to a conversation the user has deliberately shut down.
+        if (c.isBlocked) continue;
+        total += c.unreadCounts[cleanUserId] ?? 0;
       }
-
-      // `customerId` is only "whoever opened the thread first", so their role
-      // has to be read from `customerRole` — assuming UserRole.customer here
-      // sent the profile lookup to the wrong collection whenever a tailor or
-      // retailer started the chat, and the notification then said "Someone".
-      UserRole roleFor(String userId) {
-        return userId == (convData['customerId'] ?? '').toString().trim()
-            ? roleFrom(convData['customerRole'], UserRole.customer)
-            : roleFrom(convData['otherRole'], UserRole.tailor);
-      }
-
-      final senderInfo = await getUserBasicInfo(senderId, roleFor(senderId));
-      await NotificationService().notifyNewMessage(
-        receiverId,
-        roleFor(receiverId),
-        (senderInfo?['name'] as String?) ?? 'Someone',
-        (convData['orderId'] ?? '').toString(),
-        conversationId: conversationId,
-      );
-    } catch (e) {
-      debugPrint('[MessagingService] new-message notification failed: $e');
-    }
+      return total;
+    });
   }
 
   /// Deletes a message and, when it was the newest one, refreshes the

@@ -1147,17 +1147,23 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
       idLabel = 'Product ID';
     }
 
+    // A chat notification is about a conversation, not an order: several threads
+    // share one orderId and a thread started outside an order carries none at
+    // all, so the id line says nothing useful here and is left out.
+    final bool showId = n.type != NotificationDbType.newMessage;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
-          child: Text(
-            '$idLabel: $idValue',
-            style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.55)),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-          ),
+          child: showId
+              ? Text(
+                  '$idLabel: $idValue',
+                  style: TextStyle(fontSize: 12, color: Colors.black.withValues(alpha: 0.55)),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                )
+              : const SizedBox.shrink(),
         ),
         const SizedBox(width: 8),
         Icon(Icons.access_time_rounded, size: 13, color: Colors.black.withValues(alpha: 0.45)),
