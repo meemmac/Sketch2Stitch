@@ -755,7 +755,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
     _saveLocalProgress();
   }
 
-  Future<void> _openTemplateForDrawing(String templatePath) async {
+  Future<void> _openTemplateForDrawing([String? templatePath]) async {
     final result = await Navigator.push<String>(
       context,
       MaterialPageRoute(
@@ -1724,6 +1724,23 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
               },
             ),
           ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => _openTemplateForDrawing(),
+              icon: const Icon(Icons.note_add_outlined, size: 18),
+              label: const Text("Draw on a blank page"),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.green.shade800,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                textStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
           const SizedBox(height: 18),
           if (_designs.isNotEmpty) ...[
             const Text(
@@ -2629,9 +2646,10 @@ class _TextLabel extends _CanvasItem {
 }
 
 class _DesignCanvasScreen extends StatefulWidget {
-  final String templateAsset;
+  /// Body diagram to trace over, or null for a blank white page.
+  final String? templateAsset;
 
-  const _DesignCanvasScreen({required this.templateAsset});
+  const _DesignCanvasScreen({this.templateAsset});
 
   @override
   State<_DesignCanvasScreen> createState() => _DesignCanvasScreenState();
@@ -2676,6 +2694,7 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
   int _activePointers = 0;
   _DrawStroke? _activeStroke;
   _TextLabel? _dragLabel;
+  Offset _dragGrabOffset = Offset.zero;
   Offset? _dragStart;
   double _dragDistance = 0;
 
@@ -2684,7 +2703,9 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
   Size? _canvasSize;
   bool _restoreChecked = false;
 
-  String get _draftKey => 'sketch_draft_${widget.templateAsset}';
+  bool get _isBlank => widget.templateAsset == null;
+
+  String get _draftKey => 'sketch_draft_${widget.templateAsset ?? 'blank'}';
 
   double get _activeSizeValue =>
       _tool == _DrawTool.text ? _fontSize : _brushSize;
@@ -2836,6 +2857,7 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
     if (_activePointers > 1) {
       _abortActiveStroke();
       _dragLabel = null;
+      _dragStart = null; // so the pinch isn't mistaken for a note tap
       // Hand the gesture over to InteractiveViewer so two fingers can pan
       // as well as pinch. Rebuilds only on the 1->2 finger transition.
       if (_activePointers == 2) setState(() {});
@@ -2853,6 +2875,9 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
       for (final item in _items.reversed) {
         if (item is _TextLabel && item.bounds.contains(pos)) {
           _dragLabel = item;
+          // Keep the grab point under the finger instead of snapping the
+          // label's centre to it.
+          _dragGrabOffset = item.position - pos;
           break;
         }
       }
@@ -2882,7 +2907,7 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
 
     final label = _dragLabel;
     if (label != null) {
-      label.position = pos;
+      label.position = pos + _dragGrabOffset;
       _repaint.value++;
       return;
     }
@@ -2906,7 +2931,6 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
         if (_dragDistance < 6) {
           _editLabel(label);
         } else {
-          _redoStack.clear();
           _scheduleDraftSave();
         }
         return;
@@ -2950,8 +2974,6 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
         _items.remove(label);
       } else {
         label.text = text;
-        label.color = _color;
-        label.fontSize = _fontSize;
         label.remeasure();
       }
       _redoStack.clear();
@@ -2963,18 +2985,18 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
   Future<String?> _promptForText({
     String initial = '',
     bool allowDelete = false,
-  }) async {
-    final controller = TextEditingController(text: initial);
-    try {
-      return await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
+  }) {
+    String value = initial;
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),
           title: Text(allowDelete ? "Edit note" : "Add a note"),
-          content: TextField(
-            controller: controller,
+          content: TextFormField(
+            initialValue: initial,
+            onChanged: (v) => value = v,
             autofocus: true,
             maxLength: 40,
             textCapitalization: TextCapitalization.sentences,
@@ -2984,7 +3006,7 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+            onFieldSubmitted: (v) => Navigator.pop(ctx, v.trim()),
           ),
           actions: [
             if (allowDelete)
@@ -3000,18 +3022,15 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
               child: const Text("Cancel"),
             ),
             TextButton(
-              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              onPressed: () => Navigator.pop(ctx, value.trim()),
               style: TextButton.styleFrom(
                 foregroundColor: Colors.green.shade800,
               ),
               child: const Text("Done"),
             ),
-          ],
-        ),
-      );
-    } finally {
-      controller.dispose();
-    }
+        ],
+      ),
+    );
   }
 
   // ── History ──────────────────────────────────────────────────────────
@@ -3136,9 +3155,9 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFFF9FBF9),
         appBar: AppBar(
-          title: const Text(
-            "Sketch Design",
-            style: TextStyle(fontWeight: FontWeight.bold),
+          title: Text(
+            _isBlank ? "Blank Sketch" : "Sketch Design",
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           centerTitle: true,
           backgroundColor: Colors.white,
@@ -3218,21 +3237,22 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          Opacity(
-                            opacity: _templateOpacity,
-                            child: Image.asset(
-                              widget.templateAsset,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => Container(
-                                color: Colors.grey.shade50,
-                                child: Icon(
-                                  Icons.checkroom_rounded,
-                                  size: 60,
-                                  color: Colors.green.shade100,
+                          if (!_isBlank)
+                            Opacity(
+                              opacity: _templateOpacity,
+                              child: Image.asset(
+                                widget.templateAsset!,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => Container(
+                                  color: Colors.grey.shade50,
+                                  child: Icon(
+                                    Icons.checkroom_rounded,
+                                    size: 60,
+                                    color: Colors.green.shade100,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
                           Listener(
                             behavior: HitTestBehavior.opaque,
                             onPointerDown: _onPointerDown,
@@ -3438,33 +3458,36 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
             Row(
               children: [
                 _mirrorToggle(),
-                const SizedBox(width: 12),
-                Icon(
-                  Icons.contrast_rounded,
-                  size: 17,
-                  color: Colors.grey.shade500,
-                ),
-                Expanded(
-                  child: SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 3,
-                      overlayShape: const RoundSliderOverlayShape(
-                        overlayRadius: 12,
+                if (!_isBlank) ...[
+                  const SizedBox(width: 12),
+                  Icon(
+                    Icons.contrast_rounded,
+                    size: 17,
+                    color: Colors.grey.shade500,
+                  ),
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 3,
+                        overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 12,
+                        ),
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 7,
+                        ),
                       ),
-                      thumbShape: const RoundSliderThumbShape(
-                        enabledThumbRadius: 7,
+                      child: Slider(
+                        value: _templateOpacity,
+                        min: 0,
+                        max: 1,
+                        activeColor: Colors.grey.shade600,
+                        inactiveColor: Colors.grey.shade200,
+                        onChanged: (v) =>
+                            setState(() => _templateOpacity = v),
                       ),
-                    ),
-                    child: Slider(
-                      value: _templateOpacity,
-                      min: 0,
-                      max: 1,
-                      activeColor: Colors.grey.shade600,
-                      inactiveColor: Colors.grey.shade200,
-                      onChanged: (v) => setState(() => _templateOpacity = v),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
             const SizedBox(height: 8),
