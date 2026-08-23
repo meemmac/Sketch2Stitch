@@ -31,30 +31,76 @@ class MessagingService {
     }
   }
 
+  /// Streams only the conversations [userId] actually takes part in.
+  ///
+  /// Firestore has no OR across fields, so this merges two server-side
+  /// filtered queries (`customerId == me` and `otherId == me`) instead of
+  /// downloading the whole collection and filtering on the client.
   Stream<List<Conversation>> getConversations(String userId) {
     final String cleanUserId = userId.trim();
-    return _db
-        .collection(_conversations)
-        .snapshots()
-        .map((snap) {
-      final List<Conversation> results = [];
-      for (var doc in snap.docs) {
-        final data = doc.data();
-        if (data['isDeleted'] == true) continue;
+    if (cleanUserId.isEmpty) return Stream.value(const []);
 
-        final String cId = (data['customerId'] ?? '').toString().trim();
-        final String oId = (data['otherId'] ?? '').toString().trim();
-        if (cId == cleanUserId || oId == cleanUserId) {
-          results.add(Conversation.fromJson({...data, 'id': doc.id}));
+    final asCustomer = _db
+        .collection(_conversations)
+        .where('customerId', isEqualTo: cleanUserId)
+        .snapshots();
+    final asOther = _db
+        .collection(_conversations)
+        .where('otherId', isEqualTo: cleanUserId)
+        .snapshots();
+
+    QuerySnapshot<Map<String, dynamic>>? customerSnap;
+    QuerySnapshot<Map<String, dynamic>>? otherSnap;
+    StreamSubscription? customerSub;
+    StreamSubscription? otherSub;
+
+    late final StreamController<List<Conversation>> controller;
+
+    void emit() {
+      if (customerSnap == null && otherSnap == null) return;
+      // Keyed by doc id so a conversation matching both queries appears once.
+      final Map<String, Conversation> merged = {};
+      for (final snap in [customerSnap, otherSnap]) {
+        if (snap == null) continue;
+        for (final doc in snap.docs) {
+          final data = doc.data();
+          if (data['isDeleted'] == true) continue;
+          // Per-user deletion: hidden only for whoever deleted it.
+          final deletedFor = (data['deletedFor'] as List?)
+                  ?.map((e) => e.toString().trim())
+                  .toList() ??
+              const <String>[];
+          if (deletedFor.contains(cleanUserId)) continue;
+          merged[doc.id] = Conversation.fromJson({...data, 'id': doc.id});
         }
       }
-      results.sort((a, b) {
-        final dateA = a.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final dateB = b.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        return dateB.compareTo(dateA);
-      });
-      return results;
-    });
+      final results = merged.values.toList()
+        ..sort((a, b) {
+          final dateA = a.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final dateB = b.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return dateB.compareTo(dateA);
+        });
+      controller.add(results);
+    }
+
+    controller = StreamController<List<Conversation>>(
+      onListen: () {
+        customerSub = asCustomer.listen((s) {
+          customerSnap = s;
+          emit();
+        }, onError: controller.addError);
+        otherSub = asOther.listen((s) {
+          otherSnap = s;
+          emit();
+        }, onError: controller.addError);
+      },
+      onCancel: () async {
+        await customerSub?.cancel();
+        await otherSub?.cancel();
+      },
+    );
+
+    return controller.stream;
   }
 
   Stream<Conversation?> streamConversation(String conversationId) {
@@ -71,10 +117,14 @@ class MessagingService {
       final cleanCustomerId = customerId.trim();
       final cleanOtherId = otherId.trim();
 
+      // NOTE: deliberately not filtered by otherRole. The role stored on the
+      // doc is "the other party as seen by whoever started the thread", so it
+      // cannot be applied symmetrically to the reverse lookup below — filtering
+      // one direction and not the other returned different threads for the same
+      // pair depending on who opened the chat.
       Query query = _db.collection(_conversations)
           .where('customerId', isEqualTo: cleanCustomerId)
           .where('otherId', isEqualTo: cleanOtherId);
-      if (otherRole != null) query = query.where('otherRole', isEqualTo: otherRole.name);
       if (orderId != null) query = query.where('orderId', isEqualTo: orderId);
 
       final snap = await query.limit(1).get();
@@ -103,6 +153,7 @@ class MessagingService {
   // ─── Typing Status ────────────────────────────────────────────────────────
 
   Future<void> setTypingStatus(String conversationId, String userId, bool isTyping) async {
+    if (conversationId.startsWith('TEMP-')) return;
     try {
       await _db.collection(_conversations).doc(conversationId).collection('TypingStatus').doc(userId).set({
         'isTyping': isTyping,
@@ -114,6 +165,7 @@ class MessagingService {
   }
 
   Stream<bool> streamTypingStatus(String conversationId, String otherUserId) {
+    if (conversationId.startsWith('TEMP-')) return Stream.value(false);
     return _db
         .collection(_conversations).doc(conversationId).collection('TypingStatus').doc(otherUserId)
         .snapshots().map((snap) => (snap.data()?['isTyping'] as bool?) ?? false);
@@ -121,31 +173,47 @@ class MessagingService {
 
   // ─── Creation & Read Logic ────────────────────────────────────────────────
 
+  /// Creates the thread, or returns the existing one for the same pair.
+  ///
+  /// [customerRole] is the role of the *initiator*. Without it the receiving
+  /// side has no way to look the initiator up, because `customerId` is simply
+  /// whoever opened the chat first — not necessarily a customer.
   Future<Conversation> createConversation({
-    required String customerId, required String otherId, required UserRole otherRole, required String orderId,
+    required String customerId,
+    required String otherId,
+    required UserRole otherRole,
+    required String orderId,
+    UserRole customerRole = UserRole.customer,
   }) async {
     try {
+      // Guard against two devices creating duplicate threads for one pair.
+      final existing = await getConversationBetween(customerId, otherId);
+      if (existing != null) return existing;
+
       final now = Timestamp.now();
       final data = {
-        'customerId': customerId, 
-        'otherId': otherId, 
+        'customerId': customerId,
+        'otherId': otherId,
+        'customerRole': customerRole.name,
         'otherRole': otherRole.name,
-        'orderId': orderId, 
+        'orderId': orderId,
         'unreadCounts': {
           customerId: 0,
           otherId: 0,
         },
-        'isBlocked': false, 
-        'isDeleted': false, 
+        'isBlocked': false,
+        'isDeleted': false,
+        'deletedFor': <String>[],
         'updatedAt': now,
       };
       final ref = await _db.collection(_conversations).add(data);
       return Conversation(
-        id: ref.id, 
-        customerId: customerId, 
-        otherId: otherId, 
-        otherRole: otherRole, 
-        orderId: orderId, 
+        id: ref.id,
+        customerId: customerId,
+        otherId: otherId,
+        customerRole: customerRole,
+        otherRole: otherRole,
+        orderId: orderId,
         updatedAt: now.toDate(),
         unreadCounts: {customerId: 0, otherId: 0},
       );
@@ -163,6 +231,7 @@ class MessagingService {
   /// Marks all unread messages received by [userId] as read.
   /// Also resets only that user's unread counter.
   Future<void> markMessagesRead(String conversationId, String userId) async {
+    if (conversationId.startsWith('TEMP-')) return;
     try {
       final cleanUserId = userId.trim();
       final conversationRef = _db.collection(_conversations).doc(conversationId);
@@ -170,6 +239,12 @@ class MessagingService {
       final convDoc = await conversationRef.get();
       if (!convDoc.exists) return;
       final convData = convDoc.data() ?? {};
+
+      // Only a participant may clear this thread's unread state.
+      final cId = (convData['customerId'] ?? '').toString().trim();
+      final oId = (convData['otherId'] ?? '').toString().trim();
+      if (cleanUserId != cId && cleanUserId != oId) return;
+
       final lastSenderId = (convData['lastSenderId'] ?? '').toString().trim();
 
       final unreadQuery = await _db.collection(_messages)
@@ -177,37 +252,35 @@ class MessagingService {
           .where('isRead', isEqualTo: false)
           .get();
 
-      final batch = _db.batch();
+      // Only mark messages RECEIVED by the current user.
+      final toMark = unreadQuery.docs.where((doc) =>
+          (doc.data()['senderId'] ?? '').toString().trim() != cleanUserId).toList();
 
-      for (final doc in unreadQuery.docs) {
-        final senderId = (doc.data()['senderId'] ?? '').toString().trim();
-        // Only mark messages RECEIVED by the current user.
-        if (senderId != cleanUserId) {
+      // Firestore caps a batch at 500 writes — chunk so a long unread backlog
+      // does not silently fail to commit.
+      const int chunkSize = 400;
+      for (var i = 0; i < toMark.length; i += chunkSize) {
+        final batch = _db.batch();
+        for (final doc in toMark.skip(i).take(chunkSize)) {
           batch.update(doc.reference, {
             'isRead': true,
             'readAt': FieldValue.serverTimestamp(),
           });
         }
+        await batch.commit();
       }
 
-      Map<String, dynamic> existingUnread = {};
-      if (convData['unreadCounts'] is Map) {
-        existingUnread = Map<String, dynamic>.from(convData['unreadCounts'] as Map);
-      }
-      existingUnread[cleanUserId] = 0;
-
+      // Dotted field path so a concurrent increment for the *other* user is
+      // not clobbered by writing back a stale copy of the whole map.
       final Map<String, dynamic> updates = {
-        'unreadCounts': existingUnread,
+        'unreadCounts.$cleanUserId': 0,
         'lastReadAt': FieldValue.serverTimestamp(),
       };
-
       if (lastSenderId != cleanUserId) {
         updates['lastMessageRead'] = true;
       }
+      await conversationRef.update(updates);
 
-      batch.set(conversationRef, updates, SetOptions(merge: true));
-
-      await batch.commit();
       debugPrint('[MessagingService] ✅ Messages marked read for $cleanUserId');
     } catch (e) {
       debugPrint('[MessagingService] ❌ Error marking messages read: $e');
@@ -238,23 +311,22 @@ class MessagingService {
     }
   }
 
-  Future<void> deleteConversationByConversationId(String conversationId) async {
+  /// Hides the conversation for [userId] only. Previously this set a shared
+  /// `isDeleted` flag, which removed the thread from the other participant's
+  /// inbox as well.
+  Future<void> deleteConversationByConversationId(String conversationId, String userId) async {
     try {
-      await _db.collection(_conversations).doc(conversationId).update({'isDeleted': true, 'deletedAt': FieldValue.serverTimestamp()});
+      await _db.collection(_conversations).doc(conversationId).update({
+        'deletedFor': FieldValue.arrayUnion([userId.trim()]),
+        'deletedAt': FieldValue.serverTimestamp(),
+        'deletedBy': userId.trim(),
+      });
     } catch (e) {
       debugPrint('Error deleting conversation: $e');
     }
   }
 
   // ─── Message Management ──────────────────────────────────────────────────
-
-  Stream<Message?> getLatestMessage(String conversationId) {
-    return _db.collection(_messages)
-        .where('conversationId', isEqualTo: conversationId)
-        .orderBy('sentAt', descending: true).limit(1)
-        .snapshots().map((snap) => snap.docs.isNotEmpty 
-            ? Message.fromJson({...snap.docs.first.data(), 'id': snap.docs.first.id}) : null);
-  }
 
   Stream<List<Message>> getMessagesByConversationId(String conversationId) {
     return _db.collection(_messages).where('conversationId', isEqualTo: conversationId)
@@ -265,37 +337,61 @@ class MessagingService {
         });
   }
 
+  /// Newest message of [conversationId], as an inbox preview.
+  ///
+  /// Threads written before `lastMessage` was denormalized onto the
+  /// conversation carry no preview, so the inbox showed them as
+  /// "No messages yet" even when the chat was full of messages. The inbox
+  /// falls back to this for those threads.
+  Future<Map<String, String>?> getLastMessagePreview(String conversationId) async {
+    if (conversationId.startsWith('TEMP-')) return null;
+    try {
+      final snap = await _db.collection(_messages)
+          .where('conversationId', isEqualTo: conversationId)
+          .get();
+
+      Message? newest;
+      for (final doc in snap.docs) {
+        final msg = Message.fromJson({...doc.data(), 'id': doc.id});
+        if (newest == null || msg.sentAt.isAfter(newest.sentAt)) newest = msg;
+      }
+      if (newest == null) return null;
+
+      final String text = newest.msgText.trim();
+      final bool hasAttachment = (newest.attachment ?? '').isNotEmpty;
+      return {
+        'lastMessage': hasAttachment
+            ? (text.isNotEmpty ? '\u{1F4F7} $text' : '\u{1F4F7} Photo')
+            : text,
+        'lastSenderId': newest.senderId.trim(),
+      };
+    } catch (e) {
+      debugPrint('Error loading last message preview: $e');
+      return null;
+    }
+  }
+
   /// Sends a message and updates the conversation metadata atomically.
   Future<void> sendMessage(String conversationId, String senderId, Map<String, dynamic> data) async {
     final cleanSenderId = senderId.trim();
     try {
-      final msgData = {
-        ...data, 
-        'conversationId': conversationId, 
-        'senderId': cleanSenderId, 
-        'sentAt': FieldValue.serverTimestamp(), 
-        'isRead': false,
-      };
+      final convRef = _db.collection(_conversations).doc(conversationId);
 
-      // 1. Add Message document
-      await _db.collection(_messages).add(msgData);
+      // Verify the thread exists BEFORE writing the message — otherwise a bad
+      // conversationId leaves an orphaned message that no inbox ever shows.
+      final convDoc = await convRef.get();
+      if (!convDoc.exists) {
+        throw Exception('Conversation "$conversationId" does not exist');
+      }
 
-      // 🛡️ Find the receiver to increment their specific unread count
-      final convDoc = await _db.collection(_conversations).doc(conversationId).get();
-      if (!convDoc.exists) return;
-      
       final convData = convDoc.data()!;
       final String cId = (convData['customerId'] ?? '').toString().trim();
       final String oId = (convData['otherId'] ?? '').toString().trim();
+      if (cleanSenderId != cId && cleanSenderId != oId) {
+        throw Exception('You are not a participant in this conversation');
+      }
       final String receiverId = (cId == cleanSenderId) ? oId : cId;
 
-      Map<String, dynamic> existingUnread = {};
-      if (convData['unreadCounts'] is Map) {
-        existingUnread = Map<String, dynamic>.from(convData['unreadCounts'] as Map);
-      }
-      final int currentCount = (existingUnread[receiverId] as num?)?.toInt() ?? 0;
-      existingUnread[receiverId] = currentCount + 1;
-      existingUnread[cleanSenderId] = 0; // Sender has 0 unread for their own messages
       String lastMsgPreview = '';
       if (data['attachment'] != null) {
         final caption = (data['msgText'] ?? '').toString().trim();
@@ -304,24 +400,69 @@ class MessagingService {
         lastMsgPreview = (data['msgText'] ?? '').toString().trim();
       }
 
-      // 2. Update Conversation metadata
-      await _db.collection(_conversations).doc(conversationId).set({
+      // Message + conversation metadata commit together, so a failure can
+      // never leave one written without the other.
+      final batch = _db.batch();
+
+      batch.set(_db.collection(_messages).doc(), {
+        ...data,
+        'conversationId': conversationId,
+        'senderId': cleanSenderId,
+        'sentAt': FieldValue.serverTimestamp(),
+        'isRead': false,
+      });
+
+      // Dotted field paths + increment: concurrent sends can no longer lose
+      // each other's unread bump the way a read-modify-write of the whole map did.
+      batch.update(convRef, {
         'updatedAt': FieldValue.serverTimestamp(),
-        'unreadCounts': existingUnread,
+        'unreadCounts.$receiverId': FieldValue.increment(1),
+        'unreadCounts.$cleanSenderId': 0,
         'lastMessage': lastMsgPreview,
         'lastSenderId': cleanSenderId,
-        'lastMessageRead': false, 
+        'lastMessageRead': false,
         'isDeleted': false,
-      }, SetOptions(merge: true));
+        // A new message brings the thread back for anyone who had cleared it.
+        'deletedFor': FieldValue.arrayRemove([cId, oId]),
+      });
+
+      await batch.commit();
     } catch (e) {
       debugPrint('[MessagingService] ❌ Error sending message: $e');
       rethrow;
     }
   }
 
-  Future<void> deleteMessageByMessageId(String messageId) async {
+  /// Deletes a message and, when it was the newest one, refreshes the
+  /// conversation preview so the inbox stops showing deleted text.
+  Future<void> deleteMessageByMessageId(String messageId, {String? conversationId}) async {
     try {
       await _db.collection(_messages).doc(messageId).delete();
+      if (conversationId == null || conversationId.startsWith('TEMP-')) return;
+
+      final remaining = await _db.collection(_messages)
+          .where('conversationId', isEqualTo: conversationId)
+          .get();
+
+      Message? newest;
+      for (final doc in remaining.docs) {
+        final msg = Message.fromJson({...doc.data(), 'id': doc.id});
+        if (newest == null || msg.sentAt.isAfter(newest.sentAt)) newest = msg;
+      }
+
+      String preview = '';
+      if (newest != null) {
+        final hasAttachment = (newest.attachment ?? '').isNotEmpty;
+        final text = newest.msgText.trim();
+        preview = hasAttachment
+            ? (text.isNotEmpty ? '📷 $text' : '📷 Photo')
+            : text;
+      }
+
+      await _db.collection(_conversations).doc(conversationId).update({
+        'lastMessage': preview,
+        'lastSenderId': newest?.senderId ?? '',
+      });
     } catch (e) {
       debugPrint('Error deleting message: $e');
     }
@@ -337,31 +478,51 @@ class MessagingService {
       final doc = await _db.collection(collection).doc(userId).get();
       if (!doc.exists || doc.data() == null) return null;
       final data = doc.data()!;
-      return {'id': userId, 'name': data['name'] ?? data['shopName'] ?? 'Unknown', 'profilePicture': data['profilePicture'], 'role': role.name};
+      // Profiles are saved with `profilePicture: ''` when no photo was picked,
+      // and an empty string is not a usable image URL — normalise it to null so
+      // callers fall back to the initial avatar.
+      final String name = (data['name'] ?? '').toString().trim();
+      final String shopName = (data['shopName'] ?? '').toString().trim();
+      final String picture = (data['profilePicture'] ?? '').toString().trim();
+      return {
+        'id': userId,
+        'name': name.isNotEmpty ? name : (shopName.isNotEmpty ? shopName : 'Unknown'),
+        'profilePicture': picture.startsWith('http') ? picture : null,
+        'role': role.name,
+      };
     } catch (e) {
       debugPrint('Error getting user basic info: $e');
       return null;
     }
   }
 
+  /// Searches all three user collections. An empty [query] lists everyone —
+  /// the "New Conversation" sheet opens with no text typed, and returning an
+  /// empty list there showed "No users found in database" every time.
   Future<List<Map<String, dynamic>>> searchUsersByNameOrPhone(String query) async {
-    if (query.isEmpty) return [];
     try {
       final List<Map<String, dynamic>> results = [];
       final collections = ['Customer', 'Tailor', 'Retailer'];
       final lowercaseQuery = query.toLowerCase();
       for (var col in collections) {
         try {
-          final snap = await _db.collection(col).get();
+          // Firestore cannot do substring matching, so this still scans — the
+          // cap keeps a keystroke from pulling an unbounded number of docs.
+          final snap = await _db.collection(col).limit(200).get();
           for (var doc in snap.docs) {
             final data = doc.data();
             final role = col == 'Customer' ? 'customer' : (col == 'Tailor' ? 'tailor' : 'retailer');
             final String rawName = (data['name'] ?? '').toString();
             final String rawShopName = (data['shopName'] ?? '').toString();
             final String rawPhone = (data['phone'] ?? '').toString();
-            if (rawName.toLowerCase().contains(lowercaseQuery) || rawShopName.toLowerCase().contains(lowercaseQuery) || rawPhone.contains(query)) {
+            final bool matches = lowercaseQuery.isEmpty ||
+                rawName.toLowerCase().contains(lowercaseQuery) ||
+                rawShopName.toLowerCase().contains(lowercaseQuery) ||
+                rawPhone.contains(query);
+            if (matches) {
               if (!results.any((r) => r['id'] == doc.id && r['role'] == role)) {
-                results.add({'id': doc.id, 'name': rawShopName.isNotEmpty ? rawShopName : (rawName.isNotEmpty ? rawName : 'Unknown'), 'profilePicture': data['profilePicture']?.toString(), 'phone': rawPhone, 'role': role});
+                final String picture = (data['profilePicture'] ?? '').toString().trim();
+                results.add({'id': doc.id, 'name': rawShopName.isNotEmpty ? rawShopName : (rawName.isNotEmpty ? rawName : 'Unknown'), 'profilePicture': picture.startsWith('http') ? picture : null, 'phone': rawPhone, 'role': role});
               }
             }
           }

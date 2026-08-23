@@ -875,30 +875,29 @@ class _RetailerDetailScreenState extends State<RetailerDetailScreen> {
 
     // Reuse the existing thread if there is one, so reopening the chat lands
     // on the same conversation instead of spawning a duplicate.
+    //
+    // Nothing is created here any more: opening the chat used to write a
+    // Conversation immediately, which put an empty "No messages yet" thread in
+    // both inboxes just for tapping Message. ChatScreen creates it on the first
+    // actual send instead.
     final existing =
         await _messagingService.getConversationBetween(myId, widget.retailer.id);
-
-    final conversation = existing ??
-        await _messagingService.createConversation(
-          customerId: myId,
-          otherId: widget.retailer.id,
-          otherRole: UserRole.retailer,
-          orderId: 'GEN-${DateTime.now().millisecondsSinceEpoch}',
-        );
 
     if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ChatScreen(
-          conversationId: conversation.id,
+          conversationId: existing?.id ?? 'TEMP-${widget.retailer.id}',
           customerId: myId,
           otherUserId: widget.retailer.id,
           otherUserName: widget.retailer.shopName,
           otherUserRole: UserRole.retailer,
           currentUserRole: myRole,
           otherUserAvatar: widget.retailer.profilePicture,
-          orderId: conversation.orderId,
+          orderId: existing?.orderId,
+          isBlocked: existing?.isBlocked ?? false,
+          blockedBy: existing?.blockedBy,
         ),
       ),
     );

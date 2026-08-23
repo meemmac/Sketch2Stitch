@@ -102,11 +102,21 @@ class Message {
       return null;
     }
 
+    // byName throws on anything unexpected, which killed the whole message
+    // stream for one malformed doc — fall back instead.
+    UserRole parseRole(dynamic r) {
+      final name = (r ?? '').toString().toLowerCase().trim();
+      return UserRole.values.firstWhere(
+        (e) => e.name.toLowerCase() == name,
+        orElse: () => UserRole.customer,
+      );
+    }
+
     return Message(
       id: json['id'] ?? '',
       conversationId: json['conversationId'] ?? '',
       senderId: json['senderId'] ?? '',
-      senderRole: UserRole.values.byName(json['senderRole'] ?? 'customer'),
+      senderRole: parseRole(json['senderRole']),
       msgText: json['msgText'] ?? '',
       attachment: json['attachment'],
       sentAt: parseDate(json['sentAt']) ?? DateTime.now(),

@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'cart_screen.dart';
 import 'tailoring_setup_screen.dart';
 import '../../models/measurement.dart';
@@ -55,6 +58,113 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final CheckoutService _checkoutService = CheckoutService();
 
   String get _customerId => UserSession.instance.uid ?? '';
+
+  /// Payments already taken survive leaving this screen. Without this the
+  /// whole paid state lived in `_paidRetailers`, so a customer who paid but
+  /// backed out before pressing Continue was asked to pay a second time when
+  /// they re-opened checkout — with the first payment already charged.
+  static const String _paidStateKey = 'checkout_paid_v1';
+
+  /// How long a completed-but-unused payment stays resumable. Long enough to
+  /// cover coming back to finish the order, short enough that deliberately
+  /// re-buying an identical cart later isn't mistaken for the old payment.
+  static const Duration _paidStateTtl = Duration(hours: 2);
+
+  @override
+  void initState() {
+    super.initState();
+    _restorePaidState();
+  }
+
+  /// Identifies one retailer's exact payable: same customer, same retailer,
+  /// same lines, same amount. Any cart change invalidates the saved payment,
+  /// because the amount owed is no longer the amount that was paid.
+  String _signatureFor(String retailerId) {
+    final lines = widget.cartLines
+        .where((l) => l.retailerId == retailerId)
+        .map((l) => '${l.productId}:${l.optionId}:${l.quantity}')
+        .toList()
+      ..sort();
+    final subtotal = widget.cartLines
+        .where((l) => l.retailerId == retailerId)
+        .fold<double>(0, (sum, l) => sum + l.lineTotal);
+    final amount = subtotal + _deliveryChargeFor(retailerId);
+    return '$_customerId|$retailerId|${lines.join(',')}|'
+        '${amount.toStringAsFixed(2)}';
+  }
+
+  Future<Map<String, dynamic>> _readPaidState(SharedPreferences prefs) async {
+    final raw = prefs.getString(_paidStateKey);
+    if (raw == null || raw.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return {};
+      // Drop anything past the resume window so stale entries can never mark
+      // a fresh cart as already paid.
+      final cutoff =
+          DateTime.now().subtract(_paidStateTtl).millisecondsSinceEpoch;
+      return Map<String, dynamic>.fromEntries(
+        decoded.entries
+            .where((e) => e.value is Map && (e.value['ts'] as int? ?? 0) > cutoff)
+            .map((e) => MapEntry(e.key as String, e.value)),
+      );
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> _restorePaidState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final state = await _readPaidState(prefs);
+      if (state.isEmpty || !mounted) return;
+
+      final restored = <String, String>{};
+      for (final retailerId in _groupedByRetailer.keys) {
+        final entry = state[_signatureFor(retailerId)];
+        if (entry is Map) {
+          restored[retailerId] = (entry['trxId'] as String?) ?? '';
+        }
+      }
+      if (restored.isEmpty || !mounted) return;
+
+      setState(() {
+        _paidRetailers.addAll(restored.keys);
+        _trxIds.addAll(restored);
+      });
+    } catch (e) {
+      debugPrint('[Checkout] Could not restore paid state: $e');
+    }
+  }
+
+  Future<void> _rememberPayment(String retailerId, String trxId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final state = await _readPaidState(prefs);
+      state[_signatureFor(retailerId)] = {
+        'trxId': trxId,
+        'ts': DateTime.now().millisecondsSinceEpoch,
+      };
+      await prefs.setString(_paidStateKey, jsonEncode(state));
+    } catch (e) {
+      debugPrint('[Checkout] Could not persist paid state: $e');
+    }
+  }
+
+  /// Called once the order exists in Firestore — these payments now belong to
+  /// a real order and must not be reused for a future cart.
+  Future<void> _forgetPayments() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final state = await _readPaidState(prefs);
+      for (final retailerId in _groupedByRetailer.keys) {
+        state.remove(_signatureFor(retailerId));
+      }
+      await prefs.setString(_paidStateKey, jsonEncode(state));
+    } catch (e) {
+      debugPrint('[Checkout] Could not clear paid state: $e');
+    }
+  }
 
   Map<String, List<CartLine>> get _groupedByRetailer {
     final Map<String, List<CartLine>> grouped = {};
@@ -132,6 +242,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         idToken: pending.idToken,
       );
 
+      // Persist BEFORE touching the UI, so the record of the charge exists
+      // even if the customer leaves the moment it succeeds.
+      await _rememberPayment(retailerId, executed.trxID);
+
       if (!mounted) return;
       setState(() {
         _paidRetailers.add(retailerId);
@@ -208,6 +322,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       // Step 2: the cart has become an order — clear it. Delegated to the
       // cart screen's own handler so there's one place that owns clearing.
+      // The saved payments go with it: they're recorded on the order now.
+      await _forgetPayments();
       widget.onOrderPlaced();
 
       // Step 3: hand straight off to the tailoring stage against the real

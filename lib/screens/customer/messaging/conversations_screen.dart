@@ -1,4 +1,6 @@
 // lib/screens/customer/messaging/conversations_screen.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/conversation.dart';
 import 'package:sketch2stitch/models/user_role.dart';
@@ -25,6 +27,18 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   
   final Map<String, Map<String, dynamic>> _userCache = {};
   final Set<String> _fetchingIds = {};
+  // Lookups that came back empty, so a missing profile is not re-queried on
+  // every single list rebuild.
+  final Set<String> _failedIds = {};
+
+  // Preview text for threads whose Conversation doc has no denormalized
+  // `lastMessage` (they were created before that field existed), keyed by
+  // conversation id. Same caching rules as the profile lookups above.
+  final Map<String, Map<String, String>> _previewCache = {};
+  final Set<String> _fetchingPreviews = {};
+  final Set<String> _failedPreviews = {};
+
+  late final Stream<List<Conversation>> _conversationsStream;
 
   late TabController _tabController;
   OverlayEntry? _notificationOverlay;
@@ -36,11 +50,27 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   @override
   void initState() {
     super.initState();
-    final tabCount = widget.currentUserRole == UserRole.customer ? 4 : 2;
-    _tabController = TabController(length: tabCount, vsync: this);
+    _conversationsStream = _messagingService.getConversations(widget.customerId);
+    _tabController = TabController(length: 2 + _partnerRoles.length, vsync: this);
     _tabController.addListener(() {
       if (mounted) setState(() {});
     });
+  }
+
+  /// Roles the signed-in user is allowed to talk to: everyone except their
+  /// own role (customer↔tailor, customer↔retailer, tailor↔retailer).
+  List<UserRole> get _partnerRoles =>
+      UserRole.values.where((r) => r != widget.currentUserRole).toList();
+
+  static String _roleTabLabel(UserRole role) {
+    switch (role) {
+      case UserRole.customer:
+        return 'Customers';
+      case UserRole.tailor:
+        return 'Tailors';
+      case UserRole.retailer:
+        return 'Retailers';
+    }
   }
 
   void _stopSearch() {
@@ -61,40 +91,94 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
   // ─── User Data Management ──────────────────────────────────────────
 
+  /// The other participant. `customerId` is simply whoever opened the thread
+  /// first, so it is not necessarily the customer.
+  String _partnerId(Conversation conversation) =>
+      conversation.customerId == widget.customerId
+          ? conversation.otherId
+          : conversation.customerId;
+
+  /// The partner's role: `otherRole` when I started the thread, otherwise the
+  /// initiator's own `customerRole`. Assuming `customer` here left the name
+  /// stuck on "Loading..." for every tailor- or retailer-initiated chat.
+  UserRole _partnerRole(Conversation conversation) =>
+      conversation.customerId == widget.customerId
+          ? conversation.otherRole
+          : conversation.customerRole;
+
   Future<void> _fetchUserInfo(Conversation conversation) async {
-    final String myId = widget.customerId;
-    final String targetId = (conversation.customerId == myId) ? conversation.otherId : conversation.customerId;
-    final UserRole targetRole = (conversation.customerId == myId) ? conversation.otherRole : UserRole.customer;
+    final String targetId = _partnerId(conversation);
+    final UserRole targetRole = _partnerRole(conversation);
 
     final String cacheKey = "${targetId}_${targetRole.name}";
-    if (_userCache.containsKey(cacheKey) || _fetchingIds.contains(cacheKey)) return;
+    if (_userCache.containsKey(cacheKey) ||
+        _fetchingIds.contains(cacheKey) ||
+        _failedIds.contains(cacheKey)) {
+      return;
+    }
 
     _fetchingIds.add(cacheKey);
     final info = await _messagingService.getUserBasicInfo(targetId, targetRole);
-    if (info != null && mounted) {
-      setState(() {
-        _userCache[cacheKey] = info;
-        _fetchingIds.remove(cacheKey);
-      });
-    } else {
+    if (!mounted) {
       _fetchingIds.remove(cacheKey);
+      return;
     }
+    setState(() {
+      _fetchingIds.remove(cacheKey);
+      if (info != null) {
+        _userCache[cacheKey] = info;
+      } else {
+        // Cache the miss, otherwise itemBuilder re-queries it every frame.
+        _failedIds.add(cacheKey);
+      }
+    });
+  }
+
+  /// Reads the newest message straight from Messages when the conversation
+  /// itself carries no preview, so an older thread stops claiming
+  /// "No messages yet" while its chat is full of messages.
+  Future<void> _fetchLastMessagePreview(Conversation conversation) async {
+    final String convId = conversation.id;
+    if ((conversation.lastMessage ?? '').trim().isNotEmpty) return;
+    if (_previewCache.containsKey(convId) ||
+        _fetchingPreviews.contains(convId) ||
+        _failedPreviews.contains(convId)) {
+      return;
+    }
+
+    _fetchingPreviews.add(convId);
+    final preview = await _messagingService.getLastMessagePreview(convId);
+    if (!mounted) {
+      _fetchingPreviews.remove(convId);
+      return;
+    }
+    setState(() {
+      _fetchingPreviews.remove(convId);
+      if (preview != null) {
+        _previewCache[convId] = preview;
+      } else {
+        _failedPreviews.add(convId);
+      }
+    });
   }
 
   String _getOtherUserName(Conversation conversation) {
-    final String myId = widget.customerId;
-    final String targetId = (conversation.customerId == myId) ? conversation.otherId : conversation.customerId;
-    final UserRole targetRole = (conversation.customerId == myId) ? conversation.otherRole : UserRole.customer;
+    final String targetId = _partnerId(conversation);
+    final UserRole targetRole = _partnerRole(conversation);
     final String cacheKey = "${targetId}_${targetRole.name}";
-    return _userCache[cacheKey]?['name'] ?? 'Loading...';
+    final cached = _userCache[cacheKey]?['name'];
+    if (cached != null) return cached;
+    return _failedIds.contains(cacheKey) ? 'Unknown user' : 'Loading...';
   }
 
   String? _getOtherUserAvatar(Conversation conversation) {
-    final String myId = widget.customerId;
-    final String targetId = (conversation.customerId == myId) ? conversation.otherId : conversation.customerId;
-    final UserRole targetRole = (conversation.customerId == myId) ? conversation.otherRole : UserRole.customer;
+    final String targetId = _partnerId(conversation);
+    final UserRole targetRole = _partnerRole(conversation);
     final String cacheKey = "${targetId}_${targetRole.name}";
-    return _userCache[cacheKey]?['profilePicture'];
+    final String picture = (_userCache[cacheKey]?['profilePicture'] ?? '').toString().trim();
+    // An empty or non-http value would blow up NetworkImage and leave a blank
+    // circle instead of the user's initial.
+    return picture.startsWith('http') ? picture : null;
   }
 
   // ─── Notification System ────────────────────────────────────────────
@@ -168,9 +252,54 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     }
   }
 
+  void _confirmDeleteConversation(Conversation conversation) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Conversation'),
+        content: Text(
+          'Remove your copy of the chat with ${_getOtherUserName(conversation)}? '
+          'It stays in their inbox, and a new message will bring it back.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _deleteConversation(conversation);
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmBlockUser(Conversation conversation) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Block User'),
+        content: Text('Block ${_getOtherUserName(conversation)}? You will no longer exchange messages.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _blockUser(conversation);
+            },
+            child: const Text('Block', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _deleteConversation(Conversation conversation) async {
     try {
-      await _messagingService.deleteConversationByConversationId(conversation.id);
+      await _messagingService.deleteConversationByConversationId(conversation.id, widget.customerId);
       _showTopNotification('Conversation deleted');
     } catch (e) {
       _showTopNotification('Failed to delete', isError: true);
@@ -189,9 +318,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         builder: (context) => ChatScreen(
           conversationId: conversation.id,
           customerId: widget.customerId,
-          otherUserId: conversation.customerId == widget.customerId ? conversation.otherId : conversation.customerId,
+          otherUserId: _partnerId(conversation),
           otherUserName: _getOtherUserName(conversation),
-          otherUserRole: conversation.otherRole,
+          otherUserRole: _partnerRole(conversation),
           currentUserRole: widget.currentUserRole,
           otherUserAvatar: _getOtherUserAvatar(conversation),
           orderId: conversation.orderId,
@@ -282,9 +411,11 @@ class _ConversationsScreenState extends State<ConversationsScreen>
               onTap: (index) {
                 if (mounted) setState(() {});
               },
-              tabs: widget.currentUserRole == UserRole.customer
-                  ? const [Tab(text: 'All'), Tab(text: 'Unread'), Tab(text: 'Tailors'), Tab(text: 'Retailers')]
-                  : const [Tab(text: 'All'), Tab(text: 'Unread')],
+              tabs: [
+                const Tab(text: 'All'),
+                const Tab(text: 'Unread'),
+                for (final role in _partnerRoles) Tab(text: _roleTabLabel(role)),
+              ],
             ),
           ),
         ),
@@ -297,13 +428,22 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         child: const Icon(Icons.add, color: Colors.white, size: 28),
       ),
       body: StreamBuilder<List<Conversation>>(
-        stream: _messagingService.getConversations(widget.customerId),
+        stream: _conversationsStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator(color: Color(0xFF2C5C44)));
           if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
           
           final conversations = snapshot.data ?? [];
           if (conversations.isEmpty) return _buildEmptyState();
+
+          // Resolve names for the whole list, not just the rows ListView.builder
+          // happens to have built — otherwise searching by name silently misses
+          // conversations the user has not scrolled to. Results are cached, so
+          // this settles after one pass.
+          for (final conv in conversations) {
+            _fetchUserInfo(conv);
+            _fetchLastMessagePreview(conv);
+          }
 
           final int tabIndex = _tabController.index;
 
@@ -312,9 +452,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
             final bool isUnread = _isConversationUnread(conv);
 
             if (tabIndex == 1) return isUnread; // Unread tab
-            if (widget.currentUserRole == UserRole.customer) {
-              if (tabIndex == 2 && conv.otherRole != UserRole.tailor) return false;
-              if (tabIndex == 3 && conv.otherRole != UserRole.retailer) return false;
+            if (tabIndex >= 2 &&
+                _partnerRole(conv) != _partnerRoles[tabIndex - 2]) {
+              return false;
             }
 
             // Search query filter (matches contact name or last message text)
@@ -336,7 +476,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
             itemCount: filtered.length, padding: const EdgeInsets.symmetric(vertical: 8),
             itemBuilder: (context, index) {
               final conversation = filtered[index];
-              _fetchUserInfo(conversation);
               return _buildConversationCard(conversation);
             },
           );
@@ -358,8 +497,13 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
   String _formatLastMessage(Conversation conversation, bool iAmLastSender, String otherName) {
     if (conversation.isBlocked) return '🔒 Blocked';
-    final rawMsg = conversation.lastMessage;
-    if (rawMsg == null || rawMsg.trim().isEmpty) return 'No messages yet';
+    String? rawMsg = conversation.lastMessage;
+    if (rawMsg == null || rawMsg.trim().isEmpty) {
+      rawMsg = _previewCache[conversation.id]?['lastMessage'];
+    }
+    if (rawMsg == null || rawMsg.trim().isEmpty) {
+      return _fetchingPreviews.contains(conversation.id) ? '...' : 'No messages yet';
+    }
 
     final trimmed = rawMsg.trim();
     final bool isPhoto = trimmed == '📷 Photo' ||
@@ -391,15 +535,20 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     final Color unreadBg = const Color(0xFFF1F8F1);
     
     final String myId = widget.customerId.trim();
-    final String lastSenderId = (conversation.lastSenderId ?? '').trim();
-    final String partnerId = conversation.customerId.trim() == myId ? conversation.otherId.trim() : conversation.customerId.trim();
+    final String lastSenderId = (conversation.lastSenderId ??
+            _previewCache[conversation.id]?['lastSenderId'] ??
+            '')
+        .trim();
+    final String partnerId = _partnerId(conversation).trim();
 
     final int myUnreadCount = conversation.unreadCounts[myId] ?? 0;
     final int partnerUnreadCount = conversation.unreadCounts[partnerId] ?? 0;
 
     final bool iAmLastSender = lastSenderId == myId;
     final bool isUnread = _isConversationUnread(conversation);
-    final int displayBadgeCount = myUnreadCount > 0 ? myUnreadCount : 1;
+    // Only render a number when there is a real count behind it; the previous
+    // `: 1` fallback invented an unread message that did not exist.
+    final int displayBadgeCount = myUnreadCount;
 
     /// 🧠 Logic-based Ticks: If I sent the latest message, it is Seen only when the recipient's unread count is 0.
     final bool lastMessageIsRead = iAmLastSender && (partnerUnreadCount == 0 || conversation.lastMessageRead == true);
@@ -458,7 +607,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (isUnread) Container(margin: const EdgeInsets.only(left: 8), padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: primaryGreen, borderRadius: BorderRadius.circular(10)), child: Text(displayBadgeCount.toString(), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))),
+                      if (isUnread && displayBadgeCount > 0) Container(margin: const EdgeInsets.only(left: 8), padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: primaryGreen, borderRadius: BorderRadius.circular(10)), child: Text(displayBadgeCount.toString(), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))),
                     ],
                   ),
                 ],
@@ -482,12 +631,12 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             if (!conversation.isBlocked)
-              ListTile(leading: const Icon(Icons.block, color: Colors.red), title: const Text('Block user', style: TextStyle(color: Colors.red)), onTap: () { Navigator.pop(context); _blockUser(conversation); }),
+              ListTile(leading: const Icon(Icons.block, color: Colors.red), title: const Text('Block user', style: TextStyle(color: Colors.red)), onTap: () { Navigator.pop(context); _confirmBlockUser(conversation); }),
             if (iBlockedThem)
               ListTile(leading: const Icon(Icons.lock_open, color: Colors.green), title: const Text('Unblock user', style: TextStyle(color: Colors.green)), onTap: () { Navigator.pop(context); _unblockUser(conversation); }),
             if (theyBlockedMe)
               const ListTile(leading: Icon(Icons.block, color: Colors.grey), title: Text('You are blocked', style: TextStyle(color: Colors.grey))),
-            ListTile(leading: const Icon(Icons.delete, color: Colors.red), title: const Text('Delete conversation'), onTap: () { Navigator.pop(context); _deleteConversation(conversation); }),
+            ListTile(leading: const Icon(Icons.delete, color: Colors.red), title: const Text('Delete conversation'), onTap: () { Navigator.pop(context); _confirmDeleteConversation(conversation); }),
           ],
         ),
       ),
@@ -536,6 +685,11 @@ class _NewConversationBottomSheetState extends State<NewConversationBottomSheet>
   List<Map<String, dynamic>> _searchResults = [];
   bool _isLoading = false;
   bool _hasSearched = false;
+  Timer? _debounce;
+  // Incremented per search so a slow earlier response cannot overwrite a
+  // newer one's results.
+  int _searchToken = 0;
+  bool _isOpening = false;
 
   @override
   void initState() {
@@ -545,33 +699,50 @@ class _NewConversationBottomSheetState extends State<NewConversationBottomSheet>
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
+  /// Every keystroke used to scan three collections. Wait for a pause first.
+  void _onQueryChanged(String query) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () => _performSearch(query));
+  }
+
   Future<void> _performSearch(String query) async {
+    final int token = ++_searchToken;
     setState(() => _isLoading = true);
     try {
       final results = await widget.messagingService.searchUsersByNameOrPhone(query);
-      if (mounted) {
-        setState(() {
-          _searchResults = results.where((u) => u['id'] != widget.customerId).toList();
-          _isLoading = false;
-          _hasSearched = true;
-        });
-      }
+      if (!mounted || token != _searchToken) return;
+      setState(() {
+        // Only roles the current user is allowed to start a chat with.
+        final allowed = UserRole.values
+            .where((r) => r != widget.currentUserRole)
+            .map((r) => r.name)
+            .toSet();
+        _searchResults = results
+            .where((u) =>
+                u['id'] != widget.customerId &&
+                allowed.contains((u['role'] ?? '').toString()))
+            .toList();
+        _isLoading = false;
+        _hasSearched = true;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _searchResults = [];
-          _isLoading = false;
-          _hasSearched = true;
-        });
-      }
+      if (!mounted || token != _searchToken) return;
+      setState(() {
+        _searchResults = [];
+        _isLoading = false;
+        _hasSearched = true;
+      });
     }
   }
 
   void _onUserSelected(Map<String, dynamic> user) async {
+    if (_isOpening) return;
+    _isOpening = true;
     final String userId = user['id'];
     final String userName = user['name'];
     final String? avatar = user['profilePicture'];
@@ -580,7 +751,10 @@ class _NewConversationBottomSheetState extends State<NewConversationBottomSheet>
 
     final existing = await widget.messagingService.getConversationBetween(widget.customerId, userId);
 
-    if (!mounted) return;
+    if (!mounted) {
+      _isOpening = false;
+      return;
+    }
     Navigator.pop(context); // Close bottom sheet
 
     Navigator.push(
@@ -651,7 +825,7 @@ class _NewConversationBottomSheetState extends State<NewConversationBottomSheet>
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.symmetric(vertical: 12),
                     ),
-                    onChanged: (val) => _performSearch(val.trim()),
+                    onChanged: (val) => _onQueryChanged(val.trim()),
                   ),
                 ),
                 if (_searchController.text.isNotEmpty)

@@ -1,0 +1,114 @@
+rules_version = '2';
+
+// Sketch2Stitch Firestore security rules.
+//
+// Security rules are part of the free Spark plan — deploy with:
+//   firebase deploy --only firestore:rules
+//
+// Scope: this file locks down messaging (Conversations / Messages), which was
+// previously readable and writable by any client. Every other collection keeps
+// the app's existing behaviour behind a signed-in check; tighten those
+// per-collection as they get reviewed.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    // ── Conversations ────────────────────────────────────────────────────
+    match /Conversations/{conversationId} {
+
+      function participants(data) {
+        return [data.customerId, data.otherId];
+      }
+
+      function isParticipant() {
+        return isSignedIn() && uid() in participants(resource.data);
+      }
+
+      // Only the two people in the thread can see it. This is what makes the
+      // client-side inbox queries safe: a client asking for anything else is
+      // rejected by the server, not just filtered in Dart.
+      allow get, list: if isParticipant();
+
+      // The creator must be one of the two participants, and must not be
+      // opening a thread with themselves.
+      allow create: if isSignedIn()
+                    && uid() in participants(request.resource.data)
+                    && request.resource.data.customerId != request.resource.data.otherId;
+
+      // Participants may update metadata (unread counts, block state, per-user
+      // deletion), but may never rewrite who is in the conversation.
+      allow update: if isParticipant()
+                    && request.resource.data.customerId == resource.data.customerId
+                    && request.resource.data.otherId == resource.data.otherId;
+
+      // Deletion is soft (`deletedFor`), so hard deletes are never allowed.
+      allow delete: if false;
+
+      match /TypingStatus/{userId} {
+        function inParentConversation() {
+          return isSignedIn()
+            && uid() in participants(get(/databases/$(database)/documents/Conversations/$(conversationId)).data);
+        }
+
+        allow read: if inParentConversation();
+        // You may only publish your own typing state.
+        allow write: if inParentConversation() && userId == uid();
+      }
+    }
+
+    // ── Messages ─────────────────────────────────────────────────────────
+    match /Messages/{messageId} {
+
+      function conversationOf(conversationId) {
+        return get(/databases/$(database)/documents/Conversations/$(conversationId)).data;
+      }
+
+      function inConversation(conversationId) {
+        return isSignedIn()
+          && uid() in [conversationOf(conversationId).customerId,
+                       conversationOf(conversationId).otherId];
+      }
+
+      function conversationIsOpen(conversationId) {
+        return conversationOf(conversationId).isBlocked != true;
+      }
+
+      allow get, list: if inConversation(resource.data.conversationId);
+
+      // Messages are written for yourself only, into a thread you belong to
+      // and that is not blocked, and always start unread.
+      allow create: if isSignedIn()
+                    && request.resource.data.senderId == uid()
+                    && inConversation(request.resource.data.conversationId)
+                    && conversationIsOpen(request.resource.data.conversationId)
+                    && request.resource.data.isRead == false;
+
+      // The only update a client makes is the recipient marking a message
+      // read — the sender must never flip their own receipt.
+      allow update: if inConversation(resource.data.conversationId)
+                    && resource.data.senderId != uid()
+                    && request.resource.data.diff(resource.data)
+                         .affectedKeys().hasOnly(['isRead', 'readAt'])
+                    && request.resource.data.isRead == true;
+
+      // Only the author can delete their own message.
+      allow delete: if inConversation(resource.data.conversationId)
+                    && resource.data.senderId == uid();
+    }
+
+    // ── Everything else ──────────────────────────────────────────────────
+    // TODO: tighten these per collection (owner-only writes on Customer /
+    // Tailor / Retailer / Orders, etc.). Left signed-in-only for now so this
+    // deploy does not break unrelated screens.
+    match /{document=**} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}

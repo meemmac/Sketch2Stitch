@@ -6,6 +6,9 @@ class Conversation {
   final String id;
   final String customerId;
   final String otherId;
+  // Role of the thread initiator (`customerId`) — that party is not always a
+  // customer, so the receiving side needs it to look them up.
+  final UserRole customerRole;
   final UserRole otherRole;
   final String orderId;
   
@@ -32,6 +35,7 @@ class Conversation {
     required this.id,
     required this.customerId,
     required this.otherId,
+    this.customerRole = UserRole.customer,
     required this.otherRole,
     required this.orderId,
     this.lastMessage,
@@ -52,6 +56,7 @@ class Conversation {
     String? id,
     String? customerId,
     String? otherId,
+    UserRole? customerRole,
     UserRole? otherRole,
     String? orderId,
     String? lastMessage,
@@ -71,6 +76,7 @@ class Conversation {
       id: id ?? this.id,
       customerId: customerId ?? this.customerId,
       otherId: otherId ?? this.otherId,
+      customerRole: customerRole ?? this.customerRole,
       otherRole: otherRole ?? this.otherRole,
       orderId: orderId ?? this.orderId,
       lastMessage: lastMessage ?? this.lastMessage,
@@ -93,6 +99,7 @@ class Conversation {
     'id': id,
     'customerId': customerId,
     'otherId': otherId,
+    'customerRole': customerRole.name,
     'otherRole': otherRole.name,
     'orderId': orderId,
     'lastMessage': lastMessage,
@@ -116,12 +123,12 @@ class Conversation {
       return null;
     }
 
-    UserRole parseRole(dynamic r) {
-      if (r == null) return UserRole.tailor;
+    UserRole parseRole(dynamic r, {UserRole fallback = UserRole.tailor}) {
+      if (r == null) return fallback;
       final name = r.toString().toLowerCase().trim();
       return UserRole.values.firstWhere(
         (e) => e.name.toLowerCase() == name,
-        orElse: () => UserRole.tailor,
+        orElse: () => fallback,
       );
     }
 
@@ -148,6 +155,7 @@ class Conversation {
       id: json['id'] ?? '',
       customerId: cId,
       otherId: oId,
+      customerRole: parseRole(json['customerRole'], fallback: UserRole.customer),
       otherRole: parseRole(json['otherRole']),
       orderId: json['orderId'] ?? '',
       lastMessage: json['lastMessage'],

@@ -18,6 +18,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/bkash_service.dart';
 import '../../widgets/top_feedback_banner.dart';
 import '../../services/measurement_service.dart';
+import '../../services/messaging_service.dart';
 import '../../services/retailer_service.dart';
 import '../../services/tailor_service.dart';
 import '../../services/tailoring_service.dart';
@@ -837,6 +838,7 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
   ///
   Future<void> _openChatWithTailor(String tailorId) async {
     final customerId = UserSession.instance.uid ?? '';
+    if (customerId.isEmpty) return;
 
     // The tailor's display name lives on their Tailor document — falling
     // back to a generic label only if the lookup fails, so a slow or
@@ -851,22 +853,32 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
       debugPrint('[TailoringSetup] tailor name lookup failed: $e');
     }
 
+    // The conversation id must be a real Conversations document id. It used to
+    // be built client-side as "<orderId>_<tailorId>", which matched no document,
+    // so every message sent from here was written against a thread that did not
+    // exist and never reached the tailor's inbox.
+    final messagingService = MessagingService();
+    final existing = await messagingService.getConversationBetween(
+      customerId,
+      tailorId,
+      orderId: widget.orderId,
+    );
+
     if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ChatScreen(
-          // Deterministic per (order, tailor) pair so reopening the chat
-          // lands on the same thread. NOTE: messaging itself is still
-          // running on local sample data — see MessagingService, which no
-          // screen is wired to yet.
-          conversationId: '${widget.orderId}_$tailorId',
+          // Lazily created on first send when there is no thread yet.
+          conversationId: existing?.id ?? 'TEMP-$tailorId',
           customerId: customerId,
           otherUserId: tailorId,
           otherUserName: tailorName,
           otherUserRole: UserRole.tailor,
           currentUserRole: UserRole.customer,
           orderId: widget.orderId,
+          isBlocked: existing?.isBlocked ?? false,
+          blockedBy: existing?.blockedBy,
         ),
       ),
     );
