@@ -95,7 +95,7 @@ class Message {
   /// Handles both native Firestore Timestamp (current/new docs) and
   /// ISO8601 strings (legacy docs written before this fix).
   factory Message.fromJson(Map<String, dynamic> json) {
-    DateTime? _parseDate(dynamic value) {
+    DateTime? parseDate(dynamic value) {
       if (value == null) return null;
       if (value is Timestamp) return value.toDate();
       if (value is String) return DateTime.tryParse(value);
@@ -109,12 +109,12 @@ class Message {
       senderRole: UserRole.values.byName(json['senderRole'] ?? 'customer'),
       msgText: json['msgText'] ?? '',
       attachment: json['attachment'],
-      sentAt: _parseDate(json['sentAt']) ?? DateTime.now(),
+      sentAt: parseDate(json['sentAt']) ?? DateTime.now(),
       replyToMessageId: json['replyToMessageId'],
       replyToText: json['replyToText'],
       replyToSender: json['replyToSender'],
       isRead: json['isRead'] ?? false,
-      readAt: _parseDate(json['readAt']),
+      readAt: parseDate(json['readAt']),
     );
   }
 }

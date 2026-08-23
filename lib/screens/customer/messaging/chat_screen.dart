@@ -67,6 +67,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   String? _blockedBy; 
   bool _isUploading = false;
   bool _isSending = false;
+  bool _isPickingImage = false;
   Timer? _typingTimer;
 
   late String _activeConversationId;
@@ -110,7 +111,11 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     }
   }
 
+  bool _previewOpened = false;
+
   void _openPhotoPreview(File file, ImageSource source) {
+    if (_previewOpened) return;
+    _previewOpened = true;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -122,7 +127,9 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
           },
         ),
       ),
-    );
+    ).then((_) {
+      _previewOpened = false;
+    });
   }
 
   @override
@@ -256,6 +263,8 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _pickImage() async {
+    if (_isPickingImage) return;
+    _isPickingImage = true;
     try {
       final XFile? image = await _imagePicker.pickImage(source: ImageSource.gallery);
       if (image != null && mounted) {
@@ -264,6 +273,8 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     } catch (e) {
       debugPrint('Error picking image from gallery: $e');
       if (mounted) _showTopNotification('Failed to pick image: $e', isError: true);
+    } finally {
+      _isPickingImage = false;
     }
   }
 

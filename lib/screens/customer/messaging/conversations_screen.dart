@@ -1,4 +1,5 @@
 // lib/screens/customer/messaging/conversations_screen.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/conversation.dart';
 import 'package:sketch2stitch/models/user_role.dart';
@@ -29,6 +30,11 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   late TabController _tabController;
   OverlayEntry? _notificationOverlay;
 
+  bool _isSearching = false;
+  final TextEditingController _inboxSearchController = TextEditingController();
+  String _searchQuery = '';
+  Timer? _presenceTimer;
+
   @override
   void initState() {
     super.initState();
@@ -37,11 +43,29 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     _tabController.addListener(() {
       if (mounted) setState(() {});
     });
+
+    // Start online presence heartbeat
+    _messagingService.updateUserPresence(widget.customerId, widget.currentUserRole);
+    _presenceTimer = Timer.periodic(const Duration(seconds: 20), (timer) {
+      if (mounted) {
+        _messagingService.updateUserPresence(widget.customerId, widget.currentUserRole);
+      }
+    });
+  }
+
+  void _stopSearch() {
+    setState(() {
+      _isSearching = false;
+      _searchQuery = '';
+      _inboxSearchController.clear();
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _inboxSearchController.dispose();
+    _presenceTimer?.cancel();
     _removeNotificationOverlay();
     super.dispose();
   }
@@ -212,17 +236,50 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.maybePop(context),
-        ),
-        title: const Text('Messages', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        leading: _isSearching
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: _stopSearch,
+              )
+            : IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.maybePop(context),
+              ),
+        title: _isSearching
+            ? TextField(
+                controller: _inboxSearchController,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+                cursorColor: Colors.white,
+                decoration: const InputDecoration(
+                  hintText: 'Search in messages...',
+                  hintStyle: TextStyle(color: Colors.white70, fontSize: 16),
+                  border: InputBorder.none,
+                ),
+                onChanged: (val) {
+                  setState(() => _searchQuery = val.trim());
+                },
+              )
+            : const Text('Messages', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFF2C5C44),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search, color: Colors.white),
-            onPressed: _openNewConversationSheet,
-          ),
+          if (_isSearching)
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white),
+              onPressed: () {
+                if (_inboxSearchController.text.isNotEmpty) {
+                  _inboxSearchController.clear();
+                  setState(() => _searchQuery = '');
+                } else {
+                  _stopSearch();
+                }
+              },
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.search, color: Colors.white),
+              onPressed: () => setState(() => _isSearching = true),
+            ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
@@ -270,6 +327,17 @@ class _ConversationsScreenState extends State<ConversationsScreen>
               if (tabIndex == 2 && conv.otherRole != UserRole.tailor) return false;
               if (tabIndex == 3 && conv.otherRole != UserRole.retailer) return false;
             }
+
+            // Search query filter (matches contact name or last message text)
+            if (_searchQuery.isNotEmpty) {
+              final String otherName = _getOtherUserName(conv).toLowerCase();
+              final String lastMsg = (conv.lastMessage ?? '').toLowerCase();
+              final String q = _searchQuery.toLowerCase();
+              if (!otherName.contains(q) && !lastMsg.contains(q)) {
+                return false;
+              }
+            }
+
             return true;
           }).toList();
 
@@ -297,6 +365,34 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     if (unread > 0) return true;
     if (!iAmLast && lastSender.isNotEmpty && conv.lastMessageRead == false) return true;
     return false;
+  }
+
+  String _formatLastMessage(Conversation conversation, bool iAmLastSender, String otherName) {
+    if (conversation.isBlocked) return '🔒 Blocked';
+    final rawMsg = conversation.lastMessage;
+    if (rawMsg == null || rawMsg.trim().isEmpty) return 'No messages yet';
+
+    final trimmed = rawMsg.trim();
+    final bool isPhoto = trimmed == '📷 Photo' ||
+        trimmed.startsWith('📷 ') ||
+        trimmed == 'Photo' ||
+        trimmed == '📷' ||
+        trimmed.contains('chat_attachments');
+
+    if (isPhoto) {
+      final caption = trimmed.startsWith('📷 ') ? trimmed.substring(2).trim() : '';
+      final isRealCaption = caption.isNotEmpty && caption.toLowerCase() != 'photo';
+      if (iAmLastSender) {
+        return isRealCaption ? 'You sent a photo: $caption' : 'You sent a photo';
+      } else {
+        return isRealCaption ? '$otherName sent a photo: $caption' : '$otherName sent a photo';
+      }
+    }
+
+    if (iAmLastSender) {
+      return 'You: $trimmed';
+    }
+    return trimmed;
   }
 
   Widget _buildConversationCard(Conversation conversation) {
@@ -361,7 +457,18 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                           padding: const EdgeInsets.only(right: 4),
                           child: Icon(lastMessageIsRead ? Icons.done_all : Icons.done, size: 14, color: lastMessageIsRead ? Colors.blue[400] : Colors.grey),
                         ),
-                      Expanded(child: Text(conversation.isBlocked ? '🔒 Blocked' : (conversation.lastMessage ?? 'No messages yet'), style: TextStyle(fontSize: 14, color: isUnread ? Colors.black87 : Colors.grey[600], fontWeight: isUnread ? FontWeight.bold : FontWeight.normal), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                      Expanded(
+                        child: Text(
+                          _formatLastMessage(conversation, iAmLastSender, otherName),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isUnread ? Colors.black87 : Colors.grey[600],
+                            fontWeight: isUnread ? FontWeight.bold : FontWeight.normal,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                       if (isUnread) Container(margin: const EdgeInsets.only(left: 8), padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: primaryGreen, borderRadius: BorderRadius.circular(10)), child: Text(displayBadgeCount.toString(), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))),
                     ],
                   ),
@@ -399,7 +506,24 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   }
 
   Widget _buildEmptyState() => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.chat_bubble_outline, size: 80, color: Colors.grey[400]), const SizedBox(height: 16), const Text('No messages yet', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))]));
-  Widget _buildEmptyFilterState() => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.filter_alt_off, size: 80, color: Colors.grey[400]), const SizedBox(height: 16), const Text('No results match filter', style: TextStyle(fontSize: 18))]));
+  Widget _buildEmptyFilterState() {
+    if (_searchQuery.isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off, size: 80, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'No messages match "$_searchQuery"',
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Colors.black87),
+            ),
+          ],
+        ),
+      );
+    }
+    return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.filter_alt_off, size: 80, color: Colors.grey[400]), const SizedBox(height: 16), const Text('No results match filter', style: TextStyle(fontSize: 18))]));
+  }
 }
 
 class NewConversationBottomSheet extends StatefulWidget {

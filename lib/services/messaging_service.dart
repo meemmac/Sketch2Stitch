@@ -292,15 +292,19 @@ class MessagingService {
       if (convData['unreadCounts'] is Map) {
         existingUnread = Map<String, dynamic>.from(convData['unreadCounts'] as Map);
       }
-      final int currentCount = (existingUnread[receiverId] as num?)?.toInt() ?? 0;
-      existingUnread[receiverId] = currentCount + 1;
-      existingUnread[cleanSenderId] = 0; // Sender has 0 unread for their own messages
+      String lastMsgPreview = '';
+      if (data['attachment'] != null) {
+        final caption = (data['msgText'] ?? '').toString().trim();
+        lastMsgPreview = caption.isNotEmpty ? '📷 $caption' : '📷 Photo';
+      } else {
+        lastMsgPreview = (data['msgText'] ?? '').toString().trim();
+      }
 
       // 2. Update Conversation metadata
       await _db.collection(_conversations).doc(conversationId).set({
         'updatedAt': FieldValue.serverTimestamp(),
         'unreadCounts': existingUnread,
-        'lastMessage': data['msgText'] ?? (data['attachment'] != null ? '📷 Photo' : ''),
+        'lastMessage': lastMsgPreview,
         'lastSenderId': cleanSenderId,
         'lastMessageRead': false, 
         'isDeleted': false,
