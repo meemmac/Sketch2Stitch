@@ -65,15 +65,32 @@ class MessagingService {
 
   Future<Conversation?> getConversationBetween(String customerId, String otherId, {UserRole? otherRole, String? orderId}) async {
     try {
+      final cleanCustomerId = customerId.trim();
+      final cleanOtherId = otherId.trim();
+
       Query query = _db.collection(_conversations)
-          .where('customerId', isEqualTo: customerId)
-          .where('otherId', isEqualTo: otherId);
+          .where('customerId', isEqualTo: cleanCustomerId)
+          .where('otherId', isEqualTo: cleanOtherId);
       if (otherRole != null) query = query.where('otherRole', isEqualTo: otherRole.name);
       if (orderId != null) query = query.where('orderId', isEqualTo: orderId);
 
       final snap = await query.limit(1).get();
-      if (snap.docs.isEmpty) return null;
-      return Conversation.fromJson({...snap.docs.first.data() as Map<String, dynamic>, 'id': snap.docs.first.id});
+      if (snap.docs.isNotEmpty) {
+        return Conversation.fromJson({...snap.docs.first.data() as Map<String, dynamic>, 'id': snap.docs.first.id});
+      }
+
+      // Check reverse direction in case otherId initiated as customerId
+      Query revQuery = _db.collection(_conversations)
+          .where('customerId', isEqualTo: cleanOtherId)
+          .where('otherId', isEqualTo: cleanCustomerId);
+      if (orderId != null) revQuery = revQuery.where('orderId', isEqualTo: orderId);
+
+      final revSnap = await revQuery.limit(1).get();
+      if (revSnap.docs.isNotEmpty) {
+        return Conversation.fromJson({...revSnap.docs.first.data() as Map<String, dynamic>, 'id': revSnap.docs.first.id});
+      }
+
+      return null;
     } catch (e) {
       debugPrint('Error fetching conversation between users: $e');
       return null;
@@ -147,6 +164,10 @@ class MessagingService {
       final cleanUserId = userId.trim();
       final conversationRef = _db.collection(_conversations).doc(conversationId);
 
+      final convDoc = await conversationRef.get();
+      if (!convDoc.exists) return;
+      final lastSenderId = (convDoc.data()?['lastSenderId'] ?? '').toString().trim();
+
       final unreadQuery = await _db.collection(_messages)
           .where('conversationId', isEqualTo: conversationId)
           .where('isRead', isEqualTo: false)
@@ -165,12 +186,16 @@ class MessagingService {
         }
       }
 
-      // Reset only this user's unread count in the Map.
-      batch.update(conversationRef, {
+      final Map<String, dynamic> updates = {
         'unreadCounts.$cleanUserId': 0,
         'lastReadAt': FieldValue.serverTimestamp(),
-        'lastMessageRead': true, 
-      });
+      };
+
+      if (lastSenderId != cleanUserId) {
+        updates['lastMessageRead'] = true;
+      }
+
+      batch.update(conversationRef, updates);
 
       await batch.commit();
       debugPrint('[MessagingService] ✅ Messages marked read for $cleanUserId');

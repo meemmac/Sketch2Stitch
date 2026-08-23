@@ -1,12 +1,15 @@
 // lib/screens/customer/messaging/chat_screen.dart
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:sketch2stitch/models/message.dart';
 import 'package:sketch2stitch/models/user_role.dart';
+import 'package:sketch2stitch/screens/customer/messaging/in_app_camera_screen.dart';
+import 'package:sketch2stitch/screens/customer/messaging/photo_preview_screen.dart';
 import 'package:sketch2stitch/services/messaging_service.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -59,8 +62,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   String? _replyingToSender;
   
   String? _selectedMessageId;
-  late AnimationController _typingAnimationController;
-  late Animation<double> _typingAnimation;
   
   bool _isBlocked = false;
   String? _blockedBy; 
@@ -85,30 +86,41 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     _otherUserTypingStream = _messagingService.streamTypingStatus(_activeConversationId, widget.otherUserId);
     
     if (!_isNewChat) {
-      _messageSubscription = _messageStream.listen((messages) {
-        if (!mounted || messages.isEmpty) return;
-
-        final hasUnreadReceivedMessage = messages.any(
-          (message) => message.senderId != widget.customerId && !message.isRead,
-        );
-
-        if (hasUnreadReceivedMessage) {
-          _markAsRead();
-        }
-      });
-
-      _conversationSubscription = _messagingService.streamConversation(_activeConversationId).listen((conv) {
-        if (conv != null && mounted) {
-          setState(() {
-            _isBlocked = conv.isBlocked;
-            _blockedBy = conv.blockedBy;
-          });
-        }
-      });
+      _attachLiveListeners();
     }
-    
-    _typingAnimationController = AnimationController(duration: const Duration(milliseconds: 1000), vsync: this)..repeat(reverse: true);
-    _typingAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(CurvedAnimation(parent: _typingAnimationController, curve: Curves.easeInOut));
+
+    _retrieveLostData();
+  }
+
+  Future<void> _retrieveLostData() async {
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        final LostDataResponse response = await _imagePicker.retrieveLostData();
+        if (response.isEmpty) return;
+        if (response.file != null && mounted) {
+          _openPhotoPreview(File(response.file!.path), ImageSource.camera);
+        } else if (response.exception != null) {
+          debugPrint('ImagePicker lost data exception: ${response.exception}');
+        }
+      } catch (e) {
+        debugPrint('Error retrieving lost data: $e');
+      }
+    }
+  }
+
+  void _openPhotoPreview(File file, ImageSource source) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PhotoPreviewScreen(
+          initialFile: file,
+          source: source,
+          onSend: (selectedFile, caption) {
+            _uploadAndSend(selectedFile, 'image', caption: caption);
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -119,7 +131,6 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     _messageController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
-    _typingAnimationController.dispose();
     _removeNotificationOverlay();
     super.dispose();
   }
@@ -127,6 +138,26 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   void _markAsRead() {
     if (_isNewChat) return;
     _messagingService.markMessagesRead(_activeConversationId, widget.customerId);
+  }
+
+  void _attachLiveListeners() {
+    _messageSubscription?.cancel();
+    _conversationSubscription?.cancel();
+
+    _messageSubscription = _messageStream.listen((messages) {
+      if (!mounted || messages.isEmpty) return;
+      final hasUnread = messages.any((m) => m.senderId != widget.customerId && !m.isRead);
+      if (hasUnread) _markAsRead();
+    });
+
+    _conversationSubscription = _messagingService.streamConversation(_activeConversationId).listen((conv) {
+      if (conv != null && mounted) {
+        setState(() {
+          _isBlocked = conv.isBlocked;
+          _blockedBy = conv.blockedBy;
+        });
+      }
+    });
   }
 
   void _showTopNotification(String message, {bool isError = false}) {
@@ -159,7 +190,13 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       setState(() => _isSending = true);
       if (_isNewChat) {
         final newConv = await _messagingService.createConversation(customerId: widget.customerId, otherId: widget.otherUserId, otherRole: widget.otherUserRole, orderId: widget.orderId ?? 'NEW-${DateTime.now().millisecondsSinceEpoch}');
-        setState(() { _activeConversationId = newConv.id; _isNewChat = false; _messageStream = _messagingService.getMessagesByConversationId(_activeConversationId); _otherUserTypingStream = _messagingService.streamTypingStatus(_activeConversationId, widget.otherUserId); });
+        setState(() { 
+          _activeConversationId = newConv.id; 
+          _isNewChat = false; 
+          _messageStream = _messagingService.getMessagesByConversationId(_activeConversationId); 
+          _otherUserTypingStream = _messagingService.streamTypingStatus(_activeConversationId, widget.otherUserId); 
+        });
+        _attachLiveListeners();
       }
       final data = {'senderRole': widget.currentUserRole.name, 'msgText': text, 'replyToMessageId': _replyingToMessageId, 'replyToText': _replyingToMessageText, 'replyToSender': _replyingToSender};
       await _messagingService.sendMessage(_activeConversationId, widget.customerId, data);
@@ -214,34 +251,74 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     });
   }
 
-  Future<void> _pickImage() async { final XFile? image = await _imagePicker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024, imageQuality: 80); if (image != null) _uploadAndSend(File(image.path), 'image'); }
-  Future<void> _takePhoto() async { final XFile? image = await _imagePicker.pickImage(source: ImageSource.camera, maxWidth: 1024, maxHeight: 1024, imageQuality: 80); if (image != null) _uploadAndSend(File(image.path), 'image'); }
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(source: ImageSource.gallery);
+      if (image != null && mounted) {
+        _openPhotoPreview(File(image.path), ImageSource.gallery);
+      }
+    } catch (e) {
+      debugPrint('Error picking image from gallery: $e');
+      if (mounted) _showTopNotification('Failed to pick image: $e', isError: true);
+    }
+  }
 
-  Future<void> _uploadAndSend(File file, String type, {String? fileName}) async {
+  void _takePhoto() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => InAppCameraScreen(
+          onSend: (file, caption) {
+            _uploadAndSend(file, 'image', caption: caption);
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _uploadAndSend(File file, String type, {String? fileName, String? caption}) async {
     setState(() => _isUploading = true);
     try {
       final url = await _messagingService.uploadAttachmentFile(file);
       if (url != null) {
         if (_isNewChat) {
-          final newConv = await _messagingService.createConversation(customerId: widget.customerId, otherId: widget.otherUserId, otherRole: widget.otherUserRole, orderId: widget.orderId ?? 'NEW-${DateTime.now().millisecondsSinceEpoch}');
-          setState(() { _activeConversationId = newConv.id; _isNewChat = false; _messageStream = _messagingService.getMessagesByConversationId(_activeConversationId); _otherUserTypingStream = _messagingService.streamTypingStatus(_activeConversationId, widget.otherUserId); });
+          final newConv = await _messagingService.createConversation(
+            customerId: widget.customerId, 
+            otherId: widget.otherUserId, 
+            otherRole: widget.otherUserRole, 
+            orderId: widget.orderId ?? 'NEW-${DateTime.now().millisecondsSinceEpoch}',
+          );
+          setState(() { 
+            _activeConversationId = newConv.id; 
+            _isNewChat = false; 
+            _messageStream = _messagingService.getMessagesByConversationId(_activeConversationId); 
+            _otherUserTypingStream = _messagingService.streamTypingStatus(_activeConversationId, widget.otherUserId); 
+          });
+          _attachLiveListeners();
         }
-        final senderRole = (widget.otherUserRole == UserRole.customer) ? (widget.otherUserId.startsWith('t') ? UserRole.retailer : UserRole.tailor) : UserRole.customer;
-        final data = {'senderRole': senderRole.name, 'msgText': type == 'document' ? '📄 ${fileName ?? 'Document'}' : '', 'attachment': url};
-        await _messagingService.sendMessage(_activeConversationId, widget.customerId, data); _scrollToBottom();
+        final String messageText = (caption != null && caption.isNotEmpty)
+            ? caption
+            : (type == 'document' ? '📄 ${fileName ?? 'Document'}' : '');
+        final data = {
+          'senderRole': widget.currentUserRole.name, 
+          'msgText': messageText, 
+          'attachment': url,
+          'replyToMessageId': _replyingToMessageId,
+          'replyToText': _replyingToMessageText,
+          'replyToSender': _replyingToSender,
+        };
+        await _messagingService.sendMessage(_activeConversationId, widget.customerId, data);
+        _clearReply();
+        _scrollToBottom();
       }
-    } catch (e) { if (mounted) _showTopNotification('Upload failed', isError: true); } finally { if (mounted) setState(() => _isUploading = false); }
+    } catch (e) { 
+      if (mounted) _showTopNotification('Upload failed', isError: true); 
+    } finally { 
+      if (mounted) setState(() => _isUploading = false); 
+    }
   }
 
-  void _showAttachmentOptions() {
-    showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))), builder: (context) {
-      return SafeArea(child: Container(padding: const EdgeInsets.all(16), child: Column(mainAxisSize: MainAxisSize.min, children: [Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16), decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))), const Text('Share', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 16), Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [_buildAttachmentOption(icon: Icons.photo_library, label: 'Gallery', color: Colors.blue, onTap: () { Navigator.pop(context); _pickImage(); }), _buildAttachmentOption(icon: Icons.camera_alt, label: 'Camera', color: Colors.green, onTap: () { Navigator.pop(context); _takePhoto(); })]), const SizedBox(height: 16)])));
-    });
-  }
 
-  Widget _buildAttachmentOption({required IconData icon, required String label, required Color color, required VoidCallback onTap}) {
-    return GestureDetector(onTap: onTap, child: Column(children: [Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle), child: Icon(icon, color: color, size: 28)), const SizedBox(height: 8), Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey))]));
-  }
 
   void _showImageFullScreen(String imageUrl) {
     Navigator.push(context, MaterialPageRoute(builder: (context) => Scaffold(backgroundColor: Colors.black, appBar: AppBar(backgroundColor: Colors.black, elevation: 0, leading: IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.pop(context))), body: Center(child: PhotoView(imageProvider: NetworkImage(imageUrl), minScale: PhotoViewComputedScale.contained, maxScale: PhotoViewComputedScale.covered * 2)))));
@@ -299,6 +376,65 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       final String statusText = iBlockedThem ? 'You blocked this user. Unblock to message.' : 'You cannot message this user.';
       return Container(padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16), decoration: BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.grey.shade200))), child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Text(statusText, style: const TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.w500)), if (iBlockedThem) TextButton(onPressed: _showUnblockConfirmation, child: const Text('Unblock', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)))])));
     }
-    return Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), color: const Color(0xFFF0F0F0), child: Row(children: [IconButton(icon: const Icon(Icons.attach_file, color: Colors.grey), onPressed: _showAttachmentOptions), Expanded(child: Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)), child: TextField(controller: _messageController, focusNode: _focusNode, onChanged: _onTyping, decoration: const InputDecoration(hintText: 'Type a message...', border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10)), maxLines: null))), IconButton(icon: Container(padding: const EdgeInsets.all(8), decoration: const BoxDecoration(color: Color(0xFF2C5C44), shape: BoxShape.circle), child: _isSending ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.send, color: Colors.white, size: 20)), onPressed: _isSending ? null : _sendMessage)]));
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      color: const Color(0xFFF0F0F0),
+      child: Row(
+        children: [
+          // Direct Camera Button (Messenger style)
+          IconButton(
+            icon: const Icon(Icons.camera_alt, color: Color(0xFF2C5C44), size: 24),
+            tooltip: 'Camera',
+            onPressed: _takePhoto,
+          ),
+          // Direct Gallery / Attachment Button
+          IconButton(
+            icon: const Icon(Icons.photo_library, color: Color(0xFF2C5C44), size: 22),
+            tooltip: 'Gallery',
+            onPressed: _pickImage,
+          ),
+          // Message Text Field
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: TextField(
+                controller: _messageController,
+                focusNode: _focusNode,
+                onChanged: _onTyping,
+                decoration: const InputDecoration(
+                  hintText: 'Type a message...',
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
+                maxLines: null,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          // Send Button
+          IconButton(
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: const BoxDecoration(
+                color: Color(0xFF2C5C44),
+                shape: BoxShape.circle,
+              ),
+              child: _isSending
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Icon(Icons.send, color: Colors.white, size: 20),
+            ),
+            onPressed: _isSending ? null : _sendMessage,
+          ),
+        ],
+      ),
+    );
   }
 }
+

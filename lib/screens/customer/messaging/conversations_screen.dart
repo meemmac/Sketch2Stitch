@@ -202,6 +202,22 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     );
   }
 
+  void _openNewConversationSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => NewConversationBottomSheet(
+        customerId: widget.customerId,
+        currentUserRole: widget.currentUserRole,
+        messagingService: _messagingService,
+      ),
+    );
+  }
+
   // ─── Main Build ────────────────────────────────────────────────────
 
   @override
@@ -211,8 +227,18 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.maybePop(context),
+        ),
         title: const Text('Messages', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFF2C5C44),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search, color: Colors.white),
+            onPressed: _openNewConversationSheet,
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
           child: Container(
@@ -225,6 +251,13 @@ class _ConversationsScreenState extends State<ConversationsScreen>
             ),
           ),
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: const Color(0xFF2C5C44),
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        onPressed: _openNewConversationSheet,
+        child: const Icon(Icons.add, color: Colors.white, size: 28),
       ),
       body: StreamBuilder<List<Conversation>>(
         stream: _messagingService.getConversations(widget.customerId),
@@ -362,3 +395,225 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   Widget _buildEmptyState() => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.chat_bubble_outline, size: 80, color: Colors.grey[400]), const SizedBox(height: 16), const Text('No messages yet', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))]));
   Widget _buildEmptyFilterState() => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.filter_alt_off, size: 80, color: Colors.grey[400]), const SizedBox(height: 16), const Text('No results match filter', style: TextStyle(fontSize: 18))]));
 }
+
+class NewConversationBottomSheet extends StatefulWidget {
+  final String customerId;
+  final UserRole currentUserRole;
+  final MessagingService messagingService;
+
+  const NewConversationBottomSheet({
+    super.key,
+    required this.customerId,
+    required this.currentUserRole,
+    required this.messagingService,
+  });
+
+  @override
+  State<NewConversationBottomSheet> createState() => _NewConversationBottomSheetState();
+}
+
+class _NewConversationBottomSheetState extends State<NewConversationBottomSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  List<Map<String, dynamic>> _searchResults = [];
+  bool _isLoading = false;
+  bool _hasSearched = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _performSearch('');
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _performSearch(String query) async {
+    setState(() => _isLoading = true);
+    try {
+      final results = await widget.messagingService.searchUsersByNameOrPhone(query);
+      if (mounted) {
+        setState(() {
+          _searchResults = results.where((u) => u['id'] != widget.customerId).toList();
+          _isLoading = false;
+          _hasSearched = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _searchResults = [];
+          _isLoading = false;
+          _hasSearched = true;
+        });
+      }
+    }
+  }
+
+  void _onUserSelected(Map<String, dynamic> user) async {
+    final String userId = user['id'];
+    final String userName = user['name'];
+    final String? avatar = user['profilePicture'];
+    final String roleStr = user['role'] ?? 'customer';
+    final UserRole role = UserRole.values.firstWhere((e) => e.name == roleStr, orElse: () => UserRole.customer);
+
+    final existing = await widget.messagingService.getConversationBetween(widget.customerId, userId);
+
+    if (!mounted) return;
+    Navigator.pop(context); // Close bottom sheet
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          conversationId: existing?.id ?? 'TEMP-$userId',
+          customerId: widget.customerId,
+          otherUserId: userId,
+          otherUserName: userName,
+          otherUserRole: role,
+          currentUserRole: widget.currentUserRole,
+          otherUserAvatar: avatar,
+          isBlocked: existing?.isBlocked ?? false,
+          blockedBy: existing?.blockedBy,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Column(
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 12),
+              width: 44,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2.5),
+              ),
+            ),
+          ),
+          // Title
+          const Text(
+            'New Conversation',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Search input box
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.search, color: Colors.black54, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: const InputDecoration(
+                      hintText: 'Search by name or phone number...',
+                      hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onChanged: (val) => _performSearch(val.trim()),
+                  ),
+                ),
+                if (_searchController.text.isNotEmpty)
+                  GestureDetector(
+                    onTap: () {
+                      _searchController.clear();
+                      _performSearch('');
+                    },
+                    child: const Icon(Icons.close, size: 18, color: Colors.grey),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Results list
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF2C5C44)))
+                : (_searchResults.isEmpty && _hasSearched)
+                    ? Center(
+                        child: Text(
+                          _searchController.text.isEmpty ? 'No users found in database' : 'No users match "${_searchController.text}"',
+                          style: TextStyle(color: Colors.grey[600], fontSize: 15),
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: _searchResults.length,
+                        separatorBuilder: (context, index) => Divider(height: 1, indent: 72, color: Colors.grey.shade100),
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        itemBuilder: (context, index) {
+                          final user = _searchResults[index];
+                          final String userName = user['name'] ?? 'Unknown';
+                          final String? avatar = user['profilePicture'];
+                          final String phone = user['phone'] ?? '';
+                          final String role = (user['role'] ?? '').toString();
+
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                            leading: CircleAvatar(
+                              radius: 24,
+                              backgroundColor: const Color(0xFFA7E8C7),
+                              backgroundImage: (avatar != null && avatar.isNotEmpty) ? NetworkImage(avatar) : null,
+                              child: (avatar == null || avatar.isEmpty)
+                                  ? Text(
+                                      userName.isNotEmpty ? userName[0].toUpperCase() : '?',
+                                      style: const TextStyle(
+                                        color: Color(0xFF1B4332),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            title: Text(
+                              userName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            subtitle: Text(
+                              phone.isNotEmpty ? phone : (role.isNotEmpty ? role.toUpperCase() : ''),
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            trailing: const Icon(
+                              Icons.chevron_right,
+                              color: Colors.black54,
+                              size: 22,
+                            ),
+                            onTap: () => _onUserSelected(user),
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
