@@ -54,6 +54,15 @@ class NotificationService {
     UserRole viewerRole,
   ) async {
     try {
+      // A chat notification's counterparty is the sender, which no order-shaped
+      // lookup below can reach — it carries neither a subOrderId nor a
+      // tailorJobId. Resolve it from the conversation instead, for every viewer
+      // role: a customer can be messaged by a tailor, and a tailor by a
+      // retailer, so this is not customer-only like the branches that follow.
+      if (n.type == NotificationDbType.newMessage) {
+        return (await _messageSenderFromConversation(n))?['profilePicture'];
+      }
+
       switch (viewerRole) {
         case UserRole.customer:
           // A customer's counterparty is the Retailer handling the sub-order,
@@ -133,6 +142,11 @@ class NotificationService {
     AppNotification n,
     UserRole viewerRole,
   ) async {
+    // Checked before the customer-only guard below: the sender of a chat
+    // message is worth naming whichever role is looking at the card.
+    if (n.type == NotificationDbType.newMessage) {
+      return (await _messageSenderFromConversation(n))?['name'];
+    }
     if (viewerRole != UserRole.customer) return null;
     try {
       if (_isAboutTailor(n.type)) {
@@ -184,6 +198,71 @@ class NotificationService {
     if (tailorId == null || tailorId is! String || tailorId.isEmpty) return null;
     final tailorDoc = await _db.collection('Tailor').doc(tailorId).get();
     return _nonEmpty(tailorDoc.data()?['profilePicture']);
+  }
+
+  /// Resolves the *sender* of a `newMessage` notification to their display name
+  /// and profile picture.
+  ///
+  /// The thread id lives on the notification document under `conversationId`
+  /// (stamped by [_sendNotification] through `extraFields`) but is not part of
+  /// [AppNotification], so it is read back off the raw document here rather
+  /// than widening the model.
+  ///
+  /// `n.userId` is the receiver — i.e. whoever is looking at the card — so the
+  /// sender is simply the participant that isn't them. Roles come from the
+  /// conversation too: `customerId` only means "who opened the thread", so its
+  /// party is not necessarily a Customer and the role must not be assumed.
+  Future<Map<String, String?>?> _messageSenderFromConversation(
+    AppNotification n,
+  ) async {
+    try {
+      if (n.id.isEmpty) return null;
+      final notifDoc = await _db.collection(_collection).doc(n.id).get();
+      final conversationId = notifDoc.data()?['conversationId'];
+      if (conversationId is! String || conversationId.isEmpty) return null;
+
+      final convDoc =
+          await _db.collection('Conversations').doc(conversationId).get();
+      final conv = convDoc.data();
+      if (conv == null) return null;
+
+      final String customerId = (conv['customerId'] ?? '').toString().trim();
+      final String otherId = (conv['otherId'] ?? '').toString().trim();
+      final String viewerId = n.userId.trim();
+
+      final bool viewerIsCustomerSide = viewerId == customerId;
+      final String senderId = viewerIsCustomerSide ? otherId : customerId;
+      final dynamic senderRole =
+          viewerIsCustomerSide ? conv['otherRole'] : conv['customerRole'];
+      if (senderId.isEmpty || senderId == viewerId) return null;
+
+      final senderDoc =
+          await _db.collection(_collectionForRole(senderRole)).doc(senderId).get();
+      final data = senderDoc.data();
+      if (data == null) return null;
+
+      return {
+        'name': _nonEmpty(data['name']) ?? _nonEmpty(data['shopName']),
+        'profilePicture': _nonEmpty(data['profilePicture']),
+      };
+    } catch (e) {
+      debugPrint('Error resolving message sender: $e');
+      return null;
+    }
+  }
+
+  /// Maps a stored `customerRole`/`otherRole` value to its profile collection.
+  /// Falls back to `Customer`, which has no `profilePicture` and so degrades to
+  /// an initials avatar rather than showing the wrong person.
+  static String _collectionForRole(dynamic role) {
+    switch ((role ?? '').toString().toLowerCase().trim()) {
+      case 'tailor':
+        return 'Tailor';
+      case 'retailer':
+        return 'Retailer';
+      default:
+        return 'Customer';
+    }
   }
 
   /// Treats an empty/blank stored URL the same as a missing one, so the UI
@@ -409,6 +488,10 @@ class NotificationService {
 
 
 
+  /// [extraFields] are written onto the document but are not part of
+  /// [AppNotification] — they exist purely so a notification can be located
+  /// again later (see [markMessageNotificationsRead]). Reading the doc back
+  /// ignores them, so the model stays unchanged.
   Future<void> _sendNotification({
     required String userId,
     required UserRole userRole,
@@ -416,6 +499,7 @@ class NotificationService {
     required String message,
     required String orderId,
     String? subOrderId,
+    Map<String, dynamic>? extraFields,
   }) async {
     final docRef = _db.collection(_collection).doc();
     final notification = AppNotification(
@@ -429,7 +513,10 @@ class NotificationService {
       subOrderId: subOrderId,
       isRead: false,
     );
-    await docRef.set(notification.toJson());
+    await docRef.set({
+      ...notification.toJson(),
+      ...?extraFields,
+    });
   }
 
 
@@ -465,6 +552,43 @@ class NotificationService {
   }
 
 
+
+
+  /// A tailor answered the request with a price. This is NOT a confirmation —
+  /// the customer still has to accept and pay — so it must not reuse
+  /// [notifyCustomerOrderConfirmed], which tells them the opposite.
+  Future<void> notifyCustomerQuoteReceived(
+      String customerId,
+      String orderId,
+      String tailorName,
+      ) async {
+    await _sendNotification(
+      userId: customerId,
+      userRole: UserRole.customer,
+      type: NotificationDbType.quoteReceived,
+      message:
+          '$tailorName sent a quote for order #$orderId. Review it to confirm your stitching.',
+      orderId: orderId,
+    );
+  }
+
+
+  /// A tailoring window closed with nothing confirmed. Without this the
+  /// order silently reset and the customer went on waiting for a tailor who
+  /// was never coming.
+  Future<void> notifyCustomerQuoteExpired(
+      String customerId,
+      String orderId,
+      String message,
+      ) async {
+    await _sendNotification(
+      userId: customerId,
+      userRole: UserRole.customer,
+      type: NotificationDbType.quoteExpired,
+      message: message,
+      orderId: orderId,
+    );
+  }
 
 
   Future<void> notifyCustomerOrderCancelled(
@@ -528,12 +652,24 @@ class NotificationService {
 
 
 
+  /// Nudges the tailor to answer a request before their response window
+  /// closes. Raised by the tailor's own device (no Cloud Functions), so it
+  /// dedupes per job the same way the delivery reminder does — otherwise
+  /// every snapshot and every app launch would add another copy.
   Future<void> notifyTailorConfirmOrder(
       String tailorId,
       String orderId,
       String customerName,
       String itemName,
       ) async {
+    if (await _alreadySent(
+      userId: tailorId,
+      type: NotificationDbType.selectionDeadlineReminder,
+      orderId: orderId,
+    )) {
+      return;
+    }
+
     await _sendNotification(
       userId: tailorId,
       userRole: UserRole.tailor,
@@ -602,6 +738,35 @@ class NotificationService {
 
 
 
+  /// Every sub-order on this job has reached the tailor, so there is fabric
+  /// on the bench to sew. Deduped per job: only the arrival that completes
+  /// the set should raise it, and that check can re-run.
+  Future<void> notifyTailorMaterialsArrived(
+      String tailorId,
+      String orderId,
+      String customerName,
+      ) async {
+    if (await _alreadySent(
+      userId: tailorId,
+      type: NotificationDbType.materialsArrived,
+      orderId: orderId,
+    )) {
+      return;
+    }
+
+    await _sendNotification(
+      userId: tailorId,
+      userRole: UserRole.tailor,
+      type: NotificationDbType.materialsArrived,
+      message:
+          'All materials for $customerName\'s order #$orderId have arrived. You can start stitching.',
+      orderId: orderId,
+    );
+  }
+
+
+
+
   Future<void> notifyTailorOrderCancelled(
       String tailorId,
       String orderId,
@@ -613,7 +778,10 @@ class NotificationService {
       userId: tailorId,
       userRole: UserRole.tailor,
       type: NotificationDbType.jobRejected,
-      message: '$customerName cancelled their order for $itemName. Reason: $cancelReason',
+      // The card is already titled "Order Cancelled" and the footer carries the
+      // order id, so the message does not repeat either. The reason stays in
+      // the string — the card splits it out for the "View Reason" button.
+      message: '$customerName cancelled $itemName. Reason: $cancelReason',
       orderId: orderId,
     );
   }
@@ -682,6 +850,50 @@ class NotificationService {
       message: 'A tailor ($tailorName) has been assigned to $customerName\'s order #$orderId.',
       orderId: orderId,
     );
+  }
+
+
+
+
+// ─── Shared Notifications ──────────────────────────────────────────────────
+
+
+
+
+  /// Clears any "New message" cards [userId] still holds for [conversationId],
+  /// called when they open and read the thread.
+  ///
+  /// Nothing raises these cards any more — chat now announces itself through
+  /// the unread badge on the drawer's "Messages" entry
+  /// ([MessagingService.getTotalUnreadCount]) instead. This is kept so cards
+  /// written before that change still clear out of the bell as their threads
+  /// are read, rather than sitting there unread forever.
+  ///
+  /// Equality-only filters, so Firestore serves this without a composite index.
+  Future<void> markMessageNotificationsRead(
+    String userId,
+    String conversationId,
+  ) async {
+    final cleanUserId = userId.trim();
+    if (cleanUserId.isEmpty || conversationId.isEmpty) return;
+    try {
+      final snap = await _db
+          .collection(_collection)
+          .where('userId', isEqualTo: cleanUserId)
+          .where('type', isEqualTo: NotificationDbType.newMessage.name)
+          .where('conversationId', isEqualTo: conversationId)
+          .where('isRead', isEqualTo: false)
+          .get();
+      if (snap.docs.isEmpty) return;
+
+      final batch = _db.batch();
+      for (final doc in snap.docs) {
+        batch.update(doc.reference, {'isRead': true});
+      }
+      await batch.commit();
+    } catch (e) {
+      debugPrint('[NotificationService] clearing message notifications failed: $e');
+    }
   }
 
 

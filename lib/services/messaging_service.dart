@@ -7,6 +7,7 @@ import '../models/conversation.dart';
 import '../models/message.dart';
 import '../models/user_role.dart';
 import 'Cloudinary_service.dart';
+import 'notification_service.dart';
 
 class MessagingService {
   MessagingService({FirebaseFirestore? firestore})
@@ -275,11 +276,20 @@ class MessagingService {
       final Map<String, dynamic> updates = {
         'unreadCounts.$cleanUserId': 0,
         'lastReadAt': FieldValue.serverTimestamp(),
+        // Per-user read stamp. `lastReadAt` above is shared by both parties, so
+        // it cannot say whether *this* user is currently in the thread — which
+        // is what the sender checks before raising a "New message" card.
+        'readAts.$cleanUserId': FieldValue.serverTimestamp(),
       };
       if (lastSenderId != cleanUserId) {
         updates['lastMessageRead'] = true;
       }
       await conversationRef.update(updates);
+
+      // Reading the thread also retires its "New message" card, so the bell
+      // badge stops counting a message the user has already seen.
+      await NotificationService()
+          .markMessageNotificationsRead(cleanUserId, conversationId);
 
       debugPrint('[MessagingService] ✅ Messages marked read for $cleanUserId');
     } catch (e) {
@@ -431,6 +441,29 @@ class MessagingService {
       debugPrint('[MessagingService] ❌ Error sending message: $e');
       rethrow;
     }
+  }
+
+  /// Total unread messages waiting for [userId] across every thread they are
+  /// still part of — the badge on the drawer's "Messages" entry.
+  ///
+  /// A new message deliberately raises no notification card any more: an
+  /// active thread would otherwise keep dropping cards into the bell for
+  /// something the inbox already shows. The badge is derived from the same
+  /// `unreadCounts` the inbox uses, so opening a thread clears it for free via
+  /// [markMessagesRead].
+  Stream<int> getTotalUnreadCount(String userId) {
+    final cleanUserId = userId.trim();
+    if (cleanUserId.isEmpty) return Stream.value(0);
+    return getConversations(cleanUserId).map((conversations) {
+      var total = 0;
+      for (final c in conversations) {
+        // Blocked threads stay in the inbox but must not pull attention back
+        // to a conversation the user has deliberately shut down.
+        if (c.isBlocked) continue;
+        total += c.unreadCounts[cleanUserId] ?? 0;
+      }
+      return total;
+    });
   }
 
   /// Deletes a message and, when it was the newest one, refreshes the

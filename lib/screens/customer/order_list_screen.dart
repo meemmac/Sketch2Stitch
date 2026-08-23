@@ -19,11 +19,29 @@ class OrderListScreen extends StatefulWidget {
 }
 
 class _OrderListScreenState extends State<OrderListScreen> {
-  Stream<List<Order>> _getOrdersStream() {
-    return FirebaseAuth.instance.authStateChanges().asyncExpand((user) {
-      if (user == null) return Stream.value([]);
-      return OrderService().streamCustomerOrders(user.uid);
-    });
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  /// Built once, never inside [build].
+  ///
+  /// Typing calls setState on every keystroke, and a stream created in build
+  /// is a new object each time — StreamBuilder would tear down its
+  /// subscription and resubscribe per character, falling back to the spinner
+  /// and re-running the whole query. That query is not cheap:
+  /// `streamCustomerOrders` awaits a Sub-orders and a Tailor-jobs fetch for
+  /// every order in turn, so each keystroke cost 2xN serial round-trips.
+  /// Searching is a pure in-memory filter over what this already emitted.
+  late final Stream<List<Order>> _ordersStream = FirebaseAuth.instance
+      .authStateChanges()
+      .asyncExpand((user) {
+    if (user == null) return Stream.value(<Order>[]);
+    return OrderService().streamCustomerOrders(user.uid);
+  });
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
 
@@ -54,29 +72,106 @@ class _OrderListScreenState extends State<OrderListScreen> {
         ),
         centerTitle: false,
       ),
-      body: StreamBuilder<List<Order>>(
-        stream: _getOrdersStream(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: Color(0xFF2E7D32)));
-          }
+      body: Column(
+        children: [
+          _buildSearchBar(),
+          Expanded(
+            child: StreamBuilder<List<Order>>(
+              stream: _ordersStream,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator(color: Color(0xFF2E7D32)));
+                }
 
 
-          final orders = snapshot.data ?? [];
-          
-          if (orders.isEmpty) {
-            return _buildEmptyState();
-          }
+                final orders = snapshot.data ?? [];
+
+                if (orders.isEmpty) {
+                  return _buildEmptyState();
+                }
+
+                final query = _searchQuery.trim().toLowerCase();
+                final visibleOrders = query.isEmpty
+                    ? orders
+                    : orders.where((o) => o.id.toLowerCase().contains(query)).toList();
+
+                if (visibleOrders.isEmpty) {
+                  return _buildNoMatchState();
+                }
 
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: orders.length,
-            itemBuilder: (context, index) {
-              return _buildOrderCard(orders[index]);
-            },
-          );
-        },
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: visibleOrders.length,
+                  itemBuilder: (context, index) {
+                    return _buildOrderCard(visibleOrders[index]);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  Widget _buildSearchBar() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: TextField(
+        controller: _searchController,
+        textInputAction: TextInputAction.search,
+        onChanged: (value) => setState(() => _searchQuery = value),
+        decoration: InputDecoration(
+          hintText: 'Search by Order ID',
+          hintStyle: TextStyle(fontSize: 14, color: Colors.grey.shade400),
+          prefixIcon: Icon(Icons.search, color: Colors.grey.shade500),
+          suffixIcon: _searchQuery.isEmpty
+              ? null
+              : IconButton(
+                  icon: Icon(Icons.close, size: 18, color: Colors.grey.shade500),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                ),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          filled: true,
+          fillColor: const Color(0xFFF6FAF6),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: Colors.green.shade400),
+          ),
+        ),
+      ),
+    );
+  }
+
+
+  Widget _buildNoMatchState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.search_off, size: 64, color: Colors.grey.shade300),
+          const SizedBox(height: 12),
+          Text(
+            'No orders match "${_searchQuery.trim()}"',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+          ),
+        ],
       ),
     );
   }

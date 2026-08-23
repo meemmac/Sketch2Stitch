@@ -227,6 +227,12 @@ class TailoringService {
       SubOrderDeliveryDestination.customer,
     );
     await _commit(batch, 'expireTailorSearch');
+
+    await _notifyQuoteExpired(
+      orderId,
+      'The tailoring window for order #$orderId closed without a tailor. '
+      'Your materials will be delivered to you directly.',
+    );
   }
 
   /// The tailor let their 12h response window lapse without quoting.
@@ -256,6 +262,12 @@ class TailoringService {
       SubOrderDeliveryDestination.pending,
     );
     await _commit(batch, 'expireQuoteRequest');
+
+    await _notifyQuoteExpired(
+      orderId,
+      'The tailor did not respond in time for order #$orderId. '
+      'You can hire another tailor.',
+    );
   }
 
   /// True if [job] is a `pending` request whose 12h quote window has closed.
@@ -676,6 +688,20 @@ class TailoringService {
       }
     } catch (e) {
       debugPrint('[TailoringService] job-requested notifications failed: $e');
+    }
+  }
+
+  /// Tells the customer a tailoring window lapsed. Best-effort: the expiry is
+  /// already committed, so a failed notification must not fail it.
+  Future<void> _notifyQuoteExpired(String orderId, String message) async {
+    try {
+      final orderSnap = await _db.collection(_orders).doc(orderId).get();
+      final customerId = orderSnap.data()?['customerId'] as String?;
+      if (customerId == null) return;
+      await NotificationService()
+          .notifyCustomerQuoteExpired(customerId, orderId, message);
+    } catch (e) {
+      debugPrint('[TailoringService] quote-expired notification failed: $e');
     }
   }
 
