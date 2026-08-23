@@ -8,14 +8,23 @@ class Conversation {
   final String otherId;
   final UserRole otherRole;
   final String orderId;
-  // 🆕 New fields for messaging features
-  final int unreadCount;
+  
+  // 🛡️ Denormalized fields for zero-latency inbox sync
+  final String? lastMessage;
+  final String? lastSenderId;
+  final bool? lastMessageRead; 
+  
+  // 🛡️ Per-user unread tracking to prevent badges showing for senders
+  final Map<String, int> unreadCounts; 
+  
   final DateTime? lastReadAt;
   final bool isBlocked;
+  final String? blockedBy;
   final DateTime? updatedAt;
   final bool isDeleted;
   final DateTime? deletedAt;
   final String? deletedBy;
+  
   // Relationships
   List<Message>? messages;
 
@@ -25,9 +34,13 @@ class Conversation {
     required this.otherId,
     required this.otherRole,
     required this.orderId,
-    this.unreadCount = 0,
+    this.lastMessage,
+    this.lastSenderId,
+    this.lastMessageRead,
+    this.unreadCounts = const {},
     this.lastReadAt,
     this.isBlocked = false,
+    this.blockedBy,
     this.updatedAt,
     this.isDeleted = false,
     this.deletedAt,
@@ -41,9 +54,13 @@ class Conversation {
     String? otherId,
     UserRole? otherRole,
     String? orderId,
-    int? unreadCount,
+    String? lastMessage,
+    String? lastSenderId,
+    bool? lastMessageRead,
+    Map<String, int>? unreadCounts,
     DateTime? lastReadAt,
     bool? isBlocked,
+    String? blockedBy,
     DateTime? updatedAt,
     bool? isDeleted,
     DateTime? deletedAt,
@@ -56,9 +73,13 @@ class Conversation {
       otherId: otherId ?? this.otherId,
       otherRole: otherRole ?? this.otherRole,
       orderId: orderId ?? this.orderId,
-      unreadCount: unreadCount ?? this.unreadCount,
+      lastMessage: lastMessage ?? this.lastMessage,
+      lastSenderId: lastSenderId ?? this.lastSenderId,
+      lastMessageRead: lastMessageRead ?? this.lastMessageRead,
+      unreadCounts: unreadCounts ?? this.unreadCounts,
       lastReadAt: lastReadAt ?? this.lastReadAt,
       isBlocked: isBlocked ?? this.isBlocked,
+      blockedBy: blockedBy ?? this.blockedBy,
       updatedAt: updatedAt ?? this.updatedAt,
       isDeleted: isDeleted ?? this.isDeleted,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -67,27 +88,26 @@ class Conversation {
     );
   }
 
-  /// Use this for writing to Firestore directly (native Timestamp type,
-  /// matches the "timestamp" type declared in the schema).
+  /// Use this for writing to Firestore directly.
   Map<String, dynamic> toJson() => {
     'id': id,
     'customerId': customerId,
     'otherId': otherId,
     'otherRole': otherRole.name,
     'orderId': orderId,
-    'unreadCount': unreadCount,
+    'lastMessage': lastMessage,
+    'lastSenderId': lastSenderId,
+    'lastMessageRead': lastMessageRead,
+    'unreadCounts': unreadCounts,
     'lastReadAt': lastReadAt != null ? Timestamp.fromDate(lastReadAt!) : null,
     'isBlocked': isBlocked,
+    'blockedBy': blockedBy,
     'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
     'isDeleted': isDeleted,
     'deletedAt': deletedAt != null ? Timestamp.fromDate(deletedAt!) : null,
     'deletedBy': deletedBy,
   };
 
-  /// Handles both native Firestore Timestamp (current/new docs) and
-  /// ISO8601 strings (legacy docs written before this fix), plus a safe
-  /// numeric cast for unreadCount (guards against int64 vs double
-  /// ambiguity coming back from Firestore).
   factory Conversation.fromJson(Map<String, dynamic> json) {
     DateTime? _parseDate(dynamic value) {
       if (value == null) return null;
@@ -102,9 +122,15 @@ class Conversation {
       otherId: json['otherId'] ?? '',
       otherRole: UserRole.values.byName(json['otherRole'] ?? 'tailor'),
       orderId: json['orderId'] ?? '',
-      unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
+      lastMessage: json['lastMessage'],
+      lastSenderId: json['lastSenderId'],
+      lastMessageRead: json['lastMessageRead'] as bool?,
+      unreadCounts: (json['unreadCounts'] as Map<String, dynamic>?)?.map(
+            (key, value) => MapEntry(key, (value as num).toInt()),
+          ) ?? {},
       lastReadAt: _parseDate(json['lastReadAt']),
       isBlocked: json['isBlocked'] ?? false,
+      blockedBy: json['blockedBy'],
       updatedAt: _parseDate(json['updatedAt']),
       isDeleted: json['isDeleted'] ?? false,
       deletedAt: _parseDate(json['deletedAt']),

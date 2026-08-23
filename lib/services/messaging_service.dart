@@ -15,13 +15,9 @@ class MessagingService {
 
   static const String _conversations = 'Conversations';
   static const String _messages = 'Messages';
-  static const String _customers = 'Customer';
-  static const String _tailors = 'Tailor';
-  static const String _retailers = 'Retailer';
 
   // ─── Conversation Management ──────────────────────────────────────────────
 
-  /// Fetches a specific conversation by ID.
   Future<Conversation?> getConversationByConversationId(String conversationId) async {
     try {
       final doc = await _db.collection(_conversations).doc(conversationId).get();
@@ -33,74 +29,50 @@ class MessagingService {
     }
   }
 
-  /// Streams all conversations for a specific customer.
-  Stream<List<Conversation>> getConversationsByCustomerId(String customerId) {
-    return _db
-        .collection(_conversations)
-        .where('customerId', isEqualTo: customerId)
-        .where('isDeleted', isEqualTo: false)
-        .orderBy('updatedAt', descending: true)
-        .snapshots()
-        .map((snap) => snap.docs
-            .map((doc) => Conversation.fromJson({...doc.data(), 'id': doc.id}))
-            .toList());
-  }
-
-  /// Streams all conversations for a user (Customer, Tailor, or Retailer).
   Stream<List<Conversation>> getConversations(String userId) {
     final String cleanUserId = userId.trim();
-    
-    // 🧠 Real-time collection listener with local filtering for maximum reliability.
     return _db
         .collection(_conversations)
         .where('isDeleted', isEqualTo: false)
         .snapshots()
         .map((snap) {
       final List<Conversation> results = [];
-      
       for (var doc in snap.docs) {
         final data = doc.data();
         final String cId = (data['customerId'] ?? '').toString().trim();
         final String oId = (data['otherId'] ?? '').toString().trim();
-        
-        // 🛡️ Ensure I only see conversations I am part of
         if (cId == cleanUserId || oId == cleanUserId) {
           results.add(Conversation.fromJson({...data, 'id': doc.id}));
         }
       }
-
-      // Sort: Newest activity at the top
       results.sort((a, b) {
         final dateA = a.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
         final dateB = b.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
         return dateB.compareTo(dateA);
       });
-
       return results;
     });
   }
 
-  /// Fetches an existing conversation between two users for a specific order.
-  /// 🧠 Includes otherRole to prevent collisions between different roles with same ID
+  Stream<Conversation?> streamConversation(String conversationId) {
+    if (conversationId.startsWith('TEMP-')) return Stream.value(null);
+    return _db
+        .collection(_conversations)
+        .doc(conversationId)
+        .snapshots()
+        .map((snap) => snap.exists ? Conversation.fromJson({...snap.data()!, 'id': snap.id}) : null);
+  }
+
   Future<Conversation?> getConversationBetween(String customerId, String otherId, {UserRole? otherRole, String? orderId}) async {
     try {
       Query query = _db.collection(_conversations)
           .where('customerId', isEqualTo: customerId)
           .where('otherId', isEqualTo: otherId);
-      
-      if (otherRole != null) {
-        query = query.where('otherRole', isEqualTo: otherRole.name);
-      }
-
-
-      if (orderId != null) {
-        query = query.where('orderId', isEqualTo: orderId);
-      }
-
+      if (otherRole != null) query = query.where('otherRole', isEqualTo: otherRole.name);
+      if (orderId != null) query = query.where('orderId', isEqualTo: orderId);
 
       final snap = await query.limit(1).get();
       if (snap.docs.isEmpty) return null;
-      
       return Conversation.fromJson({...snap.docs.first.data() as Map<String, dynamic>, 'id': snap.docs.first.id});
     } catch (e) {
       debugPrint('Error fetching conversation between users: $e');
@@ -110,7 +82,6 @@ class MessagingService {
 
   // ─── Typing Status ────────────────────────────────────────────────────────
 
-  /// Sets the typing status for a user in a conversation.
   Future<void> setTypingStatus(String conversationId, String userId, bool isTyping) async {
     try {
       await _db.collection(_conversations).doc(conversationId).collection('TypingStatus').doc(userId).set({
@@ -122,124 +93,71 @@ class MessagingService {
     }
   }
 
-  /// Streams the typing status of the other user in a conversation.
   Stream<bool> streamTypingStatus(String conversationId, String otherUserId) {
     return _db
-        .collection(_conversations)
-        .doc(conversationId)
-        .collection('TypingStatus')
-        .doc(otherUserId)
-        .snapshots()
-        .map((snap) => (snap.data()?['isTyping'] as bool?) ?? false);
+        .collection(_conversations).doc(conversationId).collection('TypingStatus').doc(otherUserId)
+        .snapshots().map((snap) => (snap.data()?['isTyping'] as bool?) ?? false);
   }
 
-  /// Creates a new conversation record.
+  // ─── Creation & Read Logic ────────────────────────────────────────────────
+
   Future<Conversation> createConversation({
-    required String customerId,
-    required String otherId,
-    required UserRole otherRole,
-    required String orderId,
+    required String customerId, required String otherId, required UserRole otherRole, required String orderId,
   }) async {
-    debugPrint('[MessagingService] 🛠️ Creating new conversation: $customerId <-> $otherId');
     try {
       final now = Timestamp.now();
       final data = {
-        'customerId': customerId,
-        'otherId': otherId,
+        'customerId': customerId, 
+        'otherId': otherId, 
         'otherRole': otherRole.name,
-        'orderId': orderId,
-        'unreadCount': 0,
-        'isBlocked': false,
-        'isDeleted': false,
+        'orderId': orderId, 
+        'unreadCounts': {
+          customerId: 0,
+          otherId: 0,
+        },
+        'isBlocked': false, 
+        'isDeleted': false, 
         'updatedAt': now,
       };
-
-
       final ref = await _db.collection(_conversations).add(data);
-      debugPrint('[MessagingService] ✅ Conversation created with ID: ${ref.id}');
-      
       return Conversation(
-        id: ref.id,
-        customerId: customerId,
-        otherId: otherId,
-        otherRole: otherRole,
-        orderId: orderId,
+        id: ref.id, 
+        customerId: customerId, 
+        otherId: otherId, 
+        otherRole: otherRole, 
+        orderId: orderId, 
         updatedAt: now.toDate(),
+        unreadCounts: {customerId: 0, otherId: 0},
       );
     } catch (e) {
-      debugPrint('[MessagingService] ❌ Error creating conversation: $e');
+      debugPrint('Error creating conversation: $e');
       rethrow;
     }
   }
 
-  /// Alias for [createConversation].
-  Future<Conversation> createConversationByCustomerId(
-    String customerId,
-    String otherId,
-    UserRole otherRole,
-    String orderId,
-  ) => createConversation(
-        customerId: customerId,
-        otherId: otherId,
-        otherRole: otherRole,
-        orderId: orderId,
-      );
-
-  /// Marks a conversation as read and resets unread count.
-  Future<void> markConversationReadByConversationId(String conversationId) async {
-    try {
-      await _db.collection(_conversations).doc(conversationId).update({
-        'unreadCount': 0,
-        'lastReadAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      debugPrint('Error marking conversation read: $e');
-    }
+  /// Marks a conversation as read and resets unread count for [userId].
+  Future<void> markConversationReadByConversationId(String conversationId, String userId) async {
+    await markMessagesRead(conversationId, userId);
   }
 
-  /// Marks all unread messages as read for a specific user in a conversation.
+  /// Marks all unread messages received by [userId] as read.
+  /// Also resets only that user's unread counter.
   Future<void> markMessagesRead(String conversationId, String userId) async {
     try {
       final cleanUserId = userId.trim();
-      
-      // 🛡️ Step 1: Fetch the most recent message to check who sent it
-      final lastMsgSnap = await _db
-          .collection(_messages)
-          .where('conversationId', isEqualTo: conversationId)
-          .orderBy('sentAt', descending: true)
-          .limit(1)
-          .get();
+      final conversationRef = _db.collection(_conversations).doc(conversationId);
 
-      if (lastMsgSnap.docs.isNotEmpty) {
-        final lastSenderId = (lastMsgSnap.docs.first.data()['senderId'] ?? '').toString().trim();
-        
-        // 🚫 Step 2: If I am the one who sent the last message, do NOT clear unreadCount.
-        if (lastSenderId == cleanUserId) {
-          debugPrint('[MessagingService] ℹ️ User is the sender. Skipping unread reset.');
-          return;
-        }
-      }
-
-
-      final batch = _db.batch();
-      
-      // 3. Reset the unread count only for the receiver
-      batch.update(_db.collection(_conversations).doc(conversationId), {
-        'unreadCount': 0,
-        'lastReadAt': FieldValue.serverTimestamp(),
-      });
-
-
-      // 4. Mark individual messages as read
-      final unreadMessages = await _db
-          .collection(_messages)
+      final unreadQuery = await _db.collection(_messages)
           .where('conversationId', isEqualTo: conversationId)
           .where('isRead', isEqualTo: false)
           .get();
 
+      final batch = _db.batch();
 
-      for (var doc in unreadMessages.docs) {
-        if (doc.data()['senderId'].toString().trim() != cleanUserId) {
+      for (final doc in unreadQuery.docs) {
+        final senderId = (doc.data()['senderId'] ?? '').toString().trim();
+        // Only mark messages RECEIVED by the current user.
+        if (senderId != cleanUserId) {
           batch.update(doc.reference, {
             'isRead': true,
             'readAt': FieldValue.serverTimestamp(),
@@ -247,127 +165,110 @@ class MessagingService {
         }
       }
 
+      // Reset only this user's unread count in the Map.
+      batch.update(conversationRef, {
+        'unreadCounts.$cleanUserId': 0,
+        'lastReadAt': FieldValue.serverTimestamp(),
+        'lastMessageRead': true, 
+      });
 
       await batch.commit();
-      debugPrint('[MessagingService] ✅ Receiver read the messages. UI will sync.');
+      debugPrint('[MessagingService] ✅ Messages marked read for $cleanUserId');
     } catch (e) {
-      debugPrint('Error marking messages read: $e');
+      debugPrint('[MessagingService] ❌ Error marking messages read: $e');
     }
   }
 
-  /// Soft deletes a conversation.
-  Future<void> deleteConversationByConversationId(String conversationId) async {
-    try {
-      await _db.collection(_conversations).doc(conversationId).update({
-        'isDeleted': true,
-        'deletedAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      debugPrint('Error deleting conversation: $e');
-    }
-  }
+  // ─── Blocking & Deletion ──────────────────────────────────────────────────
 
-  /// Blocks a conversation.
-  Future<void> blockConversationByConversationId(String conversationId) async {
+  Future<void> blockConversationByConversationId(String conversationId, String userId) async {
     try {
       await _db.collection(_conversations).doc(conversationId).update({
-        'isBlocked': true,
+        'isBlocked': true, 
+        'blockedBy': userId,
       });
     } catch (e) {
       debugPrint('Error blocking conversation: $e');
     }
   }
 
-  /// Unblocks a conversation.
   Future<void> unblockConversationByConversationId(String conversationId) async {
     try {
       await _db.collection(_conversations).doc(conversationId).update({
-        'isBlocked': false,
+        'isBlocked': false, 
+        'blockedBy': FieldValue.delete(),
       });
     } catch (e) {
       debugPrint('Error unblocking conversation: $e');
     }
   }
 
+  Future<void> deleteConversationByConversationId(String conversationId) async {
+    try {
+      await _db.collection(_conversations).doc(conversationId).update({'isDeleted': true, 'deletedAt': FieldValue.serverTimestamp()});
+    } catch (e) {
+      debugPrint('Error deleting conversation: $e');
+    }
+  }
+
   // ─── Message Management ──────────────────────────────────────────────────
 
-  /// Fetches chat history for a specific conversation.
-  Stream<List<Message>> getMessagesByConversationId(String conversationId) {
-    return _db
-        .collection(_messages)
+  Stream<Message?> getLatestMessage(String conversationId) {
+    return _db.collection(_messages)
         .where('conversationId', isEqualTo: conversationId)
-        // 🧠 Removed orderBy to prevent messages from "vanishing" while server timestamp is null.
-        .snapshots()
-        .map((snap) {
-          final messages = snap.docs
-            .map((doc) => Message.fromJson({...doc.data(), 'id': doc.id}))
-            .toList();
-          
-          // Sort in memory instead: Oldest messages at the top.
+        .orderBy('sentAt', descending: true).limit(1)
+        .snapshots().map((snap) => snap.docs.isNotEmpty 
+            ? Message.fromJson({...snap.docs.first.data(), 'id': snap.docs.first.id}) : null);
+  }
+
+  Stream<List<Message>> getMessagesByConversationId(String conversationId) {
+    return _db.collection(_messages).where('conversationId', isEqualTo: conversationId)
+        .snapshots().map((snap) {
+          final messages = snap.docs.map((doc) => Message.fromJson({...doc.data(), 'id': doc.id})).toList();
           messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
           return messages;
         });
   }
 
-  /// Fetches paginated messages for a conversation.
-  Future<List<Message>> getMessages(String conversationId, {int limit = 20, DocumentSnapshot? lastDocument}) async {
-    try {
-      Query query = _db
-          .collection(_messages)
-          .where('conversationId', isEqualTo: conversationId)
-          .orderBy('sentAt', descending: true)
-          .limit(limit);
-
-      if (lastDocument != null) {
-        query = query.startAfterDocument(lastDocument);
-      }
-
-      final snap = await query.get();
-      return snap.docs
-          .map((doc) => Message.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id}))
-          .toList();
-    } catch (e) {
-      debugPrint('Error fetching paginated messages: $e');
-      return [];
-    }
-  }
-
-  /// Sends a message and updates the conversation timestamp and unread count.
+  /// Sends a message and updates the conversation metadata atomically.
   Future<void> sendMessage(String conversationId, String senderId, Map<String, dynamic> data) async {
+    final cleanSenderId = senderId.trim();
     try {
       final msgData = {
-        ...data,
-        'conversationId': conversationId,
-        'senderId': senderId,
-        'sentAt': FieldValue.serverTimestamp(),
+        ...data, 
+        'conversationId': conversationId, 
+        'senderId': cleanSenderId, 
+        'sentAt': FieldValue.serverTimestamp(), 
         'isRead': false,
       };
 
-
-      // 1. Add Message document first
+      // 1. Add Message document
       await _db.collection(_messages).add(msgData);
 
+      // 🛡️ Find the receiver to increment their specific unread count
+      final convDoc = await _db.collection(_conversations).doc(conversationId).get();
+      if (!convDoc.exists) return;
+      
+      final convData = convDoc.data()!;
+      final String cId = (convData['customerId'] ?? '').toString().trim();
+      final String oId = (convData['otherId'] ?? '').toString().trim();
+      final String receiverId = (cId == cleanSenderId) ? oId : cId;
 
-      // 2. Update Conversation document separately
+      // 2. Update Conversation metadata
       await _db.collection(_conversations).doc(conversationId).set({
         'updatedAt': FieldValue.serverTimestamp(),
-        'unreadCount': FieldValue.increment(1),
+        'unreadCounts.$receiverId': FieldValue.increment(1),
+        'lastMessage': data['msgText'] ?? (data['attachment'] != null ? '📷 Photo' : ''),
+        'lastSenderId': cleanSenderId,
+        'lastMessageRead': false, 
         'isDeleted': false,
       }, SetOptions(merge: true));
-      
-      debugPrint('[MessagingService] ✅ Conversation metadata UPDATED');
     } catch (e) {
-      debugPrint('[MessagingService] ❌ CRITICAL Error: $e');
+      debugPrint('[MessagingService] ❌ Error sending message: $e');
       rethrow;
     }
   }
 
-  /// Alias for [sendMessage] but takes a [Message] object.
-  Future<void> sendMessageByConversationId(String conversationId, Message message) async {
-    await sendMessage(conversationId, message.senderId, message.toJson());
-  }
-
-  /// Deletes a specific message by ID.
   Future<void> deleteMessageByMessageId(String messageId) async {
     try {
       await _db.collection(_messages).doc(messageId).delete();
@@ -376,91 +277,47 @@ class MessagingService {
     }
   }
 
-  // ─── Attachments ──────────────────────────────────────────────────────────
-
-  /// Uploads a file to Cloudinary and returns the URL.
-  Future<String?> uploadAttachmentFile(File file) async {
-    return await _cloudinary.uploadImage(file, folder: 'chat_attachments');
-  }
+  Future<String?> uploadAttachmentFile(File file) async => await _cloudinary.uploadImage(file, folder: 'chat_attachments');
 
   // ─── User Search ──────────────────────────────────────────────────────────
 
-  /// Fetches basic user info (name, profilePicture) for any role.
   Future<Map<String, dynamic>?> getUserBasicInfo(String userId, UserRole role) async {
     try {
-      final collection = role == UserRole.customer 
-          ? _customers 
-          : (role == UserRole.tailor ? _tailors : _retailers);
-      
+      final collection = role == UserRole.customer ? 'Customer' : (role == UserRole.tailor ? 'Tailor' : 'Retailer');
       final doc = await _db.collection(collection).doc(userId).get();
       if (!doc.exists || doc.data() == null) return null;
-      
       final data = doc.data()!;
-      return {
-        'id': userId,
-        'name': data['name'] ?? data['shopName'] ?? 'Unknown',
-        'profilePicture': data['profilePicture'],
-        'role': role.name,
-      };
+      return {'id': userId, 'name': data['name'] ?? data['shopName'] ?? 'Unknown', 'profilePicture': data['profilePicture'], 'role': role.name};
     } catch (e) {
       debugPrint('Error getting user basic info: $e');
       return null;
     }
   }
 
-  /// Searches for users across Customers, Tailors, and Retailers by name, shopName, or phone.
   Future<List<Map<String, dynamic>>> searchUsersByNameOrPhone(String query) async {
     if (query.isEmpty) return [];
-    
     try {
       final List<Map<String, dynamic>> results = [];
-      final collections = [_customers, _tailors, _retailers];
+      final collections = ['Customer', 'Tailor', 'Retailer'];
       final lowercaseQuery = query.toLowerCase();
-
       for (var col in collections) {
         try {
-          // 🧠 Fetching docs and filtering in memory to ensure maximum flexibility
-          // This handles Case-Insensitivity, Partial Matches, and Number vs String for phone.
           final snap = await _db.collection(col).get();
-          
           for (var doc in snap.docs) {
             final data = doc.data();
-            final role = col == _customers ? 'customer' : (col == _tailors ? 'tailor' : 'retailer');
-            
-            // 🛡️ Safe conversion to String for all searchable fields
+            final role = col == 'Customer' ? 'customer' : (col == 'Tailor' ? 'tailor' : 'retailer');
             final String rawName = (data['name'] ?? '').toString();
             final String rawShopName = (data['shopName'] ?? '').toString();
             final String rawPhone = (data['phone'] ?? '').toString();
-            
-            final name = rawName.toLowerCase();
-            final shopName = rawShopName.toLowerCase();
-            
-            // Check for match in Name, Shop Name, or Phone
-            if (name.contains(lowercaseQuery) || 
-                shopName.contains(lowercaseQuery) || 
-                rawPhone.contains(query)) {
-              
-              // Unique results by ID + Role
+            if (rawName.toLowerCase().contains(lowercaseQuery) || rawShopName.toLowerCase().contains(lowercaseQuery) || rawPhone.contains(query)) {
               if (!results.any((r) => r['id'] == doc.id && r['role'] == role)) {
-                results.add({
-                  'id': doc.id,
-                  'name': rawShopName.isNotEmpty ? rawShopName : (rawName.isNotEmpty ? rawName : 'Unknown'),
-                  'profilePicture': data['profilePicture']?.toString(),
-                  'phone': rawPhone,
-                  'role': role,
-                });
+                results.add({'id': doc.id, 'name': rawShopName.isNotEmpty ? rawShopName : (rawName.isNotEmpty ? rawName : 'Unknown'), 'profilePicture': data['profilePicture']?.toString(), 'phone': rawPhone, 'role': role});
               }
             }
           }
-        } catch (innerError) {
-          debugPrint('[MessagingService] Skip bad record in $col: $innerError');
-        }
+        } catch (innerError) { debugPrint('Skip bad record in $col: $innerError'); }
       }
-      
       return results;
-    } catch (e) {
-      debugPrint('Error searching users: $e');
-      return [];
-    }
+    } catch (e) { debugPrint('Error searching users: $e'); return []; }
   }
 }
