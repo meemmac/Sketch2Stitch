@@ -127,8 +127,9 @@ class CustomerOrder {
   final bool tailorUnpaid;
 
   bool get canReviewAnyone =>
-      deliveredRetailerNames.any((r) => retailerReviews?[r] == null) ||
-      (tailorJobCompleted && tailorReview == null);
+      isDelivered &&
+      (deliveredRetailerNames.any((r) => retailerReviews?[r] == null) ||
+      (tailorJobCompleted && tailorReview == null));
 
   CustomerOrder({
     required this.id,
@@ -1297,11 +1298,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ),
                     ],
                   ),
-                  // Reviewing is per PARTY, not per order: a shop that has
-                  // delivered can be rated while another is still preparing,
-                  // and the tailor only once the garment is finished.
+                  // Reviewing is only allowed once the entire order is delivered
+                  // (i.e. it has moved to the "Past Orders" section).
                   if (currentOrder.isDelivered ||
-                      currentOrder.canReviewAnyone ||
                       (currentOrder.retailerReviews?.isNotEmpty ?? false) ||
                       currentOrder.tailorReview != null) ...[
                     const SizedBox(height: 35),
