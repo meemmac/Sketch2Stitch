@@ -12,11 +12,13 @@ class CustomerDatabaseSeeder {
   /// to sign in as; the old hardcoded pair remain the defaults.
   static Future<void> seedData({
     String? customerUid,
-    String? targetUid,
+    String? targetRetailerUid,
+    String? targetTailorUid,
   }) async {
     final FirebaseFirestore db = FirebaseFirestore.instance;
     final String customerId = customerUid ?? "tEG3xhaGa2QgMQELVfsHlGXGbBA2";
-    final String targetId = targetUid ?? "9y8tqwjSGFcBdjj7LAy87bb2foH3";
+    final String targetRetailerId = targetRetailerUid ?? "9y8tqwjSGFcBdjj7LAy87bb2foH3";
+    final String targetTailorId = targetTailorUid ?? "EJ5i6zROajXmwiS8EXhhGcxg8PU2";
 
     debugPrint("Starting Customer Database Seeding for $customerId...");
 
@@ -75,37 +77,32 @@ class CustomerDatabaseSeeder {
 
       // --- 1b. Seed the Customer profile itself ---
       // Every screen that shows a delivery address reads it off the
-      // `Customer` document (the tailor's job sheet, the retailer's packing
-      // slip, the customer's own order summary). Seeding orders without
-      // seeding this left all three showing "N/A".
+      // `Customer` document. We only set location/address so we don't
+      // overwrite the user's real name or email that they signed up with!
       batch.set(db.collection('Customer').doc(customerId), {
-        'name': 'Maria Doe',
-        'email': 'maria.doe@example.com',
-        'phone': '+8801712345678',
         'address': 'Plot 4, Road 7, Mirpur 12, Dhaka 1216',
         'location': const GeoPoint(23.8223, 90.3654),
       }, SetOptions(merge: true));
 
       // --- 2. Create Mock Retailers & Tailors (if they don't exist) ---
-      // Each entry seeds one shop and one tailoring house. They are separate
-      // businesses that happen to share an account id here, so they get
-      // separate names — "Target Retailer/Tailor" was a placeholder that
-      // ended up on screen as if it were a real shop.
       final retailers = [
         {
-          'id': targetId,
+          'id': targetRetailerId,
+          'tailorId': targetTailorId,
           'shopName': 'Meem Fabrics',
           'tailorName': 'Meem Tailoring House',
           'address': 'Shop 12, Level 3, Bashundhara City, Panthapath, Dhaka',
         },
         {
           'id': 'mock_ret_1',
+          'tailorId': 'mock_ret_1',
           'shopName': 'Silk & Satin',
           'tailorName': 'Silk & Satin Stitching',
           'address': 'House 21, Road 5, Dhanmondi, Dhaka',
         },
         {
           'id': 'mock_ret_2',
+          'tailorId': 'mock_ret_2',
           'shopName': 'Cotton King',
           'tailorName': 'Cotton King Tailors',
           'address': 'Plot 9, Sector 4, Uttara, Dhaka',
@@ -113,25 +110,31 @@ class CustomerDatabaseSeeder {
       ];
 
       for (var r in retailers) {
-        batch.set(db.collection('Retailer').doc(r['id']), {
-          'shopName': r['shopName'],
-          'email': '${r['id']}@example.com',
-          'phone': '+8801811223344',
-          // The retailer's own screen ships to this address when a sub-order
-          // is routed to a tailor, so it cannot be left unset.
+        final retData = {
           'address': r['address'],
           'location': const GeoPoint(23.7, 90.4),
           'rating': 4.8,
-        }, SetOptions(merge: true));
-
-        batch.set(db.collection('Tailor').doc(r['id']), {
-          'name': r['tailorName'],
-          'email': '${r['id']}.tailor@example.com',
-          'phone': '+8801911223344',
+        };
+        final tailorData = {
           'address': r['address'],
           'location': const GeoPoint(23.7, 90.4),
           'rating': 4.5,
-        }, SetOptions(merge: true));
+        };
+
+        // Only overwrite name/email/phone for the fake mock accounts, 
+        // NOT the real target accounts you are signing in with!
+        if (r['id'].toString().startsWith('mock_')) {
+          retData['shopName'] = r['shopName'] as String;
+          retData['email'] = '${r['id']}@example.com';
+          retData['phone'] = '+8801811223344';
+          
+          tailorData['name'] = r['tailorName'] as String;
+          tailorData['email'] = '${r['id']}.tailor@example.com';
+          tailorData['phone'] = '+8801911223344';
+        }
+
+        batch.set(db.collection('Retailer').doc(r['id'] as String), retData, SetOptions(merge: true));
+        batch.set(db.collection('Tailor').doc(r['tailorId'] as String), tailorData, SetOptions(merge: true));
       }
 
       // --- 3. Create Products ---
@@ -151,7 +154,7 @@ class CustomerDatabaseSeeder {
         String pId = 'prod_cust_seed_$i';
         productIds.add(pId);
         batch.set(db.collection('Products').doc(pId), {
-          'retailerId': i < 3 ? targetId : 'mock_ret_${(i % 2) + 1}',
+          'retailerId': i < 3 ? targetRetailerId : 'mock_ret_${(i % 2) + 1}',
           'productName': 'Premium Fabric $i',
           'description': 'Beautiful fabric material.',
           // The exact labels the retailer's inventory form writes, so all
@@ -204,8 +207,8 @@ class CustomerDatabaseSeeder {
         String tailorJobId = "TJ-$orderId";
         
         bool isTarget = i < 3;
-        String retailerId = isTarget ? targetId : 'mock_ret_${(i % 2) + 1}';
-        String tailorId = isTarget ? targetId : 'mock_ret_${(i % 2) + 1}';
+        String retailerId = isTarget ? targetRetailerId : 'mock_ret_${(i % 2) + 1}';
+        String tailorId = isTarget ? targetTailorId : 'mock_ret_${(i % 2) + 1}';
         
         String tailorStatusValue = 'pending';
         String orderStatusText = 'Order Preparing';
@@ -307,25 +310,21 @@ class CustomerDatabaseSeeder {
         // and three lines (with quantities above 1) so the item lists, the
         // "N units" counts and the subtotal arithmetic are all visible.
         int lineCount = (i % 3 == 0) ? 3 : 1;
+        if (i == 0) lineCount = 4; // Explicit +3 more example
         if (i >= 16 && i <= 19) lineCount = 2;
         
         final List<Map<String, dynamic>> lines = [];
         for (int line = 0; line < lineCount; line++) {
-          int productIndex;
-          if (lineCount == 3) {
-            // Intentionally pick products from different retailers to create
-            // multi-retailer sub-orders for testing.
-            if (line == 0) productIndex = i % 3; // 0, 1, or 2 (targetId)
-            else if (line == 1) productIndex = 4 + (i % 2) * 2; // 4 or 6 (mock_ret_1)
-            else productIndex = 3 + (i % 2) * 2; // 3 or 5 or 7 (mock_ret_2)
+          int productIndex = (i * 3 + line) % productImages.length;
+          
+          if (i == 0) {
+            productIndex = line % 3; // Force products 0, 1, 2 (all targetRetailerId)
           } else if (i >= 16 && i <= 19) {
-            if (line == 0) productIndex = 1; // targetId
+            if (line == 0) productIndex = 1; // targetRetailerId
             else productIndex = 4; // mock_ret_1
-          } else {
-            productIndex = (i + line) % productImages.length;
           }
 
-          String lineRetailerId = productIndex < 3 ? targetId : 'mock_ret_${(productIndex % 2) + 1}';
+          String lineRetailerId = (productIndex < 3) ? targetRetailerId : 'mock_ret_${(productIndex % 2) + 1}';
 
           lines.add({
             'productId': productIds[productIndex],

@@ -1076,62 +1076,77 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               
               String? rStatus = _getRetailerSubOrderStatus(rName, order);
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade200)
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(rName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
-                        if (rStatus != null)
-                          Text(rStatus, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: primaryGreen)),
-                      ]
-                    ),
-                    const Divider(height: 16),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
+              bool isExpanded = false;
+              return StatefulBuilder(
+                  builder: (context, setState) {
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200)
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: _buildSmartImage(
-                              rItems.first.imagePath, width: 36, height: 36, fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(width: 36, height: 36, color: Colors.green.shade50, child: Icon(Icons.shopping_bag, color: primaryGreen, size: 16)),
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(rName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
+                              if (rStatus != null)
+                                Text(rStatus, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: primaryGreen)),
+                            ]
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(rItems.first.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                                Text("Qty: ${rItems.first.quantity} | ${rItems.first.color}", style: const TextStyle(color: Colors.black54, fontSize: 10, fontWeight: FontWeight.w600)),
-                              ],
+                          const Divider(height: 16),
+                          ...List.generate(isExpanded ? rItems.length : 1, (index) {
+                            final item = rItems[index];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Row(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: _buildSmartImage(
+                                      item.imagePath, width: 36, height: 36, fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => Container(width: 36, height: 36, color: Colors.green.shade50, child: Icon(Icons.shopping_bag, color: primaryGreen, size: 16)),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(item.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                        Text("Qty: ${item.quantity} | ${item.color}", style: const TextStyle(color: Colors.black54, fontSize: 10, fontWeight: FontWeight.w600)),
+                                      ],
+                                    ),
+                                  ),
+                                  Text("Tk ${(item.price * item.quantity).toInt()}", style: TextStyle(color: Colors.green.shade900, fontSize: 12, fontWeight: FontWeight.w800)),
+                                ]
+                              )
+                            );
+                          }),
+                          if (rItems.length > 1)
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  isExpanded = !isExpanded;
+                                });
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 4, bottom: 4),
+                                child: Text(
+                                  isExpanded ? "Show less" : "+${rItems.length - 1} more",
+                                  style: TextStyle(color: primaryGreen, fontWeight: FontWeight.bold, fontSize: 12),
+                                ),
+                              ),
                             ),
-                          ),
-                          Text("Tk ${(rItems.first.price * rItems.first.quantity).toInt()}", style: TextStyle(color: Colors.green.shade900, fontSize: 12, fontWeight: FontWeight.w800)),
                         ]
                       )
-                    ),
-                    if (rItems.length > 1)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4, bottom: 4),
-                        child: Text(
-                          "+${rItems.length - 1} more",
-                          style: TextStyle(color: primaryGreen, fontWeight: FontWeight.bold, fontSize: 12),
-                        ),
-                      ),
-                  ]
-                )
-              );
+                    );
+                  }
+                );
             }),
             const SizedBox(height: 4),
             Row(
