@@ -2415,12 +2415,67 @@ class _TailoringSetupScreenState extends State<TailoringSetupScreen> {
 
 enum _DrawTool { pencil, eraser }
 
+/// A single stroke. Geometry is built incrementally as points arrive so that
+/// painting is just a couple of `drawPath` calls instead of one `drawLine`
+/// per segment. Jitter is baked in once (deterministic) rather than being
+/// re-randomised on every repaint.
 class _DrawStroke {
-  final List<Offset> points;
+  static const int _layerCount = 2;
+
   final Color color;
   final double width;
+  final bool isEraser;
 
-  _DrawStroke({required this.points, required this.color, required this.width});
+  final List<Path> layers = [];
+  final List<Offset> _cursor = [];
+  final Random _rand;
+
+  final Offset _firstPoint;
+  Offset _lastPoint;
+  int _pointCount = 1;
+
+  _DrawStroke({
+    required Offset start,
+    required this.color,
+    required this.width,
+    required this.isEraser,
+  }) : _rand = Random(start.dx.toInt() * 31 + start.dy.toInt() * 17),
+       _firstPoint = start,
+       _lastPoint = start {
+    for (int i = 0; i < _layerCount; i++) {
+      final p = _jitter(start);
+      layers.add(Path()..moveTo(p.dx, p.dy));
+      _cursor.add(p);
+    }
+  }
+
+  bool get isDot => _pointCount == 1;
+  Offset get dotCenter => _firstPoint;
+
+  Offset _jitter(Offset p) {
+    if (isEraser) return p;
+    final range = width * 0.16;
+    return Offset(
+      p.dx + (_rand.nextDouble() - 0.5) * range,
+      p.dy + (_rand.nextDouble() - 0.5) * range,
+    );
+  }
+
+  /// Returns false when the point is too close to the previous one to matter.
+  bool addPoint(Offset p) {
+    if ((p - _lastPoint).distanceSquared < 2.25) return false;
+    _lastPoint = p;
+    _pointCount++;
+    for (int i = 0; i < layers.length; i++) {
+      final jp = _jitter(p);
+      final prev = _cursor[i];
+      // Quadratic smoothing through segment midpoints.
+      final mid = Offset((prev.dx + jp.dx) / 2, (prev.dy + jp.dy) / 2);
+      layers[i].quadraticBezierTo(prev.dx, prev.dy, mid.dx, mid.dy);
+      _cursor[i] = jp;
+    }
+    return true;
+  }
 }
 
 class _DesignCanvasScreen extends StatefulWidget {
@@ -2434,55 +2489,97 @@ class _DesignCanvasScreen extends StatefulWidget {
 
 class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
   static const List<Color> _palette = [
-    Colors.black,
-    Colors.red,
-    Colors.blue,
-    Colors.green,
-    Colors.orange,
-    Colors.purple,
+    Color(0xFF1B1B1B),
+    Color(0xFF6B7280),
+    Color(0xFFE53935),
+    Color(0xFFF4511E),
+    Color(0xFFFBC02D),
+    Color(0xFF2E7D32),
+    Color(0xFF00897B),
+    Color(0xFF1E88E5),
+    Color(0xFF3949AB),
+    Color(0xFF8E24AA),
+    Color(0xFFD81B60),
+    Color(0xFF6D4C41),
   ];
 
   final GlobalKey _boundaryKey = GlobalKey();
   final List<_DrawStroke> _strokes = [];
+  final List<_DrawStroke> _redoStack = [];
+
+  /// Drives canvas repaints directly, so dragging never rebuilds the widget
+  /// tree (toolbar, template image, Scaffold) — this is the main lag fix.
+  final ValueNotifier<int> _repaint = ValueNotifier<int>(0);
 
   _DrawTool _tool = _DrawTool.pencil;
-  Color _color = Colors.black;
+  Color _color = _palette.first;
   double _brushSize = 4;
+  bool _isSaving = false;
 
-  void _onPanStart(DragStartDetails details) {
-    setState(() {
-      _strokes.add(
-        _DrawStroke(
-          points: [details.localPosition],
-          color: _tool == _DrawTool.eraser ? Colors.white : _color,
-          width: _tool == _DrawTool.eraser ? _brushSize * 3 : _brushSize,
-        ),
-      );
-    });
+  @override
+  void dispose() {
+    _repaint.dispose();
+    super.dispose();
   }
 
-  void _onPanUpdate(DragUpdateDetails details) {
-    setState(() {
-      _strokes.last.points.add(details.localPosition);
-    });
+  void _onPointerDown(PointerDownEvent event) {
+    final bool wasEmpty = _strokes.isEmpty;
+    _strokes.add(
+      _DrawStroke(
+        start: event.localPosition,
+        color: _color,
+        width: _tool == _DrawTool.eraser ? _brushSize * 2.5 : _brushSize,
+        isEraser: _tool == _DrawTool.eraser,
+      ),
+    );
+    _redoStack.clear();
+    _repaint.value++;
+    // Only rebuild when the toolbar's enabled state actually flips.
+    if (wasEmpty) setState(() {});
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    if (_strokes.isEmpty) return;
+    if (_strokes.last.addPoint(event.localPosition)) _repaint.value++;
   }
 
   void _undo() {
     if (_strokes.isEmpty) return;
-    setState(() => _strokes.removeLast());
+    setState(() => _redoStack.add(_strokes.removeLast()));
+    _repaint.value++;
+  }
+
+  void _redo() {
+    if (_redoStack.isEmpty) return;
+    setState(() => _strokes.add(_redoStack.removeLast()));
+    _repaint.value++;
+  }
+
+  void _clearAll() {
+    if (_strokes.isEmpty) return;
+    setState(() {
+      _redoStack
+        ..clear()
+        ..addAll(_strokes.reversed);
+      _strokes.clear();
+    });
+    _repaint.value++;
   }
 
   Future<String?> _exportImage() async {
     try {
+      // Make sure the latest strokes are actually painted before capturing.
+      await WidgetsBinding.instance.endOfFrame;
       final boundary =
           _boundaryKey.currentContext?.findRenderObject()
               as RenderRepaintBoundary?;
       if (boundary == null) return null;
 
-      final ui.Image image = await boundary.toImage(pixelRatio: 2.0);
+      final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
       final ByteData? byteData = await image.toByteData(
         format: ui.ImageByteFormat.png,
       );
+      image.dispose();
       if (byteData == null) return null;
 
       final Uint8List bytes = byteData.buffer.asUint8List();
@@ -2497,9 +2594,16 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
   }
 
   Future<void> _upload() async {
+    if (_isSaving) return;
+    if (_strokes.isEmpty) {
+      AppFeedback.show(context, "Draw your design first.", isError: true);
+      return;
+    }
+    setState(() => _isSaving = true);
     final path = await _exportImage();
     if (!mounted) return;
     if (path == null) {
+      setState(() => _isSaving = false);
       AppFeedback.show(context, "Couldn't save the sketch. Try again.",
           isError: true);
       return;
@@ -2507,91 +2611,147 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
     Navigator.pop(context, path);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF9FBF9),
-      appBar: AppBar(
-        title: const Text(
-          "Sketch Design",
-          style: TextStyle(fontWeight: FontWeight.bold),
+  Future<void> _confirmDiscard() async {
+    if (_strokes.isEmpty) {
+      Navigator.pop(context);
+      return;
+    }
+    final bool? discard = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
         ),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0,
-        foregroundColor: Colors.black,
+        title: const Text("Discard sketch?"),
+        content: const Text("Your drawing won't be saved."),
         actions: [
-          IconButton(
-            onPressed: _undo,
-            icon: const Icon(Icons.undo_rounded),
-            tooltip: "Undo",
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("Keep drawing"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
+            child: const Text("Discard"),
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: RepaintBoundary(
-                key: _boundaryKey,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Image.asset(
-                        widget.templateAsset,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: Colors.grey.shade50,
-                          child: Icon(
-                            Icons.checkroom_rounded,
-                            size: 60,
-                            color: Colors.green.shade100,
+    );
+    if (discard == true && mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _confirmDiscard();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF9FBF9),
+        appBar: AppBar(
+          title: const Text(
+            "Sketch Design",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          centerTitle: true,
+          backgroundColor: Colors.white,
+          elevation: 0,
+          foregroundColor: Colors.black,
+          leading: IconButton(
+            icon: const Icon(Icons.close_rounded),
+            onPressed: _confirmDiscard,
+            tooltip: "Cancel",
+          ),
+          actions: [
+            IconButton(
+              onPressed: _strokes.isEmpty ? null : _undo,
+              icon: const Icon(Icons.undo_rounded),
+              tooltip: "Undo",
+            ),
+            IconButton(
+              onPressed: _redoStack.isEmpty ? null : _redo,
+              icon: const Icon(Icons.redo_rounded),
+              tooltip: "Redo",
+            ),
+            IconButton(
+              onPressed: _strokes.isEmpty ? null : _clearAll,
+              icon: const Icon(Icons.delete_outline_rounded),
+              tooltip: "Clear all",
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: RepaintBoundary(
+                  key: _boundaryKey,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.asset(
+                          widget.templateAsset,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: Colors.grey.shade50,
+                            child: Icon(
+                              Icons.checkroom_rounded,
+                              size: 60,
+                              color: Colors.green.shade100,
+                            ),
                           ),
                         ),
-                      ),
-                      GestureDetector(
-                        onPanStart: _onPanStart,
-                        onPanUpdate: _onPanUpdate,
-                        child: CustomPaint(
-                          painter: _SketchPainter(_strokes),
-                          size: Size.infinite,
+                        Listener(
+                          behavior: HitTestBehavior.opaque,
+                          onPointerDown: _onPointerDown,
+                          onPointerMove: _onPointerMove,
+                          // Isolated so stroke repaints never touch the
+                          // template image layer.
+                          child: RepaintBoundary(
+                            child: CustomPaint(
+                              painter: _SketchPainter(_strokes, _repaint),
+                              size: Size.infinite,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          _buildToolbar(),
-        ],
+            _buildToolbar(),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildToolbar() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: BoxDecoration(
         color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 12,
+            blurRadius: 14,
             offset: const Offset(0, -3),
           ),
         ],
@@ -2603,28 +2763,76 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
           children: [
             Row(
               children: [
-                _toolButton(Icons.edit, _DrawTool.pencil, "Pencil"),
+                _toolButton(Icons.edit_rounded, _DrawTool.pencil, "Pencil"),
                 const SizedBox(width: 8),
-                _toolButton(Icons.auto_fix_normal, _DrawTool.eraser, "Eraser"),
-                const SizedBox(width: 16),
+                _toolButton(
+                  Icons.auto_fix_normal_rounded,
+                  _DrawTool.eraser,
+                  "Eraser",
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                SizedBox(
+                  width: 34,
+                  height: 34,
+                  child: Center(
+                    child: Container(
+                      width: _brushSize.clamp(3, 26).toDouble(),
+                      height: _brushSize.clamp(3, 26).toDouble(),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _tool == _DrawTool.eraser
+                            ? Colors.grey.shade400
+                            : _color,
+                      ),
+                    ),
+                  ),
+                ),
                 Expanded(
-                  child: Slider(
-                    value: _brushSize,
-                    min: 1,
-                    max: 20,
-                    activeColor: Colors.green.shade800,
-                    inactiveColor: Colors.grey.shade300,
-                    onChanged: (v) => setState(() => _brushSize = v),
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 3,
+                      overlayShape:
+                          const RoundSliderOverlayShape(overlayRadius: 14),
+                      thumbShape:
+                          const RoundSliderThumbShape(enabledThumbRadius: 8),
+                    ),
+                    child: Slider(
+                      value: _brushSize,
+                      min: 1,
+                      max: 20,
+                      activeColor: Colors.green.shade800,
+                      inactiveColor: Colors.grey.shade200,
+                      onChanged: (v) => setState(() => _brushSize = v),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 30,
+                  child: Text(
+                    _brushSize.toStringAsFixed(0),
+                    textAlign: TextAlign.end,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade600,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 10),
             SizedBox(
-              height: 34,
-              child: ListView(
+              height: 36,
+              child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                children: _palette.map((c) {
+                itemCount: _palette.length,
+                padding: EdgeInsets.zero,
+                itemBuilder: (_, i) {
+                  final c = _palette[i];
                   final bool isSelected =
                       _color == c && _tool == _DrawTool.pencil;
                   return GestureDetector(
@@ -2632,58 +2840,64 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
                       _color = c;
                       _tool = _DrawTool.pencil;
                     }),
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
                       margin: const EdgeInsets.only(right: 10),
-                      width: 28,
-                      height: 28,
+                      width: 32,
+                      height: 32,
+                      padding: EdgeInsets.all(isSelected ? 3 : 0),
                       decoration: BoxDecoration(
-                        color: c,
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: isSelected
                               ? Colors.green.shade800
-                              : Colors.grey.shade300,
+                              : Colors.grey.shade200,
                           width: isSelected ? 2.5 : 1,
+                        ),
+                      ),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: c,
+                          shape: BoxShape.circle,
                         ),
                       ),
                     ),
                   );
-                }).toList(),
+                },
               ),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.black87,
-                      side: BorderSide(color: Colors.grey.shade300),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text("Cancel"),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isSaving ? null : _upload,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade800,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.green.shade200,
+                  disabledForegroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _upload,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade800,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text("Upload"),
-                  ),
+                icon: _isSaving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Icon(Icons.check_rounded, size: 20),
+                label: Text(
+                  _isSaving ? "Saving…" : "Save Design",
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
-              ],
+              ),
             ),
           ],
         ),
@@ -2693,18 +2907,35 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
 
   Widget _toolButton(IconData icon, _DrawTool tool, String label) {
     final bool isSelected = _tool == tool;
-    return GestureDetector(
-      onTap: () => setState(() => _tool = tool),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.green.shade800 : Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(
-          icon,
-          size: 18,
-          color: isSelected ? Colors.white : Colors.black54,
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _tool = tool),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.green.shade800 : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: isSelected ? Colors.white : Colors.black54,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white : Colors.black54,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -2714,52 +2945,62 @@ class _DesignCanvasScreenState extends State<_DesignCanvasScreen> {
 class _SketchPainter extends CustomPainter {
   final List<_DrawStroke> strokes;
 
-  _SketchPainter(this.strokes);
+  _SketchPainter(this.strokes, Listenable repaint) : super(repaint: repaint);
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (final stroke in strokes) {
-      final isEraser = stroke.color == Colors.white;
+    if (strokes.isEmpty) return;
 
-      if (isEraser) {
-        final paint = Paint()
-          ..color = stroke.color
+    // A layer is needed so the eraser can punch through the strokes and
+    // reveal the template underneath, instead of painting white over it.
+    canvas.saveLayer(Offset.zero & size, Paint());
+
+    for (final stroke in strokes) {
+      final paint = Paint()
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke
+        ..isAntiAlias = true;
+
+      if (stroke.isEraser) {
+        paint
+          ..color = Colors.black
           ..strokeWidth = stroke.width
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round
-          ..style = PaintingStyle.stroke;
-        for (int i = 0; i < stroke.points.length - 1; i++) {
-          canvas.drawLine(stroke.points[i], stroke.points[i + 1], paint);
+          ..blendMode = BlendMode.clear;
+        if (stroke.isDot) {
+          canvas.drawCircle(
+            stroke.dotCenter,
+            stroke.width / 2,
+            paint..style = PaintingStyle.fill,
+          );
+        } else {
+          canvas.drawPath(stroke.layers.first, paint);
         }
         continue;
       }
 
-      final seed = stroke.points.length * 7 + stroke.color.toARGB32();
-      final rand = Random(seed);
+      if (stroke.isDot) {
+        canvas.drawCircle(
+          stroke.dotCenter,
+          stroke.width / 2,
+          paint
+            ..style = PaintingStyle.fill
+            ..color = stroke.color,
+        );
+        continue;
+      }
 
-      for (int layer = 0; layer < 3; layer++) {
-        final paint = Paint()
-          ..color = stroke.color.withValues(alpha: 0.32)
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = stroke.width * (0.65 + rand.nextDouble() * 0.5)
-          ..blendMode = BlendMode.multiply;
-
-        final jitterRange = stroke.width * 0.18;
-        for (int i = 0; i < stroke.points.length - 1; i++) {
-          final jitter = Offset(
-            (rand.nextDouble() - 0.5) * jitterRange,
-            (rand.nextDouble() - 0.5) * jitterRange,
-          );
-          canvas.drawLine(
-            stroke.points[i] + jitter,
-            stroke.points[i + 1] + jitter,
-            paint,
-          );
-        }
+      // Two lightly offset passes give the pencil texture in 2 draw calls
+      // instead of one drawLine per segment per layer.
+      for (int layer = 0; layer < stroke.layers.length; layer++) {
+        paint
+          ..color = stroke.color.withValues(alpha: layer == 0 ? 0.72 : 0.38)
+          ..strokeWidth = stroke.width * (layer == 0 ? 1.0 : 0.75);
+        canvas.drawPath(stroke.layers[layer], paint);
       }
     }
+
+    canvas.restore();
   }
 
   @override
