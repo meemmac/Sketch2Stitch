@@ -7,7 +7,6 @@ import 'screens/shared/auth_wrapper.dart';
 import 'screens/shared/login_screen.dart';
 import 'screens/shared/reset_password_screen.dart';
 import 'firebase_options.dart';
-import 'utils/db_seeder_customer.dart';
 
 /// Global navigator key so the deep-link listener (which lives outside
 /// any widget's BuildContext) can still push routes.
@@ -28,10 +27,6 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
-  // Temporarily seeding data to generate multi-retailer orders.
-  // Remove this after you hot restart and see the changes!
-  await CustomerDatabaseSeeder.seedData();
 
   runApp(const Sketch2StitchApp());
 }
