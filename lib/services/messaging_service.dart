@@ -282,6 +282,11 @@ class MessagingService {
       }
       await conversationRef.update(updates);
 
+      // Reading the thread also retires its "New message" card, so the bell
+      // badge stops counting a message the user has already seen.
+      await NotificationService()
+          .markMessageNotificationsRead(cleanUserId, conversationId);
+
       debugPrint('[MessagingService] ✅ Messages marked read for $cleanUserId');
     } catch (e) {
       debugPrint('[MessagingService] ❌ Error marking messages read: $e');
@@ -439,6 +444,7 @@ class MessagingService {
               0;
       if (previousUnread == 0) {
         await _notifyNewMessage(
+          conversationId: conversationId,
           receiverId: receiverId,
           senderId: cleanSenderId,
           convData: convData,
@@ -454,21 +460,28 @@ class MessagingService {
   /// Best-effort: the message is already committed by the time this runs, so
   /// a notification failure must never surface as a failed send.
   Future<void> _notifyNewMessage({
+    required String conversationId,
     required String receiverId,
     required String senderId,
     required Map<String, dynamic> convData,
   }) async {
     try {
-      UserRole roleFor(String userId) {
-        if (userId == (convData['customerId'] ?? '').toString().trim()) {
-          return UserRole.customer;
-        }
-        final name =
-            (convData['otherRole'] ?? '').toString().toLowerCase().trim();
+      UserRole roleFrom(dynamic raw, UserRole fallback) {
+        final name = (raw ?? '').toString().toLowerCase().trim();
         return UserRole.values.firstWhere(
           (e) => e.name.toLowerCase() == name,
-          orElse: () => UserRole.tailor,
+          orElse: () => fallback,
         );
+      }
+
+      // `customerId` is only "whoever opened the thread first", so their role
+      // has to be read from `customerRole` — assuming UserRole.customer here
+      // sent the profile lookup to the wrong collection whenever a tailor or
+      // retailer started the chat, and the notification then said "Someone".
+      UserRole roleFor(String userId) {
+        return userId == (convData['customerId'] ?? '').toString().trim()
+            ? roleFrom(convData['customerRole'], UserRole.customer)
+            : roleFrom(convData['otherRole'], UserRole.tailor);
       }
 
       final senderInfo = await getUserBasicInfo(senderId, roleFor(senderId));
@@ -477,6 +490,7 @@ class MessagingService {
         roleFor(receiverId),
         (senderInfo?['name'] as String?) ?? 'Someone',
         (convData['orderId'] ?? '').toString(),
+        conversationId: conversationId,
       );
     } catch (e) {
       debugPrint('[MessagingService] new-message notification failed: $e');

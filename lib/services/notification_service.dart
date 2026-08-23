@@ -54,6 +54,15 @@ class NotificationService {
     UserRole viewerRole,
   ) async {
     try {
+      // A chat notification's counterparty is the sender, which no order-shaped
+      // lookup below can reach — it carries neither a subOrderId nor a
+      // tailorJobId. Resolve it from the conversation instead, for every viewer
+      // role: a customer can be messaged by a tailor, and a tailor by a
+      // retailer, so this is not customer-only like the branches that follow.
+      if (n.type == NotificationDbType.newMessage) {
+        return (await _messageSenderFromConversation(n))?['profilePicture'];
+      }
+
       switch (viewerRole) {
         case UserRole.customer:
           // A customer's counterparty is the Retailer handling the sub-order,
@@ -133,6 +142,11 @@ class NotificationService {
     AppNotification n,
     UserRole viewerRole,
   ) async {
+    // Checked before the customer-only guard below: the sender of a chat
+    // message is worth naming whichever role is looking at the card.
+    if (n.type == NotificationDbType.newMessage) {
+      return (await _messageSenderFromConversation(n))?['name'];
+    }
     if (viewerRole != UserRole.customer) return null;
     try {
       if (_isAboutTailor(n.type)) {
@@ -184,6 +198,71 @@ class NotificationService {
     if (tailorId == null || tailorId is! String || tailorId.isEmpty) return null;
     final tailorDoc = await _db.collection('Tailor').doc(tailorId).get();
     return _nonEmpty(tailorDoc.data()?['profilePicture']);
+  }
+
+  /// Resolves the *sender* of a `newMessage` notification to their display name
+  /// and profile picture.
+  ///
+  /// The thread id lives on the notification document under `conversationId`
+  /// (stamped by [_sendNotification] through `extraFields`) but is not part of
+  /// [AppNotification], so it is read back off the raw document here rather
+  /// than widening the model.
+  ///
+  /// `n.userId` is the receiver — i.e. whoever is looking at the card — so the
+  /// sender is simply the participant that isn't them. Roles come from the
+  /// conversation too: `customerId` only means "who opened the thread", so its
+  /// party is not necessarily a Customer and the role must not be assumed.
+  Future<Map<String, String?>?> _messageSenderFromConversation(
+    AppNotification n,
+  ) async {
+    try {
+      if (n.id.isEmpty) return null;
+      final notifDoc = await _db.collection(_collection).doc(n.id).get();
+      final conversationId = notifDoc.data()?['conversationId'];
+      if (conversationId is! String || conversationId.isEmpty) return null;
+
+      final convDoc =
+          await _db.collection('Conversations').doc(conversationId).get();
+      final conv = convDoc.data();
+      if (conv == null) return null;
+
+      final String customerId = (conv['customerId'] ?? '').toString().trim();
+      final String otherId = (conv['otherId'] ?? '').toString().trim();
+      final String viewerId = n.userId.trim();
+
+      final bool viewerIsCustomerSide = viewerId == customerId;
+      final String senderId = viewerIsCustomerSide ? otherId : customerId;
+      final dynamic senderRole =
+          viewerIsCustomerSide ? conv['otherRole'] : conv['customerRole'];
+      if (senderId.isEmpty || senderId == viewerId) return null;
+
+      final senderDoc =
+          await _db.collection(_collectionForRole(senderRole)).doc(senderId).get();
+      final data = senderDoc.data();
+      if (data == null) return null;
+
+      return {
+        'name': _nonEmpty(data['name']) ?? _nonEmpty(data['shopName']),
+        'profilePicture': _nonEmpty(data['profilePicture']),
+      };
+    } catch (e) {
+      debugPrint('Error resolving message sender: $e');
+      return null;
+    }
+  }
+
+  /// Maps a stored `customerRole`/`otherRole` value to its profile collection.
+  /// Falls back to `Customer`, which has no `profilePicture` and so degrades to
+  /// an initials avatar rather than showing the wrong person.
+  static String _collectionForRole(dynamic role) {
+    switch ((role ?? '').toString().toLowerCase().trim()) {
+      case 'tailor':
+        return 'Tailor';
+      case 'retailer':
+        return 'Retailer';
+      default:
+        return 'Customer';
+    }
   }
 
   /// Treats an empty/blank stored URL the same as a missing one, so the UI
@@ -409,6 +488,10 @@ class NotificationService {
 
 
 
+  /// [extraFields] are written onto the document but are not part of
+  /// [AppNotification] — they exist purely so a notification can be located
+  /// again later (see [markMessageNotificationsRead]). Reading the doc back
+  /// ignores them, so the model stays unchanged.
   Future<void> _sendNotification({
     required String userId,
     required UserRole userRole,
@@ -416,6 +499,7 @@ class NotificationService {
     required String message,
     required String orderId,
     String? subOrderId,
+    Map<String, dynamic>? extraFields,
   }) async {
     final docRef = _db.collection(_collection).doc();
     final notification = AppNotification(
@@ -429,7 +513,10 @@ class NotificationService {
       subOrderId: subOrderId,
       isRead: false,
     );
-    await docRef.set(notification.toJson());
+    await docRef.set({
+      ...notification.toJson(),
+      ...?extraFields,
+    });
   }
 
 
@@ -691,7 +778,10 @@ class NotificationService {
       userId: tailorId,
       userRole: UserRole.tailor,
       type: NotificationDbType.jobRejected,
-      message: '$customerName cancelled their order for $itemName. Reason: $cancelReason',
+      // The card is already titled "Order Cancelled" and the footer carries the
+      // order id, so the message does not repeat either. The reason stays in
+      // the string — the card splits it out for the "View Reason" button.
+      message: '$customerName cancelled $itemName. Reason: $cancelReason',
       orderId: orderId,
     );
   }
@@ -777,15 +867,53 @@ class NotificationService {
       String receiverId,
       UserRole receiverRole,
       String senderName,
-      String orderId,
-      ) async {
+      String orderId, {
+      String? conversationId,
+      }) async {
     await _sendNotification(
       userId: receiverId,
       userRole: receiverRole,
       type: NotificationDbType.newMessage,
       message: 'New message from $senderName.',
       orderId: orderId,
+      // Stamped so opening the thread can clear exactly this card. Matching on
+      // orderId instead would clear other threads' cards, since several
+      // conversations share one order (and some carry no order at all).
+      extraFields: (conversationId != null && conversationId.isNotEmpty)
+          ? {'conversationId': conversationId}
+          : null,
     );
+  }
+
+  /// Clears the "New message" cards [userId] holds for [conversationId],
+  /// called when they actually open and read the thread. Without this the
+  /// bell badge kept counting a message the user had already read.
+  ///
+  /// Equality-only filters, so Firestore serves this without a composite index.
+  Future<void> markMessageNotificationsRead(
+    String userId,
+    String conversationId,
+  ) async {
+    final cleanUserId = userId.trim();
+    if (cleanUserId.isEmpty || conversationId.isEmpty) return;
+    try {
+      final snap = await _db
+          .collection(_collection)
+          .where('userId', isEqualTo: cleanUserId)
+          .where('type', isEqualTo: NotificationDbType.newMessage.name)
+          .where('conversationId', isEqualTo: conversationId)
+          .where('isRead', isEqualTo: false)
+          .get();
+      if (snap.docs.isEmpty) return;
+
+      final batch = _db.batch();
+      for (final doc in snap.docs) {
+        batch.update(doc.reference, {'isRead': true});
+      }
+      await batch.commit();
+    } catch (e) {
+      debugPrint('[NotificationService] clearing message notifications failed: $e');
+    }
   }
 
 

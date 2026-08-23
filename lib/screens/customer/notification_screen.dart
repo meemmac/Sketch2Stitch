@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:sketch2stitch/models/user_role.dart';
 import 'package:sketch2stitch/services/notification_service.dart';
 import 'package:sketch2stitch/models/notification.dart';
+import 'package:sketch2stitch/widgets/cloudinary_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 
@@ -27,6 +28,81 @@ class UnifiedNotificationScreen extends StatefulWidget {
 class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   // Cache for profile data (URLs or Resolved Name/ID Maps)
   final Map<String, dynamic> _profileCache = {};
+
+  /// Ids that were still unread when this screen opened.
+  ///
+  /// Opening the list counts as seeing them, so they are marked read straight
+  /// away — that is what clears the red dot on the home screen. The "New"
+  /// badge still has to show for this visit though, so it reads from this
+  /// snapshot instead of the (now cleared) `isRead` flag.
+  final Set<String> _seenUnread = {};
+  bool _markedAllRead = false;
+
+  void _markEverythingRead(List<AppNotification> notifications) {
+    if (_markedAllRead) return;
+    _markedAllRead = true;
+    _seenUnread.addAll(
+      notifications.where((n) => !n.isRead).map((n) => n.id),
+    );
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      NotificationService().markAllNotificationsRead(uid);
+    }
+  }
+
+  /// The role a notification was actually raised for.
+  ///
+  /// [widget.role] is the *viewer's* role as resolved by `findUserRole`, which
+  /// probes Customer first — so a uid that also has a Customer doc always reads
+  /// as a customer, and every card was drawn by `_customerStyleFor`. That
+  /// switch has no case for `suborderPlaced` / `jobRequested` / `jobConfirmed`,
+  /// so retailer and tailor notifications all fell through to the generic
+  /// orange default. Each notification stores the role it was sent to, so use
+  /// that instead.
+  UserRole _roleOf(AppNotification n) => n.userRole;
+
+  static const String _reasonMarker = 'Reason:';
+
+  /// The message with any trailing "Reason: …" removed.
+  ///
+  /// Cancellations carry the explanation inside the message string, which
+  /// repeated on the card what the "View Reason" button already shows.
+  String _messageBody(AppNotification n) {
+    final i = n.message.indexOf(_reasonMarker);
+    return i == -1 ? n.message : n.message.substring(0, i).trim();
+  }
+
+  /// The cancellation reason, preferring the one resolved from `Tailor-jobs`
+  /// and falling back to the copy embedded in the message.
+  ///
+  /// The fallback matters: a quote rejection passes its reason straight into
+  /// the message and never writes `rejectionReason` on the job
+  /// (`tailoring_service.dart:730-736`), so the lookup returns nothing and the
+  /// button would otherwise never appear on those cards.
+  String? _reasonOf(AppNotification n) {
+    final resolved = n.cancelReason?.trim();
+    if (resolved != null && resolved.isNotEmpty) return resolved;
+    final i = n.message.indexOf(_reasonMarker);
+    if (i == -1) return null;
+    final reason = n.message.substring(i + _reasonMarker.length).trim();
+    return reason.isEmpty ? null : reason;
+  }
+
+  /// Whether tapping [n] can open the order tracking timeline.
+  ///
+  /// A retailer stock alert carries a *productId* in `orderId` (see
+  /// `notifyRetailerStockAlert`) and a chat notification for a thread started
+  /// outside an order carries none at all — routing either one to
+  /// [OrderTrackScreen] is what produced "Order details not found".
+  bool _opensOrderTimeline(AppNotification n) {
+    final id = n.orderId.trim();
+    if (id.isEmpty || id == 'N/A') return false;
+    if (_roleOf(n) == UserRole.retailer &&
+        n.type == NotificationDbType.deliveryReminder) {
+      return false;
+    }
+    return n.type != NotificationDbType.newMessage;
+  }
 
 
   Stream<List<AppNotification>> _getNotificationsStream() {
@@ -56,6 +132,8 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
       builder: (context, snapshot) {
         final notifications = snapshot.data ?? [];
         final count = notifications.length;
+
+        if (snapshot.hasData) _markEverythingRead(notifications);
 
 
         return PopScope(
@@ -221,7 +299,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   Widget _buildAvatar(AppNotification n, _NotificationStyle style) {
     // 1. Handle System Notifications (e.g. Stock Alerts for Retailers) — these
     // are about a product, not a person, so there is no profile picture to show.
-    final isStockAlert = widget.role == UserRole.retailer &&
+    final isStockAlert = _roleOf(n) == UserRole.retailer &&
                          n.type == NotificationDbType.deliveryReminder;
 
     if (isStockAlert) {
@@ -240,11 +318,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
 
     // If we already know the URL, show it immediately
     if (_profileCache[cacheKey] is String) {
-      return CircleAvatar(
-        radius: 22,
-        backgroundColor: Colors.white,
-        backgroundImage: NetworkImage(_profileCache[cacheKey] as String),
-      );
+      return _buildCounterpartyPicture(_profileCache[cacheKey] as String, n, style);
     }
 
     // A cached null means "already looked up, this one has no picture" — don't
@@ -254,23 +328,52 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     }
 
     return FutureBuilder<String?>(
-      future: NotificationService().getCounterpartyProfilePicture(n, widget.role),
+      future: NotificationService().getCounterpartyProfilePicture(n, _roleOf(n)),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.done) {
           _profileCache[cacheKey] = snapshot.data;
         }
         if (snapshot.hasData && snapshot.data != null) {
-          return CircleAvatar(
-            radius: 22,
-            backgroundColor: Colors.white,
-            backgroundImage: NetworkImage(snapshot.data!),
-          );
+          return _buildCounterpartyPicture(snapshot.data!, n, style);
         }
 
         // While loading or if no picture found, show initials for the
         // actual counterparty (Retailer/Tailor), not a generic person icon.
         return _buildCounterpartyInitials(n, style);
       },
+    );
+  }
+
+  /// Renders a Retailer/Tailor `profilePicture` as a 44px round avatar.
+  ///
+  /// Goes through [CloudinaryImage] rather than a bare `NetworkImage` for two
+  /// reasons: it rewrites the Cloudinary URL to request a thumbnail instead of
+  /// pulling the full-size upload down for a 44px circle, and — unlike
+  /// `CircleAvatar.backgroundImage`, which takes no error builder — it can fall
+  /// back to the initials when the URL 404s (a deleted asset, or a profile doc
+  /// pointing at a stale uid) instead of painting an empty white circle.
+  Widget _buildCounterpartyPicture(
+    String url,
+    AppNotification n,
+    _NotificationStyle style,
+  ) {
+    final fallback = _buildCounterpartyInitials(n, style);
+    return SizedBox(
+      width: 44,
+      height: 44,
+      child: ClipOval(
+        child: CloudinaryImage(
+          imageUrl: url,
+          width: 44,
+          height: 44,
+          // 2x the layout size so the thumbnail stays sharp on hi-DPI screens.
+          widthParam: 88,
+          heightParam: 88,
+          placeholderWidget: fallback,
+          errorWidget: fallback,
+          loadingWidget: fallback,
+        ),
+      ),
     );
   }
 
@@ -291,7 +394,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     }
 
     return FutureBuilder<String?>(
-      future: NotificationService().getCounterpartyName(n, widget.role),
+      future: NotificationService().getCounterpartyName(n, _roleOf(n)),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.done) {
           _profileCache[cacheKey] = snapshot.data;
@@ -315,6 +418,11 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   /// resolves a rejection reason). Keying on the linked id alone let whichever
   /// card resolved first hand its avatar/name/reason to the other.
   String _cacheKeyFor(AppNotification n) {
+    // Message cards are keyed per notification, never by order: several
+    // conversations can share one orderId, so keying on it would make two
+    // different threads collide and show the first sender's name and picture
+    // on both. The notification id is one-per-thread, which is what we want.
+    if (n.type == NotificationDbType.newMessage) return '${n.id}:${n.type.name}';
     final linked = n.subOrderId ?? n.tailorJobId ?? n.orderId;
     final base = (linked.isNotEmpty) ? linked : n.id;
     return '$base:${n.type.name}';
@@ -388,7 +496,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
     // Customer viewing their own notifications it is their own name, which must
     // not be used as the sender's initial.
     final tempNotification = n.copyWith(
-      senderName: widget.role == UserRole.customer ? null : data['customerName'],
+      senderName: _roleOf(n) == UserRole.customer ? null : data['customerName'],
       orderId: data['orderId'] ?? n.orderId,
       cancelReason: data['rejectionReason'],
     );
@@ -397,7 +505,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   }
 
   Widget _buildOriginalCardByRole(AppNotification n) {
-    switch (widget.role) {
+    switch (_roleOf(n)) {
       case UserRole.customer:
         return _buildCustomerCard(n);
       case UserRole.tailor:
@@ -419,7 +527,9 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
         borderRadius: BorderRadius.circular(20),
         onTap: () {
           NotificationService().markAsRead(n.id);
-          widget.onNotificationTap?.call(n.orderId, n.subOrderId);
+          if (_opensOrderTimeline(n)) {
+            widget.onNotificationTap?.call(n.orderId, n.subOrderId);
+          }
         },
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -443,12 +553,12 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                             Expanded(
                                 child: Text(style.title,
                                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
-                            if (!n.isRead) _buildNewBadge(),
+                            if (!n.isRead || _seenUnread.contains(n.id)) _buildNewBadge(),
                           ],
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          n.message,
+                          _messageBody(n),
                           style: TextStyle(fontSize: 13, color: Colors.black.withValues(alpha: 0.75), height: 1.4),
                         ),
                       ],
@@ -487,7 +597,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (n.cancelReason != null && n.cancelReason!.isNotEmpty)
+            if (_reasonOf(n) != null)
               Padding(
                 padding: const EdgeInsets.only(right: 10),
                 child: OutlinedButton(
@@ -550,7 +660,7 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFFF7D6D6).withValues(alpha: 0.5)),
                 ),
-                child: Text(n.cancelReason ?? 'No reason was provided.',
+                child: Text(_reasonOf(n) ?? 'No reason was provided.',
                     style: TextStyle(fontSize: 14, height: 1.5, color: Colors.black.withValues(alpha: 0.8))),
               ),
               const SizedBox(height: 16),
@@ -703,7 +813,9 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
         borderRadius: BorderRadius.circular(20),
         onTap: () {
           NotificationService().markAsRead(n.id);
-          widget.onNotificationTap?.call(n.orderId, n.subOrderId);
+          if (_opensOrderTimeline(n)) {
+            widget.onNotificationTap?.call(n.orderId, n.subOrderId);
+          }
         },
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -727,12 +839,12 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                             Expanded(
                                 child: Text(style.title,
                                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
-                            if (!n.isRead) _buildNewBadge(),
+                            if (!n.isRead || _seenUnread.contains(n.id)) _buildNewBadge(),
                           ],
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          n.message,
+                          _messageBody(n),
                           style: TextStyle(fontSize: 13, color: Colors.black.withValues(alpha: 0.75), height: 1.4),
                         ),
                       ],
@@ -741,7 +853,10 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              _buildFooterRow(n, isRetailer: true),
+              if (n.type == NotificationDbType.jobRejected)
+                _buildCustomerCancelRow(n)
+              else
+                _buildFooterRow(n, isRetailer: true),
             ],
           ),
         ),
@@ -882,7 +997,9 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
         borderRadius: BorderRadius.circular(20),
         onTap: () {
           NotificationService().markAsRead(n.id);
-          widget.onNotificationTap?.call(n.orderId, n.subOrderId);
+          if (_opensOrderTimeline(n)) {
+            widget.onNotificationTap?.call(n.orderId, n.subOrderId);
+          }
         },
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -906,12 +1023,12 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
                             Expanded(
                                 child: Text(style.title,
                                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
-                            if (!n.isRead) _buildNewBadge(),
+                            if (!n.isRead || _seenUnread.contains(n.id)) _buildNewBadge(),
                           ],
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          n.message,
+                          _messageBody(n),
                           style: TextStyle(fontSize: 13, color: Colors.black.withValues(alpha: 0.75), height: 1.4),
                         ),
                       ],

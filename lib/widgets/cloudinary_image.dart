@@ -15,6 +15,10 @@ class CloudinaryImage extends StatelessWidget {
   final String crop;
   final Widget? placeholderWidget;
   final Widget? errorWidget;
+  /// Shown while the image is in flight. Defaults to a spinner, which reads as
+  /// heavy at avatar sizes — pass the same fallback used for [errorWidget] to
+  /// keep small round images from flashing a grey box before they resolve.
+  final Widget? loadingWidget;
   final Duration fadeInDuration;
 
   const CloudinaryImage({
@@ -31,6 +35,7 @@ class CloudinaryImage extends StatelessWidget {
     this.crop = 'fill',
     this.placeholderWidget,
     this.errorWidget,
+    this.loadingWidget,
     this.fadeInDuration = const Duration(milliseconds: 300),
   });
 
@@ -91,6 +96,8 @@ class CloudinaryImage extends StatelessWidget {
   }
 
   Widget _buildLoadingIndicator(BuildContext context) {
+    if (loadingWidget != null) return loadingWidget!;
+
     return Container(
       width: width?.isFinite == true ? width : 50,
       height: height?.isFinite == true ? height : 50,
