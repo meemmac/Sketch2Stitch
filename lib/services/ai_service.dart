@@ -16,7 +16,8 @@ class AIService {
     // List of fallback endpoints/models to try
     final List<String> endpoints = [
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+      // 'gemini-2.0-flash' removed: model was shut down June 1, 2026 and
+      // dropped from the free tier June 9, 2026 — calls to it now 404.
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent',
     ];
 
@@ -86,10 +87,16 @@ class AIService {
     String mimeType = 'image/jpeg',
   }) async {
     final List<String> imageModels = [
-      'gemini-2.5-flash-image',
-      'gemini-3.1-flash-lite-image',
-      'gemini-3.1-flash-image',
-      'gemini-3-pro-image',
+      'gemini-2.5-flash-image', // confirmed free tier (500 RPD) as of Aug 2026.
+      // Note: gemini-2.5-flash-image is scheduled to shut down Oct 2, 2026 —
+      // revisit this list before then.
+
+      // Everything below has NO free tier (paid-only, or unconfirmed) as of
+      // Aug 2026 — commented out so a billed account never gets silently
+      // charged. Uncomment individually if/when you decide to pay for them:
+      // 'gemini-3.1-flash-lite-image', // free-tier status unconfirmed for the image variant
+      // 'gemini-3.1-flash-image',      // confirmed paid-only, no free tier
+      // 'gemini-3-pro-image',          // confirmed paid-only, no free tier (429 limit:0)
     ];
 
     String lastError = '';
@@ -138,9 +145,11 @@ class AIService {
               }
             }
             lastError = 'Model $model returned 200 but no image part in response';
+            debugPrint('[VirtualTrial] $lastError');
             break; // no point retrying same model, move to next model
           } else if (response.statusCode == 429) {
             lastError = 'Model $model quota exceeded (429): ${response.body}';
+            debugPrint('[VirtualTrial] $lastError');
             if (attempt == 0) {
               debugPrint('[VirtualTrial] $model hit 429, waiting 3s before one retry...');
               await Future.delayed(const Duration(seconds: 3));
@@ -149,10 +158,12 @@ class AIService {
             break; // give up on this model, try next
           } else {
             lastError = 'Model $model returned (${response.statusCode}): ${response.body}';
+            debugPrint('[VirtualTrial] $lastError');
             break; // non-retryable error, move to next model
           }
         } catch (e) {
           lastError = 'Model $model threw: ${e.toString()}';
+          debugPrint('[VirtualTrial] $lastError');
           break;
         }
       }
