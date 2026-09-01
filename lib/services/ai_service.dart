@@ -11,14 +11,23 @@ class AIService {
   /// Test the Google Gemini API with a prompt and optional image bytes.
   ///
   /// Set [jsonOutput] when the prompt asks for a JSON block: it switches the
-  /// model into strict JSON mode and drops the temperature, so the response
-  /// no longer needs to be scraped out of prose with regex fallbacks.
+  /// model into strict JSON mode, drops the temperature, and caps thinking —
+  /// so the response no longer needs to be scraped out of prose with regex
+  /// fallbacks, and arrives before [timeout].
+  ///
+  /// The thinking cap matters as much as the timeout. Left unbudgeted,
+  /// gemini-2.5-flash spent ~2,300 thought tokens on the fabric-estimation
+  /// prompt and took 17-20s to answer — past the 15s timeout this method used
+  /// to hard-code, so *every* estimate failed while image generation (a
+  /// separate call, with its own longer timeout) still succeeded. A 512-token
+  /// budget answers in ~4s with the same numbers.
   static Future<String> testGemini({
     required String apiKey,
     required String prompt,
     Uint8List? imageBytes,
     String mimeType = 'image/jpeg',
     bool jsonOutput = false,
+    Duration timeout = const Duration(seconds: 60),
   }) async {
     // List of fallback endpoints/models to try
     final List<String> endpoints = [
@@ -54,6 +63,7 @@ class AIService {
         'generationConfig': {
           'responseMimeType': 'application/json',
           'temperature': 0.2,
+          'thinkingConfig': {'thinkingBudget': 512},
         },
     };
 
@@ -66,12 +76,28 @@ class AIService {
           url,
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode(body),
-        ).timeout(const Duration(seconds: 15));
+        ).timeout(timeout);
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          final text = data['candidates'][0]['content']['parts'][0]['text'];
-          return text;
+          // Never index blindly: a safety block returns no candidates, and a
+          // response cut off by the token limit returns a candidate whose
+          // content carries no `parts` at all.
+          final candidates = data['candidates'];
+          final hasCandidate = candidates is List && candidates.isNotEmpty;
+
+          if (hasCandidate) {
+            final content = candidates.first['content'];
+            final parts = content is Map ? content['parts'] : null;
+            if (parts is List && parts.isNotEmpty) {
+              final text = parts.first['text'];
+              if (text is String && text.isNotEmpty) return text;
+            }
+          }
+
+          lastError = 'Endpoint $endpoint returned 200 with no usable text '
+              '(finishReason: '
+              '${hasCandidate ? candidates.first['finishReason'] : 'no candidates'})';
         } else {
           lastError = 'Endpoint $endpoint returned (${response.statusCode}): ${response.body}';
         }
@@ -470,6 +496,12 @@ class AIService {
 
     Map<String, String> fabricEstimates = {};
     String? estimateError;
+
+    // Distinguishes "Gemini answered, and said there was nothing to measure"
+    // from "the call never came back". Both used to end at the same message,
+    // which told a customer who *had* written a full description that they
+    // had not written enough.
+    bool analysisFailed = false;
     String outfitPrompt =
         'a beautifully tailored outfit. Style: $styleString.';
 
@@ -499,17 +531,24 @@ class AIService {
           outfitPrompt = rawPrompt;
         }
       } else {
+        analysisFailed = true;
         debugPrint('[VirtualTrial] No JSON object found in Gemini response.');
       }
     } catch (e, st) {
+      analysisFailed = true;
       debugPrint('[VirtualTrial] Fabric estimation error: $e\n$st');
     }
 
     if (fabricEstimates.isEmpty) {
       fabricEstimates = {
         '_error': estimateError ??
-            'Tell us what you want made (e.g. "a long kameez with a matching '
-                'dupatta") so the fabric quantity can be estimated.',
+            (analysisFailed
+                ? 'Couldn\'t work out the fabric quantities just now — the '
+                    'estimator did not respond. Your preview is still below; '
+                    'try generating again for the estimate.'
+                : 'Tell us what you want made (e.g. "a long kameez with a '
+                    'matching dupatta") so the fabric quantity can be '
+                    'estimated.'),
       };
     } else {
       fabricEstimates['_note'] =
