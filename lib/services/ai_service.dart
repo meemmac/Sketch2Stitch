@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/appearance_profile.dart';
+import '../utils/api_config.dart';
 
 
 class AIService {
@@ -172,6 +174,112 @@ class AIService {
     throw Exception('Gemini image generation failed after all models. Last error: $lastError');
   }
 
+  /// Downscales [bytes] so neither side exceeds [maxSide], returning PNG bytes.
+  ///
+  /// Cloudflare rejects input images that are 512x512 or larger, so every
+  /// reference photo has to be shrunk before it goes into the multipart body.
+  /// Uses `dart:ui` rather than the `image` package so this needs no new
+  /// dependency.
+  static Future<Uint8List> _downscaleForCloudflare(
+    Uint8List bytes, {
+    int maxSide = 480,
+  }) async {
+    final descriptor = await ui.ImageDescriptor.encoded(
+      await ui.ImmutableBuffer.fromUint8List(bytes),
+    );
+    final w = descriptor.width;
+    final h = descriptor.height;
+    descriptor.dispose();
+
+    // Already small enough — send as-is.
+    if (w <= maxSide && h <= maxSide) return bytes;
+
+    final scale = maxSide / (w > h ? w : h);
+    final codec = await ui.instantiateImageCodec(
+      bytes,
+      targetWidth: (w * scale).round(),
+      targetHeight: (h * scale).round(),
+    );
+    final frame = await codec.getNextFrame();
+    final data = await frame.image.toByteData(format: ui.ImageByteFormat.png);
+    frame.image.dispose();
+    codec.dispose();
+
+    if (data == null) return bytes;
+    return data.buffer.asUint8List();
+  }
+
+  /// Generates an image with Cloudflare Workers AI (FLUX.2 [klein] 4B).
+  ///
+  /// Unlike Gemini's image models — which have no free tier as of Sep 2026 —
+  /// Workers AI includes 10,000 neurons/day at no charge on the free plan.
+  /// A 1024x1024 edit costs roughly 126 neurons, so this supports on the order
+  /// of 75 try-ons per day across all users before the daily quota resets.
+  ///
+  /// The model takes multipart/form-data (NOT JSON): a `prompt` field plus up
+  /// to four binary images named `input_image_0` .. `input_image_3`, each of
+  /// which must be smaller than 512x512. It returns the result as a base64
+  /// string under `result.image`.
+  static Future<Uint8List> generateImageWithCloudflare({
+    required String accountId,
+    required String apiToken,
+    required String prompt,
+    List<Uint8List> inputImages = const [],
+    int width = 1024,
+    int height = 1024,
+    String model = '@cf/black-forest-labs/flux-2-klein-4b',
+  }) async {
+    if (accountId.isEmpty || apiToken.isEmpty) {
+      throw Exception(
+        'Cloudflare credentials missing — set CF_ACCOUNT_ID and CF_API_TOKEN.',
+      );
+    }
+
+    final uri = Uri.parse(
+      'https://api.cloudflare.com/client/v4/accounts/$accountId/ai/run/$model',
+    );
+
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $apiToken'
+      ..fields['prompt'] = prompt
+      ..fields['width'] = width.toString()
+      ..fields['height'] = height.toString();
+
+    // The model accepts at most 4 input images.
+    final images = inputImages.take(4).toList();
+    for (var i = 0; i < images.length; i++) {
+      final resized = await _downscaleForCloudflare(images[i]);
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'input_image_$i',
+          resized,
+          filename: 'input_image_$i.png',
+        ),
+      );
+    }
+
+    final streamed = await request.send().timeout(const Duration(seconds: 90));
+    final response = await http.Response.fromStream(streamed);
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Cloudflare returned ${response.statusCode}: ${response.body}',
+      );
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if (data['success'] != true) {
+      throw Exception('Cloudflare reported failure: ${response.body}');
+    }
+
+    final base64Img = data['result']?['image'] as String?;
+    if (base64Img == null || base64Img.isEmpty) {
+      throw Exception('Cloudflare returned no image: ${response.body}');
+    }
+
+    return base64Decode(base64Img);
+  }
+
   // ────────────────────────────────────────────────────────────────────────────
   // Profile-Based Virtual Trial (no personal photo)
   // ────────────────────────────────────────────────────────────────────────────
@@ -313,16 +421,37 @@ class AIService {
       };
     }
 
-    // 4. Generate image — Gemini only (free tier). No Hugging Face call:
-    // HF's free serverless inference API no longer serves any image models
-    // (confirmed 410/400 across FLUX and Stable Diffusion checkpoints), so
-    // calling it only adds delay before an inevitable failure.
-    onStatus?.call('Generating try-on preview with Google Gemini...');
-    final resultBytes = await generateImageWithGemini(
-      apiKey: geminiApiKey,
-      prompt: imagePrompt,
-      inputImages: referenceImageBytes,
-    );
+    // 4. Generate image — Cloudflare Workers AI first, Gemini as fallback.
+    //
+    // Cloudflare leads because it is the only genuinely free option: the free
+    // Workers plan includes 10,000 neurons/day with no card on file. Gemini's
+    // image models are all paid-only (verified against Google's pricing page,
+    // Sep 2026 — every Nano Banana variant lists Free Tier "Not available"),
+    // so the Gemini call below only succeeds on a billed account and is kept
+    // purely as a fallback.
+    //
+    // No Hugging Face call: HF's free serverless inference API no longer
+    // serves any image models (confirmed 410/400 across FLUX and Stable
+    // Diffusion checkpoints), so calling it only adds delay before an
+    // inevitable failure.
+    Uint8List resultBytes;
+    try {
+      onStatus?.call('Generating try-on preview with Cloudflare Workers AI...');
+      resultBytes = await generateImageWithCloudflare(
+        accountId: APIConfig.cfAccountId,
+        apiToken: APIConfig.cfApiToken,
+        prompt: imagePrompt,
+        inputImages: referenceImageBytes,
+      );
+    } catch (e) {
+      debugPrint('[VirtualTrial] Cloudflare image generation failed: $e');
+      onStatus?.call('Cloudflare unavailable — falling back to Google Gemini...');
+      resultBytes = await generateImageWithGemini(
+        apiKey: geminiApiKey,
+        prompt: imagePrompt,
+        inputImages: referenceImageBytes,
+      );
+    }
 
     return (resultBytes, fabricEstimates);
   }
