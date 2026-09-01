@@ -127,16 +127,27 @@ class VirtualTrialService {
           );
         }
 
-        final existingReset = snap.data()?['vtResetDate'];
+        final existingReset = snap.data()?['vtResetDate'] as Timestamp?;
+        final now = DateTime.now();
 
-        final updates = <String, dynamic>{
-          'vtUsed': FieldValue.increment(1),
-        };
+        final updates = <String, dynamic>{};
 
-        // Initialise the reset date on the very first use.
         if (existingReset == null) {
-          final nextMonth = DateTime.now().add(const Duration(days: 30));
-          updates['vtResetDate'] = Timestamp.fromDate(nextMonth);
+          // Very first use — start the monthly window.
+          updates['vtUsed'] = FieldValue.increment(1);
+          updates['vtResetDate'] =
+              Timestamp.fromDate(now.add(const Duration(days: 30)));
+        } else if (existingReset.toDate().isBefore(now)) {
+          // The window lapsed between the eligibility check and here (it can
+          // lapse while the screen is open). checkVTEligibility already treats
+          // the counter as 0 in that case, so rolling it over here is what
+          // keeps the two from disagreeing — incrementing the stale count
+          // would push vtUsed past the limit on a trial that was allowed.
+          updates['vtUsed'] = 1;
+          updates['vtResetDate'] =
+              Timestamp.fromDate(now.add(const Duration(days: 30)));
+        } else {
+          updates['vtUsed'] = FieldValue.increment(1);
         }
 
         tx.update(ref, updates);

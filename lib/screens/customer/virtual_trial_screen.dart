@@ -316,6 +316,14 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     return '${d.day} ${months[d.month - 1]}';
   }
 
+  /// Wording for a spent quota. `vtResetDate` is null until the very first
+  /// trial is recorded, so the reset sentence has to be able to drop out.
+  String _limitReachedMessage(int limit) {
+    final reset = _formatDate(_vtResetDate);
+    return 'You\'ve used all $limit trials this month.'
+        '${reset.isEmpty ? '' : ' Your limit resets on $reset.'}';
+  }
+
   // ── Generation ─────────────────────────────────────────────────────────────
   /// Reads every reference image into bytes for the Gemini call, in the order
   /// they're shown: the cart's chosen colour options (Cloudinary URLs, or
@@ -357,15 +365,27 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     // Checked against the cached value first (instant feedback), then against
     // Firestore, since the cache can be stale if a trial ran on another device.
     if (_vtLimitReached) {
-      _showSnack(
-        'You\'ve used all $kVirtualTrialMonthlyLimit trials this month. '
-        'Your limit resets on ${_formatDate(_vtResetDate)}.',
-      );
+      _showSnack(_limitReachedMessage(kVirtualTrialMonthlyLimit), isError: true);
       return;
     }
 
     if (_customerId.isEmpty) {
-      _showSnack('Please sign in again to run a virtual trial.');
+      _showSnack('Please sign in again to run a virtual trial.', isError: true);
+      return;
+    }
+
+    // Nothing to generate from: no reference, no description, no style. The
+    // result would be an outfit the customer never asked for — and it would
+    // still cost them a trial.
+    if (_referenceImages.isEmpty &&
+        _prefilledAssetImages.isEmpty &&
+        _customInstructionsController.text.trim().isEmpty &&
+        _selectedStyles.isEmpty) {
+      _showSnack(
+        'Add a design reference, or describe what you want made, before '
+        'generating — otherwise the preview has nothing to go on.',
+        isError: true,
+      );
       return;
     }
 
@@ -374,21 +394,21 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       if (!mounted) return;
       if (!eligibility.eligible) {
         setState(() => _vtUsed = eligibility.used);
-        _showSnack(
-          'You\'ve used all ${eligibility.limit} trials this month. '
-          'Your limit resets on ${_formatDate(_vtResetDate)}.',
-        );
+        _showSnack(_limitReachedMessage(eligibility.limit), isError: true);
         return;
       }
     } on VirtualTrialServiceException catch (e) {
-      _showSnack(e.message);
+      _showSnack(e.message, isError: true);
       return;
     }
 
     const geminiKey = APIConfig.geminiApiKey;
 
     if (geminiKey.isEmpty || geminiKey == 'YOUR_GEMINI_API_KEY_HERE') {
-      _showSnack('Please set your Gemini API key in lib/utils/api_config.dart');
+      _showSnack(
+        'Please set your Gemini API key in lib/utils/api_config.dart',
+        isError: true,
+      );
       return;
     }
 
@@ -429,6 +449,21 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         _statusMessage = 'Loading your selected designs...';
       });
       final referenceBytes = await _loadReferenceBytes();
+      final expectedReferences =
+          _prefilledAssetImages.length + _referenceImages.length;
+      if (expectedReferences > 0 && referenceBytes.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _statusMessage = '';
+        });
+        _showSnack(
+          'Your design references could not be loaded — check your connection '
+          'and try again. No trial was used.',
+          isError: true,
+        );
+        return;
+      }
 
       // 2. One call: Gemini estimates the fabric AND generates the try-on
       //    image from those same references, so the preview shows the garment
@@ -483,12 +518,17 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
             .catchError((_) {});
       }
     } catch (e) {
+      debugPrint('[VirtualTrial] Generation failed: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
           _statusMessage = '';
         });
-        _showSnack('Error generating mock preview: $e');
+        _showSnack(
+          'Couldn\'t generate your preview just now. Check your connection '
+          'and try again — no trial was used.',
+          isError: true,
+        );
       }
     }
   }
@@ -676,8 +716,8 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Your monthly limit of $kVirtualTrialMonthlyLimit trials has ended. '
-                'It resets on $resetLabel.',
+                'Your monthly limit of $kVirtualTrialMonthlyLimit trials has ended.'
+                '${resetLabel.isEmpty ? '' : ' It resets on $resetLabel.'}',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.red.shade700,
@@ -710,7 +750,8 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
           Expanded(
             child: Text(
               '$remaining of $kVirtualTrialMonthlyLimit trial${remaining == 1 ? '' : 's'} left this month'
-              '${isLow ? ' — running low' : ''} · resets $resetLabel',
+              '${isLow ? ' — running low' : ''}'
+              '${resetLabel.isEmpty ? '' : ' · resets $resetLabel'}',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -1583,7 +1624,9 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         ),
         label: Text(
           limitReached
-              ? 'Limit Reached · Resets ${_formatDate(_vtResetDate)}'
+              ? (_formatDate(_vtResetDate).isEmpty
+                  ? 'Monthly Limit Reached'
+                  : 'Limit Reached · Resets ${_formatDate(_vtResetDate)}')
               : (_isLoading ? 'Generating…' : 'Generate AI Preview'),
           style: const TextStyle(
             fontSize: 16,
@@ -1895,7 +1938,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   // ── Disclaimer ──────────────────────────────────────────────────────────────
   Widget _buildDisclaimer() {
     return const Text(
-      'Powered by Google Gemini and Hugging Face generative AI. '
+      'Powered by Cloudflare Workers AI and Google Gemini. '
       'Results are AI-generated and intended as creative references only. '
       'Please review google.com/gemini/policy-guidelines for usage terms.',
       style: TextStyle(fontSize: 10, color: Colors.black38),
