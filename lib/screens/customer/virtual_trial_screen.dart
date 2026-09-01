@@ -1370,7 +1370,10 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     return _sectionCard(
       title: 'Style Preferences',
       icon: Icons.style_outlined,
-      subtitle: 'Select all that apply — these guide the outfit generation.',
+      subtitle:
+          'Sets the mood of the outfit — fabric, colour and cut in the preview. '
+          'These are not garment pieces, so they cannot be measured on their '
+          'own: name the pieces in the box below.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1410,12 +1413,63 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
               );
             }).toList(),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
+          _buildGarmentComponentsBox(),
+        ],
+      ),
+    );
+  }
+
+  // ── Garment Components ──────────────────────────────────────────────────────
+  //
+  // The fabric estimate is driven entirely by what the customer types here.
+  // The style chips above are moods, not garments, so they can never tell the
+  // AI which pieces exist to be measured — this box is the only source for
+  // that, which is why its purpose is spelled out on screen.
+  Widget _buildGarmentComponentsBox() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _sagePale,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.checkroom_rounded, color: _sageDark, size: 17),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Garment Pieces to Estimate',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: _ink,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Describe what you want made, in your own words — a sentence or a '
+            'list, English or Bangla. This is what tells the AI which pieces '
+            'to measure against your body measurements and how much fabric to '
+            'buy, before you order it.',
+            style: TextStyle(fontSize: 11.5, color: Colors.black54, height: 1.4),
+          ),
+          const SizedBox(height: 10),
           TextField(
             controller: _customInstructionsController,
             decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.white,
               hintText:
-                  'Describe your preferences and garment parts (e.g. "Kameez, Dupatta") for the best look and an accurate fabric estimation.',
+                  'e.g. "I want a long kameez with full sleeves, a salwar and '
+                  'a matching dupatta, with lace on the neckline"',
               hintStyle: const TextStyle(fontSize: 12, color: Colors.black38),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -1768,7 +1822,9 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                     runSpacing: 4,
                     children: parts.map((part) {
                       final isInch = part.toLowerCase().contains('inch');
-                      final isGauge = part.toLowerCase().contains('gauge');
+                      final lower = part.toLowerCase();
+              final isGauge =
+                  lower.contains('gaj') || lower.contains('gauge');
                       Color bg, border, fg;
                       if (isInch) {
                         bg = const Color(0xFFE8F0FE);

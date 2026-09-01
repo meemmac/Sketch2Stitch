@@ -9,11 +9,16 @@ import '../utils/api_config.dart';
 
 class AIService {
   /// Test the Google Gemini API with a prompt and optional image bytes.
+  ///
+  /// Set [jsonOutput] when the prompt asks for a JSON block: it switches the
+  /// model into strict JSON mode and drops the temperature, so the response
+  /// no longer needs to be scraped out of prose with regex fallbacks.
   static Future<String> testGemini({
     required String apiKey,
     required String prompt,
     Uint8List? imageBytes,
     String mimeType = 'image/jpeg',
+    bool jsonOutput = false,
   }) async {
     // List of fallback endpoints/models to try
     final List<String> endpoints = [
@@ -44,7 +49,12 @@ class AIService {
         {
           'parts': parts,
         }
-      ]
+      ],
+      if (jsonOutput)
+        'generationConfig': {
+          'responseMimeType': 'application/json',
+          'temperature': 0.2,
+        },
     };
 
     String lastError = '';
@@ -284,6 +294,76 @@ class AIService {
   // Profile-Based Virtual Trial (no personal photo)
   // ────────────────────────────────────────────────────────────────────────────
 
+  /// Bolt width assumed for every fabric estimate, in inches.
+  ///
+  /// Yardage depends on bolt width more than on any single body measurement,
+  /// and the app never asks for it — so it is fixed here and surfaced to the
+  /// customer as a note under the estimate rather than left implicit.
+  static const int kAssumedFabricWidthInches = 44;
+
+  /// 1 gaj (gauge) == 36 inches == 1 yard.
+  static const int kInchesPerGaj = 36;
+
+  /// Renders one garment row as `2.5 gaj / 90 inches`.
+  ///
+  /// The inch figure is computed here rather than asked of the model, so the
+  /// two halves of the string can never disagree with each other.
+  static String _formatGaj(num gaj) {
+    final inches = (gaj * kInchesPerGaj).round();
+    final gajStr =
+        gaj == gaj.roundToDouble() ? gaj.toStringAsFixed(0) : gaj.toString();
+    return '$gajStr gaj / $inches inches';
+  }
+
+  /// Parses the `garments` array shared by both estimation prompts.
+  ///
+  /// Each entry carries either a `gaj` number (fabric pieces) or an `inches`
+  /// number (trims such as lace or piping). A legacy `quantity` string is
+  /// still accepted so an older-shaped response is not thrown away.
+  static Map<String, String> _parseGarments(dynamic rawGarments) {
+    final estimates = <String, String>{};
+    if (rawGarments is! List) return estimates;
+
+    for (final g in rawGarments) {
+      if (g is! Map) continue;
+      final name = g['name']?.toString().trim();
+      if (name == null || name.isEmpty) continue;
+
+      final gaj = g['gaj'];
+      final inches = g['inches'];
+
+      if (gaj is num && gaj > 0) {
+        estimates[name] = _formatGaj(gaj);
+      } else if (inches is num && inches > 0) {
+        estimates[name] = '${inches.round()} inches';
+      } else {
+        final legacy = g['quantity']?.toString().trim();
+        if (legacy != null && legacy.isNotEmpty) estimates[name] = legacy;
+      }
+    }
+    return estimates;
+  }
+
+  /// Extracts the first balanced-looking JSON object from [raw].
+  ///
+  /// Strict JSON mode makes this a no-op in the normal case; it still guards
+  /// against a model that wraps the object in markdown fences.
+  static Map<String, dynamic>? _extractJson(String raw) {
+    final cleaned = raw
+        .replaceAll(RegExp(r'```json\s*'), '')
+        .replaceAll(RegExp(r'```\s*'), '')
+        .trim();
+    final start = cleaned.indexOf('{');
+    final end = cleaned.lastIndexOf('}');
+    if (start == -1 || end == -1 || end <= start) return null;
+    try {
+      final decoded = jsonDecode(cleaned.substring(start, end + 1));
+      return decoded is Map<String, dynamic> ? decoded : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
 
   /// Generates an AI virtual trial image from an [AppearanceProfile] plus
   /// design-reference images.  No personal photo required.
@@ -315,111 +395,140 @@ class AIService {
         : '${referenceImageBytes.length} design reference image(s) uploaded (garments / fabrics / embroidery / accessories / sketches / patterns).';
 
     // ── Build the analysis prompt ──────────────────────────────────────────────
-    final hasCustom = customInstructions.isNotEmpty;
-    final hasStyle  = stylePreferences.isNotEmpty;
+    //
+    // The garment pieces come from `customInstructions` — free text, with no
+    // structured input anywhere in the UI. So the prompt asks Gemini to read
+    // it the way a tailor would read a customer's message: a sentence, a
+    // comma list, Bangla or Banglish, a composite name like "salwar kameez",
+    // or nothing at all with only a design photo to go on. The style chips are
+    // moods ('Traditional', 'Loose Fit'), never pieces, so they are given to
+    // Gemini for the look but explicitly excluded as a source of components.
+    final components = customInstructions.trim();
+    final hasComponents = components.isNotEmpty;
+    final hasReference = referenceImageBytes.isNotEmpty;
 
     final geminiAnalysisPrompt =
-        'You are a professional tailor and fashion designer.\n\n'
+        'You are a professional tailor and garment estimator in Bangladesh.\n\n'
+        '=== WHAT THE CUSTOMER WROTE (free text — may be a sentence, a list, '
+        'Bangla, Banglish, or a mix) ===\n'
+        '${hasComponents ? components : "(nothing written)"}\n\n'
         '=== BODY MEASUREMENTS (inches) ===\n'
         '$measurementString\n\n'
-        '=== STYLE PREFERENCES ===\n'
-        '${hasStyle ? styleString : "Not specified"}\n\n'
-        '${hasCustom ? "=== ADDITIONAL INSTRUCTIONS ===\n$customInstructions\n\n" : ""}'
+        '=== STYLE / MOOD (affects the look only, never the piece list) ===\n'
+        '$styleString\n\n'
         '=== DESIGN REFERENCES ===\n'
         '$refNote\n\n'
-        '=== AI MODEL APPEARANCE ===\n'
+        '=== MODEL APPEARANCE (context only — do NOT describe it back) ===\n'
         '$profileDesc\n\n'
-        'TASK:\n'
-        '1. Carefully inspect the Additional Instructions and Style Preferences to identify what specific garment parts are being requested (e.g. Saree, Blouse, Shirt, Dress, Trousers, Lehenga, Kameez, Salwar, etc.).\n'
-        '2. If the user\'s instructions and style preferences are empty, vague, or do not describe any garments to make, return an empty array [] for the "garments" key.\n'
-        '3. For each identified garment piece, calculate the fabric quantity required using the body measurements provided. Express the quantity in BOTH Gauge and Inches (e.g., "2.5 Gauge / 90 inches").\n'
-        '4. Write a vivid 80-word image-generation prompt describing the finished outfit on the model.\n\n'
-        'CRITICAL: Output ONLY a raw, valid JSON block. Do NOT wrap it in markdown. Do NOT add explanation text. Format exactly like this:\n'
-        '{"garments":[{"name":"[Garment Name]","quantity":"[Value]"}],"image_generation_prompt":"[Prompt]"}';
+        'STEP 1 — WORK OUT WHICH PIECES TO MAKE:\n'
+        'a. Read the free text as a tailor would read a customer message. '
+        'There is no fixed format: accept full sentences ("I want a long '
+        'kameez with three-quarter sleeves and a matching dupatta"), bare '
+        'lists ("kameez, salwar, orna"), Bangla or Banglish spellings '
+        '(orna/urna = dupatta, jama = kameez/dress, pant/pyjama = trousers, '
+        'panjabi = mens kurta, borka = burqa), plurals, typos and shorthand.\n'
+        'b. Expand composite or set names into the pieces they are actually '
+        'made of — e.g. "salwar kameez" or "three piece" gives Kameez + '
+        'Salwar + Dupatta; "saree set" gives Saree + Blouse + Petticoat; '
+        '"lehenga set" gives Lehenga + Choli + Dupatta. This is normalisation, '
+        'not invention.\n'
+        'c. Treat described features as part of the piece they belong to, not '
+        'as separate pieces — sleeves, collar, neckline, pleats, lining and '
+        'flare change that piece\'s quantity instead of adding a row. Trims '
+        'bought by length (lace, piping, ribbon, border) DO get their own row.\n'
+        'd. Normalise every name to its standard English garment name, '
+        'capitalised (Kameez, Salwar, Dupatta, Saree, Blouse, Petticoat, '
+        'Shirt, Trousers, Kurta, Panjabi, Lehenga, Choli, Skirt, Dress, Abaya).\n'
+        '${hasReference ? "e. If the text names no piece at all, identify the garment from the attached design reference image and use that.\n" : ""}'
+        'f. Do NOT derive a piece from the style/mood words alone, and do not '
+        'add a piece the customer neither wrote nor showed you.\n'
+        'g. Only if you still have nothing — no piece in the text'
+        '${hasReference ? ", and none identifiable in the image" : ""} — return '
+        '"garments": [] and set "error" to exactly: "Tell us what you want '
+        'made (e.g. \\"a long kameez with a matching dupatta\\") so the fabric '
+        'quantity can be estimated."\n\n'
+        'STEP 2 — ESTIMATE FABRIC FOR EACH PIECE:\n'
+        'h. Assume a bolt width of $kAssumedFabricWidthInches inches.\n'
+        'i. Base every number strictly on the body measurements above, using '
+        'only the measurements relevant to that piece, adjusted for the length, '
+        'sleeve and fullness the customer described, plus normal seam and hem '
+        'allowance. Do not pad beyond that.\n'
+        'j. For fabric pieces return the quantity as a NUMBER of gaj in the '
+        '"gaj" key (1 gaj = $kInchesPerGaj inches). For trims measured by '
+        'length only return a NUMBER of inches in the "inches" key instead. '
+        'Never write units inside the number.\n'
+        'k. Skip non-fabric accessories (shoes, bags, jewellery) entirely.\n\n'
+        'STEP 3 — IMAGE PROMPT:\n'
+        'l. Write "image_generation_prompt" as an 80-word description of the '
+        'FINISHED OUTFIT ONLY — fabric, colour, drape, cut, embroidery, '
+        'silhouette. Do NOT describe the person: no face, skin, hair, body '
+        'shape, height or pose. Those are added separately.\n\n'
+        'Return a single JSON object, no markdown, in exactly this shape:\n'
+        '{"garments":[{"name":"Kameez","gaj":2.5},{"name":"Lace trim","inches":48}],'
+        '"error":null,"image_generation_prompt":"..."}';
 
     onStatus?.call('Analysing with Gemini — estimating fabric quantities...');
 
     Map<String, String> fabricEstimates = {};
-    String imagePrompt =
-        'A photorealistic full-body fashion shot. $profileDesc '
-        'Wearing a beautifully tailored outfit. Style: $styleString. '
-        'Clean, minimal background. Professional fashion photography lighting.';
+    String? estimateError;
+    String outfitPrompt =
+        'a beautifully tailored outfit. Style: $styleString.';
 
     // Use first reference image as Gemini visual context if available
     final Uint8List? visualContext =
         referenceImageBytes.isNotEmpty ? referenceImageBytes.first : null;
 
-    String geminiText = '';
     try {
-      geminiText = await testGemini(
+      final geminiText = await testGemini(
         apiKey: geminiApiKey,
         prompt: geminiAnalysisPrompt,
         imageBytes: visualContext,
+        jsonOutput: true,
       );
 
-      // Strip any markdown code fences Gemini might wrap around JSON
-      String cleaned = geminiText
-          .replaceAll(RegExp(r'```json\s*'), '')
-          .replaceAll(RegExp(r'```\s*'), '')
-          .trim();
+      final parsed = _extractJson(geminiText);
+      if (parsed != null) {
+        fabricEstimates = _parseGarments(parsed['garments']);
 
-      final startIdx = cleaned.indexOf('{');
-      final endIdx   = cleaned.lastIndexOf('}');
-
-      if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
-        final jsonStr = cleaned.substring(startIdx, endIdx + 1);
-        final parsed  = jsonDecode(jsonStr) as Map<String, dynamic>;
-
-        // ── Parse garments array (type-safe: use toString on every value) ──
-        final rawGarments = parsed['garments'];
-        if (rawGarments is List) {
-          fabricEstimates = {
-            for (final g in rawGarments)
-              if (g is Map)
-                g['name'].toString().trim(): g['quantity'].toString().trim(),
-          };
+        final rawError = parsed['error']?.toString().trim();
+        if (rawError != null && rawError.isNotEmpty && rawError != 'null') {
+          estimateError = rawError;
         }
 
-        // ── Parse image prompt ─────────────────────────────────────────────
-        final rawPrompt = parsed['image_generation_prompt'];
-        if (rawPrompt != null && rawPrompt.toString().trim().isNotEmpty) {
-          imagePrompt = rawPrompt.toString().trim();
+        final rawPrompt = parsed['image_generation_prompt']?.toString().trim();
+        if (rawPrompt != null && rawPrompt.isNotEmpty) {
+          outfitPrompt = rawPrompt;
         }
       } else {
-        debugPrint('[VirtualTrial] No JSON object found in Gemini response. Trying regex fallback...');
-        final matches = RegExp(r'"name"\s*:\s*"([^"]+)"\s*,\s*"quantity"\s*:\s*"([^"]+)"').allMatches(cleaned);
-        if (matches.isNotEmpty) {
-          fabricEstimates = {
-            for (final m in matches)
-              m.group(1)!: m.group(2)!,
-          };
-        }
+        debugPrint('[VirtualTrial] No JSON object found in Gemini response.');
       }
     } catch (e, st) {
       debugPrint('[VirtualTrial] Fabric estimation error: $e\n$st');
-      if (geminiText.isNotEmpty) {
-        try {
-          final cleaned = geminiText
-              .replaceAll(RegExp(r'```json\s*'), '')
-              .replaceAll(RegExp(r'```\s*'), '')
-              .trim();
-          final matches = RegExp(r'"name"\s*:\s*"([^"]+)"\s*,\s*"quantity"\s*:\s*"([^"]+)"').allMatches(cleaned);
-          if (matches.isNotEmpty) {
-            fabricEstimates = {
-              for (final m in matches)
-                m.group(1)!: m.group(2)!,
-            };
-          }
-        } catch (_) {}
-      }
     }
 
     if (fabricEstimates.isEmpty) {
       fabricEstimates = {
-        'Garment Piece': 'No enough data',
-        '_note': 'Estimated standard fabric requirements could not be determined due to insufficient description.'
+        '_error': estimateError ??
+            'Tell us what you want made (e.g. "a long kameez with a matching '
+                'dupatta") so the fabric quantity can be estimated.',
       };
+    } else {
+      fabricEstimates['_note'] =
+          'Assumes $kAssumedFabricWidthInches" fabric width. '
+          '1 gaj = $kInchesPerGaj inches.';
     }
+
+    // The appearance profile is prepended verbatim instead of being left to
+    // Gemini's rewrite. Previously the rewritten prompt was the only thing the
+    // image model saw, so skin tone, hair, pose and body shape survived only
+    // when Gemini happened to repeat them — and often they did not.
+    final imagePrompt =
+        'Full-body photorealistic fashion photograph, single subject. '
+        '$profileDesc '
+        'The model is wearing $outfitPrompt '
+        'Render the model exactly as described above — skin tone, hair, body '
+        'shape, height, pose and expression must match. '
+        'Clean minimal studio background, professional fashion lighting.';
 
     // 4. Generate image — Cloudflare Workers AI first, Gemini as fallback.
     //
