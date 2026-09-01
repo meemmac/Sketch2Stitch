@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/customer.dart';
-import '../models/product.dart';
 
 /// Thrown by [VirtualTrialService] with a user-friendly message so callers
 /// can surface `e.message` directly without knowing Firestore error codes.
@@ -34,23 +33,10 @@ class VTEligibilityResult {
   });
 }
 
-/// Result returned by [VirtualTrialService.getProductForVirtualTrial].
-class VTProductResult {
-  /// The requested product.
-  final Product product;
-
-  /// The specific colour/variant option requested for the trial.
-  /// `null` when the [optionId] was not found among the product's options.
-  final ColorOption? selectedOption;
-
-  const VTProductResult({required this.product, this.selectedOption});
-}
-
 /// Wraps all Firestore operations needed by the Virtual Trial feature.
 ///
 /// Collections touched:
 ///   - `Customer`  — `vtUsed`, `vtResetDate` fields.
-///   - `Products`  — product data + colour options.
 class VirtualTrialService {
   VirtualTrialService({FirebaseFirestore? firestore})
       : _db = firestore ?? FirebaseFirestore.instance;
@@ -58,7 +44,6 @@ class VirtualTrialService {
   final FirebaseFirestore _db;
 
   static const _customers = 'Customer';
-  static const _products = 'Products';
 
   // ── getVirtualTrialUsage ───────────────────────────────────────────────────
 
@@ -209,46 +194,6 @@ class VirtualTrialService {
     } on FirebaseException catch (e) {
       throw VirtualTrialServiceException(
         'Failed to reset virtual trial usage: ${e.message ?? e.code}',
-      );
-    }
-  }
-
-  // ── getProductForVirtualTrial ──────────────────────────────────────────────
-
-  /// Fetches the [Product] by [productId] and resolves the specific
-  /// [ColorOption] matching [optionId].
-  ///
-  /// The returned [VTProductResult.selectedOption] is `null` when [optionId]
-  /// does not match any option on the product (caller should validate before
-  /// launching the trial).
-  Future<VTProductResult> getProductForVirtualTrial(
-    String productId,
-    int optionId,
-  ) async {
-    try {
-      final snap = await _db.collection(_products).doc(productId).get();
-
-      if (!snap.exists) {
-        throw VirtualTrialServiceException(
-          'Product "$productId" not found.',
-        );
-      }
-
-      final product = Product.fromJson({...snap.data()!, 'id': snap.id});
-
-      final selectedOption = product.colorOptions
-          .cast<ColorOption?>()
-          .firstWhere(
-            (o) => o?.optionId == optionId,
-            orElse: () => null,
-          );
-
-      return VTProductResult(product: product, selectedOption: selectedOption);
-    } on VirtualTrialServiceException {
-      rethrow;
-    } on FirebaseException catch (e) {
-      throw VirtualTrialServiceException(
-        'Failed to fetch product for virtual trial: ${e.message ?? e.code}',
       );
     }
   }

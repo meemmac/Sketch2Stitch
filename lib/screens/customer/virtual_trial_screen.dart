@@ -14,6 +14,7 @@ import '../../models/customer.dart' show kVirtualTrialMonthlyLimit;
 import '../../widgets/top_feedback_banner.dart';
 import '../../utils/api_config.dart';
 import '../../widgets/dashboard_drawer.dart';
+import 'design_canvas_screen.dart';
 import 'home_screen.dart';
 import 'package:gal/gal.dart';
 import '../../widgets/color_picker_row.dart';
@@ -88,6 +89,7 @@ const _poseIcons = [
 class VirtualTrialScreen extends StatefulWidget {
   final List<String>?
   prefillAssetImages; // NEW — retailer/product asset paths from Cart
+
   const VirtualTrialScreen({super.key, this.prefillAssetImages});
 
   @override
@@ -227,9 +229,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   AppearanceProfile? _usedProfile; // snapshot shown in summary card
 
   // ── Progress tracking ──────────────────────────────────────────
-  /// True once the user has tapped any appearance-profile control.
-  // ignore: unused_field
-  bool _profileConfigured = false;
 
   /// True once the user has expanded the Advanced Measurements tile.
   bool _measurementsReviewed = false;
@@ -437,7 +436,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       final (imageBytes, fabric) =
           await AIService.generateVirtualTrialFromProfile(
         geminiApiKey: geminiKey,
-        hfToken: APIConfig.hfToken,
         profile: profileSnapshot,
         referenceImageBytes: referenceBytes,
         measurements: _measurements,
@@ -758,6 +756,12 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                       label: 'Add More',
                       onTap: _pickReferenceImages,
                     ),
+                    const SizedBox(width: 8),
+                    _smallButton(
+                      icon: Icons.draw_outlined,
+                      label: 'Draw',
+                      onTap: _openSketchBoard,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -831,7 +835,40 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 ),
               ),
             ),
+      // Only in the empty state — once there are images the Draw button sits
+      // in the header row next to Add More.
+      footer: hasImages
+          ? null
+          : TextButton.icon(
+              onPressed: _openSketchBoard,
+              icon: const Icon(Icons.draw_outlined, size: 17, color: _sage),
+              label: const Text(
+                'Or draw your own design',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: _sage,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                minimumSize: const Size(0, 34),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
     );
+  }
+
+  /// Opens the same sketch board the tailoring flow uses. It pops with the
+  /// path of an exported PNG, which is just another reference image from
+  /// here on — no separate handling downstream.
+  Future<void> _openSketchBoard() async {
+    final path = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const DesignCanvasScreen(draftScope: 'trial')),
+    );
+    if (path == null || !mounted) return;
+    setState(() => _referenceImages.add(XFile(path)));
   }
 
   /// Wraps a thumbnail so tapping it opens the image full-screen, with a small
@@ -947,7 +984,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 selected: (v) => _profile.ageGroup == v,
                 onTap: (v) => setState(() {
                   _profile.ageGroup = v;
-                  _profileConfigured = true;
                 }),
               ),
             ),
@@ -961,7 +997,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 selected: (v) => _profile.gender == v,
                 onTap: (v) => setState(() {
                   _profile.gender = v;
-                  _profileConfigured = true;
                 }),
               ),
             ),
@@ -975,7 +1010,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 selected: (v) => _profile.bodyShape == v,
                 onTap: (v) => setState(() {
                   _profile.bodyShape = v;
-                  _profileConfigured = true;
                 }),
               ),
             ),
@@ -989,7 +1023,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 selected: (v) => _profile.height == v,
                 onTap: (v) => setState(() {
                   _profile.height = v;
-                  _profileConfigured = true;
                 }),
               ),
             ),
@@ -1016,7 +1049,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                         : b,
                   );
                   _profile.skinTone = nearest.$2;
-                  _profileConfigured = true;
                 }),
                 onAdjustChanged: (d) => setState(() {
                   _skinAdjustDelta = d;
@@ -1028,7 +1060,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                   _profile.customSkinColor = AppearanceProfile.colorToHex(
                     adjusted,
                   );
-                  _profileConfigured = true;
                 }),
               ),
             ),
@@ -1041,7 +1072,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 selected: (v) => _profile.hairLength == v,
                 onTap: (v) => setState(() {
                   _profile.hairLength = v;
-                  _profileConfigured = true;
                 }),
               ),
             ),
@@ -1061,7 +1091,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                         _profile.hairStyle == v,
                     onTap: (v) => setState(() {
                       _profile.hairStyle = v;
-                      _profileConfigured = true;
                     }),
                   ),
                 ),
@@ -1088,7 +1117,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                   _profile.hairColor = match.isNotEmpty
                       ? match.first.$2
                       : HairColor.colorful;
-                  _profileConfigured = true;
                 }),
                 onAdjustChanged: (d) => setState(() {
                   _hairAdjustDelta = d;
@@ -1100,7 +1128,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                   _profile.customHairColor = AppearanceProfile.colorToHex(
                     adjusted,
                   );
-                  _profileConfigured = true;
                 }),
               ),
             ),
@@ -1118,7 +1145,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                       child: GestureDetector(
                         onTap: () => setState(() {
                           _profile.pose = pi.$2;
-                          _profileConfigured = true;
                         }),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
@@ -1169,7 +1195,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 selected: (v) => _profile.expression == v,
                 onTap: (v) => setState(() {
                   _profile.expression = v;
-                  _profileConfigured = true;
                 }),
               ),
             ),
@@ -1192,7 +1217,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                           } else {
                             _profile.accessories.add(acc);
                           }
-                          _profileConfigured = true;
                         }),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
@@ -1247,7 +1271,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                       style: const TextStyle(fontSize: 12),
                       onChanged: (val) {
                         setState(() {
-                          _profileConfigured = true;
                         });
                       },
                     ),
@@ -1887,6 +1910,8 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     required IconData icon,
     String? subtitle,
     required Widget child,
+    /// Optional secondary action pinned under [child].
+    Widget? footer,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1936,6 +1961,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
           ),
           const SizedBox(height: 16),
           child,
+          if (footer != null) ...[const SizedBox(height: 4), footer],
         ],
       ),
     );
@@ -2057,7 +2083,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         tab('Custom', _isCustomAppearance, () {
           setState(() {
             _isCustomAppearance = true;
-            _profileConfigured = true;
           });
         }),
       ],
