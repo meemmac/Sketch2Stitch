@@ -14,6 +14,7 @@ import '../../models/customer.dart' show kVirtualTrialMonthlyLimit;
 import '../../widgets/top_feedback_banner.dart';
 import '../../utils/api_config.dart';
 import '../../widgets/dashboard_drawer.dart';
+import 'design_canvas_screen.dart';
 import 'home_screen.dart';
 import 'package:gal/gal.dart';
 import '../../widgets/color_picker_row.dart';
@@ -88,6 +89,7 @@ const _poseIcons = [
 class VirtualTrialScreen extends StatefulWidget {
   final List<String>?
   prefillAssetImages; // NEW — retailer/product asset paths from Cart
+
   const VirtualTrialScreen({super.key, this.prefillAssetImages});
 
   @override
@@ -227,9 +229,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   AppearanceProfile? _usedProfile; // snapshot shown in summary card
 
   // ── Progress tracking ──────────────────────────────────────────
-  /// True once the user has tapped any appearance-profile control.
-  // ignore: unused_field
-  bool _profileConfigured = false;
 
   /// True once the user has expanded the Advanced Measurements tile.
   bool _measurementsReviewed = false;
@@ -317,6 +316,14 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     return '${d.day} ${months[d.month - 1]}';
   }
 
+  /// Wording for a spent quota. `vtResetDate` is null until the very first
+  /// trial is recorded, so the reset sentence has to be able to drop out.
+  String _limitReachedMessage(int limit) {
+    final reset = _formatDate(_vtResetDate);
+    return 'You\'ve used all $limit trials this month.'
+        '${reset.isEmpty ? '' : ' Your limit resets on $reset.'}';
+  }
+
   // ── Generation ─────────────────────────────────────────────────────────────
   /// Reads every reference image into bytes for the Gemini call, in the order
   /// they're shown: the cart's chosen colour options (Cloudinary URLs, or
@@ -358,15 +365,27 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     // Checked against the cached value first (instant feedback), then against
     // Firestore, since the cache can be stale if a trial ran on another device.
     if (_vtLimitReached) {
-      _showSnack(
-        'You\'ve used all $kVirtualTrialMonthlyLimit trials this month. '
-        'Your limit resets on ${_formatDate(_vtResetDate)}.',
-      );
+      _showSnack(_limitReachedMessage(kVirtualTrialMonthlyLimit), isError: true);
       return;
     }
 
     if (_customerId.isEmpty) {
-      _showSnack('Please sign in again to run a virtual trial.');
+      _showSnack('Please sign in again to run a virtual trial.', isError: true);
+      return;
+    }
+
+    // Nothing to generate from: no reference, no description, no style. The
+    // result would be an outfit the customer never asked for — and it would
+    // still cost them a trial.
+    if (_referenceImages.isEmpty &&
+        _prefilledAssetImages.isEmpty &&
+        _customInstructionsController.text.trim().isEmpty &&
+        _selectedStyles.isEmpty) {
+      _showSnack(
+        'Add a design reference, or describe what you want made, before '
+        'generating — otherwise the preview has nothing to go on.',
+        isError: true,
+      );
       return;
     }
 
@@ -375,21 +394,21 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       if (!mounted) return;
       if (!eligibility.eligible) {
         setState(() => _vtUsed = eligibility.used);
-        _showSnack(
-          'You\'ve used all ${eligibility.limit} trials this month. '
-          'Your limit resets on ${_formatDate(_vtResetDate)}.',
-        );
+        _showSnack(_limitReachedMessage(eligibility.limit), isError: true);
         return;
       }
     } on VirtualTrialServiceException catch (e) {
-      _showSnack(e.message);
+      _showSnack(e.message, isError: true);
       return;
     }
 
     const geminiKey = APIConfig.geminiApiKey;
 
     if (geminiKey.isEmpty || geminiKey == 'YOUR_GEMINI_API_KEY_HERE') {
-      _showSnack('Please set your Gemini API key in lib/utils/api_config.dart');
+      _showSnack(
+        'Please set your Gemini API key in lib/utils/api_config.dart',
+        isError: true,
+      );
       return;
     }
 
@@ -430,6 +449,21 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         _statusMessage = 'Loading your selected designs...';
       });
       final referenceBytes = await _loadReferenceBytes();
+      final expectedReferences =
+          _prefilledAssetImages.length + _referenceImages.length;
+      if (expectedReferences > 0 && referenceBytes.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _statusMessage = '';
+        });
+        _showSnack(
+          'Your design references could not be loaded — check your connection '
+          'and try again. No trial was used.',
+          isError: true,
+        );
+        return;
+      }
 
       // 2. One call: Gemini estimates the fabric AND generates the try-on
       //    image from those same references, so the preview shows the garment
@@ -437,7 +471,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
       final (imageBytes, fabric) =
           await AIService.generateVirtualTrialFromProfile(
         geminiApiKey: geminiKey,
-        hfToken: APIConfig.hfToken,
         profile: profileSnapshot,
         referenceImageBytes: referenceBytes,
         measurements: _measurements,
@@ -485,12 +518,17 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
             .catchError((_) {});
       }
     } catch (e) {
+      debugPrint('[VirtualTrial] Generation failed: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
           _statusMessage = '';
         });
-        _showSnack('Error generating mock preview: $e');
+        _showSnack(
+          'Couldn\'t generate your preview just now. Check your connection '
+          'and try again — no trial was used.',
+          isError: true,
+        );
       }
     }
   }
@@ -678,8 +716,8 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Your monthly limit of $kVirtualTrialMonthlyLimit trials has ended. '
-                'It resets on $resetLabel.',
+                'Your monthly limit of $kVirtualTrialMonthlyLimit trials has ended.'
+                '${resetLabel.isEmpty ? '' : ' It resets on $resetLabel.'}',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.red.shade700,
@@ -712,7 +750,8 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
           Expanded(
             child: Text(
               '$remaining of $kVirtualTrialMonthlyLimit trial${remaining == 1 ? '' : 's'} left this month'
-              '${isLow ? ' — running low' : ''} · resets $resetLabel',
+              '${isLow ? ' — running low' : ''}'
+              '${resetLabel.isEmpty ? '' : ' · resets $resetLabel'}',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -757,6 +796,12 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                       icon: Icons.add_photo_alternate_outlined,
                       label: 'Add More',
                       onTap: _pickReferenceImages,
+                    ),
+                    const SizedBox(width: 8),
+                    _smallButton(
+                      icon: Icons.draw_outlined,
+                      label: 'Draw',
+                      onTap: _openSketchBoard,
                     ),
                   ],
                 ),
@@ -831,7 +876,40 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 ),
               ),
             ),
+      // Only in the empty state — once there are images the Draw button sits
+      // in the header row next to Add More.
+      footer: hasImages
+          ? null
+          : TextButton.icon(
+              onPressed: _openSketchBoard,
+              icon: const Icon(Icons.draw_outlined, size: 17, color: _sage),
+              label: const Text(
+                'Or draw your own design',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: _sage,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                minimumSize: const Size(0, 34),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
     );
+  }
+
+  /// Opens the same sketch board the tailoring flow uses. It pops with the
+  /// path of an exported PNG, which is just another reference image from
+  /// here on — no separate handling downstream.
+  Future<void> _openSketchBoard() async {
+    final path = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const DesignCanvasScreen(draftScope: 'trial')),
+    );
+    if (path == null || !mounted) return;
+    setState(() => _referenceImages.add(XFile(path)));
   }
 
   /// Wraps a thumbnail so tapping it opens the image full-screen, with a small
@@ -947,7 +1025,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 selected: (v) => _profile.ageGroup == v,
                 onTap: (v) => setState(() {
                   _profile.ageGroup = v;
-                  _profileConfigured = true;
                 }),
               ),
             ),
@@ -961,7 +1038,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 selected: (v) => _profile.gender == v,
                 onTap: (v) => setState(() {
                   _profile.gender = v;
-                  _profileConfigured = true;
                 }),
               ),
             ),
@@ -975,7 +1051,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 selected: (v) => _profile.bodyShape == v,
                 onTap: (v) => setState(() {
                   _profile.bodyShape = v;
-                  _profileConfigured = true;
                 }),
               ),
             ),
@@ -989,7 +1064,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 selected: (v) => _profile.height == v,
                 onTap: (v) => setState(() {
                   _profile.height = v;
-                  _profileConfigured = true;
                 }),
               ),
             ),
@@ -1016,7 +1090,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                         : b,
                   );
                   _profile.skinTone = nearest.$2;
-                  _profileConfigured = true;
                 }),
                 onAdjustChanged: (d) => setState(() {
                   _skinAdjustDelta = d;
@@ -1028,7 +1101,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                   _profile.customSkinColor = AppearanceProfile.colorToHex(
                     adjusted,
                   );
-                  _profileConfigured = true;
                 }),
               ),
             ),
@@ -1041,7 +1113,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 selected: (v) => _profile.hairLength == v,
                 onTap: (v) => setState(() {
                   _profile.hairLength = v;
-                  _profileConfigured = true;
                 }),
               ),
             ),
@@ -1061,7 +1132,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                         _profile.hairStyle == v,
                     onTap: (v) => setState(() {
                       _profile.hairStyle = v;
-                      _profileConfigured = true;
                     }),
                   ),
                 ),
@@ -1088,7 +1158,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                   _profile.hairColor = match.isNotEmpty
                       ? match.first.$2
                       : HairColor.colorful;
-                  _profileConfigured = true;
                 }),
                 onAdjustChanged: (d) => setState(() {
                   _hairAdjustDelta = d;
@@ -1100,7 +1169,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                   _profile.customHairColor = AppearanceProfile.colorToHex(
                     adjusted,
                   );
-                  _profileConfigured = true;
                 }),
               ),
             ),
@@ -1118,7 +1186,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                       child: GestureDetector(
                         onTap: () => setState(() {
                           _profile.pose = pi.$2;
-                          _profileConfigured = true;
                         }),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
@@ -1169,7 +1236,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                 selected: (v) => _profile.expression == v,
                 onTap: (v) => setState(() {
                   _profile.expression = v;
-                  _profileConfigured = true;
                 }),
               ),
             ),
@@ -1192,7 +1258,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                           } else {
                             _profile.accessories.add(acc);
                           }
-                          _profileConfigured = true;
                         }),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
@@ -1247,7 +1312,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                       style: const TextStyle(fontSize: 12),
                       onChanged: (val) {
                         setState(() {
-                          _profileConfigured = true;
                         });
                       },
                     ),
@@ -1370,7 +1434,10 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     return _sectionCard(
       title: 'Style Preferences',
       icon: Icons.style_outlined,
-      subtitle: 'Select all that apply — these guide the outfit generation.',
+      subtitle:
+          'Sets the mood of the outfit — fabric, colour and cut in the preview. '
+          'These are not garment pieces, so they cannot be measured on their '
+          'own: name the pieces in the box below.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1410,12 +1477,63 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
               );
             }).toList(),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
+          _buildGarmentComponentsBox(),
+        ],
+      ),
+    );
+  }
+
+  // ── Garment Components ──────────────────────────────────────────────────────
+  //
+  // The fabric estimate is driven entirely by what the customer types here.
+  // The style chips above are moods, not garments, so they can never tell the
+  // AI which pieces exist to be measured — this box is the only source for
+  // that, which is why its purpose is spelled out on screen.
+  Widget _buildGarmentComponentsBox() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _sagePale,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.checkroom_rounded, color: _sageDark, size: 17),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Garment Pieces to Estimate',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: _ink,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Describe what you want made, in your own words — a sentence or a '
+            'list, English or Bangla. This is what tells the AI which pieces '
+            'to measure against your body measurements and how much fabric to '
+            'buy, before you order it.',
+            style: TextStyle(fontSize: 11.5, color: Colors.black54, height: 1.4),
+          ),
+          const SizedBox(height: 10),
           TextField(
             controller: _customInstructionsController,
             decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.white,
               hintText:
-                  'Describe your preferences and garment parts (e.g. "Kameez, Dupatta") for the best look and an accurate fabric estimation.',
+                  'e.g. "I want a long kameez with full sleeves, a salwar and '
+                  'a matching dupatta, with lace on the neckline"',
               hintStyle: const TextStyle(fontSize: 12, color: Colors.black38),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -1506,7 +1624,9 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         ),
         label: Text(
           limitReached
-              ? 'Limit Reached · Resets ${_formatDate(_vtResetDate)}'
+              ? (_formatDate(_vtResetDate).isEmpty
+                  ? 'Monthly Limit Reached'
+                  : 'Limit Reached · Resets ${_formatDate(_vtResetDate)}')
               : (_isLoading ? 'Generating…' : 'Generate AI Preview'),
           style: const TextStyle(
             fontSize: 16,
@@ -1768,7 +1888,9 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
                     runSpacing: 4,
                     children: parts.map((part) {
                       final isInch = part.toLowerCase().contains('inch');
-                      final isGauge = part.toLowerCase().contains('gauge');
+                      final lower = part.toLowerCase();
+              final isGauge =
+                  lower.contains('gaj') || lower.contains('gauge');
                       Color bg, border, fg;
                       if (isInch) {
                         bg = const Color(0xFFE8F0FE);
@@ -1816,7 +1938,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
   // ── Disclaimer ──────────────────────────────────────────────────────────────
   Widget _buildDisclaimer() {
     return const Text(
-      'Powered by Google Gemini and Hugging Face generative AI. '
+      'Powered by Cloudflare Workers AI and Google Gemini. '
       'Results are AI-generated and intended as creative references only. '
       'Please review google.com/gemini/policy-guidelines for usage terms.',
       style: TextStyle(fontSize: 10, color: Colors.black38),
@@ -1831,6 +1953,8 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
     required IconData icon,
     String? subtitle,
     required Widget child,
+    /// Optional secondary action pinned under [child].
+    Widget? footer,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1880,6 +2004,7 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
           ),
           const SizedBox(height: 16),
           child,
+          if (footer != null) ...[const SizedBox(height: 4), footer],
         ],
       ),
     );
@@ -2001,7 +2126,6 @@ class _VirtualTrialScreenState extends State<VirtualTrialScreen>
         tab('Custom', _isCustomAppearance, () {
           setState(() {
             _isCustomAppearance = true;
-            _profileConfigured = true;
           });
         }),
       ],
