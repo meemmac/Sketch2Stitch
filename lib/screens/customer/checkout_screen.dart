@@ -605,8 +605,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     final phone = phoneController.text.trim();
     final address = addressController.text.trim();
-    phoneController.dispose();
-    addressController.dispose();
+    // The TextFields are still mounted while the dialog's close animation
+    // plays, so disposing the controllers the moment showDialog() returns
+    // makes Flutter throw "A TextEditingController was used after being
+    // disposed". Let the transition finish first.
+    Future.delayed(const Duration(milliseconds: 500), () {
+      phoneController.dispose();
+      addressController.dispose();
+    });
 
     if (saved != true || !mounted) return;
 
