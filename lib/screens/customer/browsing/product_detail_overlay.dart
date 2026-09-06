@@ -923,25 +923,26 @@ class CareInstructionRow extends StatelessWidget {
             child: Icon(Icons.info_outline, size: 16, color: Colors.blue.shade300),
           ),
           const SizedBox(width: 8),
+          // The label takes all the space the (short) value doesn't need.
+          // Previously both sides were flexible, so the row was split in
+          // half and the label was ellipsised while the right half sat empty.
           Expanded(
             child: Text(
               label,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: isOk ? Colors.black87 : Colors.grey),
             ),
           ),
           const SizedBox(width: 12),
-          Flexible(
-            child: Text(
-              value ?? (isOk ? "Yes" : "No"),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: isOk ? Colors.green.shade800 : Colors.grey,
-              ),
+          Text(
+            value ?? (isOk ? "Yes" : "No"),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: isOk ? Colors.green.shade800 : Colors.grey,
             ),
           ),
         ],

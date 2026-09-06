@@ -10,8 +10,12 @@ import 'tailoring_callbacks.dart';
 import '../../models/sub_order.dart';
 import '../../services/bkash_service.dart';
 import 'bkash_payment_screen.dart';
+import '../../services/auth_service.dart';
 import '../../services/checkout_service.dart';
 import '../../services/user_session.dart';
+import '../../models/user_role.dart';
+import '../../utils/validation_utils.dart';
+import '../../widgets/dashboard_drawer.dart';
 import '../../widgets/top_feedback_banner.dart';
 
 /// ─── Checkout Screen ────────────────────────────────────────────────────
@@ -375,12 +379,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       body: Column(
         children: [
           Expanded(
+            // One extra leading item: the delivery-contact card plus the
+            // note explaining that these payments are for fabric only.
             child: ListView.separated(
               padding: const EdgeInsets.all(20),
-              itemCount: retailerIds.length,
+              itemCount: retailerIds.length + 1,
               separatorBuilder: (_, __) => const SizedBox(height: 14),
               itemBuilder: (context, index) {
-                final retailerId = retailerIds[index];
+                if (index == 0) return _buildDeliveryDetailsCard();
+                final retailerId = retailerIds[index - 1];
                 final lines = grouped[retailerId]!;
                 return _buildRetailerPayCard(retailerId, lines);
               },
@@ -390,6 +397,246 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ],
       ),
     );
+  }
+
+  /// Where this order will be delivered and who to call about it — read
+  /// straight off the signed-in profile, editable in place so the customer
+  /// doesn't have to leave checkout to correct a wrong number or address.
+  Widget _buildDeliveryDetailsCard() {
+    return ValueListenableBuilder<DrawerProfileData?>(
+      valueListenable: UserSession.instance.currentProfile,
+      builder: (context, profile, _) {
+        final phone = (profile?.phone ?? '').trim();
+        final address = (profile?.address ?? '').trim();
+
+        return Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.grey.shade200),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(Icons.person_pin_circle_outlined,
+                            size: 18, color: Colors.green.shade800),
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          "Delivery details",
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => _editDeliveryDetails(profile),
+                        icon: const Icon(Icons.edit_outlined, size: 16),
+                        label: const Text("Edit",
+                            style: TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.bold)),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.green.shade800,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: const Size(0, 32),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  _contactRow(
+                    Icons.phone_outlined,
+                    phone.isEmpty ? "No phone number added" : phone,
+                    isMissing: phone.isEmpty,
+                  ),
+                  const SizedBox(height: 8),
+                  _contactRow(
+                    Icons.location_on_outlined,
+                    address.isEmpty ? "No delivery address added" : address,
+                    isMissing: address.isEmpty,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.amber.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline,
+                      size: 18, color: Colors.amber.shade800),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "You are paying the retailers only",
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.amber.shade900,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          "These payments cover the fabrics and elements "
+                          "from the retailers below, plus their delivery. "
+                          "Tailoring charges are not included — you pay your "
+                          "tailor separately after choosing them in the next "
+                          "step.",
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.4,
+                            color: Colors.brown.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _contactRow(IconData icon, String text, {bool isMissing = false}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 15, color: Colors.grey.shade500),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.35,
+              fontWeight: FontWeight.w600,
+              color: isMissing ? Colors.red.shade400 : Colors.black87,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Edits phone/address on the customer's own profile document — the same
+  /// fields the drawer's profile editor writes, so the two stay in sync.
+  Future<void> _editDeliveryDetails(DrawerProfileData? profile) async {
+    if (profile == null) return;
+    final phoneController = TextEditingController(text: profile.phone);
+    final addressController = TextEditingController(text: profile.address);
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18)),
+        title: const Text("Delivery details",
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: "Phone number",
+                prefixIcon: Icon(Icons.phone_outlined),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: addressController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: "Delivery address",
+                alignLabelWithHint: true,
+                prefixIcon: Icon(Icons.location_on_outlined),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade800,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text("Save"),
+          ),
+        ],
+      ),
+    );
+
+    final phone = phoneController.text.trim();
+    final address = addressController.text.trim();
+    phoneController.dispose();
+    addressController.dispose();
+
+    if (saved != true || !mounted) return;
+
+    if (!ValidationUtils.isValidPhone(phone)) {
+      _showPaymentError('Please enter a valid phone number.');
+      return;
+    }
+    if (address.isEmpty) {
+      _showPaymentError('Please enter a delivery address.');
+      return;
+    }
+    if (_customerId.isEmpty) {
+      _showPaymentError('Please sign in again to update your details.');
+      return;
+    }
+
+    try {
+      await AuthService().updateProfile(_customerId, UserRole.customer, {
+        'phone': phone,
+        'address': address,
+      });
+      UserSession.instance.currentProfile.value =
+          profile.copyWith(phone: phone, address: address);
+      if (!mounted) return;
+      AppFeedback.show(context, 'Delivery details updated');
+    } catch (e) {
+      debugPrint('[Checkout] Could not update delivery details: $e');
+      if (!mounted) return;
+      _showPaymentError("Couldn't save your details. Please try again.");
+    }
   }
 
   Widget _buildRetailerPayCard(String retailerId, List<CartLine> lines) {
