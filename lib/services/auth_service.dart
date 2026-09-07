@@ -14,7 +14,11 @@ import '../models/retailer.dart';
 final String _emailjsServiceId = dotenv.get('EMAILJS_SERVICE_ID', fallback: '');
 final String _emailjsPublicKey = dotenv.get('EMAILJS_PUBLIC_KEY', fallback: '');
 final String _emailjsAccessToken = dotenv.get('EMAILJS_ACCESS_TOKEN', fallback: '');
-final String _emailjsWelcomeTemplateId = dotenv.get('EMAILJS_WELCOME_TEMPLATE_ID', fallback: '');
+final String _emailjsWelcomeTemplateId = dotenv.get(
+  'EMAILJS_WELCOME_TEMPLATE_ID',
+  // .env only defines EMAILJS_TEMPLATE_ID, so fall back to it.
+  fallback: dotenv.get('EMAILJS_TEMPLATE_ID', fallback: ''),
+);
 
 /// Where Firebase's reset-password page sends the user once the new
 /// password is saved. The page itself (public/reset-done.html) offers a
@@ -485,6 +489,8 @@ class AuthService {
         },
         body: jsonEncode(payload),
       );
+
+      debugPrint('📧 EmailJS response: ${response.statusCode} ${response.body}');
 
       return response.statusCode == 200;
     } catch (e) {
