@@ -137,11 +137,23 @@ class OrderService {
   /// related to a customer’s journey into a single source of truth.
   /// Retrieve related entities in parallel to minimize latency.
   Stream<List<Map<String, dynamic>>> streamDetailedCustomerOrders(String customerId) {
-    return _db
+    // Reviews are read with a one-shot `.get()` below, so a review write —
+    // which touches nothing in Orders — never re-triggered this stream. A
+    // just-submitted review therefore stayed invisible and its "Leave a
+    // Review" card stayed on screen until the app was restarted, which read
+    // as the review not being saved at all. Re-emit the latest orders
+    // snapshot whenever this customer's reviews change as well.
+    final ordersStream = _db
         .collection(_ordersCollection)
         .where('customerId', isEqualTo: customerId)
-        .snapshots()
-        .asyncMap((snap) async {
+        .snapshots();
+
+    final reviewsStream = _db
+        .collection(_reviewsCollection)
+        .where('customerId', isEqualTo: customerId)
+        .snapshots();
+
+    return _resendOn(ordersStream, reviewsStream).asyncMap((snap) async {
       if (snap.docs.isEmpty) return <Map<String, dynamic>>[];
 
       // Internal memory cache for entities to eliminate redundant requests.
@@ -340,6 +352,42 @@ class OrderService {
         return <Map<String, dynamic>>[];
       }
     });
+  }
+
+  /// Republishes the latest [source] event whenever [trigger] fires, so a
+  /// pipeline that joins in data from other collections can refresh when
+  /// those collections change rather than only when [source] does.
+  Stream<T> _resendOn<T>(Stream<T> source, Stream<dynamic> trigger) {
+    StreamSubscription<T>? sourceSub;
+    StreamSubscription<dynamic>? triggerSub;
+    T? latest;
+    bool hasLatest = false;
+
+    late final StreamController<T> controller;
+    controller = StreamController<T>(
+      onListen: () {
+        sourceSub = source.listen(
+          (event) {
+            latest = event;
+            hasLatest = true;
+            controller.add(event);
+          },
+          onError: controller.addError,
+        );
+        triggerSub = trigger.listen(
+          (_) {
+            if (hasLatest) controller.add(latest as T);
+          },
+          // A failing trigger must never take the main stream down with it.
+          onError: (Object e) => debugPrint('OrderService: refresh trigger error: $e'),
+        );
+      },
+      onCancel: () async {
+        await sourceSub?.cancel();
+        await triggerSub?.cancel();
+      },
+    );
+    return controller.stream;
   }
 
   // ─── fetchOrderDetails ─────────────────────────────────────────────────────

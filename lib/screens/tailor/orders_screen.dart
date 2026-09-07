@@ -1170,16 +1170,21 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text("Stitching Details", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                        Text(
-                          "ID: ${order.orderId.startsWith('ORD-') ? order.orderId : "ORD-${order.orderId}"}",
-                          style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600),
-                        ),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text("Stitching Details", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                          Text(
+                            "ID: ${order.orderId.startsWith('ORD-') ? order.orderId : "ORD-${order.orderId}"}",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 12),
                     _infoBadge(
                       _getStatusText(order.status),
                       _getStatusColor(order.status).withValues(alpha: 0.1),
@@ -1197,6 +1202,10 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 const Text("Customer Requirements", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 ...order.items.map((item) => _itemPreviewCard(order, item, setModalState)),
+                // Measurements, reference images and client instructions apply
+                // to the whole job, so they are shown once below all items
+                // rather than repeated on every item card.
+                _jobInstructionsCard(order),
                 // #9: Single price and date for the whole job, shown once below all items.
                 // #13: still editable after the quote is sent — the PRICE
                 // until the customer confirms and pays, the DATE until the
@@ -1626,12 +1635,33 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
               ],
             ),
           ],
-          const SizedBox(height: 16),
-          const Divider(),
-          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+
+  /// Reference images, client instructions and measurements for the job as a
+  /// whole — the customer sets these once per order, not per item.
+  Widget _jobInstructionsCard(TailorOrder order) {
+    final List<String> refImages = [
+      for (final item in order.items) ...?item.measurementRefImages,
+    ].toSet().toList();
+
+    final String? instructions = order.items
+        .map((i) => i.tailorInstructions)
+        .firstWhere((t) => t != null && t.trim().isNotEmpty, orElse: () => null);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade200)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           const Text("Stitching Instructions & Ref", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
           const SizedBox(height: 12),
-          if (item.measurementRefImages != null && item.measurementRefImages!.isNotEmpty) ...[
+          if (refImages.isNotEmpty) ...[
             const Text(
               "Reference Images:",
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.black54),
@@ -1646,9 +1676,9 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                 mainAxisSpacing: 8,
                 childAspectRatio: 1,
               ),
-              itemCount: item.measurementRefImages!.length,
+              itemCount: refImages.length,
               itemBuilder: (context, index) {
-                final imgPath = item.measurementRefImages![index];
+                final imgPath = refImages[index];
                 return GestureDetector(
                   onTap: () => _showFullScreenImage(imgPath),
                   child: ClipRRect(
@@ -1660,20 +1690,15 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
             ),
             const SizedBox(height: 16),
           ],
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("Client Instructions:", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.black54)),
-              const SizedBox(height: 4),
-              Text(item.tailorInstructions ?? "No specific instructions provided.", style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.4)),
-              const SizedBox(height: 8),
-              TextButton.icon(
-                onPressed: () => _showMeasurements(order.measurement),
-                icon: const Icon(Icons.straighten, size: 14),
-                label: const Text("View Customer Measurements", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                style: TextButton.styleFrom(padding: EdgeInsets.zero, foregroundColor: primaryGreen, minimumSize: const Size(0, 0), tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-              ),
-            ],
+          const Text("Client Instructions:", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.black54)),
+          const SizedBox(height: 4),
+          Text(instructions ?? "No specific instructions provided.", style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.4)),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () => _showMeasurements(order.measurement),
+            icon: const Icon(Icons.straighten, size: 14),
+            label: const Text("View Customer Measurements", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+            style: TextButton.styleFrom(padding: EdgeInsets.zero, foregroundColor: primaryGreen, minimumSize: const Size(0, 0), tapTargetSize: MaterialTapTargetSize.shrinkWrap),
           ),
         ],
       ),
@@ -1909,7 +1934,14 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         Text(label, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
       ]),
     );
   }
@@ -1943,13 +1975,13 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
     return "${date.day} ${months[date.month - 1]} ${date.year}";
   }
 
-  Widget _buildProductImage(String path, double width, double height) {
+  Widget _buildProductImage(String path, double width, double height, {BoxFit fit = BoxFit.cover}) {
     if (path.startsWith('http')) {
       return Image.network(
         path,
         width: width,
         height: height,
-        fit: BoxFit.cover,
+        fit: fit,
         errorBuilder: (context, error, stackTrace) => _imagePlaceholder(width, height),
       );
     } else if (path.isNotEmpty) {
@@ -1957,7 +1989,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
         path,
         width: width,
         height: height,
-        fit: BoxFit.cover,
+        fit: fit,
         errorBuilder: (context, error, stackTrace) => _imagePlaceholder(width, height),
       );
     } else {
@@ -2089,7 +2121,7 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
           children: [
             Center(
               child: InteractiveViewer(
-                child: _buildProductImage(imagePath, double.infinity, double.infinity),
+                child: _buildProductImage(imagePath, double.infinity, double.infinity, fit: BoxFit.contain),
               ),
             ),
             Positioned(
