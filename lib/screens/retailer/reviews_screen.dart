@@ -390,15 +390,24 @@ class _RetailerReviewsScreenState extends State<RetailerReviewsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                review.userName,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              if (review.orderId != null)
-                Text(
-                  "Order #${review.orderId}",
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+              Expanded(
+                child: Text(
+                  review.userName,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
+              ),
+              if (review.orderId != null) ...[
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    "Order #${review.orderId}",
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 8),

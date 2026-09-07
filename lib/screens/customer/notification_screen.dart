@@ -95,6 +95,9 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> {
   /// outside an order carries none at all — routing either one to
   /// [OrderTrackScreen] is what produced "Order details not found".
   bool _opensOrderTimeline(AppNotification n) {
+    // Only the customer gets the tracking timeline — Tailors and Retailers have
+    // no order-tracking view, so their notifications stay non-navigating.
+    if (_roleOf(n) != UserRole.customer) return false;
     final id = n.orderId.trim();
     if (id.isEmpty || id == 'N/A') return false;
     if (_roleOf(n) == UserRole.retailer &&
