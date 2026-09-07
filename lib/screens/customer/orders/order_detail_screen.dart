@@ -292,6 +292,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       
       final Map<String, String> currentRetailerIds = {};
       final Set<String> deliveredRetailerNames = {};
+      /// Shops whose fabric was delivered to the tailor rather than to the
+      /// customer — rateable only once the tailor job is finished.
+      final Set<String> retailersAwaitingTailor = {};
       String? tailorIdStr;
       Measurement? tailorMeasurement;
       bool isTailorRejected = false;
@@ -310,11 +313,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         currentRetailerIds[currentRetailerName] = so.retailerId;
         charges[currentRetailerName] =
             (charges[currentRetailerName] ?? 0) + so.deliveryCharge;
-        // Only a sub-order that went to the CUSTOMER counts as delivered
-        // for review purposes — one handed to the tailor is an internal hop.
-        if (so.status == db.SubOrderStatus.delivered &&
-            so.deliveryDestination == db.SubOrderDeliveryDestination.customer) {
-          deliveredRetailerNames.add(currentRetailerName);
+        // A sub-order that went straight to the CUSTOMER is rateable as soon
+        // as it lands. One handed to the tailor is an internal hop: the shop
+        // only becomes rateable once the tailor finishes and the customer
+        // actually has the garment (resolved after the loop, where the
+        // tailor job's status is known).
+        if (so.status == db.SubOrderStatus.delivered) {
+          if (so.deliveryDestination == db.SubOrderDeliveryDestination.customer) {
+            deliveredRetailerNames.add(currentRetailerName);
+          } else if (so.deliveryDestination == db.SubOrderDeliveryDestination.tailor) {
+            retailersAwaitingTailor.add(currentRetailerName);
+          }
         }
         
         for (var iData in itemsData) {
@@ -375,6 +384,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         final String artisanName = tailor['name'] ?? "Artisan";
         tailorIdStr = tj.tailorId;
         tailorJobCompleted = tj.status == db.TailorJobStatus.jobCompleted;
+        // The finished garment reaching the customer is also what makes the
+        // shops that supplied it rateable.
+        if (tailorJobCompleted) {
+          deliveredRetailerNames.addAll(retailersAwaitingTailor);
+        }
         tailorUnpaid = tj.tailorPaymentStatus == db.TailorPaymentStatus.unpaid;
         tailorQuoteDeadline = tj.quoteResponseDeadline ??
             tj.requestedAt?.add(const Duration(hours: 12));
@@ -1093,9 +1107,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(rName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
-                              if (rStatus != null)
+                              Expanded(
+                                child: Text(
+                                  rName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87),
+                                ),
+                              ),
+                              if (rStatus != null) ...[
+                                const SizedBox(width: 8),
                                 Text(rStatus, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: primaryGreen)),
+                              ],
                             ]
                           ),
                           const Divider(height: 16),
@@ -1293,9 +1316,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(rName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87)),
-                              if (rStatus != null)
+                              Expanded(
+                                child: Text(
+                                  rName,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87),
+                                ),
+                              ),
+                              if (rStatus != null) ...[
+                                const SizedBox(width: 8),
                                 Text(rStatus, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: primaryGreen)),
+                              ],
                             ]
                           ),
                         ),
@@ -1899,7 +1931,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           children: [
             Center(
               child: InteractiveViewer(
-                child: _buildSmartImage(imagePath, fit: BoxFit.contain),
+                child: _buildSmartImage(imagePath, width: double.infinity, height: double.infinity, fit: BoxFit.contain),
               ),
             ),
             Positioned(
@@ -1952,7 +1984,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         Text(label, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
       ]),
     );
   }

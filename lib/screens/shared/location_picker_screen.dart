@@ -215,12 +215,12 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             ),
             children: [
               TileLayer(
-                urlTemplate:
-                    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
+                // OpenStreetMap's own tiles: no API key, no account. CARTO's
+                // basemaps look nicer but stamp "API key required" onto the
+                // tiles once the anonymous allowance runs out.
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.example.sketch2stitch',
-                maxZoom: 20,
-                retinaMode: RetinaMode.isHighDensity(context),
+                maxZoom: 19,
               ),
             ],
           ),
