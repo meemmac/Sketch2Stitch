@@ -8,6 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/user_role.dart';
 import '../../models/retailer.dart';
 import '../../widgets/top_feedback_banner.dart';
+import '../../utils/map_link.dart';
 
 class OrderItem {
   final String name;
@@ -62,6 +63,10 @@ class RetailerOrder {
   final double? rating;
   final String recipientType; // "Customer", "Tailor", or "Pending"
   final String deliveryAddress; // correct address for the recipient
+  /// The recipient's pinned map location — the tailor's when this sub-order
+  /// ships to the tailor, otherwise the customer's. Lets "Open in Maps" drop a
+  /// marker on the exact spot instead of text-searching [deliveryAddress].
+  final GeoPoint? deliveryPoint;
 
   RetailerOrder({
     required this.id,
@@ -78,6 +83,7 @@ class RetailerOrder {
     required this.isDelivered,
     required this.recipientType,
     required this.deliveryAddress,
+    this.deliveryPoint,
     this.deliveryDate,
     this.review,
     this.rating,
@@ -184,6 +190,11 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
             deliveryAddress: destination == 'tailor'
                 ? (tailorAddress ?? 'Tailor address not available')
                 : customer['address'] ?? 'No address provided',
+            deliveryPoint: destination == 'tailor'
+                ? map['tailorLocation'] as GeoPoint?
+                : (customer['location'] is GeoPoint
+                    ? customer['location'] as GeoPoint
+                    : null),
             // #23: wire in the customer's review so the star-rating block on
             // delivered order cards becomes reachable.
             rating: (map['reviewRating'] as num?)?.toDouble(),
@@ -1384,8 +1395,9 @@ class _RetailerOrdersScreenState extends State<RetailerOrdersScreen> {
                     const SizedBox(height: 8),
                     InkWell(
                       onTap: () => launchUrl(
-                        Uri.parse(
-                          'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(order.deliveryAddress)}',
+                        buildMapsUri(
+                          point: order.deliveryPoint,
+                          address: order.deliveryAddress,
                         ),
                         mode: LaunchMode.externalApplication,
                       ),

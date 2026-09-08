@@ -14,6 +14,7 @@ import '../../../services/cart_service.dart';
 import '../../../models/tailor_job.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../widgets/top_feedback_banner.dart';
+import '../../utils/map_link.dart';
 
 enum TailorOrderStatus { pending, quoted, confirmed, inProgress, ready, completed, cancelled }
 
@@ -68,6 +69,9 @@ class TailorOrder {
   final String? customerReview;
   final double? customerRating;
   final String deliveryAddress;
+  /// The customer's pinned map location, so "Open in Maps" can drop a marker
+  /// on the exact spot instead of text-searching [deliveryAddress].
+  final GeoPoint? deliveryPoint;
   final Measurement? measurement;
   final double? deliveryDistanceKm; // #14: used to compute delivery charge at quote time
   // Job-level price and date (set when tailor quotes — not per-item) #9
@@ -90,6 +94,7 @@ class TailorOrder {
     required this.status,
     required this.isCompleted,
     required this.deliveryAddress,
+    this.deliveryPoint,
     this.completionDate,
     this.customerReview,
     this.customerRating,
@@ -208,6 +213,9 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
             // blank line under a "Customer Location" heading, which read as
             // the address simply not loading.
             deliveryAddress: _addressOrFallback(customer['address']),
+            deliveryPoint: customer['location'] is GeoPoint
+                ? customer['location'] as GeoPoint
+                : null,
             // The customer's rating for this job, so the "Customer Feedback"
             // block on completed orders actually has something to render.
             customerRating: (map['reviewRating'] as num?)?.toDouble(),
@@ -1395,7 +1403,10 @@ class _TailorOrdersScreenState extends State<TailorOrdersScreen> {
                       const SizedBox(height: 8),
                       InkWell(
                         onTap: () => launchUrl(
-                          Uri.parse('https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(order.deliveryAddress)}'),
+                          buildMapsUri(
+                            point: order.deliveryPoint,
+                            address: order.deliveryAddress,
+                          ),
                           mode: LaunchMode.externalApplication,
                         ),
                         borderRadius: BorderRadius.circular(8),

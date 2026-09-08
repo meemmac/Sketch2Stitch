@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,6 +18,7 @@ import '../../models/user_role.dart';
 import '../../utils/validation_utils.dart';
 import '../../widgets/dashboard_drawer.dart';
 import '../../widgets/top_feedback_banner.dart';
+import '../shared/location_picker_screen.dart';
 
 /// ─── Checkout Screen ────────────────────────────────────────────────────
 ///
@@ -474,6 +476,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     address.isEmpty ? "No delivery address added" : address,
                     isMissing: address.isEmpty,
                   ),
+                  const SizedBox(height: 8),
+                  // The typed address is what the rider reads; the pin is what
+                  // their map app actually navigates to. Show whether one
+                  // exists, so a missing pin isn't discovered at delivery time.
+                  _contactRow(
+                    Icons.map_outlined,
+                    profile?.location == null
+                        ? "No map location pinned"
+                        : "Map location pinned",
+                    isMissing: profile?.location == null,
+                  ),
                 ],
               ),
             ),
@@ -555,51 +568,110 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (profile == null) return;
     final phoneController = TextEditingController(text: profile.phone);
     final addressController = TextEditingController(text: profile.address);
+    // Starts from whatever is already on the profile, so opening the picker
+    // and confirming without moving the map is a no-op rather than a reset.
+    GeoPoint? pickedLocation = profile.location;
 
     final saved = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18)),
-        title: const Text("Delivery details",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: "Phone number",
-                prefixIcon: Icon(Icons.phone_outlined),
-              ),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18)),
+          title: const Text("Delivery details",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: "Phone number",
+                    prefixIcon: Icon(Icons.phone_outlined),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: addressController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: "Delivery address",
+                    alignLabelWithHint: true,
+                    prefixIcon: Icon(Icons.location_on_outlined),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                // A written address gets the rider to the neighbourhood; the
+                // pin gets them to the door. Both are editable here so a
+                // last-minute change of address can move the pin with it.
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  leading: Icon(Icons.map_outlined,
+                      color: Colors.green.shade800),
+                  title: Text(
+                    pickedLocation == null
+                        ? "Pin location on map"
+                        : "Map location pinned",
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    pickedLocation == null
+                        ? "Helps the rider find you"
+                        : "${pickedLocation!.latitude.toStringAsFixed(5)}, "
+                            "${pickedLocation!.longitude.toStringAsFixed(5)}",
+                    style: TextStyle(
+                        fontSize: 11.5, color: Colors.grey.shade600),
+                  ),
+                  trailing: const Icon(Icons.chevron_right, size: 20),
+                  onTap: () async {
+                    final result = await Navigator.push<GeoPoint>(
+                      dialogContext,
+                      MaterialPageRoute(
+                        builder: (_) => LocationPickerScreen(
+                            initialLocation: pickedLocation),
+                      ),
+                    );
+                    if (result != null) {
+                      setDialogState(() => pickedLocation = result);
+                    }
+                  },
+                ),
+                if (pickedLocation != null &&
+                    pickedLocation != profile.location)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      "Delivery charges on this order were already worked out "
+                      "from your previous pin, so they won't change.",
+                      style: TextStyle(
+                          fontSize: 11.5,
+                          height: 1.35,
+                          color: Colors.amber.shade900),
+                    ),
+                  ),
+              ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: addressController,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: "Delivery address",
-                alignLabelWithHint: true,
-                prefixIcon: Icon(Icons.location_on_outlined),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green.shade800,
+                foregroundColor: Colors.white,
               ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text("Save"),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade800,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text("Save"),
-          ),
-        ],
       ),
     );
 
@@ -633,9 +705,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       await AuthService().updateProfile(_customerId, UserRole.customer, {
         'phone': phone,
         'address': address,
+        if (pickedLocation != null) 'location': pickedLocation,
       });
-      UserSession.instance.currentProfile.value =
-          profile.copyWith(phone: phone, address: address);
+      UserSession.instance.currentProfile.value = profile.copyWith(
+          phone: phone, address: address, location: pickedLocation);
       if (!mounted) return;
       AppFeedback.show(context, 'Delivery details updated');
     } catch (e) {

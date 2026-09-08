@@ -14,6 +14,7 @@ import '../../../widgets/top_feedback_banner.dart';
 import 'package:sketch2stitch/services/user_session.dart';
 import '../tailoring_setup_screen.dart';
 import '../tailoring_callbacks.dart';
+import '../../../utils/map_link.dart';
 
 enum OrderDeliveryDestination { retailer, tailor }
 
@@ -1416,7 +1417,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         const SizedBox(height: 8),
                         InkWell(
                           onTap: () => launchUrl(
-                            Uri.parse('https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(currentOrder.deliveryAddress)}'),
+                            // The address shown here is the customer's own
+                            // profile address, so their pinned location is the
+                            // matching coordinate pair.
+                            buildMapsUri(
+                              point: UserSession.instance.currentProfile.value?.location,
+                              address: currentOrder.deliveryAddress,
+                            ),
                             mode: LaunchMode.externalApplication,
                           ),
                           borderRadius: BorderRadius.circular(8),
