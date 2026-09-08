@@ -839,6 +839,9 @@ class OrderService {
       final Map<String, Map<String, dynamic>> productCache = {};
       final Map<String, String?> tailorNameCache = {};
       final Map<String, String?> tailorAddressCache = {}; // #6: tailor's physical address
+      // The tailor's pinned map location, captured with the address so the
+      // retailer's "Open in Maps" can point at the exact drop-off.
+      final Map<String, GeoPoint?> tailorLocationCache = {};
       // #23: cache reviews keyed by "orderId_retailerId" to avoid re-fetching
       final Map<String, Map<String, dynamic>?> reviewCache = {};
 
@@ -884,9 +887,13 @@ class OrderService {
                       tailorNameCache[orderId] = tDoc.data()?['name'];
                       // #6: capture address at the same time — zero extra reads
                       tailorAddressCache[orderId] = tDoc.data()?['address'];
+                      final tLoc = tDoc.data()?['location'];
+                      tailorLocationCache[orderId] =
+                          tLoc is GeoPoint ? tLoc : null;
                     } else {
                       tailorNameCache[orderId] = null;
                       tailorAddressCache[orderId] = null;
+                      tailorLocationCache[orderId] = null;
                     }
                   }
                   return tailorNameCache[orderId];
@@ -968,6 +975,7 @@ class OrderService {
               // #6: include tailor's address so the screen can display it
               // when deliveryDestination == 'tailor'
               'tailorAddress': tailorAddressCache[orderId],
+              'tailorLocation': tailorLocationCache[orderId],
               // #23: customer's review for this retailer on this order
               'reviewRating': reviewData?['rating'],
               'reviewComment': reviewData?['comment'],
